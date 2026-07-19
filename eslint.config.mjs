@@ -9,7 +9,11 @@ export default tseslint.config(
       "**/build/**",
       "**/node_modules/**",
       "**/.expo/**",
-      "**/expo-env.d.ts",
+      // Expo template (apps/mobile) is linted by its own `expo lint`
+      // (eslint-config-expo). The strict-type-checked root config below is tuned
+      // for the TypeScript we author (server + shared); do not run it over the
+      // generated React Native template rather than hand-editing every file.
+      "apps/mobile/**",
     ],
   },
   js.configs.recommended,
@@ -22,16 +26,8 @@ export default tseslint.config(
       },
     },
   },
-  // Expo template (apps/mobile): the generated React Native code is not authored
-  // by us and does not meet strict-type-checked. Keep linting on, but drop the
-  // type-aware rules for this workspace rather than hand-editing generated files.
-  // server/shared keep full strict-type-checked.
-  {
-    files: ["apps/mobile/**/*.{ts,tsx,js,jsx}"],
-    extends: [tseslint.configs.disableTypeChecked],
-  },
-  // Config/plain-JS files (eslint.config.mjs, metro/babel configs) are not part of
-  // any typecheck project — drop the type-aware rules for them.
+  // Plain-JS config files (e.g. eslint.config.mjs) aren't part of any typecheck
+  // project — drop the type-aware rules for them.
   {
     files: ["**/*.{js,cjs,mjs}"],
     extends: [tseslint.configs.disableTypeChecked],

@@ -8,3 +8,6 @@ build
 *.md
 docs/
 .github/
+
+# Expo template — kept in the template's own style, not reformatted here.
+apps/mobile/
