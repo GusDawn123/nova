@@ -1,10 +1,16 @@
 import cors from "@fastify/cors";
-import { healthResponseSchema, type HealthResponse } from "@nova/shared";
+import {
+  healthResponseSchema,
+  meResponseSchema,
+  type HealthResponse,
+  type MeResponse,
+} from "@nova/shared";
 import Fastify, {
   type FastifyInstance,
   type FastifyServerOptions,
 } from "fastify";
 
+import { requireAuth } from "./plugins/auth.js";
 import {
   generateRequestId,
   REQUEST_ID_HEADER,
@@ -43,6 +49,23 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     // zod-parse the boundary even on the way out — the response shape is a
     // hard contract shared with the mobile app.
     return healthResponseSchema.parse({ ok: true, version });
+  });
+
+  // Protected: requireAuth resolves the caller's Supabase token to `request.user`
+  // or short-circuits with 401/503, so by the time this handler runs the user is
+  // present. We narrow defensively rather than assert, then parse the outgoing
+  // body through the shared schema (house pattern — validate every boundary).
+  app.get("/me", { preHandler: requireAuth }, (request): MeResponse => {
+    const user = request.user;
+    if (user === undefined) {
+      // Unreachable: requireAuth either populated user or already replied.
+      throw new Error("requireAuth did not populate request.user");
+    }
+    const body =
+      user.email !== undefined
+        ? { user_id: user.id, email: user.email }
+        : { user_id: user.id };
+    return meResponseSchema.parse(body);
   });
 
   return app;
