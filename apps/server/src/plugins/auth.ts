@@ -66,7 +66,9 @@ function jwksFor(url: string): JWTVerifyGetKey {
  * is not exactly that scheme (missing header, `Basic ...`, garbage, empty token)
  * yields `undefined` and is treated as an auth failure by the caller.
  */
-function extractBearerToken(header: string | undefined): string | undefined {
+export function extractBearerToken(
+  header: string | undefined,
+): string | undefined {
   if (header === undefined) return undefined;
   const match = /^Bearer (.+)$/.exec(header);
   return match?.[1];

@@ -1,16 +1,21 @@
 import cors from "@fastify/cors";
 import {
+  deletionResponseSchema,
   healthResponseSchema,
   meResponseSchema,
+  type DeletionResponse,
   type HealthResponse,
   type MeResponse,
 } from "@nova/shared";
 import Fastify, {
   type FastifyInstance,
+  type FastifyReply,
   type FastifyServerOptions,
 } from "fastify";
 
-import { requireAuth } from "./plugins/auth.js";
+import { queueAccountDeletion } from "./db/account.js";
+import { SupabaseConfigError } from "./db/client.js";
+import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import {
   generateRequestId,
   REQUEST_ID_HEADER,
@@ -67,6 +72,42 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
         : { user_id: user.id };
     return meResponseSchema.parse(body);
   });
+
+  // Protected: queue the caller's account for deletion (App Store mandate) and
+  // tombstone their profile, then 202 with the queued request id. requireAuth
+  // guarantees `request.user` and that a valid Bearer token was present, so we
+  // can re-extract it to feed best-effort session revocation.
+  app.delete(
+    "/account",
+    { preHandler: requireAuth },
+    async (request, reply): Promise<FastifyReply> => {
+      const user = request.user;
+      if (user === undefined) {
+        // Unreachable: requireAuth either populated user or already replied.
+        throw new Error("requireAuth did not populate request.user");
+      }
+      const accessToken = extractBearerToken(request.headers.authorization);
+
+      try {
+        const row = await queueAccountDeletion(user.id, accessToken);
+        // Parse the outgoing body through the shared schema (house pattern).
+        const body: DeletionResponse = deletionResponseSchema.parse({
+          status: "queued",
+          request_id: row.id,
+        });
+        return await reply.code(202).send(body);
+      } catch (error) {
+        // Env unset/malformed on the DB path -> 503, consistent with
+        // requireAuth's "server not configured" convention (not a client fault).
+        if (error instanceof SupabaseConfigError) {
+          return await reply.code(503).send({ error: "unavailable" });
+        }
+        // Anything else -> uniform 500, no detail leaked to the client.
+        request.log.error({ err: error }, "queueAccountDeletion failed");
+        return await reply.code(500).send({ error: "internal" });
+      }
+    },
+  );
 
   return app;
 }
