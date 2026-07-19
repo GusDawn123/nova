@@ -5,10 +5,16 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b tsconfig.build.json",
+    "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@nova/shared": "*"
+    "@nova/shared": "*",
+    "fastify": "^5.10.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.1"
   }
 }
