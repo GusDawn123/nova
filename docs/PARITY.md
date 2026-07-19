@@ -60,13 +60,32 @@
 
 | # | Capability | Nova phase | Verified by | Status |
 |---|---|---|---|---|
-| 29 | Sign up / in (email + Apple + Google), session persistence | 1 | auth flow tests | ⬜ |
-| 30 | Per-user data isolation (A can never see B) | 1 | RLS A/B tests — CI-blocking | ⬜ |
-| 31 | In-app account deletion (Apple mandate) | 1 | deletion test | ⬜ |
+| 29 | Sign up / in (email + Apple + Google), session persistence | 1 | auth flow tests | ✅ † |
+| 30 | Per-user data isolation (A can never see B) | 1 | RLS A/B tests — CI-blocking | ✅ |
+| 31 | In-app account deletion (Apple mandate) | 1 | deletion test | ✅ |
 | 32 | Free tier limits + paid plans (quota enforcement) | 6 | quota + paywall tests | ⬜ |
 | 33 | Usage metering accurate vs vendor-reported | 6 | ±5% metering test | ⬜ |
 | 34 | Transcript-only storage (no audio persisted) | 3 | code-audit + storage assert in E2E | ⬜ |
 | 35 | Global spend kill-switch | 6 | kill-switch test — TestFlight gate | ⬜ |
+
+> **Rows 29–31 — Phase 1 (branch `dev-claude-auth`, commits `ba2e1ea..3ed3c6e`, PR pending):**
+> - **29** — Email sign-up/in + session persistence shipped: `apps/mobile/src/hooks/use-auth.tsx`
+>   (discriminated `AuthState`), `components/auth-form.tsx`, `(auth)`/`(app)` route-group guards,
+>   single vendor seam `lib/supabase.ts` (platform-conditional session storage). Real-token
+>   server round-trip proven by `apps/server/src/me.integration.test.ts`; sign-up →
+>   persist-across-reload → sign-out proven via Expo web + Playwright (no iOS simulator on the
+>   build machine). **† Apple/Google sign-in deferred** — needs Gustavo's Apple Developer +
+>   Google OAuth credentials; the provider seam is documented (not stubbed live) in `use-auth.tsx`.
+> - **30** — Postgres RLS proven by `apps/server/src/db/rls-isolation.integration.test.ts`
+>   (A/B: each user reads only own rows, cross-user reads return empty, spoofed writes rejected,
+>   anon locked out). Task 0 reordered CI to boot Supabase **before** the test step, so this runs
+>   against real Postgres on every PR (CI-blocking). Backed by migrations
+>   `create_profiles/meetings/transcripts/context_docs` (RLS + grants ship in each table's migration).
+> - **31** — `DELETE /account` (`apps/server/src/app.ts` + `db/account.ts`: idempotent enqueue into
+>   the `deletion_requests` purge queue, profile tombstone `deleted_at`, best-effort session
+>   revocation), migration `create_deletion_requests` (purge-worker FK-order contract in its header),
+>   mobile delete button via `hooks/use-delete-account.ts`. Verified by
+>   `apps/server/src/account.integration.test.ts` + `account.test.ts`.
 
 ## Explicitly OUT of scope (decided, not forgotten)
 
