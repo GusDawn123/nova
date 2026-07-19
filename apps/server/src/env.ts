@@ -13,6 +13,12 @@ const envSchema = z.object({
   // Both are absent together in a no-DB boot; the adapter checks for that.
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  // Anon (publishable) key. The server itself never uses it — it is consumed only
+  // by the RLS isolation integration tests, which build per-user authenticated
+  // clients (createClient(url, anonKey) + signInWithPassword) to prove Postgres
+  // RLS, not app code, enforces tenant isolation. Optional for the same reason as
+  // the two above: absent in a no-DB boot.
+  SUPABASE_ANON_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
