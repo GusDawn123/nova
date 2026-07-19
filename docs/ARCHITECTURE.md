@@ -147,6 +147,13 @@ not auto-expose new tables to the Data API.
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
   tombstone; the migration header carries the purge-worker FK-ordering contract
   (transcripts → meetings → context_docs → deletion_requests → auth.users).
+  **Known gap (hard Phase 2 blocker, logged):** this flat `user_id`-ordered delete is not
+  sufficient in isolation. Transcript RLS with-check validates only `user_id = self`, not that
+  the referenced `meeting_id` belongs to the writer — so an authenticated user can insert a
+  transcript they own against ANOTHER user's meeting, and that foreign child blocks the
+  victim's `meetings` delete (FK `23503`) and wedges their purge. Fix before Phase 2 ships the
+  worker: either validate parentage on transcript writes (with-check joins `meeting_id` to an
+  own meeting), or purge by `meeting_id` cascade rather than flat `user_id`.
 
 **Server auth layer (Phase 1 — live):**
 - `auth/verify-token.ts` — the only module that knows how a Supabase access token is

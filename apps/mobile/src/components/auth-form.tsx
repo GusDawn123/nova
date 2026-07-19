@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { FontSize, MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { AuthActionResult } from '@/hooks/use-auth';
 
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
-    fontSize: 16,
+    fontSize: FontSize.body,
   },
   error: {
     textAlign: 'center',
