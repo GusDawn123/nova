@@ -13,7 +13,12 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: pre-scaffold.** Phase 0 of `docs/LOOP_PLAYBOOK.md` creates the workspaces.
+**Status: Phase 0 scaffold complete (pending merge of PR #1).** The three workspaces
+build, typecheck, lint, and test; CI gates every PR; `apps/server` serves `/health`;
+`apps/mobile` renders it (verified via Expo web — no iOS simulator on this Mac, so
+simulator verification is deferred); local Supabase runs the `_smoke` migration. The
+`nova-dev` CLOUD Supabase project is not yet created (deferred to Gustavo) — DB work is
+local-only for now. Phases 1+ of `docs/LOOP_PLAYBOOK.md` build the product on top.
 
 ## Read before doing ANYTHING
 
@@ -42,12 +47,32 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 
 ## Commands
 
-*(Populated in Phase 0 — keep current in the same PR that changes them.)*
+Keep this current in the same PR that changes a script. Node >=22, npm >=10 (workspaces).
 
 ```
-npm run check        # typecheck + lint + tests + migration shadow-apply (mergeable = green)
-supabase start       # local real Postgres (never test against anything else)
+# Root (whole monorepo)
+npm run check          # typecheck + lint + test — the mergeable=green gate
+npm run typecheck      # tsc -b (server + shared) then apps/mobile tsc --noEmit
+npm run lint           # eslint . then apps/mobile expo lint
+npm run test           # vitest run (DB integration tests self-skip unless Supabase is up)
+npm run format         # prettier --write .   (format:check to verify only)
+
+# Local Supabase (real Postgres — never test against anything else)
+npm run db:start       # supabase start  (boots the local stack)
+npm run db:stop        # supabase stop
+npm run db:reset       # supabase db reset  (re-applies migrations from scratch)
+
+# Server workspace (apps/server, Fastify)
+npm run dev   --workspace apps/server   # tsx watch — GET /health => { ok, version }
+npm run start --workspace apps/server   # node dist/index.js (after a build)
+
+# Mobile workspace (apps/mobile, Expo)
+npm run start --workspace apps/mobile   # expo start (add --web / --ios / --android)
 ```
+
+CI (`.github/workflows/ci.yml`) runs typecheck + lint + test on every PR, then a
+Supabase **shadow migration replay** (`supabase db start`) that self-activates now that
+`supabase/config.toml` exists. `npm run check` is the local mirror of the first three.
 
 ## Conventions
 
