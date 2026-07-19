@@ -3,6 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "dependencies": {
     "@expo/ui": "~57.0.7",
     "@nova/shared": "*",
@@ -32,7 +33,7 @@
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
-    "eslint": "^9.18.0",
+    "eslint": "^9.22.0",
     "eslint-config-expo": "^57.0.0",
     "typescript": "~6.0.3"
   },
