@@ -74,9 +74,11 @@ npm run start --workspace apps/server   # node dist/index.js (after a build)
 npm run start --workspace apps/mobile   # expo start (add --web / --ios / --android)
 ```
 
-CI (`.github/workflows/ci.yml`) runs typecheck + lint + test on every PR, then a
-Supabase **shadow migration replay** (`supabase db start`) that self-activates now that
-`supabase/config.toml` exists. `npm run check` is the local mirror of the first three.
+CI (`.github/workflows/ci.yml`) runs, on every PR: typecheck, lint, then boots the local
+Supabase stack (`supabase start` — which replays every migration, the **shadow migration
+replay**) BEFORE the test step, so the DB integration suites (RLS isolation, /me, /account)
+run against real Postgres instead of self-skipping. `npm run check` is the local mirror
+(typecheck + lint + test; run `npm run db:start` first for the same integration coverage).
 
 ## Conventions
 
