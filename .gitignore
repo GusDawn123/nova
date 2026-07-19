@@ -5,6 +5,23 @@ build/
 .expo/
 *.tsbuildinfo
 
+# Expo / React Native (apps/mobile — merged from the template's .gitignore)
+# expo-env.d.ts is CLI-generated and ignored; apps/mobile/expo-types.d.ts is the
+# committed equivalent that keeps `tsc --noEmit` deterministic in CI.
+web-build/
+expo-env.d.ts
+.metro-health-check*
+.kotlin/
+apps/mobile/ios/
+apps/mobile/android/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
 # env & secrets — NEVER committed (RULES §11)
 .env
 .env.*
@@ -13,6 +30,9 @@ build/
 # supabase local
 supabase/.branches/
 supabase/.temp/
+
+# agent scratch — never committed
+.superpowers/
 
 # OS / editor
 .DS_Store

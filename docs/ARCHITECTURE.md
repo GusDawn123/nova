@@ -3,7 +3,10 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: pre-scaffold (design finalized, Phase 0 not yet run).**
+> **Status: Phase 0 scaffold built (pending merge of PR #1).** The monorepo, CI gate,
+> `/health` server, Expo `/health` client, and local Supabase `_smoke` migration exist.
+> The module/data-model shapes below are the finalized *design*; most are not built yet
+> — see "Built so far (Phase 0)" for what actually exists today.
 
 ## What Nova is
 
@@ -111,6 +114,25 @@ modules/<name>/
 ├── schemas.ts      # module-local zod (shared ones live in packages/shared)
 └── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
 ```
+
+### Built so far (Phase 0)
+
+The tree above is the target. What actually exists today is the skeleton plus the
+`/health` vertical slice — the `modules/*` and the mobile `features/` are not built yet.
+Two deviations from the drawing, both intentional:
+
+- **Mobile lives under `apps/mobile/src/`** (`src/app/`, `src/components/`,
+  `src/hooks/`, `src/constants/`) — Expo's `src/`-rooted template — not at the workspace
+  root as drawn. The `features/` and `theme/tokens.ts` folders arrive with the product
+  screens; `src/constants/theme.ts` is the current token home.
+- **Server is `apps/server/src/{app.ts, env.ts, index.ts, db/, plugins/}`** — the
+  `/health` slice with boot-time zod env parse and a request-id logging plugin. No
+  `modules/*` yet; `db/` wraps supabase-js behind a port with an optional-env client.
+
+Supabase is **local only** (`supabase/config.toml` + the `_smoke` migration). The
+`nova-dev` cloud project is deferred to Gustavo; CI proves migrations via a local shadow
+replay. iOS-simulator verification is deferred (no simulator on the build machine) — the
+app↔server round trip was proven via Expo web instead.
 
 ## Data model (v0 sketch — becomes real in Phase 1)
 

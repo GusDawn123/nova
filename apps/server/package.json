@@ -1,0 +1,22 @@
+{
+  "name": "@nova/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "typecheck": "tsc -b tsconfig.build.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "@nova/shared": "*",
+    "@supabase/supabase-js": "^2.110.7",
+    "fastify": "^5.10.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.1"
+  }
+}

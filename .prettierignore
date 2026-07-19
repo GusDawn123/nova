@@ -1,0 +1,13 @@
+node_modules
+dist
+build
+.expo
+*.tsbuildinfo
+
+# Pre-existing governance docs — owned by the docs loop, not reformatted here.
+*.md
+docs/
+.github/
+
+# Expo template — kept in the template's own style, not reformatted here.
+apps/mobile/
