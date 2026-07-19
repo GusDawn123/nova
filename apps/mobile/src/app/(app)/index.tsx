@@ -1,4 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
+import { useState } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -6,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/hooks/use-auth';
+import { useDeleteAccount } from '@/hooks/use-delete-account';
 import { useHealth } from '@/hooks/use-health';
 import { useMe } from '@/hooks/use-me';
 
@@ -71,6 +73,69 @@ function MeProof({ session }: { session: Session }) {
   }
 }
 
+/**
+ * Delete-account action with a two-step confirm. RN `Alert` has no web support,
+ * so instead of a native dialog we reveal an inline confirm/cancel pair on the
+ * first press (works on web and native). The confirm toggle is trivial view
+ * state; the network + sign-out logic lives in `useDeleteAccount` (screens dumb).
+ */
+function DeleteAccount({ session }: { session: Session }) {
+  const [confirming, setConfirming] = useState(false);
+  const { state, deleteAccount } = useDeleteAccount(session.access_token);
+  const busy = state.status === 'deleting';
+
+  if (!confirming) {
+    return (
+      <Pressable
+        testID="delete-account-button"
+        accessibilityRole="button"
+        onPress={() => setConfirming(true)}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <ThemedView type="backgroundElement" style={styles.signOut}>
+          <ThemedText type="smallBold" themeColor="textSecondary">
+            Delete account
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
+    );
+  }
+
+  return (
+    <ThemedView type="backgroundElement" style={styles.statusCard}>
+      <ThemedText type="small" themeColor="textSecondary">
+        This permanently deletes your account and all data.
+      </ThemedText>
+      {state.status === 'error' && (
+        <ThemedText testID="delete-account-error" type="small">
+          Delete failed: {state.message}
+        </ThemedText>
+      )}
+      <Pressable
+        testID="delete-account-confirm"
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={() => void deleteAccount()}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <ThemedView type="backgroundSelected" style={styles.signOut}>
+          <ThemedText type="smallBold">
+            {busy ? 'Deleting…' : 'Confirm delete'}
+          </ThemedText>
+        </ThemedView>
+      </Pressable>
+      <Pressable
+        testID="delete-account-cancel"
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={() => setConfirming(false)}
+        style={({ pressed }) => pressed && styles.pressed}>
+        <ThemedText type="smallBold" themeColor="textSecondary">
+          Cancel
+        </ThemedText>
+      </Pressable>
+    </ThemedView>
+  );
+}
+
 export default function HomeScreen() {
   const auth = useAuth();
 
@@ -104,6 +169,8 @@ export default function HomeScreen() {
             <ThemedText type="smallBold">Sign out</ThemedText>
           </ThemedView>
         </Pressable>
+
+        <DeleteAccount session={session} />
       </SafeAreaView>
     </ThemedView>
   );
