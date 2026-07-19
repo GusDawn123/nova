@@ -1,13 +1,15 @@
-import { healthResponseSchema, type HealthResponse } from "@nova/shared";
+import { buildApp } from "./app.js";
+import { loadEnv } from "./env.js";
 
 /**
- * Placeholder entrypoint. The real Fastify server (with a `GET /health` route
- * returning this shape) arrives in a later task. For now this proves the server
- * workspace imports and uses the shared zod schema.
+ * Server entrypoint: parse env (exits on invalid), build the app, then bind.
  */
-const health: HealthResponse = healthResponseSchema.parse({
-  ok: true,
-  version: "0.0.0",
-});
+const env = loadEnv();
+const app = buildApp();
 
-console.log("[nova/server] shared HealthResponse parsed:", health);
+try {
+  await app.listen({ port: env.PORT, host: env.HOST });
+} catch (error) {
+  app.log.error(error);
+  process.exit(1);
+}
