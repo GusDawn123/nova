@@ -385,8 +385,12 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Disabled locally: the analytics stack starts a `vector` log-collector container
+# that bind-mounts the Docker socket, which fails under colima
+# (mkdir /Users/.../.colima/default/docker.sock: operation not supported).
+# Not needed for local dev / CI shadow replay. Re-enable if log analytics are wanted.
 [analytics]
-enabled = true
+enabled = false
 port = 54327
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
