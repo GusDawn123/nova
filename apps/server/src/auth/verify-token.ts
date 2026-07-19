@@ -74,10 +74,24 @@ export async function verifyAccessToken(
 ): Promise<VerifyAccessTokenResult> {
   let payload: unknown;
   try {
-    ({ payload } = await jwtVerify(token, getKey, { algorithms: ["ES256"] }));
+    ({ payload } = await jwtVerify(token, getKey, {
+      // Pin the alg (blocks alg-confusion) and the audience Supabase stamps on
+      // every user access token; require `exp` so a signature-valid token
+      // WITHOUT an expiry is rejected rather than treated as eternal.
+      // `iss` validation is consciously skipped: the JWKS we verify against is
+      // already scoped to our own SUPABASE_URL, so a token signed by anyone
+      // else fails the signature check before issuer would matter.
+      algorithms: ["ES256"],
+      audience: "authenticated",
+      requiredClaims: ["exp"],
+    }));
   } catch (error) {
     if (error instanceof errors.JWTExpired) {
       return { valid: false, reason: "expired" };
+    }
+    if (error instanceof errors.JWTClaimValidationFailed) {
+      // Wrong/missing aud, missing exp, etc. — structurally a bad payload.
+      return { valid: false, reason: "invalid-payload" };
     }
     if (
       error instanceof errors.JWSSignatureVerificationFailed ||
@@ -85,7 +99,7 @@ export async function verifyAccessToken(
     ) {
       return { valid: false, reason: "invalid-signature" };
     }
-    // JWTInvalid, JWSInvalid, JWTClaimValidationFailed, fetch failures, etc.
+    // JWTInvalid, JWSInvalid, JOSEAlgNotAllowed, fetch failures, etc.
     return { valid: false, reason: "malformed" };
   }
 

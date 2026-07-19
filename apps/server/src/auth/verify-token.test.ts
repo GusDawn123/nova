@@ -28,19 +28,29 @@ beforeAll(async () => {
   getKey = () => Promise.resolve(publicKey);
 });
 
-/** Sign an ES256 token like Supabase would, with overridable claims/expiry. */
+/**
+ * Sign an ES256 token like Supabase would: `aud: "authenticated"` + `exp` by
+ * default, both overridable so the negative tests can strip/spoof them
+ * (`expiresIn: null` omits exp entirely; `audience: null` omits aud).
+ */
 async function signToken(
   claims: Record<string, unknown>,
   {
     expiresIn = "1h",
+    audience = "authenticated",
     key = privateKey,
-  }: { expiresIn?: string; key?: KeyLike } = {},
+  }: {
+    expiresIn?: string | null;
+    audience?: string | null;
+    key?: KeyLike;
+  } = {},
 ): Promise<string> {
-  return new SignJWT(claims)
+  const jwt = new SignJWT(claims)
     .setProtectedHeader({ alg: "ES256" })
-    .setIssuedAt()
-    .setExpirationTime(expiresIn)
-    .sign(key);
+    .setIssuedAt();
+  if (audience !== null) jwt.setAudience(audience);
+  if (expiresIn !== null) jwt.setExpirationTime(expiresIn);
+  return jwt.sign(key);
 }
 
 describe("verifyAccessToken", () => {
@@ -97,6 +107,49 @@ describe("verifyAccessToken", () => {
     const result = await verifyAccessToken(token, getKey);
 
     expect(result).toEqual({ valid: false, reason: "invalid-payload" });
+  });
+
+  it("rejects a token with the wrong audience", async () => {
+    const token = await signToken({ sub: randomUUID() }, { audience: "anon" });
+
+    const result = await verifyAccessToken(token, getKey);
+
+    expect(result).toEqual({ valid: false, reason: "invalid-payload" });
+  });
+
+  it("rejects a token with no audience at all", async () => {
+    const token = await signToken({ sub: randomUUID() }, { audience: null });
+
+    const result = await verifyAccessToken(token, getKey);
+
+    expect(result).toEqual({ valid: false, reason: "invalid-payload" });
+  });
+
+  it("rejects a signature-valid token that has no exp claim", async () => {
+    const token = await signToken({ sub: randomUUID() }, { expiresIn: null });
+
+    const result = await verifyAccessToken(token, getKey);
+
+    expect(result).toEqual({ valid: false, reason: "invalid-payload" });
+  });
+
+  it("rejects a non-ES256 token (alg-confusion: HS256 with a shared secret)", async () => {
+    // An attacker who knows any shared string (or even the JWKS contents)
+    // must not be able to downgrade to a symmetric alg. The ES256 pin makes
+    // jose refuse the header before any key is ever consulted.
+    const secret = new TextEncoder().encode(
+      "attacker-chosen-secret-32-characters-yy",
+    );
+    const token = await new SignJWT({ sub: randomUUID() })
+      .setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt()
+      .setAudience("authenticated")
+      .setExpirationTime("1h")
+      .sign(secret);
+
+    const result = await verifyAccessToken(token, getKey);
+
+    expect(result).toEqual({ valid: false, reason: "malformed" });
   });
 
   it("rejects garbage that is not a JWT", async () => {

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildApp } from "./app.js";
 
 /**
- * End-to-end proof that the server's local HS256 verification accepts a REAL
+ * End-to-end proof that the server's ES256/JWKS verification accepts a REAL
  * Supabase-issued access token (not just our self-signed fixtures). We admin-
  * create a user, sign them in through the anon client to mint a genuine token,
  * then call the in-process `/me` route with it.
