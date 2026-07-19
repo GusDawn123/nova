@@ -1,3 +1,4 @@
+import cors from "@fastify/cors";
 import { healthResponseSchema, type HealthResponse } from "@nova/shared";
 import Fastify, {
   type FastifyInstance,
@@ -29,6 +30,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   registerRequestId(app);
+
+  // Dev-only affordance: the Expo *web* client fetches cross-origin (e.g.
+  // localhost:8081 → :3000) and browsers enforce CORS. The on-device native app
+  // sends no Origin header, so this never affects the real product surface. The
+  // allowlist is restricted to localhost/127.0.0.1 on any port — no wildcard.
+  void app.register(cors, {
+    origin: [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/],
+  });
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
