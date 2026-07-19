@@ -14,6 +14,9 @@ build/
 supabase/.branches/
 supabase/.temp/
 
+# agent scratch — never committed
+.superpowers/
+
 # OS / editor
 .DS_Store
 *.log

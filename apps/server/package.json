@@ -1,0 +1,14 @@
+{
+  "name": "@nova/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "typecheck": "tsc -b",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@nova/shared": "*"
+  }
+}
