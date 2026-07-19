@@ -6,11 +6,13 @@ import { getSmokeNote, insertSmokeNote } from "./smoke.js";
  * Server <-> Postgres round trip against the RUNNING local Supabase stack.
  *
  * Requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY in the environment, sourced
- * from `supabase status -o env` (see .env.example). When SUPABASE_URL is absent
- * (no stack, e.g. a plain `npm run test` or CI's Test step) the whole suite is
+ * from `supabase status -o env` (see .env.example). Unless BOTH are present
+ * (no stack, e.g. a plain `npm run test`, or a partial env) the whole suite is
  * skipped so the default gate stays green without a database.
  */
-const hasStack = Boolean(process.env.SUPABASE_URL);
+const hasStack = Boolean(
+  process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+);
 
 describe.skipIf(!hasStack)("_smoke round trip (local stack)", () => {
   it("inserts a note and reads it back", async () => {
