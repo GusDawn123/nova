@@ -1,19 +1,60 @@
-# Placeholder CI — replaced with the real pipeline (typecheck + lint + tests +
-# supabase shadow migration replay + RLS tests) in Phase 0 of docs/LOOP_PLAYBOOK.md.
-# Exists so every PR has a required-check surface from day one.
+# Nova CI — the mergeable=green gate for every PR.
+# Runs typecheck (server + shared via root tsc -b, plus apps/mobile's own tsc),
+# lint, tests, and — once supabase/ exists — a shadow migration replay.
+# See docs/LOOP_PLAYBOOK.md Phase 0.
 name: CI
 
 on:
   pull_request:
-  push:
     branches: [development, staging, main]
+  push:
+    branches: [development]
 
 jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Placeholder check (pre-scaffold)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Root typecheck runs `tsc -b` (apps/server + packages/shared) and then
+      # apps/mobile's own `tsc --noEmit`, so mobile is covered here too.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm run test
+
+      # Supabase steps stay dormant until a later phase adds supabase/config.toml,
+      # then activate automatically — no edit to this workflow required.
+      - name: Detect Supabase project
+        id: supabase
         run: |
-          echo "Pre-scaffold placeholder — governance docs only."
-          test -f docs/RULES.md && test -f docs/ARCHITECTURE.md
+          if [ -f supabase/config.toml ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No supabase/config.toml yet — skipping shadow migration replay."
+          fi
+
+      - name: Install Supabase CLI
+        if: steps.supabase.outputs.present == 'true'
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Supabase shadow migration replay
+        if: steps.supabase.outputs.present == 'true'
+        run: supabase db start
