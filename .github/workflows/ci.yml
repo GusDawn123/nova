@@ -15,10 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node 22
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -34,11 +34,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Test
-        run: npm run test
-
-      # Supabase steps stay dormant until a later phase adds supabase/config.toml,
-      # then activate automatically — no edit to this workflow required.
+      # The Supabase stack must come up BEFORE the tests so the integration
+      # suite runs against real Postgres — it is a permanent gate, not an
+      # optional skip. These steps stay dormant until supabase/config.toml
+      # exists, then activate automatically (guard kept so Test still passes if
+      # supabase/ is ever absent).
       - name: Detect Supabase project
         id: supabase
         run: |
@@ -46,7 +46,7 @@ jobs:
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "No supabase/config.toml yet — skipping shadow migration replay."
+            echo "No supabase/config.toml yet — skipping local stack + integration tests."
           fi
 
       - name: Install Supabase CLI
@@ -55,6 +55,21 @@ jobs:
         with:
           version: "2.109.1"
 
-      - name: Supabase shadow migration replay
+      # `supabase start` boots the full local stack AND replays every migration
+      # (the shadow-migration check), then we surface its URL + service-role key
+      # to the Test step so smoke.integration.test.ts executes instead of skipping.
+      - name: Start Supabase stack
         if: steps.supabase.outputs.present == 'true'
-        run: supabase db start
+        run: supabase start
+
+      - name: Export Supabase env
+        if: steps.supabase.outputs.present == 'true'
+        run: |
+          eval "$(supabase status -o env)"
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Test
+        run: npm run test
