@@ -8,6 +8,11 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().min(1).default("127.0.0.1"),
+  // Supabase is OPTIONAL: the server must boot (and serve /health) without a DB.
+  // The db adapter demands these lazily and fails loudly only when actually used.
+  // Both are absent together in a no-DB boot; the adapter checks for that.
+  SUPABASE_URL: z.string().url().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

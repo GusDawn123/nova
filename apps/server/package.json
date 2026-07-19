@@ -12,6 +12,7 @@
   "dependencies": {
     "@fastify/cors": "^11.3.0",
     "@nova/shared": "*",
+    "@supabase/supabase-js": "^2.110.7",
     "fastify": "^5.10.0",
     "zod": "^3.24.1"
   },
