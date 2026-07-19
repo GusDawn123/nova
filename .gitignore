@@ -1,0 +1,22 @@
+# deps / builds
+node_modules/
+dist/
+build/
+.expo/
+*.tsbuildinfo
+
+# env & secrets — NEVER committed (RULES §11)
+.env
+.env.*
+!.env.example
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# OS / editor
+.DS_Store
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json

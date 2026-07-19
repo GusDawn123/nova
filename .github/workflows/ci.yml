@@ -1,0 +1,19 @@
+# Placeholder CI — replaced with the real pipeline (typecheck + lint + tests +
+# supabase shadow migration replay + RLS tests) in Phase 0 of docs/LOOP_PLAYBOOK.md.
+# Exists so every PR has a required-check surface from day one.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [development, staging, main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Placeholder check (pre-scaffold)
+        run: |
+          echo "Pre-scaffold placeholder — governance docs only."
+          test -f docs/RULES.md && test -f docs/ARCHITECTURE.md
