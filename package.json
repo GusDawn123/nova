@@ -13,7 +13,7 @@
   ],
   "scripts": {
     "typecheck": "tsc -b && npm run typecheck --workspace apps/mobile",
-    "lint": "eslint .",
+    "lint": "eslint . && npm run lint --workspace apps/mobile",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "format": "prettier --write .",

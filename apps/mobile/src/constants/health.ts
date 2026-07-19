@@ -1,9 +1,19 @@
 import { type HealthResponse } from '@nova/shared';
+import { z } from 'zod';
 
-// Base URL of the Nova server. Overridable via EXPO_PUBLIC_API_URL (Expo inlines
-// EXPO_PUBLIC_* env vars into the bundle at build time); defaults to the local
-// dev server so `expo start` works out of the box.
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:3000';
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:3000';
+
+/**
+ * Base URL of the Nova server. `EXPO_PUBLIC_API_URL` is inlined into the bundle
+ * by Expo at build time; zod-parse the env boundary (guardrails) and fall back
+ * to the local dev server on a missing/invalid value so `expo start` works out
+ * of the box.
+ */
+export const API_BASE_URL = z
+  .string()
+  .url()
+  .catch(DEFAULT_API_BASE_URL)
+  .parse(process.env.EXPO_PUBLIC_API_URL);
 
 export const HEALTH_ENDPOINT = '/health';
 
