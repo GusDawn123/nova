@@ -46,8 +46,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // localhost:8081 → :3000) and browsers enforce CORS. The on-device native app
   // sends no Origin header, so this never affects the real product surface. The
   // allowlist is restricted to localhost/127.0.0.1 on any port — no wildcard.
+  //
+  // `methods` is set explicitly to include DELETE: the CORS preflight for
+  // `DELETE /account` (a non-simple request — it carries Authorization) is only
+  // approved by the browser if DELETE is in Access-Control-Allow-Methods, and
+  // this plugin's default set omits it.
   void app.register(cors, {
     origin: [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/],
+    methods: ["GET", "HEAD", "POST", "DELETE"],
   });
 
   app.get("/health", (): HealthResponse => {
