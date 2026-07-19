@@ -13,12 +13,16 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 0 scaffold complete (pending merge of PR #1).** The three workspaces
-build, typecheck, lint, and test; CI gates every PR; `apps/server` serves `/health`;
-`apps/mobile` renders it (verified via Expo web — no iOS simulator on this Mac, so
-simulator verification is deferred); local Supabase runs the `_smoke` migration. The
-`nova-dev` CLOUD Supabase project is not yet created (deferred to Gustavo) — DB work is
-local-only for now. Phases 1+ of `docs/LOOP_PLAYBOOK.md` build the product on top.
+**Status: Phase 1 auth complete on `dev-claude-auth` (pending PR/merge into `development`;
+Phase 0 PR #1 already merged).** On top of the Phase 0 scaffold, Phase 1 added the auth
+domain: four tables + RLS (`profiles/meetings/transcripts/context_docs`) plus the
+`deletion_requests` purge queue; a server auth layer (ES256/JWKS token verify, `requireAuth`
+preHandler, protected `GET /me` and `DELETE /account`); mobile email auth with session
+persistence (single `lib/supabase` seam, `(auth)`/`(app)` route groups); and RLS A/B
+isolation tests that run against real Postgres in CI. Apple/Google sign-in is deferred (needs
+Gustavo's dev accounts). Supabase remains **local-only** — the cloud project is deferred to
+Gustavo; iOS-simulator verification is still deferred (Expo web + Playwright instead). Phases
+2+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
 
 ## Read before doing ANYTHING
 
