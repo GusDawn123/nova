@@ -19,6 +19,13 @@ const envSchema = z.object({
   // RLS, not app code, enforces tenant isolation. Optional for the same reason as
   // the two above: absent in a no-DB boot.
   SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  // LLM provider keys (Phase 2) — all OPTIONAL. The server boots without them; the
+  // llm module's `createProvidersFromEnv` builds only the providers whose key is
+  // present, so a subset (or none) is a valid configuration. Never committed.
+  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  OPENAI_API_KEY: z.string().min(1).optional(),
+  GOOGLE_API_KEY: z.string().min(1).optional(),
+  GROQ_API_KEY: z.string().min(1).optional(),
   // STT vendor keys (Phase 3.5). OPTIONAL: the server boots without them — the
   // STT engine simply has no vendors and a live session surfaces a typed error
   // instead of transcribing. ASSEMBLYAI_API_KEY selects the primary vendor,

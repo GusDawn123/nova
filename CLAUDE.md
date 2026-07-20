@@ -15,10 +15,12 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 
 **Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live vendor accuracy
 bars UNRUN, pending API keys (`ASSEMBLYAI_API_KEY` / `DEEPGRAM_API_KEY`, Gustavo action item).**
-Phase 1 auth is **merged into `development` via PR #2** (Phase 0 was PR #1); Phase 2
-`modules/llm` is **code-complete on draft PR #3**, pending vendor keys for its live smoke — a
-separate branch, not on this one. Phase 3 (this branch) adds the live-call spine on top of the
-auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
+Phases 0-2 are all **merged into `development`**: Phase 0 scaffold (PR #1), Phase 1 auth (PR #2),
+and Phase 2 `modules/llm` (PR #3, merged 2026-07-20) — the last is now in this branch's tree via
+the development→`dev-claude-stt` merge, so `modules/llm` lives here alongside the STT work. Its
+live smoke is still **pending vendor keys** (`adapters/live.smoke.test.ts` self-skips until ≥2
+LLM keys land — a Gustavo action item). Phase 3 (this branch) adds the live-call spine on top of
+the auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
 unions), an authenticated `GET /live` socket + per-call `LiveSession` (`modules/live/`), and the
 `modules/stt` gateway — a vendor-agnostic failover/reconnect/silence engine with AssemblyAI
 (primary) + Deepgram (fallback) adapters. Both STT keys are OPTIONAL: the server boots without
