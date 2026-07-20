@@ -19,7 +19,14 @@ export const sttConfigSchema = z
     reconnectBackoffMs: z
       .array(z.number().int().nonnegative())
       .default([250, 1000, 4000]),
-    /** Max consecutive same-vendor reconnects before failing over to the next vendor. */
+    /**
+     * Max consecutive same-vendor reconnects before failing over to the next
+     * vendor. POST-establishment knob: it only governs a vendor that has already
+     * connected successfully at least once — every reconnect attempt after that
+     * first success (mid-stream death, silence, or a reconnect that fails to
+     * connect) counts here. Pre-establishment connect failures use
+     * {@link failoverThreshold} instead.
+     */
     maxReconnects: z.number().int().nonnegative().default(5),
     /**
      * If a connected vendor emits ZERO events for this long while audio keeps
@@ -30,6 +37,9 @@ export const sttConfigSchema = z
     /**
      * Consecutive connect/first-event failures on a vendor before failover. A
      * single blip should retry the same vendor; a pattern means switch.
+     * PRE-establishment knob: it only counts failures on a vendor that has NOT
+     * yet connected successfully; once a vendor establishes, its churn is
+     * governed by {@link maxReconnects} instead.
      */
     failoverThreshold: z.number().int().positive().default(2),
     /**
