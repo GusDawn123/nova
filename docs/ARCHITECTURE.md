@@ -3,11 +3,13 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 1 auth built on `dev-claude-auth` (pending PR/merge; Phase 0 merged).**
-> On top of the scaffold, the auth domain now exists: the four auth-domain tables + RLS,
-> the `deletion_requests` purge queue, a server JWT-verify + `/me` + `/account` layer, and
-> mobile email auth. The module/data-model shapes below are the finalized *design*; the STT/
-> LLM/RAG/notes/metering modules are still design-only — see "Built so far" for what exists.
+> **Status: Phase 2 LLM provider router built on `dev-claude-llm` (pending live smoke + PR;
+> Phase 1 auth pending PR; Phase 0 merged).** On top of the scaffold, the auth domain exists
+> (four auth-domain tables + RLS, the `deletion_requests` purge queue, a server JWT-verify +
+> `/me` + `/account` layer, mobile email auth), and the `llm` failover router + four real
+> provider adapters now exist server-side (no transport wired to them yet). The module/
+> data-model shapes below are the finalized *design*; the STT/RAG/notes/metering modules are
+> still design-only — see "Built so far" for what exists.
 
 ## What Nova is
 
@@ -116,11 +118,12 @@ modules/<name>/
 └── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
 ```
 
-### Built so far (Phase 0 scaffold + Phase 1 auth)
+### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router)
 
 The tree above is the target. What exists today is the skeleton, the `/health` vertical
-slice, and the **Phase 1 auth domain** below. The `modules/*` product modules (stt/llm/
-rag/notes/metering/sessions) and the mobile `features/` are not built yet.
+slice, the **Phase 1 auth domain**, and the **Phase 2 LLM provider router** below. The
+remaining `modules/*` product modules (stt/rag/notes/metering/sessions) and the mobile
+`features/` are not built yet; the `llm` router module **is** built (see its section below).
 
 Two structural deviations from the drawing, both intentional:
 
@@ -128,11 +131,12 @@ Two structural deviations from the drawing, both intentional:
   `src/hooks/`, `src/lib/`, `src/constants/`) — Expo's `src/`-rooted template — not at the
   workspace root as drawn. The `features/` and `theme/tokens.ts` folders arrive with the
   product screens; `src/constants/theme.ts` is the current token home.
-- **Server is `apps/server/src/{app.ts, env.ts, index.ts, auth/, db/, plugins/}`** — flat
-  slices, not the `modules/<name>/` anatomy yet. `db/` wraps supabase-js behind a port with
+- **The auth/db layer is `apps/server/src/{app.ts, env.ts, index.ts, auth/, db/, plugins/}`** —
+  flat slices, not the `modules/<name>/` anatomy. `db/` wraps supabase-js behind a port with
   an optional-env client. The auth surface is `auth/verify-token.ts` (token boundary) +
   `plugins/auth.ts` (the `requireAuth` preHandler), matching the request-id-plugin posture;
-  a formal `modules/auth/` lands when the product modules do.
+  a formal `modules/auth/` lands when the product modules do. Phase 2's `modules/llm/` is the
+  first slice built to the real `modules/<name>/` anatomy (below).
 
 **Auth data model (Phase 1 — live):** five migrations in `supabase/migrations/`. Every
 user table enables RLS in the same migration that creates it (RULES §4.9) and grants are
@@ -184,6 +188,48 @@ cloud project is deferred to Gustavo; CI boots the local stack before the test s
 RLS A/B isolation test (`db/rls-isolation.integration.test.ts`) proves per-user isolation
 against real Postgres on every PR. iOS-simulator verification is deferred (no simulator on the
 build machine) — auth flows were proven via Expo web + Playwright instead.
+
+**LLM provider router (Phase 2 — live on `dev-claude-llm`, pending live smoke + PR):**
+`apps/server/src/modules/llm/` — the first slice built to the `modules/<name>/` anatomy
+(ports + adapters + a service-equivalent router + a public `index.ts` barrel; **no `routes.ts`
+yet** — no HTTP/WS transport is wired to the router this phase, it is a consumable seam).
+- `ports.ts` — the transport-agnostic `LlmProvider` contract every adapter and the scriptable
+  mock implement: `stream(req, signal)` yielding a discriminated `token`/`done` union (never a
+  boolean flag), zod schemas for provider ids / chat requests / stream events, and the `Meter`
+  port (+ `noopMeter`) every paid call reports through.
+- `router.ts` (`createLlmRouter`) — the failover engine. It races the first non-empty token
+  against `ttftTimeoutMs`, commits to the first provider that emits one and **never switches
+  after** (invariant 4), guards each post-commit gap with `stallTimeoutMs`, and on a pre-commit
+  failure/timeout falls over to the next configured provider. Success/usage is metered the
+  instant the terminal `done` is observed — exactly-once, so a consumer that breaks right after
+  `done` is still metered — and a caller `AbortSignal` promptly unwinds the active attempt.
+  `provider-health.ts` is the per-router circuit breaker + auth-bench (bad-key providers benched
+  far longer than a transient cooldown) that skips unhealthy providers without calling them.
+- `errors.ts` — typed error taxonomy (`LlmError` kinds auth/transient/stall/aborted,
+  `AllProvidersFailedError` carrying per-provider failure summaries with raw cause, HTTP-status
+  classifier). `config.ts` — every knob defaulted and overridable (timeouts, breaker
+  threshold/cooldown, auth cooldown, default failover order `anthropic→openai→google→groq`);
+  reads no `process.env` (env wiring is the caller's job).
+- `adapters/` — four REAL providers behind the port, the ONLY place vendor SDKs are imported
+  (RULES §): `anthropic.ts` (`@anthropic-ai/sdk`), `openai.ts` + `groq.ts` over a shared
+  `openai-compatible.ts` engine (Groq reuses the `openai` SDK against Groq's base URL — no
+  second dependency), `google.ts` (`@google/genai`); vendor errors → taxonomy via `map-error.ts`,
+  vendor usage → the `done` event via `usage.ts`. `factory.ts` (`createProvidersFromEnv`) builds
+  only the providers whose API key is present, in default order, so the server boots with any
+  subset (or none).
+- **Metering is a stub this phase.** The `Meter` port exists and the router records at every
+  success, but the wired default is `noopMeter`; the real `metering` module lands in a later
+  phase (invariant 2 preserved by construction — there is no unmetered code path, only a no-op
+  sink today).
+- **Env keys are optional.** `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` /
+  `GROQ_API_KEY` were added to `env.ts` and `.env.example`, all `.optional()`; an absent key
+  just means one fewer routable provider — the server still boots and serves `/health`.
+- Proven by **27 router behavior tests** (`router.{race,commit,stall,breaker,classify,order,
+  meter}.test.ts`) plus adapter/usage/error-mapping units — 94 llm tests green, fake-timer only,
+  zero unhandled rejections. **Live smoke is deferred:** `adapters/live.smoke.test.ts` drives
+  each real adapter through the router but self-skips without a vendor key (CI has none); the
+  phase's ≥2-provider live-smoke gate awaits Gustavo's keys, so the default model ids above are
+  unverified against the live vendors until then.
 
 ## Data model
 
