@@ -30,7 +30,7 @@
 | 11 | LLM provider fallback racing (slow/dead vendor invisible) | 2 | race/commit/breaker/classify test suite | ✅ ‡ |
 | 12 | Ask-AI free-form question mid-session | 7 (opt) | manual E2E step | ⬜ |
 
-> **Row 11 — Phase 2 (branch `dev-claude-llm`, commits `c172b74..645e32f`, PR pending):**
+> **Row 11 — Phase 2 (branch `dev-claude-llm`, commits `c172b74..645e32f`, merged via PR #3):**
 > Failover router shipped under `apps/server/src/modules/llm/`. `router.ts` (`createLlmRouter`)
 > races the first non-empty token against `ttftTimeoutMs`, commits to the first provider that
 > emits one and never switches after (invariant 4), guards each post-commit gap with
