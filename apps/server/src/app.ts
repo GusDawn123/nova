@@ -15,6 +15,7 @@ import Fastify, {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { SupabaseConfigError } from "./db/client.js";
+import { liveRoutes } from "./modules/live/routes.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import {
   generateRequestId,
@@ -55,6 +56,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     origin: [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/],
     methods: ["GET", "HEAD", "POST", "DELETE"],
   });
+
+  // Live-call socket. liveRoutes registers @fastify/websocket in its own scope
+  // then declares GET /live. Auth is enforced per-connection inside liveRoutes
+  // (WS-close codes, not HTTP status), so no preHandler here.
+  void app.register(liveRoutes);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
