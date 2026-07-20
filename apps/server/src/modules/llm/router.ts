@@ -51,8 +51,8 @@ interface AttemptContext {
   committed: boolean;
   /** Why the attempt's AbortController fired, if it did. */
   abortReason: "ttft" | "stall" | "caller" | undefined;
-  /** Usage from the `done` event, once seen (`undefined` = no `done` yet). */
-  doneUsage: DoneUsage | undefined;
+  /** Set once `done` triggered success/usage recording (exactly-once guard). */
+  successRecorded: boolean;
 }
 
 /**
@@ -93,11 +93,25 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
       const ctx: AttemptContext = {
         committed: false,
         abortReason: undefined,
-        doneUsage: undefined,
+        successRecorded: false,
+      };
+
+      // Success is recorded the moment the terminal `done` event is OBSERVED —
+      // before it is yielded — never after the attempt returns. A consumer that
+      // stops consuming right after `done` (early `break`/`return` unwinds the
+      // generator, skipping any code after `yield*`) must still be metered and
+      // must still reset the winner's breaker count. Exactly-once guarded.
+      const onDone = (usage: DoneUsage): void => {
+        if (ctx.successRecorded) {
+          return;
+        }
+        ctx.successRecorded = true;
+        health.recordSuccess(provider.id);
+        recordUsage(meter, provider.id, req, usage);
       };
 
       try {
-        yield* runAttempt(provider, req, config, callerSignal, ctx);
+        yield* runAttempt(provider, req, config, callerSignal, ctx, onDone);
       } catch (error) {
         if (ctx.committed) {
           // Committed: surface the outcome to the consumer, never fail over.
@@ -111,6 +125,7 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
           provider: provider.id,
           kind,
           message: messageOf(error),
+          cause: error,
         });
         health.recordFailure(provider.id, kind, Date.now());
         continue;
@@ -127,9 +142,11 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
         continue;
       }
 
-      // Committed and completed cleanly: the winner.
-      health.recordSuccess(provider.id);
-      recordUsage(meter, provider.id, req, ctx.doneUsage);
+      // Committed and completed cleanly. A done-less clean end still counts as
+      // a breaker success (there is just no usage to meter without a `done`).
+      if (!ctx.successRecorded) {
+        health.recordSuccess(provider.id);
+      }
       return;
     }
 
@@ -143,9 +160,15 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
  * Drive one provider attempt: race the first non-empty token against
  * `ttftTimeoutMs`, then guard each post-commit gap against `stallTimeoutMs`.
  * Timeouts and the caller's signal are enforced by aborting a per-attempt
- * controller; the mock/adapter reacts by rejecting, which unwinds the
- * `for await` below — no `Promise.race` and thus no abandoned pending `.next()`
+ * controller; the mock/adapter reacts by rejecting its pending step, which
+ * unwinds the loop below — no `Promise.race`, so no abandoned pending `.next()`
  * promises to leak as unhandled rejections.
+ *
+ * The provider iterator is driven MANUALLY (not `for await`) so that when the
+ * consumer stops early (`break`/`return` unwinds us at a `yield`), the cleanup
+ * order is ours: abort the attempt controller FIRST (so the provider observes
+ * the abort), then close the provider iterator. A plain `for await` would close
+ * the provider before our `finally` could abort it.
  */
 async function* runAttempt(
   provider: LlmProvider,
@@ -153,10 +176,12 @@ async function* runAttempt(
   config: LlmConfig,
   callerSignal: AbortSignal | undefined,
   ctx: AttemptContext,
+  onDone: (usage: DoneUsage) => void,
 ): AsyncGenerator<LlmStreamEvent> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let streamCompleted = false;
+  let doneSeen = false;
 
   const clearTimer = (): void => {
     if (timer !== undefined) {
@@ -184,10 +209,20 @@ async function* runAttempt(
     }
   }
 
+  const iterator = provider
+    .stream(req, controller.signal)
+    [Symbol.asyncIterator]();
+
   try {
     armTimer("ttft", config.ttftTimeoutMs);
-    for await (const event of provider.stream(req, controller.signal)) {
-      clearTimer(); // an event arrived → cancel the pending ttft/stall deadline
+    for (;;) {
+      const result = await iterator.next();
+      clearTimer(); // a step landed → cancel the pending ttft/stall deadline
+      if (result.done === true) {
+        streamCompleted = true;
+        return;
+      }
+      const event = result.value;
 
       if (!ctx.committed) {
         if (event.type === "token" && event.text !== "") {
@@ -201,21 +236,31 @@ async function* runAttempt(
       }
 
       if (event.type === "done") {
-        ctx.doneUsage = event.usage;
+        doneSeen = true;
+        onDone(event.usage); // record success BEFORE the consumer can bail
       }
       yield event;
       armTimer("stall", config.stallTimeoutMs); // guard the gap to the next event
     }
-    streamCompleted = true;
   } finally {
     clearTimer();
     if (callerSignal) {
       callerSignal.removeEventListener("abort", onCallerAbort);
     }
-    // Abort a losing/aborted attempt so it stops promptly. Harmless on a clean
-    // finish (the provider has already detached its abort listener).
-    if (!streamCompleted && !controller.signal.aborted) {
-      controller.abort();
+    if (!streamCompleted) {
+      // Unwound early (consumer break, timeout, caller abort, provider throw).
+      // Abort the attempt FIRST so the provider observes it as an abort — unless
+      // the stream already logically finished with `done` (a clean stop) — then
+      // close its iterator, swallowing secondary errors from the abandoned
+      // generator so nothing surfaces as an unhandled rejection.
+      if (!doneSeen && !controller.signal.aborted) {
+        controller.abort();
+      }
+      try {
+        await iterator.return?.();
+      } catch {
+        // Deliberately swallowed: the attempt is already being abandoned.
+      }
     }
   }
 }
@@ -235,7 +280,15 @@ function translatePostCommit(error: unknown, ctx: AttemptContext): LlmError {
   return LlmError.transient(messageOf(error), { cause: error });
 }
 
-/** Pre-commit failure → the breaker/summary kind. A ttft timeout is transient. */
+/**
+ * Pre-commit failure → the breaker/summary kind. A ttft timeout is transient.
+ *
+ * DELIBERATE (orchestrator ruling): a non-`LlmError` thrown pre-commit — an
+ * adapter bug, since adapters contractually throw typed errors — is classified
+ * `transient` so the router fails over instead of crashing the stream. The raw
+ * error is preserved as `cause` on the failure-summary entry for diagnosis.
+ * Revisit when real adapters land.
+ */
 function classifyPreCommit(
   error: unknown,
   ctx: AttemptContext,
@@ -246,16 +299,13 @@ function classifyPreCommit(
   return isLlmError(error) && error.kind === "auth" ? "auth" : "transient";
 }
 
-/** Record usage for the winner exactly once, only when a `done` was seen. */
+/** Report the winner's usage to the meter (usage may be `null`: no counts). */
 function recordUsage(
   meter: Meter,
   provider: ProviderId,
   req: ChatRequest,
-  usage: DoneUsage | undefined,
+  usage: DoneUsage,
 ): void {
-  if (usage === undefined) {
-    return; // no `done` event → nothing to meter
-  }
   const entry: UsageEntry = { provider };
   if (req.model !== undefined) {
     entry.model = req.model;

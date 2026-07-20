@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { Meter, UsageEntry } from "./ports.js";
+import type { LlmStreamEvent, Meter, UsageEntry } from "./ports.js";
 import { makeMockProvider } from "./testing/mock-provider.js";
 import {
   asAllProvidersFailed,
@@ -89,6 +89,56 @@ describe("router [meter] — usage accounting", () => {
     const { error } = await drained;
 
     asAllProvidersFailed(error);
+    expect(recordUsage).not.toHaveBeenCalled();
+  });
+
+  it("[meter] still records usage when the consumer stops right after the done event", async () => {
+    const recordUsage = vi.fn<(entry: UsageEntry) => void>();
+    const meter: Meter = { recordUsage };
+    const a = makeMockProvider("anthropic", {
+      events: [tok("hi"), doneWith({ inputTokens: 2, outputTokens: 4 })],
+    });
+    const router = makeRouter([a], { defaultOrder: ["anthropic"] }, meter);
+
+    // Consumer bails the moment it sees `done` — the generator is unwound at
+    // that yield, so any accounting placed AFTER the attempt would never run.
+    const events: LlmStreamEvent[] = [];
+    for await (const event of router.stream(REQ)) {
+      events.push(event);
+      if (event.type === "done") {
+        break;
+      }
+    }
+
+    expect(events).toEqual([
+      tok("hi"),
+      doneWith({ inputTokens: 2, outputTokens: 4 }),
+    ]);
+    expect(recordUsage).toHaveBeenCalledTimes(1);
+    expect(recordUsage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: "anthropic",
+        inputTokens: 2,
+        outputTokens: 4,
+      }),
+    );
+  });
+
+  it("[meter] does not record usage when the consumer bails mid-stream before done", async () => {
+    const recordUsage = vi.fn<(entry: UsageEntry) => void>();
+    const meter: Meter = { recordUsage };
+    const a = makeMockProvider("anthropic", {
+      events: [tok("one"), tok("two"), doneWith({ outputTokens: 9 })],
+    });
+    const router = makeRouter([a], { defaultOrder: ["anthropic"] }, meter);
+
+    const events: LlmStreamEvent[] = [];
+    for await (const event of router.stream(REQ)) {
+      events.push(event);
+      break; // give up after the first token, before any done
+    }
+
+    expect(events).toEqual([tok("one")]);
     expect(recordUsage).not.toHaveBeenCalled();
   });
 });

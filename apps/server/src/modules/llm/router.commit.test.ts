@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { LlmStreamEvent } from "./ports.js";
 import { makeMockProvider } from "./testing/mock-provider.js";
 import {
   asLlmError,
@@ -127,5 +128,24 @@ describe("router [abort] — caller cancellation", () => {
 
     expect(events).toHaveLength(0);
     expect(asLlmError(error).kind).toBe("aborted");
+  });
+
+  it("[abort] a consumer break mid-stream aborts the provider attempt", async () => {
+    // The async-generator hazard: an early `break` unwinds the router at a
+    // yield. The underlying attempt must still be aborted promptly — and the
+    // suite must stay free of unhandled rejections from the abandoned iterator.
+    const a = makeMockProvider("anthropic", {
+      events: [tok("one"), tok("two"), DONE],
+    });
+    const router = makeRouter([a], { defaultOrder: ["anthropic"] });
+
+    const events: LlmStreamEvent[] = [];
+    for await (const event of router.stream(REQ)) {
+      events.push(event);
+      break; // walk away after the first token, before done
+    }
+
+    expect(events).toEqual([tok("one")]);
+    expect(a.calls[0]?.aborted).toBe(true);
   });
 });

@@ -82,4 +82,39 @@ describe("router [breaker] — consecutive pre-commit failure circuit", () => {
     await drain(router.stream(REQ));
     expect(a.calls).toHaveLength(5); // zero new calls while re-opened
   });
+
+  it("[breaker] a success whose consumer stops at done still resets the failure count", async () => {
+    // Guards the yield* hazard: the success must be recorded when `done` is
+    // OBSERVED, not after the attempt returns — a consumer that breaks right
+    // after `done` skips everything placed after the yield.
+    const a = makeMockProvider("anthropic", [
+      { failBeforeFirstToken: { kind: "transient" } }, // req1 → consecutive 1
+      { events: [tok("A"), DONE] }, //                    req2 success, early-stopped
+      { failBeforeFirstToken: { kind: "transient" } }, // req3 fresh fail #1
+      { failBeforeFirstToken: { kind: "transient" } }, // req4 fresh fail #2 → opens
+    ]);
+    const b = makeMockProvider("openai", { events: [tok("b"), DONE] });
+    const router = makeRouter([a, b], {
+      defaultOrder: ["anthropic", "openai"],
+      breakerThreshold: 2,
+    });
+
+    await drain(router.stream(REQ)); // req1: fail → consecutive 1
+    for await (const event of router.stream(REQ)) {
+      if (event.type === "done") {
+        break; // req2: success, but the consumer walks away at done
+      }
+    }
+    expect(a.calls).toHaveLength(2);
+
+    // If the early-stopped success had NOT reset the count, req3's failure
+    // would reach the threshold (2) and req4 would skip anthropic entirely.
+    await drain(router.stream(REQ)); // req3: fresh fail #1
+    await drain(router.stream(REQ)); // req4: fresh fail #2 — must still be CALLED
+    expect(a.calls).toHaveLength(4);
+
+    // Only after two fresh consecutive failures is the breaker open again.
+    await drain(router.stream(REQ));
+    expect(a.calls).toHaveLength(4); // skipped without a call
+  });
 });

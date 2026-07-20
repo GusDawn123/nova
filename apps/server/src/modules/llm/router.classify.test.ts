@@ -83,4 +83,47 @@ describe("router [classify] — auth benches, transient only counts", () => {
     expect(second.events).toEqual([tok("A"), DONE]);
     expect(a.calls).toHaveLength(2);
   });
+
+  it("[classify] an auth failure during a half-open breaker trial benches for authCooldownMs", async () => {
+    const config = makeConfig({
+      defaultOrder: ["anthropic", "openai"],
+      breakerThreshold: 2,
+      breakerCooldownMs: 10_000,
+    });
+    const a = makeMockProvider("anthropic", [
+      { failBeforeFirstToken: { kind: "transient" } }, // trip the breaker…
+      { failBeforeFirstToken: { kind: "transient" } }, // …open
+      { failBeforeFirstToken: { kind: "auth" } }, //       the half-open trial
+      { events: [tok("A"), DONE] },
+    ]);
+    const b = makeMockProvider("openai", { events: [tok("b"), DONE] });
+    const router = makeRouter([a, b], {
+      defaultOrder: ["anthropic", "openai"],
+      breakerThreshold: 2,
+      breakerCooldownMs: 10_000,
+    });
+
+    // Two transient failures open the circuit.
+    await drain(router.stream(REQ));
+    await drain(router.stream(REQ));
+    expect(a.calls).toHaveLength(2);
+
+    // Cooldown elapses → half-open trial, which fails with AUTH → benched.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await drain(router.stream(REQ));
+    expect(a.calls).toHaveLength(3);
+
+    // The classify law must hold in the half-open state too: another breaker
+    // cooldown is NOT enough — the auth bench is far longer.
+    await vi.advanceTimersByTimeAsync(10_000);
+    await drain(router.stream(REQ));
+    expect(a.calls).toHaveLength(3);
+
+    // Only once the full authCooldownMs has elapsed is the provider back.
+    await vi.advanceTimersByTimeAsync(config.authCooldownMs - 10_000);
+    const revived = await drain(router.stream(REQ));
+    expect(revived.error).toBeUndefined();
+    expect(revived.events).toEqual([tok("A"), DONE]);
+    expect(a.calls).toHaveLength(4);
+  });
 });
