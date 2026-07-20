@@ -25,6 +25,12 @@ export interface ProviderFailure {
   readonly provider: ProviderId;
   readonly kind: LlmErrorKind;
   readonly message: string;
+  /**
+   * The raw thrown value, preserved for diagnosis — matters most when a
+   * non-`LlmError` (an adapter bug) was defensively classified `transient`.
+   * Absent for synthesized failures (e.g. "produced no tokens").
+   */
+  readonly cause?: unknown;
 }
 
 /** Optional cause, threaded to `Error`'s `cause` without violating exactOptional. */
