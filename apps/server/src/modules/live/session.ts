@@ -8,12 +8,20 @@ import {
   type ServerLiveEvent,
 } from "@nova/shared";
 
+import type {
+  SttEngine,
+  SttSessionHandle,
+} from "../stt/ports.js";
+
 import {
   createDisposer,
   noopAudioFrameHandler,
   type AudioFrameHandler,
   type Disposer,
 } from "./ports.js";
+
+/** PCM sample rate of the mic feed handed to the STT vendor (design doc: 16 kHz). */
+const STT_SAMPLE_RATE_HZ = 16000;
 
 /**
  * One live session per socket (per-user concurrency caps are Phase 6 — not
@@ -35,6 +43,14 @@ export interface LiveSessionDeps {
    * even if a client sends `echo: true`.
    */
   allowEcho?: boolean;
+  /**
+   * The STT engine over the configured vendor lineup. On `session.start` a
+   * per-call engine session is started; audio frames relay into it and its
+   * transcript / `provider_switched` / `error` events go straight down the
+   * socket via {@link send}. Omitted in pure protocol unit tests; the transport
+   * always supplies one (built from the env vendor registry).
+   */
+  sttEngine?: SttEngine;
 }
 
 export class LiveSession {
@@ -45,16 +61,20 @@ export class LiveSession {
   private readonly onAudioFrame: AudioFrameHandler;
   private readonly generateSessionId: () => string;
   private readonly allowEcho: boolean;
+  private readonly sttEngine: SttEngine | null;
 
   private started = false;
   private sessionId: string | null = null;
   private echo = false;
+  /** The live STT relay handle for this call; null until start (or in echo mode). */
+  private stt: SttSessionHandle | null = null;
 
   constructor(deps: LiveSessionDeps) {
     this.send = deps.send;
     this.onAudioFrame = deps.onAudioFrame ?? noopAudioFrameHandler;
     this.generateSessionId = deps.generateSessionId ?? randomUUID;
     this.allowEcho = deps.allowEcho ?? false;
+    this.sttEngine = deps.sttEngine ?? null;
   }
 
   /** The generated session id once `session.start` has been accepted. */
@@ -95,6 +115,8 @@ export class LiveSession {
       return;
     }
     this.onAudioFrame(this, frame);
+    // Hot relay into the STT engine (synchronous, throwing-free by contract).
+    this.stt?.onAudioFrame(frame);
     if (this.echo) {
       this.send({
         v: LIVE_PROTOCOL_VERSION,
@@ -141,6 +163,22 @@ export class LiveSession {
       type: "session.ready",
       session_id: this.sessionId,
     });
+
+    // Start the STT relay for this call. Echo mode is the pre-vendor transit
+    // diagnostic, so it deliberately bypasses the engine; otherwise a per-call
+    // engine session streams transcript/provider_switched/error events straight
+    // to the socket, and its teardown rides the exactly-once disposer (a dropped
+    // phone must abort the vendor socket — the money-leak rule, design doc).
+    if (this.sttEngine !== null && !this.echo) {
+      const stt = this.sttEngine.startSession(
+        { sessionId: this.sessionId, sampleRateHz: STT_SAMPLE_RATE_HZ },
+        this.send,
+      );
+      this.stt = stt;
+      this.disposer.add(() => {
+        stt.stop();
+      });
+    }
   }
 
   private sendError(code: LiveErrorCode, message: string): void {

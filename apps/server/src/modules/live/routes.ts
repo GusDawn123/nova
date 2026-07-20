@@ -4,6 +4,9 @@ import type { RawData } from "ws";
 import { z } from "zod";
 
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
+import { defaultSttConfig } from "../stt/config.js";
+import { createSttEngine } from "../stt/engine.js";
+import { createSttVendorsFromEnv } from "../stt/vendors.js";
 import { LiveSession } from "./session.js";
 
 /**
@@ -33,6 +36,13 @@ const CLOSE_TOO_MUCH_BUFFERED = 1009;
 const MAX_PENDING_FRAMES = 64;
 
 /**
+ * Per-message byte cap for the socket. Audio frames are ~2.5KB (16kHz PCM,
+ * 40–80ms); 64KB is a generous ceiling that still bounds a single hostile frame
+ * (a `ws`-level 1009 close) instead of letting one message balloon memory.
+ */
+const MAX_PAYLOAD_BYTES = 64 * 1024;
+
+/**
  * Token from `?token=` — the FALLBACK for React Native clients that can set a
  * header but where a query param is easier. SECURITY: this value must never be
  * logged. Query strings leak through pino's default req serializer, so buildApp
@@ -57,7 +67,17 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // Register the WS plugin inside this scope, then the route: fastify-plugin
   // makes `{ websocket: true }` available here, and awaiting guarantees the
   // onRoute hook is installed before the route below is added.
-  await app.register(fastifyWebsocket);
+  await app.register(fastifyWebsocket, {
+    options: { maxPayload: MAX_PAYLOAD_BYTES },
+  });
+
+  // One engine over the env-configured vendor lineup, shared across connections
+  // (it is a factory of per-session handles). No vendors yet (Task 5) → a
+  // started session emits a single typed `error` instead of hanging.
+  const sttEngine = createSttEngine(
+    defaultSttConfig,
+    createSttVendorsFromEnv(process.env),
+  );
 
   app.get("/live", { websocket: true }, (socket: WebSocket, req) => {
     // Header is primary; query param is the documented fallback.
@@ -124,6 +144,7 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
         },
         // echo mode is a test affordance only — never honored in production.
         allowEcho: process.env.NODE_ENV !== "production",
+        sttEngine,
       });
 
       // Closing the socket is itself a session-scoped resource. Registering it
