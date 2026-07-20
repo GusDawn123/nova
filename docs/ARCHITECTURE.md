@@ -3,10 +3,11 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 0 scaffold built (pending merge of PR #1).** The monorepo, CI gate,
-> `/health` server, Expo `/health` client, and local Supabase `_smoke` migration exist.
-> The module/data-model shapes below are the finalized *design*; most are not built yet
-> — see "Built so far (Phase 0)" for what actually exists today.
+> **Status: Phase 1 auth built on `dev-claude-auth` (pending PR/merge; Phase 0 merged).**
+> On top of the scaffold, the auth domain now exists: the four auth-domain tables + RLS,
+> the `deletion_requests` purge queue, a server JWT-verify + `/me` + `/account` layer, and
+> mobile email auth. The module/data-model shapes below are the finalized *design*; the STT/
+> LLM/RAG/notes/metering modules are still design-only — see "Built so far" for what exists.
 
 ## What Nova is
 
@@ -115,26 +116,80 @@ modules/<name>/
 └── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
 ```
 
-### Built so far (Phase 0)
+### Built so far (Phase 0 scaffold + Phase 1 auth)
 
-The tree above is the target. What actually exists today is the skeleton plus the
-`/health` vertical slice — the `modules/*` and the mobile `features/` are not built yet.
-Two deviations from the drawing, both intentional:
+The tree above is the target. What exists today is the skeleton, the `/health` vertical
+slice, and the **Phase 1 auth domain** below. The `modules/*` product modules (stt/llm/
+rag/notes/metering/sessions) and the mobile `features/` are not built yet.
+
+Two structural deviations from the drawing, both intentional:
 
 - **Mobile lives under `apps/mobile/src/`** (`src/app/`, `src/components/`,
-  `src/hooks/`, `src/constants/`) — Expo's `src/`-rooted template — not at the workspace
-  root as drawn. The `features/` and `theme/tokens.ts` folders arrive with the product
-  screens; `src/constants/theme.ts` is the current token home.
-- **Server is `apps/server/src/{app.ts, env.ts, index.ts, db/, plugins/}`** — the
-  `/health` slice with boot-time zod env parse and a request-id logging plugin. No
-  `modules/*` yet; `db/` wraps supabase-js behind a port with an optional-env client.
+  `src/hooks/`, `src/lib/`, `src/constants/`) — Expo's `src/`-rooted template — not at the
+  workspace root as drawn. The `features/` and `theme/tokens.ts` folders arrive with the
+  product screens; `src/constants/theme.ts` is the current token home.
+- **Server is `apps/server/src/{app.ts, env.ts, index.ts, auth/, db/, plugins/}`** — flat
+  slices, not the `modules/<name>/` anatomy yet. `db/` wraps supabase-js behind a port with
+  an optional-env client. The auth surface is `auth/verify-token.ts` (token boundary) +
+  `plugins/auth.ts` (the `requireAuth` preHandler), matching the request-id-plugin posture;
+  a formal `modules/auth/` lands when the product modules do.
 
-Supabase is **local only** (`supabase/config.toml` + the `_smoke` migration). The
-`nova-dev` cloud project is deferred to Gustavo; CI proves migrations via a local shadow
-replay. iOS-simulator verification is deferred (no simulator on the build machine) — the
-app↔server round trip was proven via Expo web instead.
+**Auth data model (Phase 1 — live):** five migrations in `supabase/migrations/`. Every
+user table enables RLS in the same migration that creates it (RULES §4.9) and grants are
+scoped to `service_role` (+ `authenticated` where a policy needs it), since this stack does
+not auto-expose new tables to the Data API.
+- `profiles` — 1:1 with `auth.users` (`on delete cascade`), auto-provisioned by a
+  `security definer` trigger on user signup; RLS `select`/`update` own only (no client
+  insert/delete); soft-delete via `deleted_at`.
+- `meetings` / `transcripts` / `context_docs` — user-owned tables, RLS own-rows-only, FK to
+  `profiles(id)` with `NO ACTION` (so the purge worker deletes children before the auth row).
+- `deletion_requests` — the account-deletion purge queue. RLS enabled with **zero policies**
+  (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
+  tombstone; the migration header carries the purge-worker FK-ordering contract
+  (transcripts → meetings → context_docs → deletion_requests → auth.users).
+  **Known gap (hard Phase 2 blocker, logged):** this flat `user_id`-ordered delete is not
+  sufficient in isolation. Transcript RLS with-check validates only `user_id = self`, not that
+  the referenced `meeting_id` belongs to the writer — so an authenticated user can insert a
+  transcript they own against ANOTHER user's meeting, and that foreign child blocks the
+  victim's `meetings` delete (FK `23503`) and wedges their purge. Fix before Phase 2 ships the
+  worker: either validate parentage on transcript writes (with-check joins `meeting_id` to an
+  own meeting), or purge by `meeting_id` cascade rather than flat `user_id`.
 
-## Data model (v0 sketch — becomes real in Phase 1)
+**Server auth layer (Phase 1 — live):**
+- `auth/verify-token.ts` — the only module that knows how a Supabase access token is
+  validated: **ES256 via remote JWKS** (`createRemoteJWKSet`, keys cached, no per-request
+  network), alg pinned, audience `authenticated`, `exp` required; the server holds no signing
+  secret. Returns a discriminated `{ valid }` result; the payload (`sub` uuid, optional
+  `email`) is zod-parsed. (Deviation from the original HS256 plan — the local CLI issues
+  ES256/JWKS; a legacy fallback would touch only this file.)
+- `plugins/auth.ts` — `requireAuth` preHandler: `SUPABASE_URL` unset → **503** (server
+  misconfig, not a client fault); no/invalid token → uniform **401**; valid → decorates
+  `request.user`.
+- `app.ts` routes — public `GET /health`; protected `GET /me` and `DELETE /account` (202
+  `queued`). `db/account.ts::queueAccountDeletion` idempotently enqueues, tombstones the
+  profile, and best-effort-revokes sessions. Dev CORS is localhost-only with `DELETE`
+  explicitly allowed (the preflight for `DELETE /account` needs it).
+
+**Mobile auth (Phase 1 — live):** `lib/supabase.ts` is the single vendor seam (zod-parsed
+`EXPO_PUBLIC_*` config, `null` when unconfigured, platform-conditional session storage —
+web `localStorage`, native AsyncStorage — both persisting across restart). `hooks/use-auth.tsx`
+exposes a discriminated `AuthState` (`loading`/`unavailable`/`signed-out`/`signed-in`) +
+`signUp`/`signIn`/`signOut`; `hooks/use-me.ts` and `use-delete-account.ts` call the server.
+Screens are split into `(auth)/` (sign-in, sign-up) and `(app)/` (home, explore) route groups,
+each with a layout guard that redirects on session state. **Apple/Google sign-in is deferred**
+(needs Gustavo's dev accounts) — the provider seam is documented in `use-auth.tsx`.
+
+Supabase is **local only** (`supabase/config.toml` + the migrations above). The `nova-dev`
+cloud project is deferred to Gustavo; CI boots the local stack before the test step, so the
+RLS A/B isolation test (`db/rls-isolation.integration.test.ts`) proves per-user isolation
+against real Postgres on every PR. iOS-simulator verification is deferred (no simulator on the
+build machine) — auth flows were proven via Expo web + Playwright instead.
+
+## Data model
+
+The auth-domain tables (`profiles`, `meetings`, `transcripts`, `context_docs`,
+`deletion_requests`) are **built** as of Phase 1 — see "Built so far" for their live shape
+and RLS posture. The rest below is the v0 sketch that becomes real in later phases.
 
 - `profiles` — user profile + plan (1:1 with auth.users)
 - `meetings` — id, user_id, title, started_at, duration, status

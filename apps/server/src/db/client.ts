@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { z } from "zod";
 
-import { loadEnv } from "../env.js";
 import { type Database } from "./schema.js";
 
 /**
@@ -34,27 +34,50 @@ export function createSupabaseClient(config: SupabaseConfig): Db {
   });
 }
 
+/**
+ * Raised when the Supabase env vars are absent or malformed on a DB code path.
+ * A typed error (not `process.exit`) so callers — including vitest workers —
+ * fail the operation instead of killing the whole process.
+ */
+export class SupabaseConfigError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SupabaseConfigError";
+  }
+}
+
+/**
+ * The two env vars the DB adapter needs, parsed at the boundary. Kept local to
+ * this module (not the boot env schema) so demanding the DB never triggers the
+ * process-exiting boot loader.
+ */
+const supabaseEnvSchema = z.object({
+  SUPABASE_URL: z.string().url(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
+});
+
 let cached: Db | undefined;
 
 /**
- * Lazily build and memoise the client from env. Throws a clear error when the
- * Supabase env vars are absent — call this only on code paths that genuinely
- * need the DB, never at boot (so /health works without a database).
+ * Lazily build and memoise the client from env. Throws {@link SupabaseConfigError}
+ * when the Supabase env vars are absent or invalid — call this only on code
+ * paths that genuinely need the DB, never at boot (so /health works without a
+ * database).
  */
 export function getSupabaseClient(): Db {
   if (cached) return cached;
 
-  const env = loadEnv();
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
-    throw new Error(
+  const result = supabaseEnvSchema.safeParse(process.env);
+  if (!result.success) {
+    throw new SupabaseConfigError(
       "Supabase is not configured: set SUPABASE_URL and " +
         "SUPABASE_SERVICE_ROLE_KEY to use the database.",
     );
   }
 
   cached = createSupabaseClient({
-    url: env.SUPABASE_URL,
-    serviceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY,
+    url: result.data.SUPABASE_URL,
+    serviceRoleKey: result.data.SUPABASE_SERVICE_ROLE_KEY,
   });
   return cached;
 }

@@ -2,6 +2,7 @@
   "name": "nova",
   "version": "0.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Nova — mobile AI call copilot (npm-workspaces monorepo)",
   "engines": {
     "node": ">=22",
