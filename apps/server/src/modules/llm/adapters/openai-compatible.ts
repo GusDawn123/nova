@@ -46,9 +46,10 @@ export function toOpenAiMessages(
 export function createOpenAiCompatibleProvider(
   opts: OpenAiCompatibleOptions,
 ): LlmProvider {
-  const clientOptions: { apiKey: string; baseURL?: string } = {
-    apiKey: opts.apiKey,
-  };
+  // maxRetries: 0 — retries are the ROUTER's job (failover + breaker); SDK
+  // retries must not stack under it (would burn the TTFT window / re-hammer 429s).
+  const clientOptions: { apiKey: string; maxRetries: number; baseURL?: string } =
+    { apiKey: opts.apiKey, maxRetries: 0 };
   if (opts.baseURL !== undefined) {
     clientOptions.baseURL = opts.baseURL;
   }

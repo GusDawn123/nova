@@ -62,7 +62,9 @@ export function toAnthropicMessages(
 export function createAnthropicProvider(
   opts: AnthropicProviderOptions,
 ): LlmProvider {
-  const client = new Anthropic({ apiKey: opts.apiKey });
+  // maxRetries: 0 — retries are the ROUTER's job (failover + breaker); SDK
+  // retries must not stack under it (would burn the TTFT window / re-hammer 429s).
+  const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 0 });
   const model = opts.model ?? DEFAULT_MODEL;
   const maxTokens = opts.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
 
@@ -95,8 +97,11 @@ export function createAnthropicProvider(
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
-            if (event.delta.text !== "") {
-              yield { type: "token", text: event.delta.text };
+            // Runtime boundary guard (mirrors openai/google): don't trust the
+            // SDK type — only yield an actual non-empty string.
+            const text: unknown = event.delta.text;
+            if (typeof text === "string" && text !== "") {
+              yield { type: "token", text };
             }
           } else if (event.type === "message_delta") {
             outputTokens = event.usage.output_tokens;
