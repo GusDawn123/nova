@@ -3,11 +3,13 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 1 auth built on `dev-claude-auth` (pending PR/merge; Phase 0 merged).**
-> On top of the scaffold, the auth domain now exists: the four auth-domain tables + RLS,
-> the `deletion_requests` purge queue, a server JWT-verify + `/me` + `/account` layer, and
-> mobile email auth. The module/data-model shapes below are the finalized *design*; the STT/
-> LLM/RAG/notes/metering modules are still design-only — see "Built so far" for what exists.
+> **Status: Phase 3 streaming STT gateway built on `dev-claude-stt` (live vendor accuracy bars
+> pending API keys). Phase 1 auth is merged into `development` via PR #2; Phase 2 `modules/llm`
+> is code-complete on draft PR #3 — a separate branch, pending vendor keys, not on this branch.**
+> On top of the auth domain, this branch adds the live-call spine: the shared WebSocket wire
+> protocol, an authenticated `GET /live` socket + per-call session, and the `modules/stt` gateway
+> (engine + AssemblyAI/Deepgram adapters). The RAG/notes/metering modules remain design-only —
+> see "Built so far" for what exists and `DESIGN/live-pipeline.md` for the live-pipeline spec.
 
 ## What Nova is
 
@@ -116,11 +118,12 @@ modules/<name>/
 └── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
 ```
 
-### Built so far (Phase 0 scaffold + Phase 1 auth)
+### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 3 STT gateway)
 
 The tree above is the target. What exists today is the skeleton, the `/health` vertical
-slice, and the **Phase 1 auth domain** below. The `modules/*` product modules (stt/llm/
-rag/notes/metering/sessions) and the mobile `features/` are not built yet.
+slice, the **Phase 1 auth domain**, and the **Phase 3 live-call STT gateway** — both below.
+The remaining product modules (rag/notes/metering) and the mobile `features/` are not built
+yet; Phase 2's `modules/llm` is code-complete but lives on a separate draft-PR branch, not here.
 
 Two structural deviations from the drawing, both intentional:
 
@@ -128,11 +131,12 @@ Two structural deviations from the drawing, both intentional:
   `src/hooks/`, `src/lib/`, `src/constants/`) — Expo's `src/`-rooted template — not at the
   workspace root as drawn. The `features/` and `theme/tokens.ts` folders arrive with the
   product screens; `src/constants/theme.ts` is the current token home.
-- **Server is `apps/server/src/{app.ts, env.ts, index.ts, auth/, db/, plugins/}`** — flat
-  slices, not the `modules/<name>/` anatomy yet. `db/` wraps supabase-js behind a port with
-  an optional-env client. The auth surface is `auth/verify-token.ts` (token boundary) +
-  `plugins/auth.ts` (the `requireAuth` preHandler), matching the request-id-plugin posture;
-  a formal `modules/auth/` lands when the product modules do.
+- **Server is `apps/server/src/{app.ts, env.ts, index.ts, auth/, db/, plugins/, modules/}`** —
+  the auth/health surface is still flat slices (`auth/verify-token.ts` token boundary +
+  `plugins/auth.ts` the `requireAuth` preHandler, matching the request-id-plugin posture; `db/`
+  wraps supabase-js behind an optional-env port), while Phase 3 introduced the `modules/<name>/`
+  anatomy for real: `modules/stt/` and `modules/live/` now exist (see the Phase 3 STT gateway
+  below). A formal `modules/auth/` lands when the rest of the product modules do.
 
 **Auth data model (Phase 1 — live):** five migrations in `supabase/migrations/`. Every
 user table enables RLS in the same migration that creates it (RULES §4.9) and grants are
@@ -147,13 +151,17 @@ not auto-expose new tables to the Data API.
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
   tombstone; the migration header carries the purge-worker FK-ordering contract
   (transcripts → meetings → context_docs → deletion_requests → auth.users).
-  **Known gap (hard Phase 2 blocker, logged):** this flat `user_id`-ordered delete is not
-  sufficient in isolation. Transcript RLS with-check validates only `user_id = self`, not that
-  the referenced `meeting_id` belongs to the writer — so an authenticated user can insert a
-  transcript they own against ANOTHER user's meeting, and that foreign child blocks the
-  victim's `meetings` delete (FK `23503`) and wedges their purge. Fix before Phase 2 ships the
-  worker: either validate parentage on transcript writes (with-check joins `meeting_id` to an
-  own meeting), or purge by `meeting_id` cascade rather than flat `user_id`.
+  **Resolved (Phase 3, migration `20260720150000_enforce_transcript_parentage.sql`):** the
+  original transcript write policies checked only `user_id = auth.uid()`, not that the referenced
+  `meeting_id` belonged to the writer — so an authenticated user could insert a transcript they
+  own against ANOTHER user's meeting, and that foreign child blocked the victim's `meetings`
+  delete (FK `23503`) and wedged their purge. The migration tightens both the INSERT and UPDATE
+  with-check to require the parent meeting to EXIST, be owned by `auth.uid()`, and be live
+  (`deleted_at is null`), closing the re-parenting hole on writes (the `user_id = auth.uid()`
+  ownership check is kept alongside the added `EXISTS` parentage guard). Proven by the A/B tests
+  in `apps/server/src/db/transcript-parentage.integration.test.ts` (`[parentage-spoof]` rejects a
+  cross-user parent, `[parentage-happy]` allows an own live meeting, `[parentage-soft-deleted]`
+  rejects a tombstoned parent).
 
 **Server auth layer (Phase 1 — live):**
 - `auth/verify-token.ts` — the only module that knows how a Supabase access token is
@@ -184,6 +192,49 @@ cloud project is deferred to Gustavo; CI boots the local stack before the test s
 RLS A/B isolation test (`db/rls-isolation.integration.test.ts`) proves per-user isolation
 against real Postgres on every PR. iOS-simulator verification is deferred (no simulator on the
 build machine) — auth flows were proven via Expo web + Playwright instead.
+
+**Live-call STT gateway (Phase 3 — live on `dev-claude-stt`):** the phone-dumb / server-brain
+live spine — design spec in `DESIGN/live-pipeline.md`.
+- **Wire protocol** — `packages/shared/src/live.ts`: one versioned (`v: 1`) zod discriminated
+  union per direction, snake_case on the wire. Up: `session.start`/`session.end`, `ping`, and an
+  `audio.frame` MARKER only (real audio travels as raw binary WS frames, never JSON). Down:
+  `transcript.partial`/`transcript.final`, `provider_switched`,
+  `suggestion.start`/`delta`/`done`/`discard` (defined now, emitted in Phase 7), `error`, `pong`,
+  plus a test-only `audio.echo`. `parseClientEvent` safe-parses every inbound message (RULES:
+  parse every boundary, no throws across the seam).
+- **`modules/live/`** — `routes.ts` is the ONLY file that touches `ws`: it registers
+  `@fastify/websocket` (64 KB `maxPayload`), authenticates the `GET /live` upgrade
+  (`Authorization` header primary, `?token=` query fallback for RN; failure → 4401/4503 policy
+  close), buffers up to 64 frames during the JWKS-bound auth window (overflow → 1009 close), and
+  adapts raw socket events onto a transport-agnostic `LiveSession` (`session.ts`) whose teardown
+  runs exactly once via an idempotent disposer (a dropped phone aborts the vendor socket — the
+  money-leak rule). The `?token=` value is stripped from request logs globally
+  (`plugins/log-redaction.ts`) so it never lands in the logs.
+- **`modules/stt/` engine** (`engine.ts`) — relays audio frames to a FIXED priority-ordered
+  vendor lineup and hides vendor churn from the client. Semantics: a dropped/silent socket
+  **reconnects the SAME vendor** invisibly (bounded drop-oldest frame buffer + backoff ladder);
+  consecutive failures crossing `failoverThreshold` (pre-establishment) or `maxReconnects`
+  (post-establishment) **fail over** to the next vendor with a single `provider_switched`; a
+  vendor emitting nothing past `vendorSilenceTimeoutMs` while audio flows is treated as dead and
+  reconnected; only when EVERY vendor is exhausted does the client see one typed `error` (never a
+  hang). Sequential attempt-loop with a per-attempt `AbortController` + active abort on teardown
+  (adr-0004 shape, mirroring the llm router). No disk, no network, no vendor SDKs in the engine
+  itself; tunables are zod-parsed in `config.ts`.
+- **Vendor adapters** (`modules/stt/adapters/`) — AssemblyAI (primary, `ASSEMBLYAI_API_KEY`) +
+  Deepgram (fallback, `DEEPGRAM_API_KEY`) behind the `SttVendor` port (RULES §5: SDKs only in
+  `adapters/`; SDK-internal retries OFF per adr-0004 §3). `vendors.ts` builds the lineup from env
+  — a vendor is included only when its key is present, so the server boots with neither, one, or
+  both. **Both keys are OPTIONAL** (`env.ts`): with none, a live session surfaces a typed `error`
+  instead of transcribing — no crash. Company-held secrets; never in the repo, never shipped to
+  mobile.
+- **Fixtures + accuracy bars** — a reproducible two-speaker fixture pipeline
+  (`scripts/make-stt-fixtures.sh`) writes `apps/server/fixtures/stt/two-speaker-60s{,-noisy}.wav`
+  (+ a `.json` turn/reference manifest). The live word-overlap / diarization / dead-vendor
+  failover accuracy bars (`modules/stt/adapters/live.accuracy.test.ts`) are **key-gated
+  (`describe.skipIf`) and UNRUN** — they need real vendor keys, exactly like Phase 2's live smoke;
+  everything else runs green against scriptable mock vendors. Raw audio is **never written to
+  disk** — enforced by a static + runtime `[no-disk]` audit pair
+  (`engine.no-disk.test.ts`, `no-disk.audit.test.ts`).
 
 ## Data model
 
@@ -220,3 +271,6 @@ Details in `GIT_WORKFLOW.md`.
   fallback; acoustic (mic/speakerphone) capture model
 - **ADR-0003** *(implicit, to formalize)* — Clean build from public patterns; no code
   from the personal-use-licensed reference repo (RULES §9)
+- **ADR-0004** — LLM routing, latency tiers, and prompt-cache strategy (see DECISIONS/); the
+  Phase 3 STT engine reuses its sequential-cascade + SDK-retries-off shape. Companion live-pipeline
+  build spec: `DESIGN/live-pipeline.md`.
