@@ -1,7 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { SttVendorEvent } from "../ports.js";
-import { AsyncEventQueue, VendorStreamConnection } from "./stream-bridge.js";
+import {
+  AsyncEventQueue,
+  VendorStreamConnection,
+  raceTimeout,
+} from "./stream-bridge.js";
 
 /** Drain an async iterable to an array. */
 async function collect<T>(iterable: AsyncIterable<T>): Promise<T[]> {
@@ -92,5 +96,41 @@ describe("VendorStreamConnection", () => {
     await conn.end();
     conn.abort();
     expect(calls).toEqual(["end", "abort"]);
+  });
+});
+
+describe("raceTimeout", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("resolves false when the promise settles before the timeout", async () => {
+    vi.useFakeTimers();
+    let settle!: () => void;
+    const pending = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
+    const race = raceTimeout(pending, 2000);
+    settle();
+    await expect(race).resolves.toBe(false);
+  });
+
+  it("resolves true when the timeout fires first (the graceful-close bound)", async () => {
+    vi.useFakeTimers();
+    const never = new Promise<void>(() => {
+      /* a vendor that never acknowledges CloseStream */
+    });
+    const race = raceTimeout(never, 2000);
+    await vi.advanceTimersByTimeAsync(2000);
+    await expect(race).resolves.toBe(true);
+  });
+
+  it("does not fire the timeout later once the promise has won", async () => {
+    vi.useFakeTimers();
+    const result = await raceTimeout(Promise.resolve(), 2000);
+    expect(result).toBe(false);
+    // The timer was cleared: advancing the clock finds no pending timers.
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

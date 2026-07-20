@@ -64,6 +64,31 @@ export class AsyncEventQueue<T> implements AsyncIterable<T> {
   }
 }
 
+/**
+ * Race `promise` against a timeout. Resolves `true` if the timeout fired first,
+ * `false` if the promise settled in time; the timer is always cleared (no open
+ * handles). Used to bound a vendor's graceful-close wait: a vendor that never
+ * acknowledges CloseStream must not hang `end()` forever.
+ */
+export async function raceTimeout(
+  promise: Promise<void>,
+  timeoutMs: number,
+): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise.then(() => false),
+      new Promise<boolean>((resolve) => {
+        timer = setTimeout(() => {
+          resolve(true);
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** The vendor-specific teardown/relay hooks a {@link VendorStreamConnection} drives. */
 export interface VendorStreamHooks {
   /** Relay one raw PCM frame to the vendor socket. May throw; the wrapper swallows. */

@@ -10,7 +10,11 @@ import {
   type SttVendorConnection,
   type SttVendorEvent,
 } from "../ports.js";
-import { AsyncEventQueue, VendorStreamConnection } from "./stream-bridge.js";
+import {
+  AsyncEventQueue,
+  VendorStreamConnection,
+  raceTimeout,
+} from "./stream-bridge.js";
 import { toSttError } from "./vendor-errors.js";
 
 /**
@@ -128,6 +132,13 @@ function boolFlag(value: boolean): "true" | "false" {
 }
 
 /**
+ * How long a graceful `end()` waits for Deepgram to acknowledge CloseStream
+ * (flush finals + close the socket) before falling through to abort-style
+ * teardown. 2s is generous for a flush yet keeps session teardown bounded.
+ */
+const GRACEFUL_CLOSE_TIMEOUT_MS = 2000;
+
+/**
  * Build the Deepgram {@link SttVendor}. `connect` pre-warms a live socket,
  * resolving only once it opens (or rejecting with a typed error / on abort /
  * on a pre-open close).
@@ -223,7 +234,9 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
         },
         end: async () => {
           // Tell Deepgram no more audio; it flushes finals then closes, which
-          // fires "close" → queue.close(). Await the close to drain finals.
+          // fires "close" → queue.close(). Await the close to drain finals — but
+          // BOUNDED: a vendor that never acknowledges CloseStream must not hang
+          // end() forever, so past the timeout fall through to abort-style teardown.
           const closed = new Promise<void>((resolve) => {
             socket.on("close", () => {
               queue.close();
@@ -231,7 +244,11 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
             });
           });
           socket.sendCloseStream({ type: "CloseStream" });
-          await closed;
+          const timedOut = await raceTimeout(closed, GRACEFUL_CLOSE_TIMEOUT_MS);
+          if (timedOut) {
+            socket.close();
+            queue.close();
+          }
         },
         abort: () => {
           socket.close();

@@ -161,6 +161,8 @@ export function createAssemblyAiVendor(
         sampleRate: info.sampleRateHz,
         encoding: "pcm_s16le",
         speechModel: "u3-rt-pro",
+        // The ENGINE owns retry/failover (adr-0004 §3); no hidden SDK connect retries.
+        maxConnectionRetries: 0,
         formatTurns: opts.formatTurns ?? true,
         speakerLabels: opts.speakerLabels ?? true,
         includePartialTurns: true,
