@@ -13,16 +13,22 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 1 auth complete on `dev-claude-auth` (pending PR/merge into `development`;
-Phase 0 PR #1 already merged).** On top of the Phase 0 scaffold, Phase 1 added the auth
-domain: four tables + RLS (`profiles/meetings/transcripts/context_docs`) plus the
-`deletion_requests` purge queue; a server auth layer (ES256/JWKS token verify, `requireAuth`
-preHandler, protected `GET /me` and `DELETE /account`); mobile email auth with session
-persistence (single `lib/supabase` seam, `(auth)`/`(app)` route groups); and RLS A/B
-isolation tests that run against real Postgres in CI. Apple/Google sign-in is deferred (needs
-Gustavo's dev accounts). Supabase remains **local-only** — the cloud project is deferred to
-Gustavo; iOS-simulator verification is still deferred (Expo web + Playwright instead). Phases
-2+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
+**Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live vendor accuracy
+bars UNRUN, pending API keys (`ASSEMBLYAI_API_KEY` / `DEEPGRAM_API_KEY`, Gustavo action item).**
+Phase 1 auth is **merged into `development` via PR #2** (Phase 0 was PR #1); Phase 2
+`modules/llm` is **code-complete on draft PR #3**, pending vendor keys for its live smoke — a
+separate branch, not on this one. Phase 3 (this branch) adds the live-call spine on top of the
+auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
+unions), an authenticated `GET /live` socket + per-call `LiveSession` (`modules/live/`), and the
+`modules/stt` gateway — a vendor-agnostic failover/reconnect/silence engine with AssemblyAI
+(primary) + Deepgram (fallback) adapters. Both STT keys are OPTIONAL: the server boots without
+them and a keyless live session returns a typed `error` instead of transcribing. Behavior is
+green vs scriptable mock vendors; the live word-overlap / diarization / dead-vendor-failover
+accuracy bars are **UNRUN** until real keys land (same posture as Phase 2's live smoke). Raw
+audio is **never persisted** (static + runtime `[no-disk]` audits). Phase 1 carry-overs still
+hold: Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only**
+(cloud project deferred), iOS-simulator verification deferred (Expo web + Playwright instead).
+Phases 4+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
 
 ## Read before doing ANYTHING
 
@@ -72,6 +78,10 @@ npm run start --workspace apps/server   # node dist/index.js (after a build)
 
 # Mobile workspace (apps/mobile, Expo)
 npm run start --workspace apps/mobile   # expo start (add --web / --ios / --android)
+
+# STT test fixtures (rare; needs macOS `say` + ffmpeg). Regenerates the committed
+# two-speaker WAVs under apps/server/fixtures/stt/ for the key-gated accuracy suite.
+./scripts/make-stt-fixtures.sh
 ```
 
 CI (`.github/workflows/ci.yml`) runs, on every PR: typecheck, lint, then boots the local
