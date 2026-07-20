@@ -13,16 +13,19 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 1 auth complete on `dev-claude-auth` (pending PR/merge into `development`;
-Phase 0 PR #1 already merged).** On top of the Phase 0 scaffold, Phase 1 added the auth
-domain: four tables + RLS (`profiles/meetings/transcripts/context_docs`) plus the
-`deletion_requests` purge queue; a server auth layer (ES256/JWKS token verify, `requireAuth`
-preHandler, protected `GET /me` and `DELETE /account`); mobile email auth with session
-persistence (single `lib/supabase` seam, `(auth)`/`(app)` route groups); and RLS A/B
-isolation tests that run against real Postgres in CI. Apple/Google sign-in is deferred (needs
-Gustavo's dev accounts). Supabase remains **local-only** — the cloud project is deferred to
-Gustavo; iOS-simulator verification is still deferred (Expo web + Playwright instead). Phases
-2+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
+**Status: Phase 2 LLM provider router complete on `dev-claude-llm` (pending live smoke + PR;
+Phase 1 auth PR pending; Phase 0 PR #1 merged).** Phase 2 added `apps/server/src/modules/llm/`:
+a transport-agnostic `LlmProvider` port, a failover `router.ts` (first-token race on
+`ttftTimeoutMs`, first-token commit / never-switch-after, `stallTimeoutMs` guard, per-router
+circuit breaker + auth-bench, meter-at-`done`, caller abort), four real adapters (Anthropic /
+OpenAI / Google via their own SDKs, Groq via the `openai` SDK + baseURL), and an env-driven
+`factory.ts` that builds only the providers whose key is set — all four `*_API_KEY` env vars
+optional. Proven by 27 router behavior tests (94 llm tests green, fake-timer only);
+**live smoke is NOT yet run — no API keys in env** (`adapters/live.smoke.test.ts` self-skips;
+the ≥2-provider gate is a Gustavo action item). Phase 1 (auth domain — tables + RLS, ES256/JWKS
+verify + `GET /me` + `DELETE /account`, mobile email auth) is complete and still pending its PR;
+Supabase remains **local-only**; iOS-simulator verification deferred (Expo web + Playwright).
+Phases 3+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
 
 ## Read before doing ANYTHING
 

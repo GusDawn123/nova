@@ -27,8 +27,31 @@
 | 8 | Suggestions grounded in user's own context (RAG) | 7 | grounding test | ⬜ |
 | 9 | Stays quiet during small talk (no spam) | 7 | quiet test (zero cards in no-op windows) | ⬜ |
 | 10 | Rolling live transcript view in-app | 7 + 8 | live-call screen loop checklist | ⬜ |
-| 11 | LLM provider fallback racing (slow/dead vendor invisible) | 2 | race/commit/breaker/classify test suite | ⬜ |
+| 11 | LLM provider fallback racing (slow/dead vendor invisible) | 2 | race/commit/breaker/classify test suite | ✅ ‡ |
 | 12 | Ask-AI free-form question mid-session | 7 (opt) | manual E2E step | ⬜ |
+
+> **Row 11 — Phase 2 (branch `dev-claude-llm`, commits `c172b74..645e32f`, PR pending):**
+> Failover router shipped under `apps/server/src/modules/llm/`. `router.ts` (`createLlmRouter`)
+> races the first non-empty token against `ttftTimeoutMs`, commits to the first provider that
+> emits one and never switches after (invariant 4), guards each post-commit gap with
+> `stallTimeoutMs`, and on a pre-commit failure/timeout falls over to the next configured
+> provider; `provider-health.ts` is the per-router circuit breaker + auth-bench that skips
+> unhealthy providers WITHOUT calling them. Contracts live in `ports.ts` (transport-agnostic
+> `LlmProvider`, discriminated `token`/`done` stream events, `Meter` port), `errors.ts` (typed
+> taxonomy + `AllProvidersFailedError`), `config.ts` (all timeouts/thresholds + default order
+> `anthropic→openai→google→groq`). Four REAL adapters behind the port —
+> `adapters/anthropic.ts` (`@anthropic-ai/sdk`), `adapters/openai.ts` + `adapters/groq.ts`
+> (shared `openai`-SDK engine `openai-compatible.ts`, Groq via baseURL), `adapters/google.ts`
+> (`@google/genai`) — built only when their key is set (`factory.ts::createProvidersFromEnv`).
+> Proven by **27 router behavior tests** (`router.{race,commit,stall,breaker,classify,order,meter}.test.ts`:
+> TTFT race, first-token commit, stall, breaker open/reset, error classification, per-request
+> order override, meter-at-`done`, consumer-abort) plus adapter/usage/error-mapping units —
+> **94 llm tests green** under fake timers, zero unhandled rejections.
+> **‡ Live smoke pending API keys** — `adapters/live.smoke.test.ts` drives each real adapter
+> through the router but self-skips without a vendor key (CI has none, so all 4 cases skip); the
+> phase's live-smoke-on-≥2-providers gate is a Gustavo action item (default models
+> `claude-haiku-4-5` / `gpt-4o-mini` / `gemini-2.0-flash` / `llama-3.1-8b-instant` unverified
+> until then).
 
 ## Post-call notes (the hero)
 
