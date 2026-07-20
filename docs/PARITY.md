@@ -12,11 +12,11 @@
 
 | # | Capability | Nova phase | Verified by | Status |
 |---|---|---|---|---|
-| 1 | Live transcription during a conversation (interim + final results) | 3 | fixture WAV streaming test | ⬜ |
-| 2 | Speaker separation — who said what (diarization from single mic feed) | 3 | 2-speaker fixture, turn-boundary assert | ⬜ |
-| 3 | Works for in-person conversations (mic acoustic capture) | 3 + 9 | noisy-fixture bar + physical-device E2E | ⬜ |
+| 1 | Live transcription during a conversation (interim + final results) | 3 | fixture WAV streaming test | 🔨 † |
+| 2 | Speaker separation — who said what (diarization from single mic feed) | 3 | 2-speaker fixture, turn-boundary assert | 🔨 † |
+| 3 | Works for in-person conversations (mic acoustic capture) | 3 + 9 | noisy-fixture bar + physical-device E2E | 🔨 † |
 | 4 | Works for phone/VoIP calls via speakerphone | 9 | physical-device E2E checklist | ⬜ |
-| 5 | STT provider failover (vendor outage invisible to user) | 3 | dead-endpoint failover test | ⬜ |
+| 5 | STT provider failover (vendor outage invisible to user) | 3 | dead-endpoint failover test | 🔨 † |
 | 6 | Language selection for transcription | 3 (opt) | config test | ⬜ |
 
 ## Live copilot (during the call)
@@ -65,10 +65,10 @@
 | 31 | In-app account deletion (Apple mandate) | 1 | deletion test | ✅ |
 | 32 | Free tier limits + paid plans (quota enforcement) | 6 | quota + paywall tests | ⬜ |
 | 33 | Usage metering accurate vs vendor-reported | 6 | ±5% metering test | ⬜ |
-| 34 | Transcript-only storage (no audio persisted) | 3 | code-audit + storage assert in E2E | ⬜ |
+| 34 | Transcript-only storage (no audio persisted) | 3 | code-audit + storage assert in E2E | ✅ † |
 | 35 | Global spend kill-switch | 6 | kill-switch test — TestFlight gate | ⬜ |
 
-> **Rows 29–31 — Phase 1 (branch `dev-claude-auth`, commits `ba2e1ea..3ed3c6e`, PR pending):**
+> **Rows 29–31 — Phase 1 (branch `dev-claude-auth`, commits `ba2e1ea..3ed3c6e`, merged via PR #2):**
 > - **29** — Email sign-up/in + session persistence shipped: `apps/mobile/src/hooks/use-auth.tsx`
 >   (discriminated `AuthState`), `components/auth-form.tsx`, `(auth)`/`(app)` route-group guards,
 >   single vendor seam `lib/supabase.ts` (platform-conditional session storage). Real-token
@@ -86,6 +86,42 @@
 >   revocation), migration `create_deletion_requests` (purge-worker FK-order contract in its header),
 >   mobile delete button via `hooks/use-delete-account.ts`. Verified by
 >   `apps/server/src/account.integration.test.ts` + `account.test.ts`.
+
+> **Rows 1–3, 5, 34 — Phase 3 streaming STT gateway (branch `dev-claude-stt`, commits
+> `0c0b995..9373e6a`):** the gateway ships — the shared live wire protocol
+> (`packages/shared/src/live.ts`, zod discriminated unions, versioned), an authenticated
+> `GET /live` WebSocket + per-call session (`apps/server/src/modules/live/{routes,session}.ts`),
+> the vendor-agnostic STT engine (`apps/server/src/modules/stt/engine.ts`) and the AssemblyAI
+> (primary) + Deepgram (fallback) adapters (`modules/stt/adapters/`). Behavior is proven **green
+> vs scriptable mock vendors**; the live per-vendor **accuracy bars need real API keys and are
+> UNRUN** (`ASSEMBLYAI_API_KEY` / `DEEPGRAM_API_KEY` — Gustavo action item, the same honest
+> posture as Phase 2's pending live smoke). † flags a claim whose real-vendor proof is still
+> pending keys or a later phase.
+> - **1 (interim + final)** — 🔨 relay + interim-before-final + final proven vs mocks:
+>   `stt/engine.transcript.test.ts` (`[relay]`/`[interim]`/`[final]`) and end-to-end over the
+>   socket in `live/live.stt.integration.test.ts`. **†** the fixture-WAV streaming-accuracy bar
+>   (≥80% word-overlap over `apps/server/fixtures/stt/two-speaker-60s.wav`) is key-gated
+>   (`describe.skipIf`) in `stt/adapters/live.accuracy.test.ts` — **UNRUN, pending keys**.
+> - **2 (diarization)** — 🔨 the engine carries per-utterance `speaker` + `ts_ms` end to end
+>   (`engine.transcript.test.ts [final]`); the 2-speaker turn-boundary bar (≥2 speakers,
+>   boundaries ±2s over the two-speaker fixture) is key-gated in `live.accuracy.test.ts` —
+>   **† UNRUN, pending keys**.
+> - **3 (in-person / acoustic)** — 🔨 a speakerphone-simulated noisy fixture exists
+>   (`apps/server/fixtures/stt/two-speaker-60s-noisy.wav`, regenerable via
+>   `scripts/make-stt-fixtures.sh`); **†** its ≥70%-overlap bar is key-gated + UNRUN, and the
+>   physical-device E2E is Phase 9 (row shares phase 3 + 9).
+> - **5 (failover)** — 🔨 the failover MECHANISM is proven vs mocks: exactly one
+>   `provider_switched`, no client-visible error, frames keep relaying
+>   (`engine.resilience.test.ts [failover]`), plus invisible same-vendor reconnect
+>   (`[reconnect]`) and a single typed error only when EVERY vendor is exhausted
+>   (`[reconnect-exhaust]`); mirrored over the live socket (`live.stt.integration.test.ts`).
+>   **†** the dead-AssemblyAI → real-Deepgram accuracy failover is key-gated in
+>   `live.accuracy.test.ts` — UNRUN, pending keys.
+> - **34 (no raw audio persisted)** — ✅ proven now and **NOT** key-gated: a static source audit
+>   (`stt/engine.no-disk.test.ts [no-disk]` — no filesystem-write API anywhere in `modules/stt`
+>   incl. adapters or the live layer) plus a runtime audit (`stt/no-disk.audit.test.ts [no-disk]`
+>   — a full mock-vendor session writes nothing to the repo or tmpdir), both CI-gated. **†** the
+>   device-level storage assertion inside the full end-to-end run rides Phase 9.
 
 ## Explicitly OUT of scope (decided, not forgotten)
 
