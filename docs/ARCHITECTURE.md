@@ -211,7 +211,8 @@ yet** — no HTTP/WS transport is wired to the router this phase, it is a consum
   threshold/cooldown, auth cooldown, default failover order `anthropic→openai→google→groq`);
   reads no `process.env` (env wiring is the caller's job).
 - `adapters/` — four REAL providers behind the port, the ONLY place vendor SDKs are imported
-  (RULES §): `anthropic.ts` (`@anthropic-ai/sdk`), `openai.ts` + `groq.ts` over a shared
+  (RULES: SDKs live in `modules/*/adapters/`): `anthropic.ts` (`@anthropic-ai/sdk`),
+  `openai.ts` + `groq.ts` over a shared
   `openai-compatible.ts` engine (Groq reuses the `openai` SDK against Groq's base URL — no
   second dependency), `google.ts` (`@google/genai`); vendor errors → taxonomy via `map-error.ts`,
   vendor usage → the `done` event via `usage.ts`. `factory.ts` (`createProvidersFromEnv`) builds
