@@ -1,6 +1,8 @@
 /**
- * Public surface of the `llm` module. Task 1 ships the contracts and the test
- * harness only — the router, adapters, HTTP, and env wiring land in later tasks.
+ * Public surface of the `llm` module: the port contracts, the typed error
+ * taxonomy, the config schema, the failover router, the four real provider
+ * adapters, and the env-driven factory. Vendor SDKs stay inside `adapters/` —
+ * nothing re-exported here pulls one into a consumer's type surface.
  */
 
 export {
@@ -28,6 +30,31 @@ export {
 } from "./errors.js";
 
 export { llmConfigSchema, type LlmConfig } from "./config.js";
+
+export {
+  createLlmRouter,
+  type LlmRouter,
+  type LlmRouterDeps,
+} from "./router.js";
+
+export {
+  createAnthropicProvider,
+  type AnthropicProviderOptions,
+} from "./adapters/anthropic.js";
+export {
+  createOpenAiProvider,
+  type OpenAiProviderOptions,
+} from "./adapters/openai.js";
+export { createGroqProvider, type GroqProviderOptions } from "./adapters/groq.js";
+export {
+  createGoogleProvider,
+  type GoogleProviderOptions,
+} from "./adapters/google.js";
+
+export {
+  createProvidersFromEnv,
+  type LlmProviderEnv,
+} from "./factory.js";
 
 export {
   makeMockProvider,
