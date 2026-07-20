@@ -148,20 +148,26 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
         throw new SttTransientError("deepgram: aborted before connect");
       }
 
-      const socket = await client.listen.v1.connect({
-        Authorization: `Token ${opts.apiKey}`,
-        model: opts.model ?? "nova-3",
-        language: opts.language ?? "en",
-        encoding: "linear16",
-        sample_rate: info.sampleRateHz,
-        channels: 1,
-        interim_results: "true",
-        punctuate: "true",
-        diarize: boolFlag(opts.diarize ?? true),
-        endpointing: opts.endpointingMs ?? 300,
-        reconnectAttempts: 0,
-        abortSignal: signal,
-      });
+      // `.catch` (never-returning) maps any SDK rejection to a typed error so no
+      // raw SDK error leaks out of the adapter (RULES §5), without a `let`.
+      const socket = await client.listen.v1
+        .connect({
+          Authorization: `Token ${opts.apiKey}`,
+          model: opts.model ?? "nova-3",
+          language: opts.language ?? "en",
+          encoding: "linear16",
+          sample_rate: info.sampleRateHz,
+          channels: 1,
+          interim_results: "true",
+          punctuate: "true",
+          diarize: boolFlag(opts.diarize ?? true),
+          endpointing: opts.endpointingMs ?? 300,
+          reconnectAttempts: 0,
+          abortSignal: signal,
+        })
+        .catch((err: unknown): never => {
+          throw mapDeepgramError(err);
+        });
 
       const queue = new AsyncEventQueue<SttVendorEvent>();
       let opened = false;

@@ -183,8 +183,12 @@ export function createAssemblyAiVendor(
       });
 
       const abortRace = rejectOnAbort(signal);
+      // Attach a no-op catch so that, if the abort wins the race, the losing
+      // connect promise rejecting later never becomes an unhandled rejection.
+      const connectPromise = transcriber.connect();
+      connectPromise.catch(() => undefined);
       try {
-        await Promise.race([transcriber.connect(), abortRace.promise]);
+        await Promise.race([connectPromise, abortRace.promise]);
       } catch (err) {
         void transcriber.close(false).catch(() => undefined);
         queue.close();
