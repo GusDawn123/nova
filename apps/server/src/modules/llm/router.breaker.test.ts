@@ -42,11 +42,13 @@ describe("router [breaker] — consecutive pre-commit failure circuit", () => {
     expect(a.calls).toHaveLength(2); // zero new calls while open
   });
 
-  it("[breaker] becomes eligible after breakerCooldownMs and a success resets the count", async () => {
+  it("[breaker] becomes eligible after breakerCooldownMs and a success resets the count (full threshold required to re-open)", async () => {
     const a = makeMockProvider("anthropic", [
-      { failBeforeFirstToken: { kind: "transient" } },
-      { failBeforeFirstToken: { kind: "transient" } },
-      { events: [tok("A"), DONE] },
+      { failBeforeFirstToken: { kind: "transient" } }, // 1 → consecutive 1
+      { failBeforeFirstToken: { kind: "transient" } }, // 2 → consecutive 2, opens
+      { events: [tok("A"), DONE] }, //                    3 trial success → reset
+      { failBeforeFirstToken: { kind: "transient" } }, // 4 fresh fail #1 (not enough)
+      { failBeforeFirstToken: { kind: "transient" } }, // 5 fresh fail #2 → re-opens
     ]);
     const b = makeMockProvider("openai", { events: [tok("b"), DONE] });
     const router = makeRouter([a, b], {
@@ -68,10 +70,16 @@ describe("router [breaker] — consecutive pre-commit failure circuit", () => {
     expect(trial.events).toEqual([tok("A"), DONE]);
     expect(a.calls).toHaveLength(3);
 
-    // The success reset the consecutive count: next request tries anthropic first
-    // again (it keeps repeating its last, succeeding, script) without re-opening.
-    const next = await drain(router.stream(REQ));
-    expect(next.events).toEqual([tok("A"), DONE]);
-    expect(a.calls).toHaveLength(4);
+    // STRENGTHENED: the success reset the consecutive count to zero, so a SINGLE
+    // fresh failure must NOT re-open the circuit — the FULL breakerThreshold of
+    // consecutive failures is required again.
+    await drain(router.stream(REQ)); // fresh fail #1 (script[3]) → consecutive 1
+    expect(a.calls).toHaveLength(4); // still eligible: it was actually called
+    await drain(router.stream(REQ)); // fresh fail #2 (script[4]) → consecutive 2, re-opens
+    expect(a.calls).toHaveLength(5);
+
+    // Only now (full threshold reached again) is the breaker open → skipped.
+    await drain(router.stream(REQ));
+    expect(a.calls).toHaveLength(5); // zero new calls while re-opened
   });
 });
