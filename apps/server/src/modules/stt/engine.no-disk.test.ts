@@ -1,5 +1,5 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
@@ -16,11 +16,19 @@ import { describe, expect, it } from "vitest";
  * the other STT behavior tests are intentionally RED until Task 4.)
  */
 
-const MODULE_DIR = dirname(fileURLToPath(import.meta.url));
+const STT_DIR = dirname(fileURLToPath(import.meta.url));
+/** The live transport layer that feeds audio into the engine (sibling module). */
+const LIVE_DIR = join(STT_DIR, "..", "live");
+/** Every directory the static guarantee scans (stt engine + adapters + live layer). */
+const SCANNED_DIRS = [STT_DIR, LIVE_DIR];
 
-/** Filesystem-write surfaces that would mean audio could hit disk. */
+/**
+ * Filesystem-write surfaces that would mean audio could hit disk. Covers the
+ * `fs`/`fs/promises` write APIs plus stream/handle openers — extended in Task 5
+ * to also catch `node:fs` imports and the promise-API `writeFile`.
+ */
 const FORBIDDEN =
-  /\bfs\.|\bwriteFile\b|\bwriteFileSync\b|\bappendFile\b|\bappendFileSync\b|createWriteStream|\bopenSync\b/;
+  /\bfs\.|from ["']node:fs["']|require\(["']node:fs["']\)|\bwriteFile\b|\bwriteFileSync\b|\bappendFile\b|\bappendFileSync\b|createWriteStream|\bopenSync\b|\bwriteSync\b/;
 
 /** Recursively collect non-test `.ts` sources under `dir`. */
 function collectSources(dir: string): string[] {
@@ -39,9 +47,13 @@ function collectSources(dir: string): string[] {
 }
 
 describe("modules/stt never writes raw audio to disk", () => {
-  it("[no-disk] contains no filesystem-write usage in any non-test source", () => {
-    const files = collectSources(MODULE_DIR);
+  it("[no-disk] contains no filesystem-write usage in stt (incl. adapters) or the live layer", () => {
+    const files = SCANNED_DIRS.flatMap((dir) => collectSources(dir));
     expect(files.length).toBeGreaterThan(0); // guard: the scan actually found sources
+
+    // Sanity: the scan must actually reach the vendor adapters + the live layer.
+    expect(files.some((f) => f.includes(`${sep}adapters${sep}`))).toBe(true);
+    expect(files.some((f) => f.includes(`${sep}live${sep}`))).toBe(true);
 
     const offenders = files.filter((file) =>
       FORBIDDEN.test(readFileSync(file, "utf8")),
