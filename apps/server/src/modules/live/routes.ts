@@ -16,15 +16,28 @@ import { LiveSession } from "./session.js";
  * onRoute hook is installed before `{ websocket: true }` is declared below.
  */
 
-/** WS close codes (4000–4999 = application-defined). */
+/** WS close codes (1009 = RFC 6455 "message too big"; 4xxx = app-defined). */
 const CLOSE_UNAUTHORIZED = 4401;
 const CLOSE_UNAVAILABLE = 4503;
 const CLOSE_NORMAL = 1000;
+const CLOSE_TOO_MUCH_BUFFERED = 1009;
+
+/**
+ * Cap on frames buffered from a NOT-YET-AUTHENTICATED client while token
+ * verification is in flight (the auth window is JWKS-fetch-bound, so it can be
+ * network-slow). 64 frames ≈ several seconds of 40–80ms audio — far more than a
+ * legit client sends before `session.ready` — while bounding what an
+ * unauthenticated socket can make us hold in memory. Past the cap: policy-close
+ * 1009 and stop buffering.
+ */
+const MAX_PENDING_FRAMES = 64;
 
 /**
  * Token from `?token=` — the FALLBACK for React Native clients that can set a
  * header but where a query param is easier. SECURITY: this value must never be
- * logged (query strings leak into access logs); nothing here logs `req`.
+ * logged. Query strings leak through pino's default req serializer, so buildApp
+ * installs the redacting serializer from `plugins/log-redaction.ts` globally
+ * (tested there); nothing in this module logs `req` either.
  */
 const queryTokenSchema = z.object({ token: z.string().min(1).optional() });
 
@@ -67,11 +80,22 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
 
     socket.on("message", (data: RawData, isBinary: boolean) => {
       const buf = toBuffer(data);
-      if (session) deliver(session, buf, isBinary);
-      else pending.push({ buf, isBinary });
+      if (session) {
+        deliver(session, buf, isBinary);
+        return;
+      }
+      // Unauthenticated flood guard: the buffer is bounded; a client that blows
+      // past it gets a policy close instead of growing server memory. The close
+      // handler flags closedEarly, so auth resolving later just disposes.
+      if (pending.length >= MAX_PENDING_FRAMES) {
+        socket.close(CLOSE_TOO_MUCH_BUFFERED, "too much data before auth");
+        return;
+      }
+      pending.push({ buf, isBinary });
     });
     socket.on("close", () => {
       closedEarly = true;
+      pending.length = 0; // drop anything buffered for a client that is gone
       session?.close();
     });
     socket.on("error", () => {

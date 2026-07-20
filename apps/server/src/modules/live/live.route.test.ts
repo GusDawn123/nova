@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
 
 import { buildApp } from "../../app.js";
+import { authenticateToken } from "../../plugins/auth.js";
 
 /**
  * Transport-level proof over a REAL WebSocket (in-process Fastify listening on
@@ -159,6 +160,34 @@ describe("GET /live (authed protocol)", () => {
       const { code } = await closed;
       expect(code).toBe(1000);
     } finally {
+      ws.terminate();
+    }
+  });
+
+  it("policy-closes 1009 when flooded with frames before auth resolves", async () => {
+    // Hold auth open so every frame lands in the pre-auth buffer.
+    let releaseAuth: (() => void) | undefined;
+    vi.mocked(authenticateToken).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseAuth = () => {
+            resolve({ ok: true, user: { id: "test-user" } });
+          };
+        }),
+    );
+
+    const ws = await connect();
+    try {
+      const closed = nextClose(ws);
+      // Well past the 64-frame cap — the server must close, not buffer all 200.
+      for (let i = 0; i < 200; i++) {
+        ws.send(Buffer.from([i & 0xff]));
+      }
+      const { code } = await closed;
+      expect(code).toBe(1009);
+    } finally {
+      // Let the held auth settle; closedEarly makes it dispose cleanly.
+      releaseAuth?.();
       ws.terminate();
     }
   });
