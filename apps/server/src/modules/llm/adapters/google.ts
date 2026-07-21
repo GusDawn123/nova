@@ -15,8 +15,10 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  * the streamed chunks into {@link LlmStreamEvent}s.
  */
 
-/** A cheap/fast current model — see docs before changing (do not guess IDs). */
-const DEFAULT_MODEL = "gemini-2.0-flash";
+/** A cheap/fast current model — see docs before changing (do not guess IDs).
+ * gemini-2.0-flash was retired (404 "no longer available", mid-2026); gemini-2.5-flash
+ * is its GA flash-class successor per the @google/genai model list. */
+const DEFAULT_MODEL = "gemini-2.5-flash";
 const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 
 export interface GoogleProviderOptions {
@@ -77,6 +79,11 @@ export function createGoogleProvider(
       try {
         const config: GenerateContentConfig = {
           maxOutputTokens: maxTokens,
+          // Disable Gemini 2.5's default dynamic "thinking": a live call copilot
+          // wants low latency, and thinking tokens count against maxOutputTokens
+          // (a small cap can be consumed entirely by thinking, yielding zero text
+          // — the router then sees no first token and fails the provider).
+          thinkingConfig: { thinkingBudget: 0 },
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,
