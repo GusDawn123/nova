@@ -41,9 +41,18 @@ const FIXTURE_DIR = join(
 const SAMPLE_RATE_HZ = 16000;
 const FRAME_MS = 60; // 60ms frame → 1920 bytes at 16kHz mono PCM16 (in the 40–80ms band)
 const FRAME_BYTES = (SAMPLE_RATE_HZ * 2 * FRAME_MS) / 1000;
-const PACE_MS = 20; // faster than real-time; vendors accept bursts (documented)
-const FINAL_FLUSH_MS = 6000; // wait after last frame for endpointed finals
-const NETWORK_TIMEOUT_MS = 240_000; // generous per-file network budget
+// REAL-TIME pacing: wait one frame's worth of wall-clock between frames, so audio
+// is delivered at ~1x (a live phone call's rate). AssemblyAI Universal-Streaming and
+// Deepgram both process a streaming socket in real time and expect ingest at roughly
+// that rate; blasting the whole file 3x faster (the old PACE_MS=20) overruns the
+// vendor — it never drains the backlog before we close the socket, so the TAIL of the
+// call is dropped as one contiguous chunk (measured: overlap 60.6%→87.8% clean on
+// assemblyai just by pacing at real-time). This is a HARNESS artifact, not audio
+// difficulty; see p3 accuracy diagnosis. Cost: each accuracy test now takes ~audio
+// length (58.4s) + flush of wall-clock — fine, the suite is key-gated and never in CI.
+const PACE_MS = FRAME_MS; // ~1x real-time (frame duration of wall-clock per frame)
+const FINAL_FLUSH_MS = 8000; // wait after last frame for endpointed finals (tail turn)
+const NETWORK_TIMEOUT_MS = 240_000; // generous per-file network budget (real-time send + flush)
 
 const ASSEMBLYAI_KEY = process.env.ASSEMBLYAI_API_KEY;
 const DEEPGRAM_KEY = process.env.DEEPGRAM_API_KEY;
