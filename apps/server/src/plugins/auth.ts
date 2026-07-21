@@ -75,6 +75,39 @@ export function extractBearerToken(
 }
 
 /**
+ * Outcome of resolving a raw token, independent of any transport. `unavailable`
+ * = the server itself can't verify (SUPABASE_URL unset); `unauthorized` = a
+ * missing/invalid token. Callers map these to their transport's failure signal
+ * (HTTP 503/401 for `requireAuth`; WS close 4503/4401 for the live socket).
+ */
+export type TokenAuthResult =
+  | { ok: true; user: AuthUser }
+  | { ok: false; reason: "unavailable" | "unauthorized" };
+
+/**
+ * The one place token → identity resolution happens, shared by every transport.
+ * Order matters: an unset SUPABASE_URL is a server fault (`unavailable`) checked
+ * BEFORE the token, so a correct caller is never falsely blamed for a broken
+ * deploy. Reuses the JWKS cache (built once per URL) via {@link jwksFor}.
+ */
+export async function authenticateToken(
+  token: string | undefined,
+): Promise<TokenAuthResult> {
+  const url = readSupabaseUrl();
+  if (url === undefined) {
+    return { ok: false, reason: "unavailable" };
+  }
+  if (token === undefined) {
+    return { ok: false, reason: "unauthorized" };
+  }
+  const result = await verifyAccessToken(token, jwksFor(url));
+  if (!result.valid) {
+    return { ok: false, reason: "unauthorized" };
+  }
+  return { ok: true, user: result.user };
+}
+
+/**
  * Fastify preHandler enforcing a valid Supabase access token.
  *
  * - SUPABASE_URL unset -> 503 `{ error: "unavailable" }` (server misconfig, not
@@ -87,23 +120,16 @@ export async function requireAuth(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const url = readSupabaseUrl();
-  if (url === undefined) {
-    await reply.code(503).send(UNAVAILABLE);
+  const auth = await authenticateToken(
+    extractBearerToken(request.headers.authorization),
+  );
+  if (!auth.ok) {
+    if (auth.reason === "unavailable") {
+      await reply.code(503).send(UNAVAILABLE);
+    } else {
+      await reply.code(401).send(UNAUTHORIZED);
+    }
     return;
   }
-
-  const token = extractBearerToken(request.headers.authorization);
-  if (token === undefined) {
-    await reply.code(401).send(UNAUTHORIZED);
-    return;
-  }
-
-  const result = await verifyAccessToken(token, jwksFor(url));
-  if (!result.valid) {
-    await reply.code(401).send(UNAUTHORIZED);
-    return;
-  }
-
-  request.user = result.user;
+  request.user = auth.user;
 }

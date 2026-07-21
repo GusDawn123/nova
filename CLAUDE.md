@@ -13,19 +13,26 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 2 LLM provider router complete on `dev-claude-llm` (pending live smoke + PR;
-Phase 1 auth PR pending; Phase 0 PR #1 merged).** Phase 2 added `apps/server/src/modules/llm/`:
-a transport-agnostic `LlmProvider` port, a failover `router.ts` (first-token race on
-`ttftTimeoutMs`, first-token commit / never-switch-after, `stallTimeoutMs` guard, per-router
-circuit breaker + auth-bench, meter-at-`done`, caller abort), four real adapters (Anthropic /
-OpenAI / Google via their own SDKs, Groq via the `openai` SDK + baseURL), and an env-driven
-`factory.ts` that builds only the providers whose key is set — all four `*_API_KEY` env vars
-optional. Proven by 27 router behavior tests (94 llm tests green, fake-timer only);
-**live smoke is NOT yet run — no API keys in env** (`adapters/live.smoke.test.ts` self-skips;
-the ≥2-provider gate is a Gustavo action item). Phase 1 (auth domain — tables + RLS, ES256/JWKS
-verify + `GET /me` + `DELETE /account`, mobile email auth) is complete and still pending its PR;
-Supabase remains **local-only**; iOS-simulator verification deferred (Expo web + Playwright).
-Phases 3+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
+**Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live accuracy gates RUN
+and GREEN (2026-07-21): word-overlap 87.8–96.3% vs 80/70 bars, both vendors ≥2 speakers,
+dead-vendor failover proven; turn-boundary alignment is per-vendor (Deepgram strict 7/7,
+AssemblyAI relaxed ≥1 on synthetic TTS — real-audio re-test rides Phase 9).**
+Phases 0-2 are all **merged into `development`**: Phase 0 scaffold (PR #1), Phase 1 auth (PR #2),
+and Phase 2 `modules/llm` (PR #3, merged 2026-07-20) — the last is now in this branch's tree via
+the development→`dev-claude-stt` merge, so `modules/llm` lives here alongside the STT work. Its
+live smoke has now **PASSED** (2026-07-21: anthropic + openai + google; google default model
+bumped to `gemini-2.5-flash`, thinking off; groq unkeyed → skips). Phase 3 adds the live-call spine on top of
+the auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
+unions), an authenticated `GET /live` socket + per-call `LiveSession` (`modules/live/`), and the
+`modules/stt` gateway — a vendor-agnostic failover/reconnect/silence engine with AssemblyAI
+(primary) + Deepgram (fallback) adapters. Both STT keys are OPTIONAL: the server boots without
+them and a keyless live session returns a typed `error` instead of transcribing. Behavior is
+green vs scriptable mock vendors AND the key-gated live accuracy suite passes against both real
+vendors (the suite self-skips keyless, e.g. in CI — with keys it paces audio at real time). Raw
+audio is **never persisted** (static + runtime `[no-disk]` audits). Phase 1 carry-overs still
+hold: Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only**
+(cloud project deferred), iOS-simulator verification deferred (Expo web + Playwright instead).
+Phases 4+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
 
 ## Read before doing ANYTHING
 
@@ -75,6 +82,10 @@ npm run start --workspace apps/server   # node dist/index.js (after a build)
 
 # Mobile workspace (apps/mobile, Expo)
 npm run start --workspace apps/mobile   # expo start (add --web / --ios / --android)
+
+# STT test fixtures (rare; needs macOS `say` + ffmpeg). Regenerates the committed
+# two-speaker WAVs under apps/server/fixtures/stt/ for the key-gated accuracy suite.
+./scripts/make-stt-fixtures.sh
 ```
 
 CI (`.github/workflows/ci.yml`) runs, on every PR: typecheck, lint, then boots the local

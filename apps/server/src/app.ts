@@ -15,7 +15,9 @@ import Fastify, {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { SupabaseConfigError } from "./db/client.js";
+import { liveRoutes } from "./modules/live/routes.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
+import { withLogRedaction } from "./plugins/log-redaction.js";
 import {
   generateRequestId,
   REQUEST_ID_HEADER,
@@ -34,7 +36,10 @@ export interface BuildAppOptions {
  */
 export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const app = Fastify({
-    logger: options.logger ?? true,
+    // withLogRedaction installs a req serializer that strips query strings from
+    // logged urls — `/live?token=<JWT>` must never reach the logs (RULES: no
+    // secrets in logs). Applied here so EVERY logger config gets it.
+    logger: withLogRedaction(options.logger),
     // Honour an incoming x-request-id; otherwise mint one via genReqId.
     requestIdHeader: REQUEST_ID_HEADER,
     genReqId: generateRequestId,
@@ -55,6 +60,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     origin: [/^http:\/\/localhost(:\d+)?$/, /^http:\/\/127\.0\.0\.1(:\d+)?$/],
     methods: ["GET", "HEAD", "POST", "DELETE"],
   });
+
+  // Live-call socket. liveRoutes registers @fastify/websocket in its own scope
+  // then declares GET /live. Auth is enforced per-connection inside liveRoutes
+  // (WS-close codes, not HTTP status), so no preHandler here.
+  void app.register(liveRoutes);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
