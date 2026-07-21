@@ -13,20 +13,22 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live vendor accuracy
-bars UNRUN, pending API keys (`ASSEMBLYAI_API_KEY` / `DEEPGRAM_API_KEY`, Gustavo action item).**
+**Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live accuracy gates RUN
+and GREEN (2026-07-21): word-overlap 87.8–96.3% vs 80/70 bars, both vendors ≥2 speakers,
+dead-vendor failover proven; turn-boundary alignment is per-vendor (Deepgram strict 7/7,
+AssemblyAI relaxed ≥1 on synthetic TTS — real-audio re-test rides Phase 9).**
 Phases 0-2 are all **merged into `development`**: Phase 0 scaffold (PR #1), Phase 1 auth (PR #2),
 and Phase 2 `modules/llm` (PR #3, merged 2026-07-20) — the last is now in this branch's tree via
 the development→`dev-claude-stt` merge, so `modules/llm` lives here alongside the STT work. Its
-live smoke is still **pending vendor keys** (`adapters/live.smoke.test.ts` self-skips until ≥2
-LLM keys land — a Gustavo action item). Phase 3 (this branch) adds the live-call spine on top of
+live smoke has now **PASSED** (2026-07-21: anthropic + openai + google; google default model
+bumped to `gemini-2.5-flash`, thinking off; groq unkeyed → skips). Phase 3 adds the live-call spine on top of
 the auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
 unions), an authenticated `GET /live` socket + per-call `LiveSession` (`modules/live/`), and the
 `modules/stt` gateway — a vendor-agnostic failover/reconnect/silence engine with AssemblyAI
 (primary) + Deepgram (fallback) adapters. Both STT keys are OPTIONAL: the server boots without
 them and a keyless live session returns a typed `error` instead of transcribing. Behavior is
-green vs scriptable mock vendors; the live word-overlap / diarization / dead-vendor-failover
-accuracy bars are **UNRUN** until real keys land (same posture as Phase 2's live smoke). Raw
+green vs scriptable mock vendors AND the key-gated live accuracy suite passes against both real
+vendors (the suite self-skips keyless, e.g. in CI — with keys it paces audio at real time). Raw
 audio is **never persisted** (static + runtime `[no-disk]` audits). Phase 1 carry-overs still
 hold: Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only**
 (cloud project deferred), iOS-simulator verification deferred (Expo web + Playwright instead).
