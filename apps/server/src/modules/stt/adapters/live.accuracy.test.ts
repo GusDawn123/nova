@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -26,7 +26,18 @@ import { createDeepgramVendor } from "./deepgram.js";
  * REPORT, not a reason to silently lower the bar.
  */
 
-const FIXTURE_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "fixtures", "stt");
+// This file lives at apps/server/src/modules/stt/adapters/, so FOUR "..".s reach
+// apps/server (adapters→stt→modules→src→apps/server); the committed fixtures live
+// at apps/server/fixtures/stt (canonical: make-stt-fixtures.sh OUT_DIR).
+const FIXTURE_DIR = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  "..",
+  "fixtures",
+  "stt",
+);
 const SAMPLE_RATE_HZ = 16000;
 const FRAME_MS = 60; // 60ms frame → 1920 bytes at 16kHz mono PCM16 (in the 40–80ms band)
 const FRAME_BYTES = (SAMPLE_RATE_HZ * 2 * FRAME_MS) / 1000;
@@ -177,6 +188,26 @@ function boundaryAlignment(
   }
   return { matched, total: boundaries.length, deltasMs };
 }
+
+// ---------------------------------------------------------------------------
+// Fixture existence guard — ALWAYS ON (no skipIf). The accuracy describes below
+// are key-gated (skipIf), so a wrong FIXTURE_DIR used to fail silently on CI
+// (which has no keys). This cheap test runs everywhere and fails loudly if the
+// fixtures move or the path drifts, catching the class of bug keyless.
+// ---------------------------------------------------------------------------
+
+describe("stt accuracy fixtures — existence guard", () => {
+  it("resolves FIXTURE_DIR to the committed JSON + clean/noisy WAVs", () => {
+    for (const fileName of [
+      "two-speaker-60s.json",
+      "two-speaker-60s.wav",
+      "two-speaker-60s-noisy.wav",
+    ]) {
+      const path = join(FIXTURE_DIR, fileName);
+      expect(existsSync(path), `missing fixture: ${path}`).toBe(true);
+    }
+  });
+});
 
 // ---------------------------------------------------------------------------
 // AssemblyAI (primary)
