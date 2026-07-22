@@ -11,6 +11,13 @@ export {
   type NotesJobHandlerDeps,
 } from "./handler.js";
 export {
+  generateFollowUp,
+  buildFallbackFollowUp,
+  type FollowUpDeps,
+  type FollowUpInput,
+  type FollowUpResult,
+} from "./follow-up.js";
+export {
   type NotesJobHandler,
   type NotesLogger,
   type NotesWorker,
