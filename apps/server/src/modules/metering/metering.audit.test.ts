@@ -10,40 +10,55 @@ import { createMeteringService, type MeteringServiceDeps } from "./index.js";
 /**
  * [metering-wiring] STATIC audit (adr-0007 §Wire-through invariant, RULES §6): no
  * code path reaches a vendor adapter without a REAL metering sink. Mirrors the STT
- * `[no-disk]` static-grep audit — it reads `app.ts` and inspects the llm-router
+ * `[no-disk]` static-grep audit — it reads `app.ts` and inspects the vendor
  * construction sites rather than running them.
  *
- * TASK-1 HONESTY (my choice): app.ts wiring is Task 2/3's job, so this audit does NOT
- * yet assert the router sites pass a meter. Instead it:
- *   1. proves the real sink is BUILDABLE now (createMeteringService → a non-noop
- *      Meter) — so the invariant is satisfiable, not vapourware; and
- *   2. pins the CURRENT unwired state (every createLlmRouter site omits `meter`, so
- *      the router falls back to its internal noopMeter). This assertion is the
- *      RED-then-GREEN forcing function: when Task 2 threads `metering.meterFor(...)`
- *      into the router sites, THIS test goes red and must be flipped to the positive
- *      invariant below (the `it.todo`).
+ * Task-2 form (app.ts wiring landed): the audit asserts POSITIVELY that
+ *   1. the real sink is buildable and non-noop;
+ *   2. every function in app.ts that constructs an llm router also threads the
+ *      metering seam (`meterFor`) into that router's consumer — the notes
+ *      pipeline and the follow-up generator both receive it;
+ *   3. every RAG construction site (`createRagFromEnv`) passes a `logUsage` sink;
+ *   4. app.ts builds the real metering service and never references `noopMeter`.
+ * STT wiring is Task 3's flush points; this audit tightens again there.
  */
 
-const APP_TS = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "..",
-  "..",
-  "app.ts",
-);
+const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const APP_TS = join(SRC_ROOT, "app.ts");
+/** The split-out metering boot helpers app.ts calls (RULES §2 file cap). */
+const WIRING_TS = join(SRC_ROOT, "metering-wiring.ts");
 
 /**
- * The object-literal argument text of every `createLlmRouter({ ... })` call in the
- * source — brace-matched so nested objects (e.g. `config: llmConfigSchema.parse({})`)
- * don't truncate the capture.
+ * Split the source into top-level `function` blocks (name → body text). Good
+ * enough for the audit: app.ts wires everything inside named top-level functions.
  */
-function llmRouterCallArgs(src: string): string[] {
-  const needle = "createLlmRouter({";
+function functionBlocks(src: string): Map<string, string> {
+  const blocks = new Map<string, string>();
+  const re = /^(?:async )?function (\w+)/gm;
+  const marks: { name: string; start: number }[] = [];
+  for (let m = re.exec(src); m !== null; m = re.exec(src)) {
+    marks.push({ name: m[1] ?? "", start: m.index });
+  }
+  for (let i = 0; i < marks.length; i++) {
+    const mark = marks[i];
+    if (!mark) continue;
+    const end = marks[i + 1]?.start ?? src.length;
+    blocks.set(mark.name, src.slice(mark.start, end));
+  }
+  return blocks;
+}
+
+/**
+ * The object-literal argument text of every `<callee>({ ... })` call in the
+ * source — brace-matched so nested objects don't truncate the capture.
+ */
+function callArgs(src: string, callee: string): string[] {
+  const needle = `${callee}({`;
   const args: string[] = [];
   let from = 0;
   for (;;) {
     const start = src.indexOf(needle, from);
     if (start === -1) break;
-    // Walk from the opening brace of the argument object to its match.
     let depth = 0;
     let i = start + needle.length - 1; // index of the '{'
     const open = i;
@@ -80,22 +95,56 @@ describe("modules/metering wiring audit", () => {
     expect(typeof meter.recordUsage).toBe("function");
   });
 
-  it("[metering-not-yet-wired] app.ts llm-router sites omit a meter (Task 2 flips this)", () => {
+  it("[metering-wired] every llm-router construction site threads the metering seam", () => {
     const src = readFileSync(APP_TS, "utf8");
-    const calls = llmRouterCallArgs(src);
-    // There ARE router construction sites to eventually wire.
-    expect(calls.length).toBeGreaterThan(0);
-    // Task-1 state: none threads a `meter` yet. When Task 2 wires
-    // `metering.meterFor(...)`, this expectation fails → flip to the positive
-    // invariant (the `it.todo`) and delete this placeholder.
-    for (const args of calls) {
-      expect(args).not.toMatch(/\bmeter\b/);
+    const blocks = functionBlocks(src);
+
+    // There ARE router construction sites, and each lives in a function that
+    // also threads `meterFor` into the router's consumer.
+    const routerBlocks = [...blocks.entries()].filter(([, body]) =>
+      body.includes("createLlmRouter("),
+    );
+    expect(routerBlocks.length).toBeGreaterThan(0);
+    for (const [name, body] of routerBlocks) {
+      expect(
+        body,
+        `function ${name} constructs a router without meterFor`,
+      ).toMatch(/meterFor/);
+    }
+
+    // The consumers RECEIVE it: every pipeline/follow-up construction includes it.
+    const pipelineCalls = callArgs(src, "createNotesPipeline");
+    expect(pipelineCalls.length).toBeGreaterThan(0);
+    for (const args of pipelineCalls) {
+      expect(args).toMatch(/meterFor/);
+    }
+    const followUpCalls = callArgs(src, "generateFollowUp");
+    expect(followUpCalls.length).toBeGreaterThan(0);
+    for (const args of followUpCalls) {
+      expect(args).toMatch(/meterFor/);
     }
   });
 
-  // The invariant this audit enforces once app.ts is wired (Task 2/3). Flip the
-  // placeholder above into this once `metering.meterFor(...)` reaches every site.
-  it.todo(
-    "[metering-wired] every createLlmRouter site in app.ts passes a non-noop meter",
-  );
+  it("[metering-wired] every RAG construction site passes a usage sink", () => {
+    const src = readFileSync(APP_TS, "utf8");
+    const blocks = functionBlocks(src);
+    const ragBlocks = [...blocks.entries()].filter(([, body]) =>
+      body.includes("createRagFromEnv("),
+    );
+    expect(ragBlocks.length).toBeGreaterThan(0);
+    for (const [name, body] of ragBlocks) {
+      expect(
+        body,
+        `function ${name} builds RAG without a logUsage sink`,
+      ).toMatch(/logUsage/);
+    }
+  });
+
+  it("[metering-wired] the wiring builds the real service and never references noopMeter", () => {
+    const src = readFileSync(APP_TS, "utf8") + readFileSync(WIRING_TS, "utf8");
+    expect(src).toMatch(/createMeteringService/);
+    expect(src).not.toMatch(/noopMeter/);
+    // app.ts actually consumes the split-out builder.
+    expect(readFileSync(APP_TS, "utf8")).toMatch(/maybeCreateMetering/);
+  });
 });

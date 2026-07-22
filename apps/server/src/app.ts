@@ -25,7 +25,9 @@ import {
   createNotesReader,
   createNotesWriter,
 } from "./db/notes.js";
+import { maybeCreateMetering, voyageMeteringSink } from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
+import { type MeteringService } from "./modules/metering/index.js";
 import {
   AllProvidersFailedError,
   createLlmRouter,
@@ -94,10 +96,17 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // (WS-close codes, not HTTP status), so no preHandler here.
   void app.register(liveRoutes);
 
+  // Metering (Phase 6, adr-0007): ONE service over the usage_events ledger,
+  // shared by every vendor construction site below. Env-gated on SUPABASE_DB_URL —
+  // the same gate every metered consumer (worker / notes routes / RAG indexer)
+  // already requires, so whenever any of them wires, the sink is REAL (the audit
+  // invariant: no vendor path behind a noop sink).
+  const metering = maybeCreateMetering(app);
+
   // Auto-index sweeper: closes the memory loop (call ends → chunks queryable
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
   // suites drive the sweeper explicitly, never the boot-wired background one.
-  maybeStartRagIndexer(app);
+  maybeStartRagIndexer(app, metering);
 
   // Stale-call reaper: stamps ended_at on crashed-mid-call orphans (feeds BOTH RAG
   // and notes). Gated on the DB alone — same posture as the RAG indexer.
@@ -105,12 +114,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
   // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
-  maybeStartNotesWorker(app);
+  maybeStartNotesWorker(app, metering);
 
   // Post-call notes REST surface (read / regenerate / follow-up). Registered only
   // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
   // broken routes (it just doesn't expose them — /health still serves).
-  maybeRegisterNotesRoutes(app);
+  maybeRegisterNotesRoutes(app, metering);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -178,14 +187,22 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
  * Start the RAG completion sweeper on boot, but ONLY when RAG is configured
  * (`VOYAGE_API_KEY` + `SUPABASE_DB_URL` present) AND we are not under test — the
  * test suites construct and drive their own indexer. Stopped on server close.
+ * The Voyage usage sink feeds the metering ledger (metering is always present
+ * here: this gate requires SUPABASE_DB_URL, which is metering's own gate).
  */
-function maybeStartRagIndexer(app: FastifyInstance): void {
+function maybeStartRagIndexer(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): void {
   const env = process.env;
   const ragConfigured =
     Boolean(env.VOYAGE_API_KEY) && Boolean(env.SUPABASE_DB_URL);
   if (!ragConfigured || env.NODE_ENV === "test") return;
 
-  const ragService = createRagFromEnv(env, { logger: app.log });
+  const ragService = createRagFromEnv(env, {
+    logger: app.log,
+    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+  });
   const indexer = createRagIndexer({
     ragService,
     db: createRagIndexerDb(),
@@ -235,7 +252,10 @@ function llmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
  * the env-built failover router → `createNotesPipeline` → `createNotesJobHandler`
  * over the supabase-js read/write seams, driven by the durable `pg`-Pool queue.
  */
-function maybeStartNotesWorker(app: FastifyInstance): void {
+function maybeStartNotesWorker(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): void {
   if (
     !isNotesWorkerEnabled(process.env) ||
     !isJobStoreConfigured(process.env) ||
@@ -254,8 +274,22 @@ function maybeStartNotesWorker(app: FastifyInstance): void {
   }
 
   const { store } = notesJobStoreFromEnv(process.env);
-  const router = createLlmRouter({ providers, config: llmConfigSchema.parse({}) });
-  const pipeline = createNotesPipeline({ router, logger: app.log });
+  const router = createLlmRouter({
+    providers,
+    config: llmConfigSchema.parse({}),
+  });
+  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
+  // gate); the conditional spread only satisfies the type, never skips the sink.
+  const pipeline = createNotesPipeline({
+    router,
+    logger: app.log,
+    ...(metering
+      ? {
+          meterFor: (userId: string, meetingId?: string) =>
+            metering.meterFor(userId, meetingId),
+        }
+      : {}),
+  });
   const handler = createNotesJobHandler({
     pipeline,
     source: createNotesSource(),
@@ -280,7 +314,10 @@ function maybeStartNotesWorker(app: FastifyInstance): void {
  * `AllProvidersFailedError`, mapped by the route). Request-scoped, so — unlike the
  * background worker — it is NOT gated on NODE_ENV.
  */
-function maybeRegisterNotesRoutes(app: FastifyInstance): void {
+function maybeRegisterNotesRoutes(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): void {
   if (
     !isSupabaseConfigured(process.env) ||
     !isJobStoreConfigured(process.env)
@@ -289,6 +326,8 @@ function maybeRegisterNotesRoutes(app: FastifyInstance): void {
   }
 
   const providers = createProvidersFromEnv(llmProviderEnv(process.env));
+  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
+  // gate); the conditional spread only satisfies the type, never skips the sink.
   const followUp: (input: FollowUpInput) => Promise<FollowUpResult> =
     providers.length > 0
       ? generateFollowUp({
@@ -297,6 +336,12 @@ function maybeRegisterNotesRoutes(app: FastifyInstance): void {
             config: llmConfigSchema.parse({}),
           }),
           logger: app.log,
+          ...(metering
+            ? {
+                meterFor: (userId: string, meetingId?: string) =>
+                  metering.meterFor(userId, meetingId),
+              }
+            : {}),
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 

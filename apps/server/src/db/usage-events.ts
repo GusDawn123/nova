@@ -129,3 +129,14 @@ export function isUsageEventsConfigured(
 ): boolean {
   return pgEnvSchema.safeParse(source).success;
 }
+
+let cachedPool: Pool | undefined;
+
+/** Lazily build + memoise the pool and wrap it as a {@link UsageEventsDb}. */
+export function usageEventsDbFromEnv(source: NodeJS.ProcessEnv = process.env): {
+  db: UsageEventsDb;
+  pool: Pool;
+} {
+  cachedPool ??= createUsageEventsPool(source);
+  return { db: createUsageEventsDb(cachedPool), pool: cachedPool };
+}

@@ -113,6 +113,11 @@ export {
 
 export { ragConfig, type RagConfig } from "./config.js";
 
+// The usage-line shape `RagFromEnvDeps.logUsage` receives — already implicitly part
+// of this module's public surface; re-exported so the app.ts metering sink can type
+// its mapper without reaching into `adapters/` (a plain data type, no vendor code).
+export { type VoyageUsageLog } from "./adapters/voyage.js";
+
 export {
   createRagIndexer,
   type RagIndexer,
