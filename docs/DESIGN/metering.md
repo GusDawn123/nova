@@ -1,5 +1,12 @@
 # Design — Usage metering, quotas, billing hooks (`modules/metering`)
 
+> **Status: BUILT (Phase 6, 2026-07-22, branch `dev-claude-metering`).** All exit bars
+> green — ±5% STT accuracy, exact llm passthrough, seeded-ledger kill-switch E2E (the
+> TestFlight gate), the static wiring audit, fixture-proven RevenueCat webhook. Build
+> rulings live as amendments in adr-0007 (fail-open quota posture, lineup-head STT
+> attribution, rerank amount=1, RC static-bearer auth). ARCHITECTURE.md carries the
+> as-built shape.
+>
 > Phase 6 build spec (LOOP_PLAYBOOK Phase 6, PARITY rows 32–33, 35). Why-decisions in
 > `DECISIONS/adr-0007-metering.md`. This phase GATES external TestFlight: no outside
 > testers until the kill-switch test passes. Vendor set note: Anthropic is DISABLED

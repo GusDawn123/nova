@@ -85,3 +85,38 @@ integration forces one (YAGNI).
   now); Reranker userId lands here (rag port change).
 - Phase 8 reads the typed `quota_exceeded` / `daily_cap_reached` wire errors as
   paywall/blocked states; Phase 9's device test exercises the full metered path.
+
+## Amendments (Phase 6 build, 2026-07-22)
+
+Appended during the phase that authored this ADR (pre-merge amendments, not history
+rewrites). Each is a ruling made during implementation and ratified in review.
+
+1. **Failure-posture triad: quota/cap checks FAIL OPEN; ownership FAILS CLOSED; the
+   kill-switch is the backstop.** An internal failure of a quota or daily-cap check
+   (plan read, usage sum, seam throw) logs at error level and ADMITS the call/job —
+   quota protects SPEND, not tenancy, and a metering-DB blip must not refuse every
+   call on the platform. The meeting-ownership guard on the same `session.start`
+   path keeps its Phase 4 FAIL-CLOSED law (it protects tenant isolation — different
+   stakes). Runaway aggregate spend under a broken quota path is still bounded by
+   the daily kill-switch, whose own check also fails open but with a LOUD, distinct
+   `metering.daily_cap_check_failed` log. Gate order in `session.start`, cheap/global
+   before per-user DB work: concurrency → daily cap → ownership → quota.
+
+2. **Pre-first-establish STT attribution = the configured lineup head.** The engine
+   announces vendors only on a SWITCH (`provider_switched` fires when the NEXT vendor
+   establishes), so bytes relayed before the first switch are billed to the lineup's
+   first vendor. If vendor[0] never establishes and relaying started before failover,
+   a brief span can be attributed to a vendor that never transcribed — bounded by the
+   engine's failover threshold; the frame count stays the billed truth (§3). "unknown"
+   appears only when metering is wired with zero configured vendors (dev edge).
+
+3. **Rerank events bill amount = 1 per request** (priced by the $/1k-requests book
+   rate). The vendor-reported rerank token count rides the structured usage LOG line
+   only — it is not persisted on the ledger row. Advisory-cost nuance only; quotas
+   have no rerank dimension.
+
+4. **RevenueCat auth is a static bearer token — no HMAC.** RevenueCat's webhook
+   supports only a fixed Authorization header (no request signing), so the token's
+   secrecy IS the whole authentication guarantee (ops note: rotate it via the RC
+   dashboard + env together; the route is absent entirely when the env var is unset).
+   Comparison is constant-time (sha-256 both sides + timingSafeEqual).

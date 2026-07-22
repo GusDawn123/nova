@@ -138,10 +138,49 @@
 | 29 | Sign up / in (email + Apple + Google), session persistence | 1 | auth flow tests | ✅ † |
 | 30 | Per-user data isolation (A can never see B) | 1 | RLS A/B tests — CI-blocking | ✅ |
 | 31 | In-app account deletion (Apple mandate) | 1 | deletion test | ✅ |
-| 32 | Free tier limits + paid plans (quota enforcement) | 6 | quota + paywall tests | ⬜ |
-| 33 | Usage metering accurate vs vendor-reported | 6 | ±5% metering test | ⬜ |
+| 32 | Free tier limits + paid plans (quota enforcement) | 6 | quota + paywall tests | ✅ † |
+| 33 | Usage metering accurate vs vendor-reported | 6 | ±5% metering test | ✅ |
 | 34 | Transcript-only storage (no audio persisted) | 3 | code-audit + storage assert in E2E | ✅ † |
-| 35 | Global spend kill-switch | 6 | kill-switch test — TestFlight gate | ⬜ |
+| 35 | Global spend kill-switch | 6 | kill-switch test — TestFlight gate | ✅ |
+
+> **Rows 32–33, 35 — Phase 6 metering/quotas/billing (branch `dev-claude-metering`, commits
+> `d447f1b..` this phase):**
+> - **32 (quotas + plans)** — Plan tiers live on `profiles.plan` (`free|pro`, migration
+>   `20260722130000`), limits in `modules/metering/config.ts` (free 1 800 stt-s / 200k llm-tok
+>   per rolling 30d; pro 36 000 / 5M), bound on AMOUNTS by `modules/metering/quota.ts`.
+>   Enforced + tested at every spend gate: live session start refused BEFORE any STT vendor
+>   connects and mid-stream every 15s of METERED audio → typed, wire-valid `quota_exceeded` +
+>   policy close (`modules/live/session.metering.test.ts` — the paywall state the app renders);
+>   notes claim → job dead-lettered `quota_exceeded` + `notes_status='failed'`, never silent
+>   fallback notes (`handler.quota.test.ts` + the real-store E2E in
+>   `modules/metering/metering.e2e.integration.test.ts`); follow-up → 429
+>   (`routes.integration.test.ts`). Plan changes land through the fixture-proven RevenueCat
+>   webhook: INITIAL_PURCHASE free→pro DB-asserted, RENEWAL idempotent, EXPIRATION downgrade,
+>   401/400/`{applied:false}` vendor-proofing, route absent without the env token
+>   (`modules/metering/revenuecat.integration.test.ts`). **† Billing half = the fixture-proven
+>   webhook seam only:** the live RevenueCat account, store products, and the mobile SDK
+>   setting `app_user_id` (plus the paywall SCREENS) are Gustavo/Phase 8 items.
+> - **33 (metering accuracy)** — LLM: EXACT vendor-reported passthrough — a notes job over the
+>   real failover router with scripted usage lands `usage_events` rows exact to the token
+>   (118/2555 with input/output splits, user+meeting attribution, `usedInPeriod` sum exact;
+>   `metering.e2e.integration.test.ts`). STT: the committed 58.4s two-speaker fixture WAV
+>   relayed frame-by-frame bills within ±5% of ground truth (exact on relayed bytes —
+>   frame count is authoritative per adr-0007 §3), with mid-call failover splitting
+>   attribution per vendor (`modules/live/session.metering.test.ts`). Voyage
+>   embedding/rerank lines land via the typed usage sink (`modules/rag/rag.meter.test.ts`).
+>   The static audit (`modules/metering/metering.audit.test.ts`) proves no vendor path runs
+>   unmetered in production wiring.
+> - **35 (kill-switch — the external-TestFlight gate)** — `spendTodayUsd() >= $50` (config)
+>   refuses NEW live sessions (typed `daily_cap_reached` before ownership/quota/vendor work)
+>   and gates the notes worker's CLAIM itself (jobs stay queued, attempts unburned — nothing
+>   lost, nothing dead-letters); in-flight work finishes; exactly ONE
+>   `metering.daily_cap_tripped` error log per UTC day (injectable-clock dedupe). Proven
+>   end-to-end against a live ledger seeded past the cap: new claim refused, queued job
+>   survives untouched, a job claimed pre-trip completes, one alert
+>   (`metering.e2e.integration.test.ts` `[cap-e2e]`, plus `kill-switch.test.ts`,
+>   `session.cap.test.ts`, `worker.cap.test.ts`). Adjacent guards shipped with it: REST rate
+>   limiting (100/min, `plugins/rate-limit.test.ts` 100-rapid-request bar) and ONE live
+>   session per user (`session.concurrency.test.ts` deterministic simultaneous-start).
 
 > **Rows 29–31 — Phase 1 (branch `dev-claude-auth`, commits `ba2e1ea..3ed3c6e`, merged via PR #2):**
 > - **29** — Email sign-up/in + session persistence shipped: `apps/mobile/src/hooks/use-auth.tsx`
