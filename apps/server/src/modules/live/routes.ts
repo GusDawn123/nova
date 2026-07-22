@@ -4,7 +4,9 @@ import type { RawData } from "ws";
 import { z } from "zod";
 
 import { isSupabaseConfigured } from "../../db/client.js";
+import { isJobStoreConfigured, notesJobStoreFromEnv } from "../../db/jobs.js";
 import { createTranscriptPersister } from "../../db/transcripts.js";
+import { isNotesWorkerEnabled } from "../../env.js";
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
 import { defaultSttConfig } from "../stt/config.js";
 import { createSttEngine } from "../stt/engine.js";
@@ -85,8 +87,32 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // session still streams to the phone, just without persistence (same keyless
   // posture as STT). A DB write never blocks the relay (fire-and-forget in the
   // session), so a slow/absent DB can never stall or drop a socket frame.
+  //
+  // When the notes system is enabled, `markEnded` also EAGER-enqueues a generate_notes
+  // job (adr-0006 §4). The enqueue is fire-and-forget and best-effort: a failure is
+  // logged (ids only) and the sweep backstop still covers the meeting. The pg-Pool job
+  // store never leaks into the supabase-js persister — it is injected as a callback.
+  const notesStore =
+    isNotesWorkerEnabled(process.env) &&
+    isJobStoreConfigured(process.env) &&
+    process.env.NODE_ENV !== "test"
+      ? notesJobStoreFromEnv(process.env).store
+      : null;
+  const persisterOptions =
+    notesStore !== null
+      ? {
+          onEnded: (meetingId: string, userId: string): void => {
+            void notesStore.enqueue(meetingId, userId).catch((err: unknown) => {
+              app.log.error(
+                { meeting_id: meetingId, user_id: userId, err },
+                "notes.eager_enqueue_failed",
+              );
+            });
+          },
+        }
+      : {};
   const persister = isSupabaseConfigured(process.env)
-    ? createTranscriptPersister()
+    ? createTranscriptPersister(persisterOptions)
     : null;
 
   app.get("/live", { websocket: true }, (socket: WebSocket, req) => {

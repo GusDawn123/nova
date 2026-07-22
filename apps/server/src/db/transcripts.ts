@@ -26,8 +26,24 @@ const MEETINGS_TABLE = "meetings";
  */
 const meetingIdRowSchema = z.object({ id: z.string().uuid() });
 
+/**
+ * Optional wiring for {@link createTranscriptPersister}. `onEnded` is the EAGER
+ * best-effort enqueue seam (adr-0006 §4): the wiring site (app.ts) passes a callback
+ * that kicks off `NotesJobStore.enqueue`, so the durable `pg`-Pool queue never leaks
+ * into this supabase-js adapter. It fires ONLY when `markEnded` actually stamped the
+ * meeting (a first, real disposal), so a belt-and-suspenders second disposal is a
+ * true no-op — the enqueue happens at most once per call from this path (the sweep
+ * backstop covers a crash between the stamp and the enqueue).
+ */
+export interface TranscriptPersisterOptions {
+  onEnded?: (meetingId: string, userId: string) => void;
+}
+
 /** Build a {@link TranscriptPersister} over the env-configured service-role client. */
-export function createTranscriptPersister(): TranscriptPersister {
+export function createTranscriptPersister(
+  options: TranscriptPersisterOptions = {},
+): TranscriptPersister {
+  const { onEnded } = options;
   return {
     async saveFinal(row: TranscriptFinalRow): Promise<void> {
       const client = getSupabaseClient();
@@ -52,9 +68,28 @@ export function createTranscriptPersister(): TranscriptPersister {
         .update({ ended_at: new Date().toISOString() })
         .eq("id", meetingId)
         .eq("user_id", userId)
-        .is("ended_at", null);
+        .is("ended_at", null)
+        // `.select` returns the rows this stamp actually changed, so the eager
+        // enqueue fires exactly once (a second disposal matches nothing).
+        .select("id");
       if (res.error) {
         throw new Error(`markEnded update failed: ${res.error.message}`);
+      }
+      const stamped = res.data.length > 0;
+      if (stamped && onEnded !== undefined) {
+        // Best-effort: the enqueue is fire-and-forget inside the callback and must
+        // never throw into (or delay) the call-teardown path. A synchronously-throwing
+        // hook is swallowed here (log-and-continue) — a failed eager enqueue is fine,
+        // the sweep backstop (adr-0006 §4) re-enqueues the ended+un-noted meeting.
+        try {
+          onEnded(meetingId, userId);
+        } catch (err) {
+          console.error("onEnded hook threw; relying on sweep backstop", {
+            meetingId,
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     },
 

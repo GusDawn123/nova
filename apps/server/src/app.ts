@@ -14,9 +14,34 @@ import Fastify, {
 } from "fastify";
 
 import { queueAccountDeletion } from "./db/account.js";
-import { SupabaseConfigError } from "./db/client.js";
+import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
+import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
+import { createStaleCallReaper } from "./db/stale-call-reaper.js";
+import { isNotesWorkerEnabled } from "./env.js";
+import { createNotesSource } from "./db/notes-source.js";
+import {
+  createFollowUpWriter,
+  createNotesReader,
+  createNotesWriter,
+} from "./db/notes.js";
 import { liveRoutes } from "./modules/live/routes.js";
+import {
+  AllProvidersFailedError,
+  createLlmRouter,
+  createProvidersFromEnv,
+  llmConfigSchema,
+  type LlmProviderEnv,
+} from "./modules/llm/index.js";
+import {
+  createNotesJobHandler,
+  createNotesPipeline,
+  createNotesRoutes,
+  createNotesWorker,
+  generateFollowUp,
+  type FollowUpInput,
+  type FollowUpResult,
+} from "./modules/notes/index.js";
 import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
@@ -73,6 +98,19 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
   // suites drive the sweeper explicitly, never the boot-wired background one.
   maybeStartRagIndexer(app);
+
+  // Stale-call reaper: stamps ended_at on crashed-mid-call orphans (feeds BOTH RAG
+  // and notes). Gated on the DB alone — same posture as the RAG indexer.
+  maybeStartStaleCallReaper(app);
+
+  // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
+  // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
+  maybeStartNotesWorker(app);
+
+  // Post-call notes REST surface (read / regenerate / follow-up). Registered only
+  // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
+  // broken routes (it just doesn't expose them — /health still serves).
+  maybeRegisterNotesRoutes(app);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -158,4 +196,118 @@ function maybeStartRagIndexer(app: FastifyInstance): void {
     indexer.stop();
     done();
   });
+}
+
+/**
+ * Start the stale-call reaper on boot when the DB is configured (SUPABASE_DB_URL)
+ * AND not under test — the integration suite drives its own reaper. It stamps
+ * `ended_at` on orphaned meetings so both the RAG sweep and the notes queue pick
+ * them up (adr-0006 §4). Stopped on server close.
+ */
+function maybeStartStaleCallReaper(app: FastifyInstance): void {
+  if (!isJobStoreConfigured(process.env) || process.env.NODE_ENV === "test") {
+    return;
+  }
+  const { pool } = notesJobStoreFromEnv(process.env);
+  const reaper = createStaleCallReaper({ pool, logger: app.log });
+  reaper.start();
+  app.addHook("onClose", (_instance, done) => {
+    reaper.stop();
+    done();
+  });
+}
+
+/** Only the LLM provider keys that are set — exactOptionalPropertyTypes-safe. */
+function llmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
+  const out: LlmProviderEnv = {};
+  if (env.ANTHROPIC_API_KEY) out.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
+  if (env.OPENAI_API_KEY) out.OPENAI_API_KEY = env.OPENAI_API_KEY;
+  if (env.GOOGLE_API_KEY) out.GOOGLE_API_KEY = env.GOOGLE_API_KEY;
+  if (env.GROQ_API_KEY) out.GROQ_API_KEY = env.GROQ_API_KEY;
+  return out;
+}
+
+/**
+ * Start the notes worker on boot ONLY when explicitly enabled
+ * (`NOTES_WORKER_ENABLED=true`) with the DB configured AND at least one LLM provider
+ * key present, and never under test. Any missing precondition is a graceful no-op —
+ * same posture as the RAG indexer. Wires the REAL pipeline-backed handler (Task 4):
+ * the env-built failover router → `createNotesPipeline` → `createNotesJobHandler`
+ * over the supabase-js read/write seams, driven by the durable `pg`-Pool queue.
+ */
+function maybeStartNotesWorker(app: FastifyInstance): void {
+  if (
+    !isNotesWorkerEnabled(process.env) ||
+    !isJobStoreConfigured(process.env) ||
+    process.env.NODE_ENV === "test"
+  ) {
+    return;
+  }
+  const providers = createProvidersFromEnv(llmProviderEnv(process.env));
+  if (providers.length === 0) {
+    // Enabled + DB present but no LLM key: generation cannot run, so stay off
+    // rather than claim jobs only to retry them forever.
+    app.log.warn(
+      "NOTES_WORKER_ENABLED set but no LLM provider key present — notes worker stays off",
+    );
+    return;
+  }
+
+  const { store } = notesJobStoreFromEnv(process.env);
+  const router = createLlmRouter({ providers, config: llmConfigSchema.parse({}) });
+  const pipeline = createNotesPipeline({ router, logger: app.log });
+  const handler = createNotesJobHandler({
+    pipeline,
+    source: createNotesSource(),
+    writer: createNotesWriter(),
+    logger: app.log,
+  });
+  const worker = createNotesWorker({ store, handler, logger: app.log });
+  worker.start();
+  app.addHook("onClose", (_instance, done) => {
+    worker.stop();
+    done();
+  });
+}
+
+/**
+ * Register the notes REST surface when BOTH the supabase-js read/write seam
+ * (SUPABASE_URL + SERVICE_ROLE_KEY) and the pg-Pool job store (SUPABASE_DB_URL) are
+ * configured — otherwise a keyless/DB-less boot would mount routes whose seams throw
+ * on first use. The follow-up call needs an LLM router: when no provider key is
+ * present the GET/regenerate routes still work and follow-up cleanly returns the
+ * typed 503 `provider_unavailable` (an injected runner that rejects with
+ * `AllProvidersFailedError`, mapped by the route). Request-scoped, so — unlike the
+ * background worker — it is NOT gated on NODE_ENV.
+ */
+function maybeRegisterNotesRoutes(app: FastifyInstance): void {
+  if (
+    !isSupabaseConfigured(process.env) ||
+    !isJobStoreConfigured(process.env)
+  ) {
+    return;
+  }
+
+  const providers = createProvidersFromEnv(llmProviderEnv(process.env));
+  const followUp: (input: FollowUpInput) => Promise<FollowUpResult> =
+    providers.length > 0
+      ? generateFollowUp({
+          router: createLlmRouter({
+            providers,
+            config: llmConfigSchema.parse({}),
+          }),
+          logger: app.log,
+        })
+      : () => Promise.reject(new AllProvidersFailedError([]));
+
+  const { store } = notesJobStoreFromEnv(process.env);
+  void app.register(
+    createNotesRoutes({
+      reader: createNotesReader(),
+      followUpWriter: createFollowUpWriter(),
+      store,
+      followUp,
+      logger: app.log,
+    }),
+  );
 }

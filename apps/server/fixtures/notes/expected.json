@@ -1,0 +1,24 @@
+{
+  "sales": {
+    "expectedType": "sales",
+    "titleKeywords": ["acme", "pricing"],
+    "factKeywords": ["proposal", "pricing"],
+    "commitment": {
+      "textKeyword": "proposal",
+      "ownerKeyword": "marcus",
+      "deadline": "2026-07-24",
+      "deadlineRawKeyword": "friday"
+    }
+  },
+  "interview": {
+    "expectedType": "interview",
+    "factKeywords": ["queue"],
+    "minOpenQuestions": 1,
+    "requireInsightsNonEmpty": true
+  },
+  "casual": {
+    "expectedType": "casual",
+    "factKeywords": [],
+    "maxActionItems": 2
+  }
+}

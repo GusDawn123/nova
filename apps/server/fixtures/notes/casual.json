@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "title": "Catch-up with Sam",
+    "startedAt": "2026-07-22T22:30:00Z"
+  },
+  "turns": [
+    { "speaker": "Jordan", "text": "Hey Sam! It's been way too long. How was the move? Did you finally get out of the old apartment?", "tsMs": 0 },
+    { "speaker": "Sam", "text": "We did! Last box went in the truck Sunday. The new place has actual closet space, which after five years feels like winning the lottery.", "tsMs": 14000 },
+    { "speaker": "Jordan", "text": "Ha, that's the dream. How's the neighborhood? Any good coffee within walking distance?", "tsMs": 30000 },
+    { "speaker": "Sam", "text": "There's a little roaster two blocks down that does a ridiculous cortado. You'd love it. We should go when you're in town.", "tsMs": 44000 },
+    { "speaker": "Jordan", "text": "I'm holding you to that. Actually I might be over your way in September for my cousin's wedding.", "tsMs": 60000 },
+    { "speaker": "Sam", "text": "Oh nice, September's gorgeous here. Let me know the dates and I'll keep that weekend open.", "tsMs": 74000 },
+    { "speaker": "Jordan", "text": "Will do. How's the new job treating you? Last time we talked you were still deciding whether to take it.", "tsMs": 89000 },
+    { "speaker": "Sam", "text": "I took it, and so far no regrets. The team's kind, the work is interesting, and my commute is a ten-minute bike ride now.", "tsMs": 104000 },
+    { "speaker": "Jordan", "text": "A ten-minute bike commute? Okay now I'm jealous. Mine is still an hour each way on a good day.", "tsMs": 120000 },
+    { "speaker": "Sam", "text": "You should come visit and remember what fresh air feels like. Seriously though, how are you doing? How's everything with your dad?", "tsMs": 134000 },
+    { "speaker": "Jordan", "text": "He's doing a lot better, thanks for asking. The physical therapy is slow but he's back to gardening, which is basically his whole personality.", "tsMs": 150000 },
+    { "speaker": "Sam", "text": "That's such good news. Tell him the tomato guy from the barbecue says hi.", "tsMs": 167000 },
+    { "speaker": "Jordan", "text": "He will absolutely remember you as the tomato guy. Alright, I should let you get back to unpacking. Send me those September dates.", "tsMs": 181000 },
+    { "speaker": "Sam", "text": "I will. Text me when you book the flights. So good to catch up, Jordan.", "tsMs": 195000 },
+    { "speaker": "Jordan", "text": "You too. Enjoy the new place, and go get me one of those cortados. Talk soon!", "tsMs": 208000 }
+  ]
+}

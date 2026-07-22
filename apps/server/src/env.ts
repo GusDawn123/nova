@@ -49,9 +49,26 @@ const envSchema = z.object({
   // `postgresql://postgres:postgres@127.0.0.1:54322/postgres` (`supabase status`
   // → DB_URL). Treated as a secret (carries the DB password); never logged.
   SUPABASE_DB_URL: z.string().url().optional(),
+  // Post-call notes worker switch (Phase 5). OFF by default: the durable queue
+  // machinery (worker poll loop + lease reaper + eager-enqueue seam) only runs when
+  // this is the string "true" AND SUPABASE_DB_URL is set — the same explicit-opt-in,
+  // off-in-tests/keyless-boots posture the RAG indexer takes. The stale-call reaper
+  // is gated separately (on SUPABASE_DB_URL alone), since it also feeds RAG.
+  NOTES_WORKER_ENABLED: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Is the notes worker explicitly enabled? Read directly off the environment at the
+ * wiring site (like the RAG indexer's `VOYAGE_API_KEY` gate) so a background feature
+ * never starts under test or on a boot that did not opt in.
+ */
+export function isNotesWorkerEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.NOTES_WORKER_ENABLED === "true";
+}
 
 /**
  * Pure parse of an env-shaped object. Returns a zod result so callers (and
