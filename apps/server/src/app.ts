@@ -19,8 +19,20 @@ import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
 import { createStaleCallReaper } from "./db/stale-call-reaper.js";
 import { isNotesWorkerEnabled } from "./env.js";
+import { createNotesSource } from "./db/notes-source.js";
+import { createNotesWriter } from "./db/notes.js";
 import { liveRoutes } from "./modules/live/routes.js";
-import { createNotesWorker, type NotesJobHandler } from "./modules/notes/index.js";
+import {
+  createLlmRouter,
+  createProvidersFromEnv,
+  llmConfigSchema,
+  type LlmProviderEnv,
+} from "./modules/llm/index.js";
+import {
+  createNotesJobHandler,
+  createNotesPipeline,
+  createNotesWorker,
+} from "./modules/notes/index.js";
 import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
@@ -191,15 +203,23 @@ function maybeStartStaleCallReaper(app: FastifyInstance): void {
   });
 }
 
+/** Only the LLM provider keys that are set — exactOptionalPropertyTypes-safe. */
+function llmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
+  const out: LlmProviderEnv = {};
+  if (env.ANTHROPIC_API_KEY) out.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
+  if (env.OPENAI_API_KEY) out.OPENAI_API_KEY = env.OPENAI_API_KEY;
+  if (env.GOOGLE_API_KEY) out.GOOGLE_API_KEY = env.GOOGLE_API_KEY;
+  if (env.GROQ_API_KEY) out.GROQ_API_KEY = env.GROQ_API_KEY;
+  return out;
+}
+
 /**
  * Start the notes worker on boot ONLY when explicitly enabled
- * (`NOTES_WORKER_ENABLED=true`) with the DB configured, and never under test.
- *
- * TODO(Phase 5 Task 4): the real pipeline-backed {@link NotesJobHandler} is wired by
- * Task 4. Until it lands the worker delegates to a deliberate placeholder that
- * requeues each job with a clear marker (rather than silently spinning). Because the
- * feature is OFF by default, no boot runs this placeholder — it exists so the machinery
- * is fully wired and reviewable now, and Task 4 swaps one line.
+ * (`NOTES_WORKER_ENABLED=true`) with the DB configured AND at least one LLM provider
+ * key present, and never under test. Any missing precondition is a graceful no-op —
+ * same posture as the RAG indexer. Wires the REAL pipeline-backed handler (Task 4):
+ * the env-built failover router → `createNotesPipeline` → `createNotesJobHandler`
+ * over the supabase-js read/write seams, driven by the durable `pg`-Pool queue.
  */
 function maybeStartNotesWorker(app: FastifyInstance): void {
   if (
@@ -209,19 +229,26 @@ function maybeStartNotesWorker(app: FastifyInstance): void {
   ) {
     return;
   }
+  const providers = createProvidersFromEnv(llmProviderEnv(process.env));
+  if (providers.length === 0) {
+    // Enabled + DB present but no LLM key: generation cannot run, so stay off
+    // rather than claim jobs only to retry them forever.
+    app.log.warn(
+      "NOTES_WORKER_ENABLED set but no LLM provider key present — notes worker stays off",
+    );
+    return;
+  }
+
   const { store } = notesJobStoreFromEnv(process.env);
-  const placeholderHandler: NotesJobHandler = {
-    handle: () =>
-      Promise.resolve({
-        outcome: "retry",
-        error: "notes pipeline not wired yet (Phase 5 Task 4)",
-      }),
-  };
-  const worker = createNotesWorker({
-    store,
-    handler: placeholderHandler,
+  const router = createLlmRouter({ providers, config: llmConfigSchema.parse({}) });
+  const pipeline = createNotesPipeline({ router, logger: app.log });
+  const handler = createNotesJobHandler({
+    pipeline,
+    source: createNotesSource(),
+    writer: createNotesWriter(),
     logger: app.log,
   });
+  const worker = createNotesWorker({ store, handler, logger: app.log });
   worker.start();
   app.addHook("onClose", (_instance, done) => {
     worker.stop();
