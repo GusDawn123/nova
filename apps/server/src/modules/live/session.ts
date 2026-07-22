@@ -17,6 +17,7 @@ import {
   type Disposer,
   type LiveLogger,
   type LiveMetering,
+  type LiveSessionRegistry,
   type TranscriptPersister,
 } from "./ports.js";
 
@@ -81,6 +82,11 @@ export interface LiveSessionDeps {
   initialSttVendor?: string;
   /** Mid-stream quota recheck cadence in seconds of METERED audio (default 15). */
   quotaRecheckSeconds?: number;
+  /**
+   * ONE-live-session-per-user registry (Phase 6, adr-0007 §6). OPTIONAL like
+   * the other enforcement seams; effective only with a {@link userId}.
+   */
+  registry?: LiveSessionRegistry;
 }
 
 export class LiveSession {
@@ -97,6 +103,7 @@ export class LiveSession {
   private readonly logger: LiveLogger | null;
 
   private readonly metering: LiveMetering | null;
+  private readonly registry: LiveSessionRegistry | null;
   private readonly initialSttVendor: string;
   private readonly quotaRecheckSeconds: number;
 
@@ -125,6 +132,7 @@ export class LiveSession {
     this.userId = deps.userId ?? null;
     this.logger = deps.logger ?? null;
     this.metering = deps.metering ?? null;
+    this.registry = deps.registry ?? null;
     // "unknown" only ever bills on a misconfigured wiring (the transport always
     // passes the lineup head when vendors exist); kept explicit, never invented.
     this.initialSttVendor = deps.initialSttVendor ?? "unknown";
@@ -223,6 +231,27 @@ export class LiveSession {
     this.started = true;
     this.echo = this.allowEcho && echo;
     this.meetingId = meetingId;
+
+    // Concurrency cap (Phase 6, adr-0007 §6) — the CHEAPEST check, first:
+    // synchronous, no DB, so two simultaneous starts resolve deterministically
+    // before any ownership/quota/vendor work. The release is registered on the
+    // disposer IMMEDIATELY (before any await) so a socket that drops during the
+    // later guards still frees the slot exactly once.
+    if (this.registry !== null && this.userId !== null) {
+      const registry = this.registry;
+      const userId = this.userId;
+      if (!registry.acquire(userId)) {
+        this.sendError(
+          "concurrent_session",
+          "another live session is already active for this user",
+        );
+        this.close();
+        return;
+      }
+      this.disposer.add(() => {
+        registry.release(userId);
+      });
+    }
 
     // Ownership guard (Phase 4 review C1). The persist path is service-role (RLS +
     // the DB parentage `with_check` are BYPASSED), so before this socket may start

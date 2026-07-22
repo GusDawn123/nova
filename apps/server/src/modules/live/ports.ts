@@ -114,6 +114,39 @@ export interface LiveMetering {
   isOverSttQuota(userId: string): Promise<boolean>;
 }
 
+/**
+ * ONE live session per user (Phase 6, adr-0007 §6) — the concurrency cap the
+ * live WS gets instead of REST rate limiting. `acquire` is SYNCHRONOUS so two
+ * simultaneous starts resolve deterministically (no async race window); the
+ * session releases its slot exactly-once via its disposer. OPTIONAL in session
+ * deps (the keyless posture).
+ *
+ * OPENER (logged, adr-0007 §6): this port's in-memory implementation is
+ * single-instance by design — the deployment law today. A multi-instance
+ * deploy needs a shared claim (alongside the RAG sweeper's same opener).
+ */
+export interface LiveSessionRegistry {
+  /** Claim the user's single live-session slot; false = already held. */
+  acquire(userId: string): boolean;
+  /** Free the slot. Harmless no-op when not held. */
+  release(userId: string): void;
+}
+
+/** The in-memory single-instance implementation (see the port's opener note). */
+export function createInMemorySessionRegistry(): LiveSessionRegistry {
+  const active = new Set<string>();
+  return {
+    acquire(userId: string): boolean {
+      if (active.has(userId)) return false;
+      active.add(userId);
+      return true;
+    },
+    release(userId: string): void {
+      active.delete(userId);
+    },
+  };
+}
+
 /** Build a fresh {@link Disposer}. */
 export function createDisposer(): Disposer {
   const cleanups: (() => void)[] = [];

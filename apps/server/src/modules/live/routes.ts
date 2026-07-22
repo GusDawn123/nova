@@ -13,6 +13,7 @@ import { meteringConfig } from "../metering/index.js";
 import { defaultSttConfig } from "../stt/config.js";
 import { createSttEngine } from "../stt/engine.js";
 import { createSttVendorsFromEnv } from "../stt/vendors.js";
+import { createInMemorySessionRegistry } from "./ports.js";
 import { LiveSession } from "./session.js";
 
 /**
@@ -89,6 +90,11 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // configured — a keyless/DB-less dev boot skips enforcement exactly as it
   // skips persistence (the seams-optional posture).
   const metering = maybeCreateLiveMetering(app);
+
+  // ONE live session per user (Phase 6, adr-0007 §6). Purely in-memory — no env
+  // gate: concurrency needs only the authenticated identity, so it holds even on
+  // keyless/DB-less boots. Single-instance by design (the logged opener).
+  const registry = createInMemorySessionRegistry();
 
   // Durable transcript memory. Wired only when the DB is configured; otherwise the
   // session still streams to the phone, just without persistence (same keyless
@@ -194,21 +200,23 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
           // echo mode is a test affordance only — never honored in production.
           allowEcho: process.env.NODE_ENV !== "production",
           sttEngine,
+          // The authenticated caller. Every enforcement seam below additionally
+          // gates on its OWN dependency (persister/metering/registry), so the
+          // unconditional identity enables exactly the wired subset.
+          userId: auth.user.id,
           // Persist finals + stamp ended_at for the authenticated owner (when the DB
           // is wired). app.log carries persistence-failure logs (ids only, no content).
-          ...(persister !== null ? { persister, userId: auth.user.id } : {}),
+          ...(persister !== null ? { persister } : {}),
           // Metering + quota (Phase 6): bill relayed stt seconds + enforce the plan
-          // quota for the authenticated caller. userId rides the persister spread
-          // above when the DB is wired; when only metering is wired (not possible
-          // today — both gate on the DB) the session skips enforcement without an
-          // owner, so the pairing stays safe either way.
+          // quota for the authenticated caller.
           ...(metering !== undefined
             ? {
                 metering,
-                userId: auth.user.id,
                 quotaRecheckSeconds: meteringConfig.quotaRecheckSeconds,
               }
             : {}),
+          // One-session-per-user cap (typed concurrent_session on a second start).
+          registry,
           ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
           logger: app.log,
         });
