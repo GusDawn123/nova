@@ -57,16 +57,68 @@
 
 | # | Capability | Nova phase | Verified by | Status |
 |---|---|---|---|---|
-| 13 | Auto-generated title | 5 | fixture fact-check | ⬜ |
-| 14 | TL;DR + overview | 5 | schema + fixture tests | ⬜ |
-| 15 | Decisions list | 5 | fixture fact-check | ⬜ |
-| 16 | Action items with owner + deadline | 5 | "send proposal by Friday" assert | ⬜ |
-| 17 | Open questions + risks | 5 | schema test | ⬜ |
-| 18 | Conversation-type awareness (sales / interview / casual → different note shape) | 5 | 3-fixture differentiation test | ⬜ |
-| 19 | Follow-up draft (email etc.), tone options, regenerate | 5 | draft-cites-notes-only test | ⬜ |
-| 20 | Long-call handling (90-min transcript, no context overflow) | 5 | first+last-10-min facts assert | ⬜ |
-| 21 | Crash recovery — interrupted processing resumes | 5 | kill-worker recovery test | ⬜ |
-| 22 | Regenerate notes on demand | 5 | regenerate endpoint test | ⬜ |
+| 13 | Auto-generated title | 5 | fixture fact-check | ✅ |
+| 14 | TL;DR + overview | 5 | schema + fixture tests | ✅ |
+| 15 | Decisions list | 5 | fixture fact-check | ✅ |
+| 16 | Action items with owner + deadline | 5 | "send proposal by Friday" assert | ✅ |
+| 17 | Open questions + risks | 5 | schema test | ✅ |
+| 18 | Conversation-type awareness (sales / interview / casual → different note shape) | 5 | 3-fixture differentiation test | ✅ |
+| 19 | Follow-up draft (email etc.), tone options, regenerate | 5 | draft-cites-notes-only test | ✅ |
+| 20 | Long-call handling (90-min transcript, no context overflow) | 5 | first+last-10-min facts assert | ✅ |
+| 21 | Crash recovery — interrupted processing resumes | 5 | kill-worker recovery test | ✅ |
+| 22 | Regenerate notes on demand | 5 | regenerate endpoint test | ✅ |
+
+> **Rows 13–22 — Phase 5 post-call notes (branch `dev-claude-notes`, commits `b29fec1..` this
+> phase):** the hero pipeline ships — the durable `jobs` queue (`apps/server/src/db/jobs.ts`
+> over `FOR UPDATE SKIP LOCKED`, migration `20260722120000_create_jobs_and_notes_columns.sql`),
+> the worker + handler (`apps/server/src/modules/notes/{worker,handler,config}.ts`), the
+> classify → single-pass|map-reduce → ladder → quote-verify pipeline
+> (`modules/notes/{pipeline,chunking,map-reduce,ladder,verify-quotes}.ts` + authored
+> `prompts/`), the follow-up generator (`follow-up.ts`), the authed REST surface
+> (`routes.ts`), and the shared wire contract (`packages/shared/src/notes.ts`). The **live LLM
+> accuracy gates RAN GREEN 2026-07-22** (`modules/notes/notes.accuracy.test.ts`, key-gated so
+> keyless CI self-skips) after ONE prompt-iteration round (a weekday→ISO-date lookup table
+> injected into the generate/map prompts fixed a real model resolving "by Friday" off-by-one;
+> the casual manifest's max-action-items 1→2 corrected an objectively-wrong expectation — the
+> frozen fixture contains two explicit commitments).
+> - **13 (title)** — ✅ schema `min(1)` + live gate: the sales fixture's title carries an
+>   expected keyword (`expected.json` titleKeywords vs the generated title).
+> - **14 (tl;dr + overview)** — ✅ `meetingNotesSchema` requires both non-empty (zod
+>   `min(1)`, `packages/shared/src/notes.ts`; schema round-trips proven in `notes.test.ts`);
+>   fixture fact-keywords assert over the full notes blob in the live gate.
+> - **15 (decisions)** — ✅ live gate: sales decisions carry the expected facts and **every
+>   emitted evidence quote substring-verifies** (zero `unverified` flags); flag-don't-drop
+>   guard unit-tested in `modules/notes/verify-quotes.test.ts`.
+> - **16 (action items owner + deadline)** — ✅ the named bar: the sales fixture's
+>   "I'll send the proposal over by Friday" (call = Wednesday 2026-07-22) yields an action
+>   item owned by "Marcus" with ISO `deadline` **2026-07-24** + verbatim `deadlineRaw`
+>   "by Friday" — live-asserted; mock-asserted in `modules/notes/pipeline.test.ts`.
+> - **17 (open questions + risks)** — ✅ schema arrays + live: the interview fixture yields
+>   ≥1 open question (`minOpenQuestions`).
+> - **18 (type awareness)** — ✅ live: the three fixtures produce three DISTINCT
+>   `conversationType`s AND three distinct `typeInsights` arms (sales
+>   objections/buyingSignals vs interview questionsAsked/answersToRevisit vs casual bare) —
+>   the shape difference, not just a label.
+> - **19 (follow-up draft, tones, regenerate)** — ✅ cites-notes-only holds BY CONSTRUCTION
+>   (the generator's input type admits no transcript) and is asserted MECHANICALLY
+>   (`modules/notes/follow-up.test.ts`: captured prompt contains notes strings and no
+>   verbatim line of the fixture transcript that produced them); three distinct tone
+>   registers asserted; drafts persisted + returned over REST
+>   (`modules/notes/routes.integration.test.ts`). Note: the gate is the mechanical/
+>   type-level proof — no separate live no-invented-commitments spot-check is automated.
+> - **20 (long call)** — ✅ the ~90-min fixture forced through MAP-REDUCE (lowered
+>   `maxSinglePassTokens`) keeps a fact planted in the FIRST 10 min AND one in the LAST —
+>   mock (`modules/notes/long-call.test.ts`) and LIVE (`notes.accuracy.test.ts` long-call
+>   gate), both green.
+> - **21 (crash recovery)** — ✅ kill-worker bar: a claimed job whose worker dies (no
+>   complete) is requeued by the lease reaper under a tiny test lease and then completes;
+>   two CONCURRENT claims of one job → exactly one winner (`db/jobs.integration.test.ts`
+>   `[claim-race]`/`[reap-requeue]`/`[reap-dead]`, `modules/notes/worker.test.ts` recovery
+>   suite vs the live local stack). The stale-call reaper (crashed mid-CALL, `ended_at`
+>   never stamped) is covered by `db/stale-call-reaper.integration.test.ts`.
+> - **22 (regenerate)** — ✅ endpoint: 202 `{status:'queued'}` + a fresh job row after
+>   completion (history preserved), 409 `already_running` while a job is active
+>   (`modules/notes/routes.integration.test.ts`, `notes.pipeline.integration.test.ts`).
 
 ## Memory & history
 

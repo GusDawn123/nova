@@ -3,21 +3,25 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 4 RAG memory built on `dev-claude-rag` (branched off `development`, which now
-> carries Phases 0-3). Phases 0-3 are merged into `development`: Phase 0 scaffold (PR #1), Phase 1
-> auth (PR #2), Phase 2 `modules/llm` (PR #3), Phase 3 streaming STT gateway (PR #4). Phase 4 adds
-> `modules/rag`: the pure chunker, the four ports (Chunker/Embedder/VectorStore/Reranker), the
-> Voyage + pgvector adapters, `RagService`, and the marker-and-sweep auto-indexer over the
-> `chunks`/`embeddings` (halfvec 1024, HNSW) tables. What runs GREEN: the mock/DB suites, the RLS
-> isolation tests, the freshness exit bar (auto-index queryable in ~0.7s vs the <60s bar), and the
-> store-level latency bar (p95 7.2ms over a 40k-chunk corpus vs the <300ms bar). What is KEY-GATED
-> and SKIPPED pending `VOYAGE_API_KEY`: the live Voyage smoke and the top-3 retrieval accuracy
-> gate.** On the live-call spine below, this tree also carries the shared WebSocket wire protocol,
-> the authenticated `GET /live` socket + per-call session, the `modules/stt` gateway (engine +
-> AssemblyAI/Deepgram adapters, live accuracy bars GREEN), and the `llm` failover router + four
-> real provider adapters (no transport wired to them yet). The notes/metering modules remain
-> design-only — see "Built so far" for what exists and `DESIGN/live-pipeline.md` for the
-> live-pipeline spec.
+> **Status: Phase 5 post-call notes built on `dev-claude-notes` (branched off `development`,
+> which carries Phases 0-4 via PRs #1-#5). Phase 5 adds `modules/notes` — the MVP hero: a durable
+> `jobs`-table queue (FOR UPDATE SKIP LOCKED claim, lease + reaper crash recovery, sweep
+> backstop), the classify → generate (single-pass | map-reduce) → structured-output-ladder →
+> quote-verify pipeline over the EXISTING llm failover router, the follow-up draft generator
+> (cites notes by construction), the authed notes REST surface (read / regenerate / follow-up),
+> the stale-call reaper (closes the Phase 4 crash-orphan opener), and per-user usage logging on
+> every completion (the Phase 6 metering seam). What runs GREEN: the full mock/DB suites incl.
+> the kill-worker recovery + concurrent-claim race bars, the full-loop integration test
+> (markEnded → enqueue → worker → valid notes on the meeting row), the route integration suite
+> (real Postgres + real JWTs), AND the live LLM accuracy gates (2026-07-22, Task 6 round 1:
+> sales/interview/casual fixture fact-checks incl. the proposal-by-Friday owner+deadline bar,
+> three distinct type shapes, and the long-call map-reduce first+last-10-min planted-facts bar
+> — key-gated so keyless CI self-skips).** The Phase 4 RAG live gates (Voyage smoke + top-3
+> retrieval) also RAN GREEN 2026-07-22 once `VOYAGE_API_KEY` landed. On the live-call spine,
+> this tree carries the shared WebSocket wire protocol, the authenticated `GET /live` socket +
+> per-call session, the `modules/stt` gateway (live accuracy bars GREEN), and the `llm` failover
+> router + four real provider adapters (the notes pipeline is its first wired consumer). The
+> metering module remains design-only — see "Built so far" for what exists.
 
 ## What Nova is
 
@@ -125,14 +129,13 @@ modules/<name>/
 # tests are co-located as *.test.ts beside the code; fixtures live in apps/server/fixtures/
 ```
 
-### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory)
+### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory + Phase 5 post-call notes)
 
 The tree above is the target. What exists today is the skeleton, the `/health` vertical
-slice, the **Phase 1 auth domain**, the **Phase 2 LLM provider router**, and the **Phase 3
-live-call STT gateway** — all below. The remaining product modules (rag/notes/metering) and
-the mobile `features/` are not built yet. Phase 2's `modules/llm` is now in this branch's tree
-(merged into `development` via PR #3, then merged here); its section and the Phase 3 STT section
-both follow.
+slice, the **Phase 1 auth domain**, the **Phase 2 LLM provider router**, the **Phase 3
+live-call STT gateway**, the **Phase 4 RAG memory**, and the **Phase 5 post-call notes
+pipeline** — all below. The remaining product module (`metering`) and the mobile
+`features/` are not built yet.
 
 Two structural deviations from the drawing, both intentional:
 
@@ -160,13 +163,16 @@ not auto-expose new tables to the Data API.
 - `deletion_requests` — the account-deletion purge queue. RLS enabled with **zero policies**
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
   tombstone. The purge-worker FK-ordering contract (deepest child first, every FK
-  `NO ACTION`) is: **embeddings → chunks → transcripts → meetings → context_docs →
+  `NO ACTION`) is: **embeddings → chunks → transcripts → jobs → meetings → context_docs →
   deletion_requests → auth.users** — the Phase 4 RAG tables (`chunks` → meetings /
   context_docs / profiles; `embeddings` → chunks / profiles) must be purged BEFORE the
-  meetings/context_docs they hang off. NOTE: the `deletion_requests` migration header
-  predates the RAG tables and still lists the shorter `transcripts → meetings →
-  context_docs → deletion_requests → auth.users` order; an applied migration is law and
-  is not edited (RULES §4) — this doc carries the current contract.
+  meetings/context_docs they hang off, and the Phase 5 `jobs` table (→ meetings / profiles,
+  both `NO ACTION`) BEFORE the meetings its rows reference — otherwise the meetings delete
+  fails on the jobs FK. NOTE: the `deletion_requests` migration header predates the RAG and
+  jobs tables and still lists the shorter `transcripts → meetings → context_docs →
+  deletion_requests → auth.users` order; an applied migration is law and is not edited
+  (RULES §4) — this doc carries the current contract (the `jobs` migration header,
+  `20260722120000_create_jobs_and_notes_columns.sql`, carries the same full order).
   **Resolved (Phase 3, migration `20260720150000_enforce_transcript_parentage.sql`):** the
   original transcript write policies checked only `user_id = auth.uid()`, not that the referenced
   `meeting_id` belonged to the writer — so an authenticated user could insert a transcript they
@@ -339,18 +345,87 @@ live spine — design spec in `DESIGN/live-pipeline.md`.
   are **key-gated (`describe.skipIf`) and UNRUN** — they need a real `VOYAGE_API_KEY` (Gustavo action
   item), exactly like Phase 2's llm smoke and Phase 3's STT accuracy bars were before their keys
   landed. A store-query-embed split is deliberate: this p95 bar governs the store only; query-embed
-  latency is vendor-side and reported separately by the key-gated smoke.
+  latency is vendor-side and reported separately by the key-gated smoke. **Update (2026-07-22,
+  post-key):** both key-gated gates RAN and PASSED — see the PARITY rows 24–25 note.
+
+**Phase 5 — `modules/notes/` (post-call notes pipeline, built on `dev-claude-notes`):** the MVP
+hero — design spec `DESIGN/notes-pipeline.md`, decisions `DECISIONS/adr-0006-notes-pipeline.md`.
+- **Durable queue** (`db/jobs.ts`) — a hand-rolled `jobs` table store over the direct `pg` Pool
+  (adr-0006 §1): atomic `FOR UPDATE SKIP LOCKED` claim (multi-instance-safe), jittered-backoff
+  retry, lease + reaper crash recovery (`reapExpired`), dead-letter at the attempt cap, sweep
+  backstop (`sweepEnqueue` — ended, live, un-noted meetings can never be lost), `hasActive` for
+  the regenerate 409. Every product-visible transition mirrors the denormalized
+  `meetings.notes_status`; `complete()` deliberately does NOT flip it — the 'completed' flip is
+  atomic with the notes write in `db/notes.ts` so a completed job whose write failed never reads
+  as ready (adr §2). Enqueue is belt-and-suspenders: EAGER on `markEnded` (wired in
+  `modules/live/routes.ts` as an injected callback) + the sweep (adr §4).
+- **Worker + handler** (`worker.ts`, `handler.ts`, `config.ts`) — poll loop (~5s) + reaper loop,
+  exactly-once start/stop, one job per tick; the handler loads meta + final turns
+  (`db/notes-source.ts`), runs the pipeline, persists via `db/notes.ts`, and maps outcomes:
+  missing meeting → terminal fail, soft-deleted → complete no-op, transport failure → retry.
+  All lease/backoff/interval numbers are zod-config and injectable. Gated behind
+  `NOTES_WORKER_ENABLED=true` + DB + ≥1 LLM key, never under test.
+- **Pipeline** (`pipeline.ts`, `chunking.ts`, `map-reduce.ts`, `ladder.ts`, `verify-quotes.ts`,
+  `prompts/`) — classify (small call, failure → 'casual') → generate: single-pass under
+  `maxSinglePassTokens` (32k default), MAP-REDUCE above it (turn-boundary ~6k chunks, ~15%
+  overlap, structured facts + mini-summaries, reduce merges in code — early-call facts cannot
+  be re-derived away). Every structured response walks the ladder: salvage (`jsonrepair`) → zod
+  → ONE repair round-trip → deterministic schema-valid fallback (`source:'fallback'`); raw
+  failing text lands on `jobs.raw_output`, never in `meetings.notes` (RULES §1 — malformed LLM
+  JSON is unrepresentable in the typed column). Quotes are substring-verified against the
+  transcript; failures are FLAGGED `unverified`, never dropped. Deadlines resolve against an
+  injected calendar table (weekday→ISO lookup, not model date arithmetic — a live-gate fix).
+  The pipeline consumes the EXISTING `LlmRouter` (its first wired consumer); it never touches
+  vendor SDKs.
+- **Follow-up + REST** (`follow-up.ts`, `routes.ts`, `db/notes.ts`) — the follow-up generator's
+  input type is the VALIDATED notes object + tone + title: it cannot receive a transcript, so
+  cites-notes-only holds by construction and is asserted mechanically on the captured prompt
+  (adr §8). Authed surface (all `requireAuth`, user-scoped, uniform 404 for
+  missing/foreign/soft-deleted — no existence leak): `GET /meetings/:id/notes`,
+  `POST /meetings/:id/notes/regenerate` (202 | 409 `already_running`),
+  `POST /meetings/:id/follow-up` (200 persisted draft | 409 `notes_not_ready` | 503
+  `provider_unavailable` on transport failure — synchronous, one small call). Wire schemas in
+  `packages/shared/src/notes.ts` (versioned `meetingNotesSchema`, follow-up + response shapes).
+- **Stale-call reaper** (`db/stale-call-reaper.ts`) — stamps `ended_at` on crashed-mid-call
+  orphans (~6h, config), feeding BOTH the RAG indexer and the notes queue — closes the Phase 4
+  crash-orphan opener.
+- **Cost visibility** — per-attempt token usage persists on `jobs.usage` (jsonb) and every
+  completion emits one per-user structured log line `{user_id, meeting_id, job_id,
+  input_tokens, output_tokens, calls}`; the follow-up endpoint logs its own — the Phase 6
+  metering seam (ids/counts only, never content).
+- **Exit bars.** Mock/DB: the ladder walk, quote-grounding flags, map-reduce boundary-fact
+  survival, kill-worker recovery + concurrent-claim single-winner (`db/jobs.integration.test.ts`,
+  tiny-lease reaper), the full loop (`notes.pipeline.integration.test.ts`: markEnded → eager
+  enqueue → worker tick → zod-valid notes + usage jsonb on the job row), and the route contract
+  (`routes.integration.test.ts`: real JWTs, 401/404-trio/409s/400/503, follow-up persisted).
+  **Live (key-gated, RAN GREEN 2026-07-22 after one prompt-iteration round):**
+  `notes.accuracy.test.ts` — sales/interview/casual fixture fact-checks (owner "Marcus" +
+  deadline 2026-07-24 from "by Friday", zero unverified quotes), three DISTINCT
+  conversation-type shapes, and the long-call map-reduce bar (first- AND last-10-min planted
+  facts survive a forced map-reduce over the ~90-min fixture).
 
 ## Data model
 
 The auth-domain tables (`profiles`, `meetings`, `transcripts`, `context_docs`,
-`deletion_requests`) are **built** as of Phase 1, and the RAG tables (`chunks`, `embeddings`)
-plus the Phase 4 column expansions are **built** as of Phase 4 — see "Built so far" for their
-live shape and RLS posture. The `usage_events` sketch below becomes real in Phase 6.
+`deletion_requests`) are **built** as of Phase 1, the RAG tables (`chunks`, `embeddings`)
+plus the Phase 4 column expansions are **built** as of Phase 4, and the `jobs` table plus the
+meetings notes columns are **built** as of Phase 5 — see "Built so far" for their live shape
+and RLS posture. The `usage_events` sketch below becomes real in Phase 6.
 
 - `profiles` — user profile + plan (1:1 with auth.users)
 - `meetings` — id, user_id, title, started_at, **`ended_at`** (call completion), **`indexed_at`**
-  (RAG sweeper marker: finished + null → unindexed backlog), notes jsonb, deleted_at
+  (RAG sweeper marker: finished + null → unindexed backlog), deleted_at; **built (Phase 5):**
+  **`notes`** jsonb (ONLY ever a zod-valid `meetingNotesSchema` object — the ladder guarantees
+  it), **`notes_status`** (`none|queued|processing|completed|failed` — the denormalized read
+  model, no jobs join), **`notes_generated_at`**, **`follow_up`** jsonb (latest draft
+  `{tone, subject, body, generated_at}`)
+- `jobs` — **built (Phase 5):** the durable background-job queue (`kind='generate_notes'`),
+  service-role/pool-only — RLS enabled with **zero policies** (the `deletion_requests`
+  posture). status `queued|processing|completed|dead`, attempts/max_attempts, `run_at`
+  (backoff), `locked_at`/`locked_by` (lease), `last_error`, `raw_output` (failed generations
+  keep raw model text HERE, never in a typed jsonb column), `usage` jsonb (per-attempt tokens —
+  the Phase 6 metering seam); partial unique `(kind, meeting_id) where status in
+  ('queued','processing')` — one active job per meeting, completed/dead rows are history
 - `transcripts` — meeting_id, user_id, content, **`speaker`** (diarized label, nullable),
   **`ts_ms`** (turn time, nullable), created_at, deleted_at
 - `context_docs` — user_id, title, content — a RAG source (the "your life" library)
@@ -391,3 +466,9 @@ Details in `GIT_WORKFLOW.md`.
   `iterative_scan`, hybrid RRF in one round trip over a direct `pg` Pool (not PostgREST),
   rerank deliberate-tier-only, marker-and-sweep auto-indexer (`ended_at`/`indexed_at`),
   turn-window chunking with metadata headers. Design: `DESIGN/rag-memory.md`.
+- **ADR-0006** — Post-call notes pipeline: hand-rolled `jobs` table over `FOR UPDATE SKIP
+  LOCKED` (not pg-boss/graphile), jobs-for-execution + `meetings.notes_status` read model,
+  at-least-once + idempotent worker with lease/reaper recovery, eager + sweep enqueue,
+  single-pass primary with a 32k-token map-reduce gate, quote-grounding (flag-don't-drop),
+  the portable structured-output ladder (salvage → zod → one repair → constant fallback),
+  follow-up drafts citing notes by construction. Design: `DESIGN/notes-pipeline.md`.

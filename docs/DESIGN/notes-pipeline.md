@@ -1,5 +1,9 @@
 # Design — Post-call notes pipeline (`modules/notes`)
 
+> **STATUS: BUILT (Phase 5, `dev-claude-notes`, 2026-07-22)** — implemented as specced,
+> live accuracy gates GREEN; evidence in PARITY rows 13–22, as-built shape in
+> ARCHITECTURE "Built so far".
+>
 > Phase 5 build spec (LOOP_PLAYBOOK Phase 5, PARITY rows 13–22). Decisions and their
 > "why" live in `DECISIONS/adr-0006-notes-pipeline.md`; this file is the build shape.
 > Research-first design (2026-07-22): three parallel research passes — long-transcript
