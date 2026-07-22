@@ -86,7 +86,10 @@ describe("LiveSession binary audio path", () => {
   it("errors on a binary frame received before session.start", () => {
     const { session, sent } = makeSession();
     session.handleBinaryMessage(Buffer.from([1, 2, 3]));
-    expect(sent[0]).toMatchObject({ type: "error", code: "audio_before_start" });
+    expect(sent[0]).toMatchObject({
+      type: "error",
+      code: "audio_before_start",
+    });
   });
 
   it("hands post-start frames to the audio seam", () => {
@@ -129,13 +132,17 @@ interface FakeEngine {
   emit: (event: ServerLiveEvent) => void;
   /** How many times the per-session handle's stop() was called. */
   stops: () => number;
+  /** How many times a per-call engine session was started. */
+  starts: () => number;
 }
 
 function makeFakeEngine(): FakeEngine {
   let captured: SttEmit | null = null;
   let stops = 0;
+  let starts = 0;
   const engine: SttEngine = {
     startSession(_info, emit) {
+      starts += 1;
       captured = emit;
       return {
         onAudioFrame() {
@@ -153,6 +160,7 @@ function makeFakeEngine(): FakeEngine {
       if (captured) captured(event);
     },
     stops: () => stops,
+    starts: () => starts,
   };
 }
 
@@ -172,10 +180,15 @@ function defer(): Deferred {
 class FakePersister implements TranscriptPersister {
   readonly saveCalls: TranscriptFinalRow[] = [];
   readonly markEndedCalls: { meetingId: string; userId: string }[] = [];
+  readonly ownershipCalls: { meetingId: string; userId: string }[] = [];
   /** When set, `saveFinal` returns this pending promise instead of resolving. */
   saveGate: Deferred | null = null;
   /** When set, `saveFinal` rejects with it. */
   saveError: Error | null = null;
+  /** What `verifyMeetingOwnership` resolves to (default: the caller owns it). */
+  ownsResult = true;
+  /** When set, `verifyMeetingOwnership` REJECTS (a DB-down → fail-closed start). */
+  ownershipError: Error | null = null;
 
   saveFinal(row: TranscriptFinalRow): Promise<void> {
     this.saveCalls.push(row);
@@ -186,6 +199,12 @@ class FakePersister implements TranscriptPersister {
   markEnded(meetingId: string, userId: string): Promise<void> {
     this.markEndedCalls.push({ meetingId, userId });
     return Promise.resolve();
+  }
+
+  verifyMeetingOwnership(meetingId: string, userId: string): Promise<boolean> {
+    this.ownershipCalls.push({ meetingId, userId });
+    if (this.ownershipError) return Promise.reject(this.ownershipError);
+    return Promise.resolve(this.ownsResult);
   }
 }
 
@@ -224,6 +243,7 @@ describe("LiveSession transcript persistence", () => {
       userId: USER_ID,
     });
     session.handleTextMessage(startFrame());
+    await flush(); // let the async ownership guard resolve so the STT engine starts
 
     fake.emit(partialEvent("interim"));
     fake.emit(finalEvent("committed one"));
@@ -257,6 +277,7 @@ describe("LiveSession transcript persistence", () => {
       userId: USER_ID,
     });
     session.handleTextMessage(startFrame());
+    await flush(); // let the async ownership guard resolve so the STT engine starts
     fake.emit(finalEvent("still writing"));
 
     session.close(); // disposal kicks off finalize (await writes → markEnded)
@@ -286,6 +307,7 @@ describe("LiveSession transcript persistence", () => {
       logger,
     });
     session.handleTextMessage(startFrame());
+    await flush(); // let the async ownership guard resolve so the STT engine starts
     fake.emit(finalEvent("still delivered"));
     await flush();
 
@@ -309,6 +331,7 @@ describe("LiveSession transcript persistence", () => {
     const persister = new FakePersister();
     const { session } = makeSession({ persister, userId: USER_ID });
     session.handleTextMessage(startFrame());
+    await flush(); // guard resolves + persistence teardown registers before disposal
 
     session.handleTextMessage(JSON.stringify({ v: 1, type: "session.end" }));
     session.close(); // belt-and-suspenders transport close
@@ -325,6 +348,119 @@ describe("LiveSession transcript persistence", () => {
     session.close();
     await flush();
     expect(persister.markEndedCalls).toHaveLength(0);
+  });
+});
+
+describe("LiveSession meeting-ownership guard (C1)", () => {
+  it("proceeds (ready + engine start) when the caller owns the meeting", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    persister.ownsResult = true;
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+    });
+
+    session.handleTextMessage(startFrame());
+    // Nothing happens until the async guard resolves: no ready, no engine start yet.
+    expect(sent).toHaveLength(0);
+    expect(fake.starts()).toBe(0);
+
+    await flush();
+
+    expect(persister.ownershipCalls).toEqual([
+      { meetingId: MEETING_ID, userId: USER_ID },
+    ]);
+    expect(sent).toEqual([
+      { v: 1, type: "session.ready", session_id: FIXED_SESSION_ID },
+    ]);
+    expect(fake.starts()).toBe(1);
+    expect(session.disposer.disposed).toBe(false);
+  });
+
+  it("rejects a NON-owned meeting BEFORE the engine starts (meeting_forbidden + close)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    persister.ownsResult = false; // wrong owner / missing / soft-deleted
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+
+    // Typed error + policy close, and the engine NEVER started (no vendor cost, no
+    // transcript write path opened) — the socket is torn down.
+    expect(sent).toEqual([
+      {
+        v: 1,
+        type: "error",
+        code: "meeting_forbidden",
+        message: "meeting not found or not owned by caller",
+      },
+    ]);
+    expect(fake.starts()).toBe(0);
+    expect(session.disposer.disposed).toBe(true);
+    expect(session.id).toBeNull();
+    // No transcript work and no ended-stamp for a meeting we refused.
+    expect(persister.saveCalls).toHaveLength(0);
+    expect(persister.markEndedCalls).toHaveLength(0);
+  });
+
+  it("fails CLOSED on a DB error (internal error + close, engine never starts)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    persister.ownershipError = new Error("db unreachable");
+    const errors: { fields: Record<string, unknown>; msg: string }[] = [];
+    const logger: LiveLogger = {
+      error: (fields, msg) => errors.push({ fields, msg }),
+    };
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+      logger,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+
+    // A DB-unavailable start is REFUSED (not silently accepted): typed error + close.
+    expect(sent).toEqual([
+      {
+        v: 1,
+        type: "error",
+        code: "internal",
+        message: "could not verify meeting ownership",
+      },
+    ]);
+    expect(fake.starts()).toBe(0);
+    expect(session.disposer.disposed).toBe(true);
+    // Logged with ids only — never meeting content leaks into the log fields.
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.msg).toBe("live.meeting_ownership_check_failed");
+    expect(errors[0]?.fields).toMatchObject({
+      user_id: USER_ID,
+      meeting_id: MEETING_ID,
+    });
+  });
+
+  it("does not verify ownership at all when no persister is wired (dev-mode)", async () => {
+    // DB-less dev session: streams without persistence, so there is nothing to
+    // guard and no DB to ask — session.ready is emitted with no ownership call.
+    const fake = makeFakeEngine();
+    const { session, sent } = makeSession({ sttEngine: fake.engine });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+
+    expect(sent).toEqual([
+      { v: 1, type: "session.ready", session_id: FIXED_SESSION_ID },
+    ]);
+    expect(fake.starts()).toBe(1);
   });
 });
 

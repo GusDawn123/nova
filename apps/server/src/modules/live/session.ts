@@ -8,10 +8,7 @@ import {
   type ServerLiveEvent,
 } from "@nova/shared";
 
-import type {
-  SttEngine,
-  SttSessionHandle,
-} from "../stt/ports.js";
+import type { SttEngine, SttSessionHandle } from "../stt/ports.js";
 
 import {
   createDisposer,
@@ -160,7 +157,9 @@ export class LiveSession {
   private dispatch(event: ClientLiveEvent): void {
     switch (event.type) {
       case "session.start":
-        this.onSessionStart(event.meeting_id, event.echo ?? false);
+        // `onSessionStart` is async (it awaits the ownership guard when a persister
+        // is wired). It catches its own DB errors and never rejects; `void` is safe.
+        void this.onSessionStart(event.meeting_id, event.echo ?? false);
         return;
       case "session.end":
         this.close();
@@ -175,7 +174,10 @@ export class LiveSession {
     }
   }
 
-  private onSessionStart(meetingId: string, echo: boolean): void {
+  private async onSessionStart(
+    meetingId: string,
+    echo: boolean,
+  ): Promise<void> {
     if (this.started) {
       // One live session per socket; a second start is a client protocol bug.
       this.sendError("already_started", "session already started");
@@ -184,6 +186,48 @@ export class LiveSession {
     this.started = true;
     this.echo = this.allowEcho && echo;
     this.meetingId = meetingId;
+
+    // Ownership guard (Phase 4 review C1). The persist path is service-role (RLS +
+    // the DB parentage `with_check` are BYPASSED), so before this socket may start
+    // STT or write a single transcript, confirm the client-supplied meeting_id names
+    // a LIVE meeting owned by the caller — otherwise B could stream a call onto A's
+    // meeting_id and wedge A's purge. Awaited BEFORE any engine start / persistence.
+    //
+    // DEV-MODE BOUNDARY: the guard is only enforced when a persister (DB) is wired.
+    // A keyless/DB-less dev session already streams to the phone WITHOUT persistence
+    // (routes.ts wires no persister then), so there is nothing to protect and no DB
+    // to ask; that path stays guard-free, exactly as it streams without persistence.
+    if (this.persister !== null && this.userId !== null) {
+      let owned: boolean;
+      try {
+        owned = await this.persister.verifyMeetingOwnership(
+          meetingId,
+          this.userId,
+        );
+      } catch (err: unknown) {
+        // Fail CLOSED: a DB-unavailable start is REFUSED (typed error + policy
+        // close), never silently accepted. Log ids only (never content, RULES §6).
+        this.logger?.error(
+          { user_id: this.userId, meeting_id: meetingId, err },
+          "live.meeting_ownership_check_failed",
+        );
+        this.sendError("internal", "could not verify meeting ownership");
+        this.close();
+        return;
+      }
+      if (!owned) {
+        this.sendError(
+          "meeting_forbidden",
+          "meeting not found or not owned by caller",
+        );
+        this.close();
+        return;
+      }
+      // The socket may have dropped while the guard was in flight — the disposer
+      // ran, so do not resurrect a dead session (no ready, no engine, no writes).
+      if (this.disposer.disposed) return;
+    }
+
     this.sessionId = this.generateSessionId();
     this.send({
       v: LIVE_PROTOCOL_VERSION,

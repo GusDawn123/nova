@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type {
   TranscriptFinalRow,
   TranscriptPersister,
@@ -16,6 +18,13 @@ import { getSupabaseClient } from "./client.js";
 
 const TRANSCRIPTS_TABLE = "transcripts";
 const MEETINGS_TABLE = "meetings";
+
+/**
+ * The single column `verifyMeetingOwnership` reads back — parsed at the boundary so
+ * a shape drift from the DB (vendor output is hostile, RULES) fails loudly rather
+ * than silently green-lighting a session on a malformed row.
+ */
+const meetingIdRowSchema = z.object({ id: z.string().uuid() });
 
 /** Build a {@link TranscriptPersister} over the env-configured service-role client. */
 export function createTranscriptPersister(): TranscriptPersister {
@@ -47,6 +56,35 @@ export function createTranscriptPersister(): TranscriptPersister {
       if (res.error) {
         throw new Error(`markEnded update failed: ${res.error.message}`);
       }
+    },
+
+    async verifyMeetingOwnership(
+      meetingId: string,
+      userId: string,
+    ): Promise<boolean> {
+      const client = getSupabaseClient();
+      // Service role bypasses RLS, so THIS query is the parentage guard for the
+      // live write path (the DB `with_check` only covers Data-API/JWT writes). A
+      // meeting counts as usable only if it exists, is owned by the caller, and is
+      // not soft-deleted — mirroring the transcript-parentage RLS predicate.
+      const res = await client
+        .from(MEETINGS_TABLE)
+        .select("id")
+        .eq("id", meetingId)
+        .eq("user_id", userId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (res.error) {
+        // A DB error must NOT be read as "not owned" — throw so the session fails
+        // CLOSED (the caller refuses the start rather than silently accepting it).
+        throw new Error(
+          `verifyMeetingOwnership query failed: ${res.error.message}`,
+        );
+      }
+      if (res.data === null) return false;
+      // Parse the row shape at the boundary before trusting it (RULES).
+      meetingIdRowSchema.parse(res.data);
+      return true;
     },
   };
 }

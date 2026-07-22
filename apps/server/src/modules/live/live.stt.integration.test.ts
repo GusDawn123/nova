@@ -38,6 +38,17 @@ vi.mock("../../plugins/auth.js", async (importActual) => {
   };
 });
 
+// This suite exercises the STT relay only, over a stubbed (non-DB) user + a constant
+// meeting_id, so it runs the transport DB-LESS: no persister is wired, which is the
+// same dev-mode posture routes.ts takes when Supabase is unconfigured. That keeps the
+// C1 meeting-ownership guard (which only fires when a persister IS wired) out of the
+// relay path here — the guard's own coverage lives in session.test.ts + the DB-gated
+// live A/B integration case (live.auth.integration.test.ts).
+vi.mock("../../db/client.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../db/client.js")>();
+  return { ...actual, isSupabaseConfigured: () => false };
+});
+
 const MEETING_ID = "11111111-1111-4111-8111-111111111111";
 
 let app: FastifyInstance;
@@ -73,13 +84,19 @@ function connect(): Promise<WebSocket> {
 /** Accumulate every JSON event the server sends; also expose a waiter. */
 function collect(ws: WebSocket): {
   events: ServerLiveEvent[];
-  waitFor: (type: ServerLiveEvent["type"], ms?: number) => Promise<ServerLiveEvent>;
+  waitFor: (
+    type: ServerLiveEvent["type"],
+    ms?: number,
+  ) => Promise<ServerLiveEvent>;
 } {
   const events: ServerLiveEvent[] = [];
   ws.on("message", (data: Buffer) => {
     events.push(JSON.parse(data.toString("utf8")) as ServerLiveEvent);
   });
-  const waitFor = (type: ServerLiveEvent["type"], ms = 2000): Promise<ServerLiveEvent> =>
+  const waitFor = (
+    type: ServerLiveEvent["type"],
+    ms = 2000,
+  ): Promise<ServerLiveEvent> =>
     new Promise((resolve, reject) => {
       const started = Date.now();
       const tick = (): void => {
@@ -131,10 +148,23 @@ describe("GET /live STT relay", () => {
       connections: [
         {
           events: [
-            { afterMs: 5, event: { type: "partial", text: "hel", speaker: null, ts_ms: 100 } },
             {
               afterMs: 5,
-              event: { type: "final", text: "hello there", speaker: "spk_0", ts_ms: 200 },
+              event: {
+                type: "partial",
+                text: "hel",
+                speaker: null,
+                ts_ms: 100,
+              },
+            },
+            {
+              afterMs: 5,
+              event: {
+                type: "final",
+                text: "hello there",
+                speaker: "spk_0",
+                ts_ms: 200,
+              },
             },
           ],
           terminal: "hang",
@@ -155,7 +185,10 @@ describe("GET /live STT relay", () => {
       const partial = await waitFor("transcript.partial");
       const final = await waitFor("transcript.final");
 
-      expect(partial).toMatchObject({ type: "transcript.partial", text: "hel" });
+      expect(partial).toMatchObject({
+        type: "transcript.partial",
+        text: "hel",
+      });
       expect(final).toEqual({
         v: 1,
         type: "transcript.final",
@@ -165,7 +198,9 @@ describe("GET /live STT relay", () => {
         is_final: true,
       });
       // The binary frame actually reached the vendor connection.
-      await until(() => (vendor.connections[0]?.framesReceived.length ?? 0) > 0);
+      await until(
+        () => (vendor.connections[0]?.framesReceived.length ?? 0) > 0,
+      );
       expect(vendor.connections[0]?.framesReceived).toContainEqual(frame);
       expect(events.some((e) => e.type === "error")).toBe(false);
     } finally {
@@ -179,14 +214,20 @@ describe("GET /live STT relay", () => {
       connections: [
         {
           events: [
-            { afterMs: 5, event: { type: "partial", text: "one", speaker: null, ts_ms: 10 } },
+            {
+              afterMs: 5,
+              event: { type: "partial", text: "one", speaker: null, ts_ms: 10 },
+            },
             { afterMs: 5, event: { type: "closed" } },
           ],
           terminal: "close",
         },
         {
           events: [
-            { afterMs: 5, event: { type: "final", text: "two", speaker: null, ts_ms: 20 } },
+            {
+              afterMs: 5,
+              event: { type: "final", text: "two", speaker: null, ts_ms: 20 },
+            },
           ],
           terminal: "hang",
         },
@@ -219,7 +260,10 @@ describe("GET /live STT relay", () => {
       connections: [
         {
           events: [
-            { afterMs: 5, event: { type: "partial", text: "live", speaker: null, ts_ms: 1 } },
+            {
+              afterMs: 5,
+              event: { type: "partial", text: "live", speaker: null, ts_ms: 1 },
+            },
           ],
           terminal: "hang",
         },

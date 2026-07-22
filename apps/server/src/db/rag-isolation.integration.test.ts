@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
  *   - A ingests a chunk (parented to A's context_doc) + its embedding; A can read both.
  *   - B's JWT select → zero rows on chunks AND embeddings (isolation).
  *   - B's JWT insert of a chunk parented to A's context_doc → RLS rejection (parentage).
+ *   - B's JWT insert of a chunk parented to A's MEETING → RLS rejection (parentage).
  *   - B's JWT insert of an embedding for A's chunk → RLS rejection (parentage).
  *   - authenticated insert of a chunk with BOTH parents set → CHECK rejection.
  *   - authenticated insert of a chunk with NEITHER parent set → CHECK rejection.
@@ -225,7 +226,11 @@ describe.skipIf(!hasStack)("rag storage isolation (local stack)", () => {
     const aDoc = unwrap(
       await userA.client
         .from("context_docs")
-        .insert({ user_id: userA.id, title: "A doc", content: "A's source text" })
+        .insert({
+          user_id: userA.id,
+          title: "A doc",
+          content: "A's source text",
+        })
         .select()
         .single(),
       "A insert context_doc",
@@ -310,6 +315,42 @@ describe.skipIf(!hasStack)("rag storage isolation (local stack)", () => {
     // Only A's original chunk exists under A's doc.
     expect(children).toHaveLength(1);
     expect(children[0]?.user_id).toBe(userA.id);
+  });
+
+  it("[rag-parentage] B cannot INSERT a chunk parented to A's meeting", async () => {
+    // Mirror of the context_doc-branch case above for the OTHER chunk parent
+    // (meeting). A owns a live meeting; B owns the chunk row (user_id = self) but
+    // points meeting_id at A's meeting. The meeting-branch parentage with-check
+    // must reject it (A's meeting is not owned by B).
+    const aMeeting = unwrap(
+      await userA.client
+        .from("meetings")
+        .insert({ user_id: userA.id, title: "A meeting for parentage test" })
+        .select()
+        .single(),
+      "A insert meeting",
+    );
+
+    const res = await userB.client
+      .from("chunks")
+      .insert({
+        user_id: userB.id,
+        meeting_id: aMeeting.id,
+        content: "B spoofing onto A's meeting",
+        chunk_index: 0,
+        token_count: 3,
+      })
+      .select();
+
+    expect(res.error).not.toBeNull();
+    expect(res.data ?? []).toHaveLength(0);
+
+    // Nothing was written against A's meeting (service role bypasses RLS to confirm).
+    const children = unwrap(
+      await admin.from("chunks").select().eq("meeting_id", aMeeting.id),
+      "service-role read chunks",
+    );
+    expect(children).toHaveLength(0);
   });
 
   it("[rag-parentage] B cannot INSERT an embedding for A's chunk", async () => {

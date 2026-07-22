@@ -11,9 +11,15 @@ import type { RagService } from "./service.js";
  * contract (queryable < 60s after call end); a ~20s interval meets it with 3x
  * headroom, no queue infra (adr §7).
  *
- * Crash-safe by construction: a restart loses nothing — unindexed meetings are
- * simply found on the next sweep, and idempotent re-ingest makes double-processing
- * harmless. Every failure leaves `indexed_at` null so the next sweep retries.
+ * Crash-safe ONLY on the sweep half: an already-ENDED but unindexed meeting
+ * (`ended_at` set, `indexed_at` null) survives a restart — it is found on the next
+ * sweep, and idempotent re-ingest makes double-processing harmless; every failure
+ * leaves `indexed_at` null so the next sweep retries. The MARKER half is NOT
+ * crash-safe: `ended_at` is stamped only by the live session's disposal, so a crash
+ * mid-call (before disposal runs) leaves `ended_at` null forever and that call is
+ * never swept — orphaned from memory until a stale-call reaper exists. That reaper
+ * is a Phase 5 opener: sweep-side, treat a meeting whose `started_at` is old AND
+ * `ended_at` is still null as ended (stamp it) so the normal sweep then picks it up.
  *
  * SINGLE-INSTANCE ASSUMPTION (adr §7): meetings are claimed by an UNGUARDED
  * `indexed_at is null` scan, so two server instances running this sweeper would

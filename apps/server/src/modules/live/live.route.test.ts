@@ -16,14 +16,24 @@ import { authenticateToken } from "../../plugins/auth.js";
  * live.auth.integration.test.ts.
  */
 vi.mock("../../plugins/auth.js", async (importActual) => {
-  const actual =
-    await importActual<typeof import("../../plugins/auth.js")>();
+  const actual = await importActual<typeof import("../../plugins/auth.js")>();
   return {
     ...actual,
     authenticateToken: vi.fn(() =>
       Promise.resolve({ ok: true, user: { id: "test-user" } }),
     ),
   };
+});
+
+// This suite is a STACK-DOWN protocol proof over a stubbed (non-DB) user + a
+// constant meeting_id, so it runs the transport DB-LESS: no persister is wired,
+// matching routes.ts's posture when Supabase is unconfigured. That keeps the C1
+// meeting-ownership guard (which only fires when a persister IS wired) out of the
+// handshake here; the guard is proven in session.test.ts + the DB-gated A/B case in
+// live.auth.integration.test.ts.
+vi.mock("../../db/client.js", async (importActual) => {
+  const actual = await importActual<typeof import("../../db/client.js")>();
+  return { ...actual, isSupabaseConfigured: () => false };
 });
 
 const MEETING_ID = "11111111-1111-4111-8111-111111111111";

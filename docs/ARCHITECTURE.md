@@ -160,8 +160,14 @@ not auto-expose new tables to the Data API.
   `profiles(id)` with `NO ACTION` (so the purge worker deletes children before the auth row).
 - `deletion_requests` — the account-deletion purge queue. RLS enabled with **zero policies**
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
-  tombstone; the migration header carries the purge-worker FK-ordering contract
-  (transcripts → meetings → context_docs → deletion_requests → auth.users).
+  tombstone. The purge-worker FK-ordering contract (deepest child first, every FK
+  `NO ACTION`) is: **embeddings → chunks → transcripts → meetings → context_docs →
+  deletion_requests → auth.users** — the Phase 4 RAG tables (`chunks` → meetings /
+  context_docs / profiles; `embeddings` → chunks / profiles) must be purged BEFORE the
+  meetings/context_docs they hang off. NOTE: the `deletion_requests` migration header
+  predates the RAG tables and still lists the shorter `transcripts → meetings →
+  context_docs → deletion_requests → auth.users` order; an applied migration is law and
+  is not edited (RULES §4) — this doc carries the current contract.
   **Resolved (Phase 3, migration `20260720150000_enforce_transcript_parentage.sql`):** the
   original transcript write policies checked only `user_id = auth.uid()`, not that the referenced
   `meeting_id` belonged to the writer — so an authenticated user could insert a transcript they
@@ -173,6 +179,18 @@ not auto-expose new tables to the Data API.
   in `apps/server/src/db/transcript-parentage.integration.test.ts` (`[parentage-spoof]` rejects a
   cross-user parent, `[parentage-happy]` allows an own live meeting, `[parentage-soft-deleted]`
   rejects a tombstoned parent).
+  **Fully guarded on BOTH write paths (Phase 4 review C1):** the RLS `with_check` above covers only
+  Data-API/JWT writes; the live product write path (`modules/live` → the service-role
+  `TranscriptPersister` in `db/transcripts.ts`) BYPASSES RLS, so it is guarded independently by an
+  in-session ownership check — at `session.start`, before any STT starts or any transcript is
+  written, `verifyMeetingOwnership` confirms the client-supplied `meeting_id` names a live meeting
+  owned by the authenticated caller (missing/wrong-owner/tombstoned → typed `meeting_forbidden`
+  error + policy-close; a DB error fails CLOSED). Enforced only when a persister is wired (a
+  keyless/DB-less dev session streams without persistence and thus without the guard). Proven by the
+  DB-gated A/B case in `apps/server/src/modules/live/live.auth.integration.test.ts`
+  (`[ownership-spoof]`: B cannot open a session on A's meeting and no transcript row lands) plus the
+  `session.test.ts` unit guard tests. Net: the product write path is now guarded by the in-session
+  ownership check (service-role writes) AND the RLS `with_check` (Data API).
 
 **Server auth layer (Phase 1 — live):**
 - `auth/verify-token.ts` — the only module that knows how a Supabase access token is

@@ -121,11 +121,17 @@ dropped them; Phase 4 closes the loop:
 3. a sweeper (`indexer.ts`, ~20s interval) picks meetings with `ended_at` set and
    `indexed_at` null, runs `ingest`, then stamps `indexed_at`
 
-Marker-and-sweep instead of an in-process queue because it is crash-safe by
-construction: a server restart loses nothing — unindexed meetings are simply found
-on the next sweep, and idempotent ingest makes double-processing harmless. Freshness
-bar (queryable < 60s after call end) holds with 3x headroom at a 20s sweep. The
-durable job-queue generalization arrives with Phase 5's notes pipeline; single-server
+Marker-and-sweep instead of an in-process queue. Only the **sweep half** is crash-safe
+by construction: an already-ENDED but unindexed meeting (`ended_at` set, `indexed_at`
+null) survives a restart — it is simply found on the next sweep, and idempotent ingest
+makes double-processing harmless. The **marker half is NOT crash-safe**: `ended_at` is
+stamped *only* by session disposal, so a crash mid-call — before disposal runs — leaves
+`ended_at` null forever, and that call is never swept and never indexed; it is orphaned
+from memory until a stale-call reaper exists. That reaper is a **Phase 5 opener**:
+sweep-side, treat a meeting whose `started_at` is old AND `ended_at` is still null as
+having ended (stamp `ended_at`) so the normal sweep then picks it up. Freshness bar
+(queryable < 60s after call end) holds with 3x headroom at a 20s sweep. The durable
+job-queue generalization arrives with Phase 5's notes pipeline; single-server
 assumption is documented in `indexer.ts` (multi-instance needs claim semantics —
 `FOR UPDATE SKIP LOCKED` — logged as a Phase 6 opener).
 

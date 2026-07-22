@@ -59,10 +59,22 @@ export interface TranscriptFinalRow {
  * the session treats writes as fire-and-forget with error logging, because a DB
  * hiccup must NEVER stall or kill the socket relay (RULES). `markEnded` is idempotent
  * (only sets `ended_at` where currently null).
+ *
+ * `verifyMeetingOwnership` is the session-start parentage guard (Phase 4 review C1):
+ * because these writes go through the SERVICE ROLE (which bypasses RLS and the DB
+ * `with_check` parentage guard from migration 20260720150000), the socket transport
+ * must itself confirm the client-supplied `meeting_id` names a LIVE meeting owned by
+ * the authenticated caller BEFORE any STT starts or any transcript is written —
+ * otherwise user B could stream a call onto user A's meeting_id (FK satisfied, RLS
+ * bypassed), wedging A's delete/purge with foreign child rows. It resolves `true`
+ * only for an existing, own, `deleted_at is null` meeting, `false` for
+ * missing/wrong-owner/tombstoned, and REJECTS on a DB error so the session fails
+ * CLOSED (a DB-unavailable start is refused, never silently accepted).
  */
 export interface TranscriptPersister {
   saveFinal(row: TranscriptFinalRow): Promise<void>;
   markEnded(meetingId: string, userId: string): Promise<void>;
+  verifyMeetingOwnership(meetingId: string, userId: string): Promise<boolean>;
 }
 
 /**
