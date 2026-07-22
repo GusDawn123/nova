@@ -60,7 +60,9 @@ deferred), iOS-simulator verification deferred (Expo web + Playwright instead). 
   Personal-use license; legally off-limits for this commercial product (RULES §9).
   If you need to know "how X works," derive from public patterns and docs/ specs here.
 - No secrets in the repo. No vendor keys in the mobile app, ever.
-- No unmetered paths to paid vendor APIs (everything flows through `modules/metering`).
+- No unmetered paths to paid vendor APIs is the target; today metering is partial —
+  LLM has an optional meter port, RAG's Voyage adapter has an ad-hoc usage sink, STT is
+  unmetered. A unified `modules/metering` is tracked for Phase 6 and must land before real traffic.
 - Never claim "done" without the phase's mechanical verification passing.
 
 ## Commands
@@ -110,7 +112,9 @@ run against real Postgres instead of self-skipping. `npm run check` is the local
   (`backfill_*`). Style rules: docs/RULES.md §10 (Prettier + typescript-eslint
   strict-type-checked; discriminated unions over boolean flags; async/await only;
   screens dumb / hooks smart; tokens-only styling; snake_case SQL)
-- Module anatomy: `ports.ts / adapters/ / service.ts / routes.ts / schemas.ts / __tests__/`
+- Module anatomy: `ports.ts / adapters/ / service.ts / routes.ts`; module-local zod
+  lives in `ports.ts` (shared wire types in `packages/shared`); tests are co-located
+  `*.test.ts` beside the code; fixtures under `apps/server/fixtures/`
 - Soft cap ~400 lines/file — split before you blow past it
 - Structured errors + logs with `request_id`/`user_id`; never log secrets or raw
   transcripts at info level

@@ -118,12 +118,11 @@ nova/
 Module anatomy (every server module follows it):
 ```
 modules/<name>/
-├── ports.ts        # interfaces the module needs from the outside world
+├── ports.ts        # interfaces + module-local zod (shared wire types in packages/shared)
 ├── adapters/       # vendor implementations of ports (ONLY place SDKs are imported)
 ├── service.ts      # business logic, exported interface for other modules
-├── routes.ts       # HTTP/WS surface, zod-parsed in and out
-├── schemas.ts      # module-local zod (shared ones live in packages/shared)
-└── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
+└── routes.ts       # HTTP/WS surface, zod-parsed in and out
+# tests are co-located as *.test.ts beside the code; fixtures live in apps/server/fixtures/
 ```
 
 ### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory)
