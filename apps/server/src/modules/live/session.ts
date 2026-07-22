@@ -16,11 +16,16 @@ import {
   type AudioFrameHandler,
   type Disposer,
   type LiveLogger,
+  type LiveMetering,
   type TranscriptPersister,
 } from "./ports.js";
 
-/** PCM sample rate of the mic feed handed to the STT vendor (design doc: 16 kHz). */
-const STT_SAMPLE_RATE_HZ = 16000;
+import {
+  DEFAULT_QUOTA_RECHECK_SECONDS,
+  isOverSttQuotaAtStart,
+  STT_SAMPLE_RATE_HZ,
+  SttUsageMeter,
+} from "./stt-usage.js";
 
 /**
  * One live session per socket (per-user concurrency caps are Phase 6 — not
@@ -61,6 +66,21 @@ export interface LiveSessionDeps {
   userId?: string;
   /** Structured-error sink for persistence failures (never receives content). */
   logger?: LiveLogger;
+  /**
+   * Metering + quota seam (Phase 6, adr-0007 §3/§4). OPTIONAL, like the
+   * persister: a keyless/DB-less dev boot skips enforcement exactly as it skips
+   * persistence — the session streams unmetered because there is no ledger.
+   * Effective only when {@link userId} is also set (attribution needs an owner).
+   */
+  metering?: LiveMetering;
+  /**
+   * The FIRST vendor of the configured STT lineup — pre-failover attribution
+   * (the engine only announces vendors on a SWITCH). The transport supplies it
+   * from the same registry it builds the engine with.
+   */
+  initialSttVendor?: string;
+  /** Mid-stream quota recheck cadence in seconds of METERED audio (default 15). */
+  quotaRecheckSeconds?: number;
 }
 
 export class LiveSession {
@@ -76,6 +96,10 @@ export class LiveSession {
   private readonly userId: string | null;
   private readonly logger: LiveLogger | null;
 
+  private readonly metering: LiveMetering | null;
+  private readonly initialSttVendor: string;
+  private readonly quotaRecheckSeconds: number;
+
   private started = false;
   private sessionId: string | null = null;
   private echo = false;
@@ -83,6 +107,8 @@ export class LiveSession {
   private meetingId: string | null = null;
   /** The live STT relay handle for this call; null until start (or in echo mode). */
   private stt: SttSessionHandle | null = null;
+  /** STT usage accounting + quota cadence; null until start (or unmetered). */
+  private sttUsage: SttUsageMeter | null = null;
   /**
    * In-flight final-transcript writes. `markEnded` waits on these so a call is
    * never stamped ended while its own transcript rows are still being written.
@@ -98,6 +124,12 @@ export class LiveSession {
     this.persister = deps.persister ?? null;
     this.userId = deps.userId ?? null;
     this.logger = deps.logger ?? null;
+    this.metering = deps.metering ?? null;
+    // "unknown" only ever bills on a misconfigured wiring (the transport always
+    // passes the lineup head when vendors exist); kept explicit, never invented.
+    this.initialSttVendor = deps.initialSttVendor ?? "unknown";
+    this.quotaRecheckSeconds =
+      deps.quotaRecheckSeconds ?? DEFAULT_QUOTA_RECHECK_SECONDS;
   }
 
   /** The generated session id once `session.start` has been accepted. */
@@ -140,6 +172,11 @@ export class LiveSession {
     this.onAudioFrame(this, frame);
     // Hot relay into the STT engine (synchronous, throwing-free by contract).
     this.stt?.onAudioFrame(frame);
+    // Bill exactly what we relay (adr-0007 §3: frame count is authoritative).
+    // Synchronous accumulation; flush + quota recheck live in the usage meter.
+    if (this.stt !== null) {
+      this.sttUsage?.onRelayedBytes(frame.byteLength);
+    }
     if (this.echo) {
       this.send({
         v: LIVE_PROTOCOL_VERSION,
@@ -228,6 +265,29 @@ export class LiveSession {
       if (this.disposer.disposed) return;
     }
 
+    // Quota gate (Phase 6, adr-0007 §4): AFTER the ownership guard, BEFORE any
+    // STT vendor connects — a refused session spends nothing. Enforced only when
+    // the metering seam + owner are wired (the persister-optional posture); a
+    // failing check FAILS OPEN inside the helper (quota protects spend, not
+    // tenancy — see stt-usage.ts).
+    if (this.metering !== null && this.userId !== null) {
+      const over = await isOverSttQuotaAtStart(
+        this.metering,
+        this.userId,
+        meetingId,
+        this.logger,
+      );
+      if (this.disposer.disposed) return;
+      if (over) {
+        this.sendError(
+          "quota_exceeded",
+          "stt quota exhausted for the current period",
+        );
+        this.close();
+        return;
+      }
+    }
+
     this.sessionId = this.generateSessionId();
     this.send({
       v: LIVE_PROTOCOL_VERSION,
@@ -242,6 +302,33 @@ export class LiveSession {
     if (this.persister !== null && this.userId !== null) {
       this.disposer.add(() => {
         void this.finalizePersistence();
+      });
+    }
+
+    // Usage accounting (Phase 6): one meter per started session, only when the
+    // seam + owner are wired. Its disposal flush is registered before the STT
+    // stop below so LIFO runs stop() first (no more frames), then the final
+    // flush of the unbilled tail.
+    if (this.metering !== null && this.userId !== null) {
+      const sttUsage = new SttUsageMeter({
+        metering: this.metering,
+        userId: this.userId,
+        meetingId,
+        initialVendor: this.initialSttVendor,
+        quotaRecheckSeconds: this.quotaRecheckSeconds,
+        logger: this.logger,
+        isDisposed: () => this.disposer.disposed,
+        onQuotaExceeded: () => {
+          this.sendError(
+            "quota_exceeded",
+            "stt quota exhausted for the current period",
+          );
+          this.close();
+        },
+      });
+      this.sttUsage = sttUsage;
+      this.disposer.add(() => {
+        sttUsage.flush();
       });
     }
 
@@ -272,6 +359,11 @@ export class LiveSession {
     this.send(event);
     if (event.type === "transcript.final") {
       this.persistFinal(event.text, event.speaker, event.ts_ms);
+    }
+    if (event.type === "provider_switched") {
+      // Attribution split (adr-0007 §3): the usage meter bills the stretch so
+      // far to the OLD vendor and everything after to the new one.
+      this.sttUsage?.onVendorSwitch(event.to);
     }
   };
 

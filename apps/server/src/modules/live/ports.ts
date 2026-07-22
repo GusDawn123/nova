@@ -86,6 +86,34 @@ export interface LiveLogger {
   error(fields: Record<string, unknown>, msg: string): void;
 }
 
+/** One flushed span of relayed audio attributed to the CURRENT stt vendor. */
+export interface LiveSttUsage {
+  readonly userId: string;
+  readonly meetingId: string;
+  readonly vendor: string;
+  readonly seconds: number;
+}
+
+/**
+ * Metering + quota seam the live session enforces spend through (Phase 6,
+ * adr-0007 §3/§4). Kept live-local (not the metering module's own interface) so
+ * this module stays an island; `metering-wiring.ts` adapts the real
+ * MeteringService + QuotaChecker onto it. OPTIONAL everywhere it is consumed —
+ * a keyless/DB-less dev boot skips enforcement exactly as it skips persistence
+ * (the persister-optional posture): the session still streams to the phone,
+ * just unmetered and unquota'd, because there is no ledger to meter into.
+ *
+ * `recordSttSeconds` follows the never-fail-the-metered-op law (the metering
+ * service swallows persistence failures); the session still `.catch`es it so a
+ * misbehaving seam cannot produce an unhandled rejection on the audio path.
+ * `isOverSttQuota` resolves true when the caller is AT/OVER their plan's
+ * stt-seconds budget for the rolling period.
+ */
+export interface LiveMetering {
+  recordSttSeconds(usage: LiveSttUsage): Promise<void>;
+  isOverSttQuota(userId: string): Promise<boolean>;
+}
+
 /** Build a fresh {@link Disposer}. */
 export function createDisposer(): Disposer {
   const cleanups: (() => void)[] = [];
