@@ -22,6 +22,12 @@ get typed `RAG_NOT_CONFIGURED`, never a crash).
 ## 2. Storage: halfvec(1024), HNSW, model-versioned rows
 
 `halfvec` (fp16) unconditionally — ~2x storage/build-time win at <1% recall cost.
+The `model` column (and the `model` an Embedder reports) is the **embedding-space
+identifier** — `voyage-4` for the whole two-speed family, since space membership is
+what governs vector comparability, storage, search filtering, and migration. The
+actual per-call vendor model (`voyage-4-lite` on queries) appears in usage logs
+only. Without this, §1's two-speed trick would store rows under one name and
+search under another — zero hits by construction.
 HNSW (`m=16, ef_construction=128`), never IVFFlat (30x worse tail latency at equal
 recall, retrain-on-write). `embeddings` rows carry `model` + `dims` (RULES §5); one
 row per (chunk, model) so a migration runs shadow-corpus → verify → cut over —
