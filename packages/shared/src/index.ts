@@ -1,7 +1,4 @@
-export {
-  deletionResponseSchema,
-  type DeletionResponse,
-} from "./account.js";
+export { deletionResponseSchema, type DeletionResponse } from "./account.js";
 export { healthResponseSchema, type HealthResponse } from "./health.js";
 export {
   LIVE_PROTOCOL_VERSION,
@@ -29,3 +26,21 @@ export {
   type ServerLiveEvent,
 } from "./live.js";
 export { meResponseSchema, type MeResponse } from "./me.js";
+export {
+  FALLBACK_TLDR,
+  buildFallbackNotes,
+  conversationTypeSchema,
+  followUpDraftSchema,
+  followUpToneSchema,
+  meetingNotesSchema,
+  noteActionItemSchema,
+  noteDecisionSchema,
+  typeInsightsSchema,
+  type ConversationType,
+  type FollowUpDraft,
+  type FollowUpTone,
+  type MeetingNotes,
+  type NoteActionItem,
+  type NoteDecision,
+  type TypeInsights,
+} from "./notes.js";
