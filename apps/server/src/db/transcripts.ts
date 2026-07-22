@@ -78,8 +78,18 @@ export function createTranscriptPersister(
       const stamped = res.data.length > 0;
       if (stamped && onEnded !== undefined) {
         // Best-effort: the enqueue is fire-and-forget inside the callback and must
-        // never throw into (or delay) the call-teardown path.
-        onEnded(meetingId, userId);
+        // never throw into (or delay) the call-teardown path. A synchronously-throwing
+        // hook is swallowed here (log-and-continue) — a failed eager enqueue is fine,
+        // the sweep backstop (adr-0006 §4) re-enqueues the ended+un-noted meeting.
+        try {
+          onEnded(meetingId, userId);
+        } catch (err) {
+          console.error("onEnded hook threw; relying on sweep backstop", {
+            meetingId,
+            userId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
       }
     },
 

@@ -298,11 +298,29 @@ describe.skipIf(!hasStack)("createNotesWorker — recovery (local stack)", () =>
 
     await store.enqueue(meetingId, userId);
 
+    // Backdate THIS job's run_at before the first claim so it sorts first in the
+    // GLOBAL claim order — otherwise `claim` (which scans jobs table-wide with no
+    // meeting/user guard) could grab a foreign suite's older queued row under
+    // parallel execution. We then assert on the claimed job's OWN id, so this suite
+    // is independent of execution order (mirrors jobs.integration.test.ts's
+    // backdate-then-assert-own-id pattern; serialization is no longer load-bearing).
+    const queued = await pool.query<{ id: string }>(
+      "select id from jobs where meeting_id = $1 and status = 'queued' limit 1",
+      [meetingId],
+    );
+    const jobId = queued.rows[0]?.id;
+    if (jobId === undefined) throw new Error("no queued job");
+    await pool.query(
+      "update jobs set run_at = now() - interval '1 day' where id = $1",
+      [jobId],
+    );
+
     // A worker claims the job, then DIES before completing (no complete/retry). Model
     // the death by claiming, then backdating the lease well past expiry. run_at is
     // pushed far into the past so the requeued job is the oldest globally and a fresh
     // worker's claim deterministically picks it.
     const claimed = await store.claim("crashed-worker");
+    expect(claimed?.id).toBe(jobId);
     expect(claimed?.meetingId).toBe(meetingId);
     await pool.query(
       `update jobs set locked_at = now() - interval '1 hour',
