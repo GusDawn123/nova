@@ -1,12 +1,16 @@
 import type { FastifyInstance } from "fastify";
 
+import { createPlanReader } from "./db/plans.js";
 import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
 } from "./db/usage-events.js";
+import type { LiveMetering } from "./modules/live/ports.js";
 import {
   createMeteringService,
+  createQuotaChecker,
   type MeteringService,
+  type QuotaChecker,
 } from "./modules/metering/index.js";
 import type { VoyageUsageLog } from "./modules/rag/index.js";
 
@@ -58,5 +62,48 @@ export function voyageMeteringSink(
       amount: entry.kind === "rerank" ? 1 : entry.tokens,
       model: entry.model,
     });
+  };
+}
+
+/**
+ * Build the plan-quota checker over the same pool + service (Phase 6, adr-0007
+ * §4). Undefined exactly when metering is (DB-less boot — no enforcement without
+ * a ledger, matching the seams-optional posture everywhere).
+ */
+export function maybeCreateQuotaChecker(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): QuotaChecker | undefined {
+  if (!metering || !isUsageEventsConfigured(process.env)) return undefined;
+  const { pool } = usageEventsDbFromEnv(process.env);
+  return createQuotaChecker({
+    usedInPeriod: (userId, kind) => metering.usedInPeriod(userId, kind),
+    plans: createPlanReader(pool),
+    logger: app.log,
+  });
+}
+
+/**
+ * Adapt the metering service + quota checker onto the live module's
+ * {@link LiveMetering} seam (modules stay islands — the session types against
+ * its own port, this wiring bridges them): relayed-audio spans land as
+ * `stt_seconds` usage events; the quota question is the stt-seconds plan check.
+ */
+export function maybeCreateLiveMetering(
+  app: FastifyInstance,
+): LiveMetering | undefined {
+  const metering = maybeCreateMetering(app);
+  const quota = maybeCreateQuotaChecker(app, metering);
+  if (!metering || !quota) return undefined;
+  return {
+    recordSttSeconds: ({ userId, meetingId, vendor, seconds }) =>
+      metering.record({
+        userId,
+        meetingId,
+        vendor,
+        kind: "stt_seconds",
+        amount: seconds,
+      }),
+    isOverSttQuota: (userId) => quota.isOverQuota(userId, "stt_seconds"),
   };
 }

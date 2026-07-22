@@ -27,6 +27,8 @@ const SRC_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const APP_TS = join(SRC_ROOT, "app.ts");
 /** The split-out metering boot helpers app.ts calls (RULES §2 file cap). */
 const WIRING_TS = join(SRC_ROOT, "metering-wiring.ts");
+/** The live WS transport — the STT vendor path (Task 3 flush points). */
+const LIVE_ROUTES_TS = join(SRC_ROOT, "modules", "live", "routes.ts");
 
 /**
  * Split the source into top-level `function` blocks (name → body text). Good
@@ -138,6 +140,16 @@ describe("modules/metering wiring audit", () => {
         `function ${name} builds RAG without a logUsage sink`,
       ).toMatch(/logUsage/);
     }
+  });
+
+  it("[metering-wired] the live STT transport wires the usage + quota seam", () => {
+    // Task-3 tightening: the WS transport must hand the session the metering
+    // seam (recordSttSeconds/isOverSttQuota) built from the REAL service — an
+    // unmetered STT path in the transport would silently stream for free.
+    const src = readFileSync(LIVE_ROUTES_TS, "utf8");
+    expect(src).toMatch(/maybeCreateLiveMetering/);
+    expect(src).toMatch(/\bmetering\b/);
+    expect(src).toMatch(/initialSttVendor/);
   });
 
   it("[metering-wired] the wiring builds the real service and never references noopMeter", () => {

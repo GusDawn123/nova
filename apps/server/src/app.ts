@@ -25,9 +25,16 @@ import {
   createNotesReader,
   createNotesWriter,
 } from "./db/notes.js";
-import { maybeCreateMetering, voyageMeteringSink } from "./metering-wiring.js";
+import {
+  maybeCreateMetering,
+  maybeCreateQuotaChecker,
+  voyageMeteringSink,
+} from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
-import { type MeteringService } from "./modules/metering/index.js";
+import {
+  type MeteringService,
+  type QuotaChecker,
+} from "./modules/metering/index.js";
 import {
   AllProvidersFailedError,
   createLlmRouter,
@@ -102,6 +109,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // already requires, so whenever any of them wires, the sink is REAL (the audit
   // invariant: no vendor path behind a noop sink).
   const metering = maybeCreateMetering(app);
+  const quota = maybeCreateQuotaChecker(app, metering);
 
   // Auto-index sweeper: closes the memory loop (call ends → chunks queryable
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
@@ -114,12 +122,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
   // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
-  maybeStartNotesWorker(app, metering);
+  maybeStartNotesWorker(app, metering, quota);
 
   // Post-call notes REST surface (read / regenerate / follow-up). Registered only
   // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
   // broken routes (it just doesn't expose them — /health still serves).
-  maybeRegisterNotesRoutes(app, metering);
+  maybeRegisterNotesRoutes(app, metering, quota);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -255,6 +263,7 @@ function llmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
 function maybeStartNotesWorker(
   app: FastifyInstance,
   metering: MeteringService | undefined,
+  quota: QuotaChecker | undefined,
 ): void {
   if (
     !isNotesWorkerEnabled(process.env) ||
@@ -295,6 +304,14 @@ function maybeStartNotesWorker(
     source: createNotesSource(),
     writer: createNotesWriter(),
     logger: app.log,
+    // Claim-time llm quota gate (adr-0007 §4): over-quota jobs dead-letter with
+    // 'quota_exceeded' so the paywall stays visible. Present whenever metering is.
+    ...(quota
+      ? {
+          isOverLlmQuota: (userId: string) =>
+            quota.isOverQuota(userId, "llm_tokens"),
+        }
+      : {}),
   });
   const worker = createNotesWorker({ store, handler, logger: app.log });
   worker.start();
@@ -317,6 +334,7 @@ function maybeStartNotesWorker(
 function maybeRegisterNotesRoutes(
   app: FastifyInstance,
   metering: MeteringService | undefined,
+  quota: QuotaChecker | undefined,
 ): void {
   if (
     !isSupabaseConfigured(process.env) ||
@@ -353,6 +371,13 @@ function maybeRegisterNotesRoutes(
       store,
       followUp,
       logger: app.log,
+      // Request-time llm quota gate for follow-up (typed 429 quota_exceeded).
+      ...(quota
+        ? {
+            isOverLlmQuota: (userId: string) =>
+              quota.isOverQuota(userId, "llm_tokens"),
+          }
+        : {}),
     }),
   );
 }

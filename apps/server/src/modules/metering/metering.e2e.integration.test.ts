@@ -12,9 +12,11 @@ import {
   llmConfigSchema,
   makeMockProvider,
 } from "../llm/index.js";
+import { createNotesJobStore } from "../../db/jobs.js";
 import { createNotesJobHandler } from "../notes/handler.js";
 import { createNotesPipeline } from "../notes/pipeline.js";
-import type { NotesLogger } from "../notes/ports.js";
+import { createNotesWorker } from "../notes/worker.js";
+import type { NotesLogger, NotesPipeline } from "../notes/ports.js";
 
 import { createMeteringService } from "./service.js";
 import type { MeteringLogger } from "./ports.js";
@@ -116,6 +118,7 @@ describe.skipIf(!hasStack)(
 
     afterAll(async () => {
       await pool.query("delete from usage_events where user_id = $1", [userId]);
+      await pool.query("delete from jobs where user_id = $1", [userId]);
       await pool.query("delete from transcripts where user_id = $1", [userId]);
       await pool.query("delete from meetings where user_id = $1", [userId]);
       await admin.auth.admin.deleteUser(userId);
@@ -221,6 +224,64 @@ describe.skipIf(!hasStack)(
       // And the aggregate the quota engine will read is exact too.
       const used = await metering.usedInPeriod(userId, "llm_tokens");
       expect(used).toBe(118 + 2555);
+    });
+
+    it("[quota-e2e] an over-quota claim dead-letters: dead + quota_exceeded + notes_status failed", async () => {
+      // A fresh ended meeting with its own queued job (the claim path, for real).
+      const meeting = await pool.query<{ id: string }>(
+        `insert into meetings (user_id, title, started_at, ended_at)
+         values ($1, $2, now(), now()) returning id`,
+        [userId, "Over-quota call"],
+      );
+      const quotaMeetingId = meeting.rows[0]?.id;
+      if (quotaMeetingId === undefined)
+        throw new Error("meeting insert failed");
+
+      const store = createNotesJobStore(pool);
+      expect(await store.enqueue(quotaMeetingId, userId)).toBe("enqueued");
+      // Make this job the oldest eligible row so the global claim picks it.
+      await pool.query(
+        "update jobs set run_at = now() - interval '2 days' where meeting_id = $1",
+        [quotaMeetingId],
+      );
+
+      // A pipeline that MUST NOT run: the quota gate refuses before any paid work.
+      const neverPipeline: NotesPipeline = {
+        generate: () => Promise.reject(new Error("generate must not run")),
+      };
+      const handler = createNotesJobHandler({
+        pipeline: neverPipeline,
+        source: createNotesSource(),
+        writer: createNotesWriter(),
+        logger: NOOP_NOTES_LOGGER,
+        isOverLlmQuota: () => Promise.resolve(true),
+      });
+      const worker = createNotesWorker({
+        store,
+        handler,
+        logger: NOOP_NOTES_LOGGER,
+      });
+
+      expect(await worker.tickOnce()).toBe(1);
+
+      // Dead-lettered with the typed reason — NOT completed with fallback notes.
+      const job = await pool.query<{
+        status: string;
+        last_error: string | null;
+      }>("select status, last_error from jobs where meeting_id = $1", [
+        quotaMeetingId,
+      ]);
+      expect(job.rows[0]).toMatchObject({
+        status: "dead",
+        last_error: "quota_exceeded",
+      });
+      // The paywall is visible on the read model.
+      const m = await pool.query<{ notes_status: string; notes: unknown }>(
+        "select notes_status, notes from meetings where id = $1",
+        [quotaMeetingId],
+      );
+      expect(m.rows[0]?.notes_status).toBe("failed");
+      expect(m.rows[0]?.notes).toBeNull();
     });
   },
 );

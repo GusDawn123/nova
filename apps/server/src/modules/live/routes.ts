@@ -7,7 +7,9 @@ import { isSupabaseConfigured } from "../../db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "../../db/jobs.js";
 import { createTranscriptPersister } from "../../db/transcripts.js";
 import { isNotesWorkerEnabled } from "../../env.js";
+import { maybeCreateLiveMetering } from "../../metering-wiring.js";
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
+import { meteringConfig } from "../metering/index.js";
 import { defaultSttConfig } from "../stt/config.js";
 import { createSttEngine } from "../stt/engine.js";
 import { createSttVendorsFromEnv } from "../stt/vendors.js";
@@ -77,11 +79,16 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
 
   // One engine over the env-configured vendor lineup, shared across connections
   // (it is a factory of per-session handles). No vendors yet (Task 5) → a
-  // started session emits a single typed `error` instead of hanging.
-  const sttEngine = createSttEngine(
-    defaultSttConfig,
-    createSttVendorsFromEnv(process.env),
-  );
+  // started session emits a single typed `error` instead of hanging. The lineup
+  // HEAD also seeds the session's pre-failover usage attribution (Phase 6).
+  const sttVendors = createSttVendorsFromEnv(process.env);
+  const sttEngine = createSttEngine(defaultSttConfig, sttVendors);
+  const initialSttVendor = sttVendors[0]?.id;
+
+  // Metering + quota seam (Phase 6, adr-0007 §3/§4). Wired only when the DB is
+  // configured — a keyless/DB-less dev boot skips enforcement exactly as it
+  // skips persistence (the seams-optional posture).
+  const metering = maybeCreateLiveMetering(app);
 
   // Durable transcript memory. Wired only when the DB is configured; otherwise the
   // session still streams to the phone, just without persistence (same keyless
@@ -183,9 +190,20 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
         sttEngine,
         // Persist finals + stamp ended_at for the authenticated owner (when the DB
         // is wired). app.log carries persistence-failure logs (ids only, no content).
-        ...(persister !== null
-          ? { persister, userId: auth.user.id }
+        ...(persister !== null ? { persister, userId: auth.user.id } : {}),
+        // Metering + quota (Phase 6): bill relayed stt seconds + enforce the plan
+        // quota for the authenticated caller. userId rides the persister spread
+        // above when the DB is wired; when only metering is wired (not possible
+        // today — both gate on the DB) the session skips enforcement without an
+        // owner, so the pairing stays safe either way.
+        ...(metering !== undefined
+          ? {
+              metering,
+              userId: auth.user.id,
+              quotaRecheckSeconds: meteringConfig.quotaRecheckSeconds,
+            }
           : {}),
+        ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
         logger: app.log,
       });
 
