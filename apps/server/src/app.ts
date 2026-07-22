@@ -7,6 +7,7 @@ import {
   type HealthResponse,
   type MeResponse,
 } from "@nova/shared";
+import type { z } from "zod";
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -56,6 +57,10 @@ import { createRagFromEnv } from "./modules/rag/index.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import { withLogRedaction } from "./plugins/log-redaction.js";
 import {
+  rateLimitConfigSchema,
+  registerRateLimit,
+} from "./plugins/rate-limit.js";
+import {
   generateRequestId,
   REQUEST_ID_HEADER,
   registerRequestId,
@@ -65,6 +70,8 @@ import { version } from "./version.js";
 export interface BuildAppOptions {
   /** Fastify logger config. Defaults to pino enabled; pass `false` in tests. */
   logger?: FastifyServerOptions["logger"];
+  /** Rate-limit tunables (zod-defaulted 100/min); tests inject tiny windows. */
+  rateLimit?: z.input<typeof rateLimitConfigSchema>;
 }
 
 /**
@@ -83,6 +90,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   registerRequestId(app);
+
+  // REST rate limiting (Phase 6, adr-0007 §6). Registered BEFORE every route so
+  // the whole REST surface inherits it; the live WS route opts out via its own
+  // `config: { rateLimit: false }` (concurrency-capped instead).
+  void registerRateLimit(
+    app,
+    rateLimitConfigSchema.parse(options.rateLimit ?? {}),
+  );
 
   // Dev-only affordance: the Expo *web* client fetches cross-origin (e.g.
   // localhost:8081 → :3000) and browsers enforce CORS. The on-device native app
@@ -129,64 +144,69 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // broken routes (it just doesn't expose them — /health still serves).
   maybeRegisterNotesRoutes(app, metering, quota);
 
-  app.get("/health", (): HealthResponse => {
-    // zod-parse the boundary even on the way out — the response shape is a
-    // hard contract shared with the mobile app.
-    return healthResponseSchema.parse({ ok: true, version });
-  });
+  // Direct root routes are declared inside `after()` so they register only once
+  // the queued plugins (rate limit above all — it protects routes via an
+  // `onRoute` hook, which cannot see routes added before it loads) are ready.
+  app.after(() => {
+    app.get("/health", (): HealthResponse => {
+      // zod-parse the boundary even on the way out — the response shape is a
+      // hard contract shared with the mobile app.
+      return healthResponseSchema.parse({ ok: true, version });
+    });
 
-  // Protected: requireAuth resolves the caller's Supabase token to `request.user`
-  // or short-circuits with 401/503, so by the time this handler runs the user is
-  // present. We narrow defensively rather than assert, then parse the outgoing
-  // body through the shared schema (house pattern — validate every boundary).
-  app.get("/me", { preHandler: requireAuth }, (request): MeResponse => {
-    const user = request.user;
-    if (user === undefined) {
-      // Unreachable: requireAuth either populated user or already replied.
-      throw new Error("requireAuth did not populate request.user");
-    }
-    const body =
-      user.email !== undefined
-        ? { user_id: user.id, email: user.email }
-        : { user_id: user.id };
-    return meResponseSchema.parse(body);
-  });
-
-  // Protected: queue the caller's account for deletion (App Store mandate) and
-  // tombstone their profile, then 202 with the queued request id. requireAuth
-  // guarantees `request.user` and that a valid Bearer token was present, so we
-  // can re-extract it to feed best-effort session revocation.
-  app.delete(
-    "/account",
-    { preHandler: requireAuth },
-    async (request, reply): Promise<FastifyReply> => {
+    // Protected: requireAuth resolves the caller's Supabase token to `request.user`
+    // or short-circuits with 401/503, so by the time this handler runs the user is
+    // present. We narrow defensively rather than assert, then parse the outgoing
+    // body through the shared schema (house pattern — validate every boundary).
+    app.get("/me", { preHandler: requireAuth }, (request): MeResponse => {
       const user = request.user;
       if (user === undefined) {
         // Unreachable: requireAuth either populated user or already replied.
         throw new Error("requireAuth did not populate request.user");
       }
-      const accessToken = extractBearerToken(request.headers.authorization);
+      const body =
+        user.email !== undefined
+          ? { user_id: user.id, email: user.email }
+          : { user_id: user.id };
+      return meResponseSchema.parse(body);
+    });
 
-      try {
-        const row = await queueAccountDeletion(user.id, accessToken);
-        // Parse the outgoing body through the shared schema (house pattern).
-        const body: DeletionResponse = deletionResponseSchema.parse({
-          status: "queued",
-          request_id: row.id,
-        });
-        return await reply.code(202).send(body);
-      } catch (error) {
-        // Env unset/malformed on the DB path -> 503, consistent with
-        // requireAuth's "server not configured" convention (not a client fault).
-        if (error instanceof SupabaseConfigError) {
-          return await reply.code(503).send({ error: "unavailable" });
+    // Protected: queue the caller's account for deletion (App Store mandate) and
+    // tombstone their profile, then 202 with the queued request id. requireAuth
+    // guarantees `request.user` and that a valid Bearer token was present, so we
+    // can re-extract it to feed best-effort session revocation.
+    app.delete(
+      "/account",
+      { preHandler: requireAuth },
+      async (request, reply): Promise<FastifyReply> => {
+        const user = request.user;
+        if (user === undefined) {
+          // Unreachable: requireAuth either populated user or already replied.
+          throw new Error("requireAuth did not populate request.user");
         }
-        // Anything else -> uniform 500, no detail leaked to the client.
-        request.log.error({ err: error }, "queueAccountDeletion failed");
-        return await reply.code(500).send({ error: "internal" });
-      }
-    },
-  );
+        const accessToken = extractBearerToken(request.headers.authorization);
+
+        try {
+          const row = await queueAccountDeletion(user.id, accessToken);
+          // Parse the outgoing body through the shared schema (house pattern).
+          const body: DeletionResponse = deletionResponseSchema.parse({
+            status: "queued",
+            request_id: row.id,
+          });
+          return await reply.code(202).send(body);
+        } catch (error) {
+          // Env unset/malformed on the DB path -> 503, consistent with
+          // requireAuth's "server not configured" convention (not a client fault).
+          if (error instanceof SupabaseConfigError) {
+            return await reply.code(503).send({ error: "unavailable" });
+          }
+          // Anything else -> uniform 500, no detail leaked to the client.
+          request.log.error({ err: error }, "queueAccountDeletion failed");
+          return await reply.code(500).send({ error: "internal" });
+        }
+      },
+    );
+  });
 
   return app;
 }

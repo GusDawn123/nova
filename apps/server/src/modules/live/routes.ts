@@ -122,108 +122,116 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
     ? createTranscriptPersister(persisterOptions)
     : null;
 
-  app.get("/live", { websocket: true }, (socket: WebSocket, req) => {
-    // Header is primary; query param is the documented fallback.
-    const token =
-      extractBearerToken(req.headers.authorization) ?? readQueryToken(req);
+  // EXCLUDED from the REST rate limiter (adr-0007 §6): the socket has the
+  // one-session-per-user concurrency cap instead, and a mid-call upgrade must
+  // never be starved by unrelated REST traffic from the same caller.
+  app.get(
+    "/live",
+    { websocket: true, config: { rateLimit: false } },
+    (socket: WebSocket, req) => {
+      // Header is primary; query param is the documented fallback.
+      const token =
+        extractBearerToken(req.headers.authorization) ?? readQueryToken(req);
 
-    // The session doesn't exist until auth resolves (below), but auth can be
-    // network-bound (JWKS fetch). Listeners are attached SYNCHRONOUSLY here so a
-    // frame that arrives during the auth window is buffered, not lost, and an
-    // early disconnect is remembered. Nothing is processed until the session is
-    // live.
-    let session: LiveSession | null = null;
-    let closedEarly = false;
-    const pending: { buf: Buffer; isBinary: boolean }[] = [];
+      // The session doesn't exist until auth resolves (below), but auth can be
+      // network-bound (JWKS fetch). Listeners are attached SYNCHRONOUSLY here so a
+      // frame that arrives during the auth window is buffered, not lost, and an
+      // early disconnect is remembered. Nothing is processed until the session is
+      // live.
+      let session: LiveSession | null = null;
+      let closedEarly = false;
+      const pending: { buf: Buffer; isBinary: boolean }[] = [];
 
-    const deliver = (target: LiveSession, buf: Buffer, isBinary: boolean) => {
-      if (isBinary) target.handleBinaryMessage(buf);
-      else target.handleTextMessage(buf.toString("utf8"));
-    };
+      const deliver = (target: LiveSession, buf: Buffer, isBinary: boolean) => {
+        if (isBinary) target.handleBinaryMessage(buf);
+        else target.handleTextMessage(buf.toString("utf8"));
+      };
 
-    socket.on("message", (data: RawData, isBinary: boolean) => {
-      const buf = toBuffer(data);
-      if (session) {
-        deliver(session, buf, isBinary);
-        return;
-      }
-      // Unauthenticated flood guard: the buffer is bounded; a client that blows
-      // past it gets a policy close instead of growing server memory. The close
-      // handler flags closedEarly, so auth resolving later just disposes.
-      if (pending.length >= MAX_PENDING_FRAMES) {
-        socket.close(CLOSE_TOO_MUCH_BUFFERED, "too much data before auth");
-        return;
-      }
-      pending.push({ buf, isBinary });
-    });
-    socket.on("close", () => {
-      closedEarly = true;
-      pending.length = 0; // drop anything buffered for a client that is gone
-      session?.close();
-    });
-    socket.on("error", () => {
-      closedEarly = true;
-      session?.close();
-    });
+      socket.on("message", (data: RawData, isBinary: boolean) => {
+        const buf = toBuffer(data);
+        if (session) {
+          deliver(session, buf, isBinary);
+          return;
+        }
+        // Unauthenticated flood guard: the buffer is bounded; a client that blows
+        // past it gets a policy close instead of growing server memory. The close
+        // handler flags closedEarly, so auth resolving later just disposes.
+        if (pending.length >= MAX_PENDING_FRAMES) {
+          socket.close(CLOSE_TOO_MUCH_BUFFERED, "too much data before auth");
+          return;
+        }
+        pending.push({ buf, isBinary });
+      });
+      socket.on("close", () => {
+        closedEarly = true;
+        pending.length = 0; // drop anything buffered for a client that is gone
+        session?.close();
+      });
+      socket.on("error", () => {
+        closedEarly = true;
+        session?.close();
+      });
 
-    // Auth happens post-upgrade: a WS has no clean HTTP 401 once upgraded, so a
-    // failure is a policy close with an app code (4401/4503) + reason.
-    void authenticateToken(token).then((auth) => {
-      if (!auth.ok) {
-        socket.close(
-          auth.reason === "unavailable"
-            ? CLOSE_UNAVAILABLE
-            : CLOSE_UNAUTHORIZED,
-          auth.reason,
-        );
-        return;
-      }
+      // Auth happens post-upgrade: a WS has no clean HTTP 401 once upgraded, so a
+      // failure is a policy close with an app code (4401/4503) + reason.
+      void authenticateToken(token).then((auth) => {
+        if (!auth.ok) {
+          socket.close(
+            auth.reason === "unavailable"
+              ? CLOSE_UNAVAILABLE
+              : CLOSE_UNAUTHORIZED,
+            auth.reason,
+          );
+          return;
+        }
 
-      session = new LiveSession({
-        send: (event) => {
-          if (socket.readyState === socket.OPEN) {
-            socket.send(JSON.stringify(event));
-          }
-        },
-        // echo mode is a test affordance only — never honored in production.
-        allowEcho: process.env.NODE_ENV !== "production",
-        sttEngine,
-        // Persist finals + stamp ended_at for the authenticated owner (when the DB
-        // is wired). app.log carries persistence-failure logs (ids only, no content).
-        ...(persister !== null ? { persister, userId: auth.user.id } : {}),
-        // Metering + quota (Phase 6): bill relayed stt seconds + enforce the plan
-        // quota for the authenticated caller. userId rides the persister spread
-        // above when the DB is wired; when only metering is wired (not possible
-        // today — both gate on the DB) the session skips enforcement without an
-        // owner, so the pairing stays safe either way.
-        ...(metering !== undefined
-          ? {
-              metering,
-              userId: auth.user.id,
-              quotaRecheckSeconds: meteringConfig.quotaRecheckSeconds,
+        session = new LiveSession({
+          send: (event) => {
+            if (socket.readyState === socket.OPEN) {
+              socket.send(JSON.stringify(event));
             }
-          : {}),
-        ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
-        logger: app.log,
+          },
+          // echo mode is a test affordance only — never honored in production.
+          allowEcho: process.env.NODE_ENV !== "production",
+          sttEngine,
+          // Persist finals + stamp ended_at for the authenticated owner (when the DB
+          // is wired). app.log carries persistence-failure logs (ids only, no content).
+          ...(persister !== null ? { persister, userId: auth.user.id } : {}),
+          // Metering + quota (Phase 6): bill relayed stt seconds + enforce the plan
+          // quota for the authenticated caller. userId rides the persister spread
+          // above when the DB is wired; when only metering is wired (not possible
+          // today — both gate on the DB) the session skips enforcement without an
+          // owner, so the pairing stays safe either way.
+          ...(metering !== undefined
+            ? {
+                metering,
+                userId: auth.user.id,
+                quotaRecheckSeconds: meteringConfig.quotaRecheckSeconds,
+              }
+            : {}),
+          ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
+          logger: app.log,
+        });
+
+        // Closing the socket is itself a session-scoped resource. Registering it
+        // means `session.end` (→ disposer.dispose) also closes the socket, and a
+        // transport-driven close/error runs the disposer — exactly once, since
+        // dispose is idempotent (the resulting `close` event re-entry no-ops).
+        session.disposer.add(() => {
+          if (socket.readyState === socket.OPEN) socket.close(CLOSE_NORMAL);
+        });
+
+        // The client may have already gone away while auth was in flight — dispose
+        // now (the close handler above ran before `session` existed).
+        if (closedEarly) {
+          session.close();
+          return;
+        }
+
+        for (const frame of pending)
+          deliver(session, frame.buf, frame.isBinary);
+        pending.length = 0;
       });
-
-      // Closing the socket is itself a session-scoped resource. Registering it
-      // means `session.end` (→ disposer.dispose) also closes the socket, and a
-      // transport-driven close/error runs the disposer — exactly once, since
-      // dispose is idempotent (the resulting `close` event re-entry no-ops).
-      session.disposer.add(() => {
-        if (socket.readyState === socket.OPEN) socket.close(CLOSE_NORMAL);
-      });
-
-      // The client may have already gone away while auth was in flight — dispose
-      // now (the close handler above ran before `session` existed).
-      if (closedEarly) {
-        session.close();
-        return;
-      }
-
-      for (const frame of pending) deliver(session, frame.buf, frame.isBinary);
-      pending.length = 0;
-    });
-  });
+    },
+  );
 }
