@@ -290,6 +290,8 @@ function translatePostCommit(error: unknown, ctx: AttemptContext): LlmError {
 
 /**
  * Pre-commit failure → the breaker/summary kind. A ttft timeout is transient.
+ * `auth` benches; `invalid` (400/404/422 — Phase 6) fails over immediately with
+ * NO same-provider retry and feeds the breaker like a transient.
  *
  * DELIBERATE (orchestrator ruling): a non-`LlmError` thrown pre-commit — an
  * adapter bug, since adapters contractually throw typed errors — is classified
@@ -300,11 +302,14 @@ function translatePostCommit(error: unknown, ctx: AttemptContext): LlmError {
 function classifyPreCommit(
   error: unknown,
   ctx: AttemptContext,
-): "auth" | "transient" {
+): "auth" | "invalid" | "transient" {
   if (ctx.abortReason === "ttft") {
     return "transient";
   }
-  return isLlmError(error) && error.kind === "auth" ? "auth" : "transient";
+  if (isLlmError(error) && (error.kind === "auth" || error.kind === "invalid")) {
+    return error.kind;
+  }
+  return "transient";
 }
 
 /** Report the winner's usage to the meter (usage may be `null`: no counts). */

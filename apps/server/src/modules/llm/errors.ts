@@ -7,6 +7,12 @@ import type { ProviderId } from "./ports.js";
  *
  * - `auth`      — 401/403-class; a bad/expired key. Benched FAR longer than a
  *                 blip (see `authCooldownMs`) because retrying won't help.
+ * - `invalid`   — 400/404/422-class; the request/credit/model is bad AT this
+ *                 provider (Phase 6; live evidence: the 2026-07-22 Anthropic
+ *                 credit outage returned 400s classed `transient`, burning a
+ *                 failover sweep per call). Immediate failover, no same-provider
+ *                 retry; DOES count toward the breaker so repeated invalids trip
+ *                 it open.
  * - `transient` — 5xx / timeout / network. Retryable; short breaker cooldown.
  * - `stall`     — a committed stream went silent past `stallTimeoutMs`.
  * - `aborted`   — the caller aborted; not a provider fault.
@@ -15,6 +21,7 @@ import type { ProviderId } from "./ports.js";
  */
 export type LlmErrorKind =
   | "auth"
+  | "invalid"
   | "transient"
   | "stall"
   | "aborted"
@@ -63,6 +70,10 @@ export class LlmError extends Error {
     return new LlmError("auth", message, options);
   }
 
+  static invalid(message = "invalid request", options?: LlmErrorOptions) {
+    return new LlmError("invalid", message, options);
+  }
+
   static transient(
     message = "transient provider failure",
     options?: LlmErrorOptions,
@@ -91,9 +102,14 @@ export class LlmError extends Error {
     message: string,
     options?: LlmErrorOptions,
   ) {
-    return classifyHttpStatus(status) === "auth"
-      ? LlmError.auth(message, options)
-      : LlmError.transient(message, options);
+    switch (classifyHttpStatus(status)) {
+      case "auth":
+        return LlmError.auth(message, options);
+      case "invalid":
+        return LlmError.invalid(message, options);
+      case "transient":
+        return LlmError.transient(message, options);
+    }
   }
 }
 
@@ -113,12 +129,21 @@ export class AllProvidersFailedError extends LlmError {
 
 /**
  * Map an HTTP status to the retry taxonomy. 401/403 are `auth` (a key problem —
- * retrying is pointless); everything else an adapter surfaces as an error
- * (5xx, 429, timeouts modelled as a status) is `transient` (worth failing over
- * and retrying later).
+ * retrying is pointless); 400/404/422 are `invalid` (the request/credit/model is
+ * bad AT this provider — fail over, never re-probe in-call, breaker counts);
+ * everything else an adapter surfaces as an error (5xx, 429, timeouts modelled
+ * as a status) is `transient` (worth failing over and retrying later).
  */
-export function classifyHttpStatus(status: number): "auth" | "transient" {
-  return status === 401 || status === 403 ? "auth" : "transient";
+export function classifyHttpStatus(
+  status: number,
+): "auth" | "invalid" | "transient" {
+  if (status === 401 || status === 403) {
+    return "auth";
+  }
+  if (status === 400 || status === 404 || status === 422) {
+    return "invalid";
+  }
+  return "transient";
 }
 
 /** Narrow an unknown thrown value to our taxonomy. */

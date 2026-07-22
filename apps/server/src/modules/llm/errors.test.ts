@@ -15,7 +15,9 @@ describe("classifyHttpStatus", () => {
   });
 
   it("maps every other status to transient", () => {
-    for (const status of [400, 408, 429, 500, 502, 503, 504]) {
+    // Phase 6: 400 moved to the `invalid` class (router.invalid.test.ts covers
+    // 400/404/422); the remaining statuses keep their transient semantics.
+    for (const status of [408, 429, 500, 502, 503, 504]) {
       expect(classifyHttpStatus(status)).toBe("transient");
     }
   });
