@@ -1,0 +1,27 @@
+{
+  "meta": {
+    "title": "Backend engineer screen — Priya & candidate",
+    "startedAt": "2026-07-22T17:00:00Z"
+  },
+  "turns": [
+    { "speaker": "Priya", "text": "Thanks for joining. I'm Priya, I lead the platform team. This is a technical screen, so I'll ask about your background and then we'll dig into a design problem. Sound good?", "tsMs": 0 },
+    { "speaker": "Candidate", "text": "Sounds great. For background, I've spent the last four years on backend systems, mostly Node and Postgres, with a stretch owning our job-processing pipeline.", "tsMs": 16000 },
+    { "speaker": "Priya", "text": "The job pipeline is a good place to start. What did that system do, and what was the hardest part of running it?", "tsMs": 33000 },
+    { "speaker": "Candidate", "text": "It processed webhook events into downstream syncs. The hardest part was exactly-once delivery — we kept getting duplicate side effects when workers crashed mid-job.", "tsMs": 48000 },
+    { "speaker": "Priya", "text": "How did you handle that? Walk me through the mechanism.", "tsMs": 66000 },
+    { "speaker": "Candidate", "text": "We made the workers idempotent and used a claim with a lease. A worker would claim a row, and if it died, a reaper requeued the job after the lease expired.", "tsMs": 80000 },
+    { "speaker": "Priya", "text": "That's a solid pattern. Let me pin one thing: how did you pick the lease length?", "tsMs": 99000 },
+    { "speaker": "Candidate", "text": "Honestly, we set it to five minutes and mostly left it. I don't think we ever tuned it against the actual worst-case job time, which in hindsight was a gap.", "tsMs": 113000 },
+    { "speaker": "Priya", "text": "Fair and honest. Let's switch to design. Suppose you had to build a queue on Postgres from scratch — no Redis, no SQS. How would you claim jobs safely across many workers?", "tsMs": 132000 },
+    { "speaker": "Candidate", "text": "I'd use SELECT FOR UPDATE SKIP LOCKED inside an UPDATE, so each worker atomically grabs a different unlocked row. That avoids two workers claiming the same job.", "tsMs": 154000 },
+    { "speaker": "Priya", "text": "Good. Now how do you keep the claim query fast when the table has millions of completed rows?", "tsMs": 172000 },
+    { "speaker": "Candidate", "text": "A partial index on the queued rows only, so the planner isn't scanning completed history. You index where status equals queued, ordered by run-at.", "tsMs": 187000 },
+    { "speaker": "Priya", "text": "Nice. One more: how would you add observability so you know when jobs are backing up?", "tsMs": 206000 },
+    { "speaker": "Candidate", "text": "Um, I'd probably log completions and errors. Beyond that I haven't done much with metrics dashboards, so I'd lean on whatever the team already uses.", "tsMs": 221000 },
+    { "speaker": "Priya", "text": "That's useful to know. Observability is an area we'd want to grow with you. What questions do you have for me?", "tsMs": 240000 },
+    { "speaker": "Candidate", "text": "What does the on-call rotation look like, and how much of the roadmap is greenfield versus maintaining existing systems?", "tsMs": 257000 },
+    { "speaker": "Priya", "text": "On-call is one week in six, and right now it's roughly sixty-forty greenfield to maintenance. I'll follow up on the exact rotation after this.", "tsMs": 273000 },
+    { "speaker": "Candidate", "text": "That's helpful, thank you. I'm genuinely interested in the queue and pipeline work you described.", "tsMs": 291000 },
+    { "speaker": "Priya", "text": "Great. Thanks for walking through all of that. We'll be in touch on next steps.", "tsMs": 305000 }
+  ]
+}
