@@ -30,6 +30,7 @@ import {
   maybeCreateKillSwitch,
   maybeCreateMetering,
   maybeCreateQuotaChecker,
+  maybeRegisterRevenueCatRoutes,
   voyageMeteringSink,
 } from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
@@ -146,6 +147,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
   // broken routes (it just doesn't expose them — /health still serves).
   maybeRegisterNotesRoutes(app, metering, quota, killSwitch);
+
+  // RevenueCat webhook (adr-0007 §7): server-to-server plan sync, registered
+  // ONLY when REVENUECAT_WEBHOOK_TOKEN (+ the DB) is configured.
+  maybeRegisterRevenueCatRoutes(app);
 
   // Direct root routes are declared inside `after()` so they register only once
   // the queued plugins (rate limit above all — it protects routes via an

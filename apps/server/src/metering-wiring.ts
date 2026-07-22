@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
-import { createPlanReader } from "./db/plans.js";
+import { createPlanReader, createPlanWriter } from "./db/plans.js";
 import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
@@ -10,6 +10,7 @@ import {
   createKillSwitch,
   createMeteringService,
   createQuotaChecker,
+  createRevenueCatRoutes,
   type KillSwitch,
   type MeteringService,
   type QuotaChecker,
@@ -131,4 +132,29 @@ export function maybeCreateLiveMetering(
     isOverSttQuota: (userId) => quota.isOverQuota(userId, "stt_seconds"),
     isOverDailyCap: () => killSwitch.isTripped(),
   };
+}
+
+/**
+ * Register the RevenueCat webhook (adr-0007 §7) ONLY when BOTH the shared
+ * secret (`REVENUECAT_WEBHOOK_TOKEN`) and the DB (`SUPABASE_DB_URL` — the plan
+ * writer's pool) are configured. Absent either, the route does not exist (404)
+ * — the seam stays dark until billing goes live (Phase 8).
+ */
+export function maybeRegisterRevenueCatRoutes(app: FastifyInstance): void {
+  const token = process.env.REVENUECAT_WEBHOOK_TOKEN;
+  if (
+    token === undefined ||
+    token === "" ||
+    !isUsageEventsConfigured(process.env)
+  ) {
+    return;
+  }
+  const { pool } = usageEventsDbFromEnv(process.env);
+  void app.register(
+    createRevenueCatRoutes({
+      token,
+      writer: createPlanWriter(pool),
+      logger: app.log,
+    }),
+  );
 }

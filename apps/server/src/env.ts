@@ -5,7 +5,9 @@ import { z } from "zod";
  * actually needs today (YAGNI) — grow it as real config appears.
  */
 const envSchema = z.object({
-  NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NODE_ENV: z
+    .enum(["development", "test", "production"])
+    .default("development"),
   PORT: z.coerce.number().int().positive().default(3000),
   HOST: z.string().min(1).default("127.0.0.1"),
   // Supabase is OPTIONAL: the server must boot (and serve /health) without a DB.
@@ -55,6 +57,12 @@ const envSchema = z.object({
   // off-in-tests/keyless-boots posture the RAG indexer takes. The stale-call reaper
   // is gated separately (on SUPABASE_DB_URL alone), since it also feeds RAG.
   NOTES_WORKER_ENABLED: z.string().optional(),
+  // RevenueCat webhook shared secret (Phase 6, adr-0007 §7). OPTIONAL: when unset
+  // the `POST /webhooks/revenuecat` route is NOT registered at all (the seam stays
+  // dark until billing goes live in Phase 8). When set, the webhook requires
+  // `Authorization: Bearer <this value>` (constant-time compared). Secret — never
+  // logged, never in the repo, configured in the RevenueCat dashboard.
+  REVENUECAT_WEBHOOK_TOKEN: z.string().min(1).optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
