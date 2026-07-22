@@ -3,6 +3,13 @@ import { z } from "zod";
 import type { RagConfig } from "../config.js";
 import { RagError } from "../ports.js";
 import type { Embedder, RagHit, Reranker } from "../ports.js";
+import {
+  defaultLogBackoff,
+  MAX_RETRY_ATTEMPTS,
+  voyagePost,
+  type VoyageBackoffLog,
+  type VoyageRetry,
+} from "./voyage.retry.js";
 
 /**
  * Voyage AI adapter (Phase 4) — the ONLY place the embeddings/rerank vendor HTTP
@@ -24,6 +31,11 @@ import type { Embedder, RagHit, Reranker } from "../ports.js";
  * env factory, so a keyless deploy degrades, never crashes); an auth rejection
  * (401/403) once a key IS present is a genuine vendor failure → `EMBEDDER_FAILED`
  * with the cause, NOT `RAG_NOT_CONFIGURED`.
+ *
+ * Rate limits (adr §8 — retrieval can shrink, never delay): a 429 on a BACKGROUND
+ * call (document embed, rerank) backs off and retries (see `voyage.retry.ts`); a
+ * 429 on the hot-path query embed is fail-fast — zero waits, an immediate typed
+ * failure — so the live suggestion degrades instead of stalling.
  *
  * Logging (RULES §6): every embed/rerank invocation emits exactly ONE structured
  * usage line `{ vendor, model, tokens, user_id }` (metering-ready). Input texts
@@ -107,66 +119,9 @@ function defaultLogUsage(entry: VoyageUsageLog): void {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP with a hard timeout + typed error mapping.
+// Batching + rerank rendering helpers. The vendor HTTP (with rate-limit retry)
+// lives in `voyage.retry.ts` — see {@link voyagePost}.
 // ---------------------------------------------------------------------------
-
-/**
- * POST JSON to Voyage under an {@link AbortController} deadline. Returns the raw
- * parsed body as `unknown` (the caller zod-validates it). Every failure — abort/
- * timeout, network error, non-2xx, malformed JSON — becomes `EMBEDDER_FAILED`
- * with the cause preserved. The request body and any error-response body are NEVER
- * put in the message (they may echo input text).
- */
-async function voyagePost(
-  url: string,
-  apiKey: string,
-  body: unknown,
-  timeoutMs: number,
-): Promise<unknown> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-
-  let res: Response;
-  try {
-    res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (cause) {
-    const aborted = cause instanceof Error && cause.name === "AbortError";
-    throw RagError.embedderFailed(
-      aborted
-        ? `voyage: request timed out after ${String(timeoutMs)}ms`
-        : "voyage: network error",
-      { cause },
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-
-  if (!res.ok) {
-    // Status only — the response body can echo the input text; never surface it.
-    throw RagError.embedderFailed(`voyage: HTTP ${String(res.status)}`, {
-      cause: new Error(
-        `voyage responded ${String(res.status)} ${res.statusText}`,
-      ),
-    });
-  }
-
-  try {
-    const body: unknown = await res.json();
-    return body;
-  } catch (cause) {
-    throw RagError.embedderFailed("voyage: malformed JSON response", { cause });
-  }
-}
 
 /** Split `items` into consecutive slices of at most `size` (>=1). */
 function batched<T>(items: T[], size: number): T[][] {
@@ -194,6 +149,8 @@ export interface VoyageAdapterOptions {
   readonly config: VoyageConfig;
   /** Usage-line sink; defaults to one info-level JSON line. Injected in tests. */
   readonly logUsage?: (entry: VoyageUsageLog) => void;
+  /** Backoff-warn sink; defaults to one warn-level JSON line. Injected in tests. */
+  readonly logBackoff?: (entry: VoyageBackoffLog) => void;
 }
 
 /**
@@ -206,6 +163,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
 } {
   const { apiKey, config } = opts;
   const logUsage = opts.logUsage ?? defaultLogUsage;
+  const logBackoff = opts.logBackoff ?? defaultLogBackoff;
 
   const embedder: Embedder = {
     async embed(texts, embedOpts) {
@@ -217,6 +175,16 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
         : config.ingestEmbedTimeoutMs;
       // Queries are ALWAYS one unbatched call; documents chunk into batches.
       const batches = isQuery ? [texts] : batched(texts, config.embedBatchSize);
+
+      // LAW (adr-0005 §8 — retrieval can shrink, never delay): the live hot path
+      // never waits on a rate limiter. Query embeds are fail-fast (maxAttempts=1,
+      // zero retries) so a 429 degrades the suggestion instantly; only BACKGROUND
+      // document ingest may back off and retry on 429.
+      const retry: VoyageRetry = {
+        model: requestModel,
+        maxAttempts: isQuery ? 1 : MAX_RETRY_ATTEMPTS,
+        logBackoff,
+      };
 
       const vectors: number[][] = [];
       let tokens = 0;
@@ -236,6 +204,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
             output_dimension: EMBED_DIMS,
           },
           timeoutMs,
+          retry,
         );
         const parsed = embeddingsResponseSchema.safeParse(raw);
         if (!parsed.success) {
@@ -284,7 +253,8 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
       if (hits.length === 0) return [];
       const topK = Math.min(k, hits.length);
       // Rerank is deliberate-tier (post-call, off the hot path — adr §5), so it
-      // gets the generous ingest deadline, never the tight query one.
+      // gets the generous ingest deadline, never the tight query one, and — like
+      // background embeds — may back off and retry on a 429 (adr §8).
       const raw = await voyagePost(
         RERANK_URL,
         apiKey,
@@ -295,6 +265,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
           top_k: topK,
         },
         config.ingestEmbedTimeoutMs,
+        { model: RERANK_MODEL, maxAttempts: MAX_RETRY_ATTEMPTS, logBackoff },
       );
       const parsed = rerankResponseSchema.safeParse(raw);
       if (!parsed.success) {

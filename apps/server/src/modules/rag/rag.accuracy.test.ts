@@ -137,7 +137,11 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
         content: doc.content,
       });
     }
-  }, 120_000);
+    // Generous hook timeout: a fresh Voyage key without a payment method has a low
+    // RPM cap, so ~20 back-to-back ingests may each back off on 429 (adr-0005 §8).
+    // This suite is key-gated and never runs keyless/CI, so a long ceiling here
+    // costs nothing and prevents a spurious timeout on a throttled key.
+  }, 600_000);
 
   afterAll(async () => {
     for (const id of userIds) {
@@ -162,13 +166,13 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
     );
 
     expect(top3).toContain(acmeDocId);
-  }, 60_000);
+  }, 600_000);
 
   it("[isolation] the same query for user B returns zero snippets", async () => {
     const { snippets } = await service.query(userB, QUERY, { tier: "deliberate" });
     console.log(`[rag isolation] userB_returned=${String(snippets.length)}`);
     expect(snippets).toHaveLength(0);
-  }, 60_000);
+  }, 600_000);
 
   it("[versioning] every stored embedding row has a model text and dims === 1024", async () => {
     const rows = await pool.query<{ model: string; dims: number }>(
@@ -185,7 +189,7 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
       `[rag versioning] embedding_rows=${String(rows.rows.length)} ` +
         `model=${rows.rows[0]?.model ?? "?"} dims=${String(rows.rows[0]?.dims ?? "?")}`,
     );
-  }, 60_000);
+  }, 600_000);
 
   it("[soft/live] reports the live-tier top-3 (no hard bar — live never reranks)", async () => {
     const acmeDocId = docIdBySlug.get(ACME_DOC);
@@ -200,5 +204,5 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
     // Soft: assert only that live retrieval runs and returns something; the hard
     // top-3 bar lives on the deliberate tier.
     expect(snippets.length).toBeGreaterThan(0);
-  }, 60_000);
+  }, 600_000);
 });
