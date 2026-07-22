@@ -15,8 +15,12 @@ import Fastify, {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { SupabaseConfigError } from "./db/client.js";
+import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
+import { createStaleCallReaper } from "./db/stale-call-reaper.js";
+import { isNotesWorkerEnabled } from "./env.js";
 import { liveRoutes } from "./modules/live/routes.js";
+import { createNotesWorker, type NotesJobHandler } from "./modules/notes/index.js";
 import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
@@ -73,6 +77,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
   // suites drive the sweeper explicitly, never the boot-wired background one.
   maybeStartRagIndexer(app);
+
+  // Stale-call reaper: stamps ended_at on crashed-mid-call orphans (feeds BOTH RAG
+  // and notes). Gated on the DB alone — same posture as the RAG indexer.
+  maybeStartStaleCallReaper(app);
+
+  // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
+  // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
+  maybeStartNotesWorker(app);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -156,6 +168,63 @@ function maybeStartRagIndexer(app: FastifyInstance): void {
   indexer.start();
   app.addHook("onClose", (_instance, done) => {
     indexer.stop();
+    done();
+  });
+}
+
+/**
+ * Start the stale-call reaper on boot when the DB is configured (SUPABASE_DB_URL)
+ * AND not under test — the integration suite drives its own reaper. It stamps
+ * `ended_at` on orphaned meetings so both the RAG sweep and the notes queue pick
+ * them up (adr-0006 §4). Stopped on server close.
+ */
+function maybeStartStaleCallReaper(app: FastifyInstance): void {
+  if (!isJobStoreConfigured(process.env) || process.env.NODE_ENV === "test") {
+    return;
+  }
+  const { pool } = notesJobStoreFromEnv(process.env);
+  const reaper = createStaleCallReaper({ pool, logger: app.log });
+  reaper.start();
+  app.addHook("onClose", (_instance, done) => {
+    reaper.stop();
+    done();
+  });
+}
+
+/**
+ * Start the notes worker on boot ONLY when explicitly enabled
+ * (`NOTES_WORKER_ENABLED=true`) with the DB configured, and never under test.
+ *
+ * TODO(Phase 5 Task 4): the real pipeline-backed {@link NotesJobHandler} is wired by
+ * Task 4. Until it lands the worker delegates to a deliberate placeholder that
+ * requeues each job with a clear marker (rather than silently spinning). Because the
+ * feature is OFF by default, no boot runs this placeholder — it exists so the machinery
+ * is fully wired and reviewable now, and Task 4 swaps one line.
+ */
+function maybeStartNotesWorker(app: FastifyInstance): void {
+  if (
+    !isNotesWorkerEnabled(process.env) ||
+    !isJobStoreConfigured(process.env) ||
+    process.env.NODE_ENV === "test"
+  ) {
+    return;
+  }
+  const { store } = notesJobStoreFromEnv(process.env);
+  const placeholderHandler: NotesJobHandler = {
+    handle: () =>
+      Promise.resolve({
+        outcome: "retry",
+        error: "notes pipeline not wired yet (Phase 5 Task 4)",
+      }),
+  };
+  const worker = createNotesWorker({
+    store,
+    handler: placeholderHandler,
+    logger: app.log,
+  });
+  worker.start();
+  app.addHook("onClose", (_instance, done) => {
+    worker.stop();
     done();
   });
 }
