@@ -253,6 +253,32 @@ export class LiveSession {
       });
     }
 
+    // Global daily-cap kill-switch (Phase 6, adr-0007 §5) — cheap/global before
+    // the per-user DB work below; refuses NEW sessions while in-flight ones
+    // finish (there is deliberately no mid-stream cap cut). Fail OPEN on a
+    // failing check (the kill-switch already logs loudly; this guards a
+    // misbehaving seam).
+    if (this.metering !== null) {
+      let capTripped = false;
+      try {
+        capTripped = await this.metering.isOverDailyCap();
+      } catch (err: unknown) {
+        this.logger?.error(
+          { user_id: this.userId, meeting_id: meetingId, err },
+          "live.daily_cap_check_failed",
+        );
+      }
+      if (this.disposer.disposed) return;
+      if (capTripped) {
+        this.sendError(
+          "daily_cap_reached",
+          "the service's daily spend cap is reached; try again tomorrow",
+        );
+        this.close();
+        return;
+      }
+    }
+
     // Ownership guard (Phase 4 review C1). The persist path is service-role (RLS +
     // the DB parentage `with_check` are BYPASSED), so before this socket may start
     // STT or write a single transcript, confirm the client-supplied meeting_id names

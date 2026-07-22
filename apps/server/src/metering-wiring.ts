@@ -7,8 +7,10 @@ import {
 } from "./db/usage-events.js";
 import type { LiveMetering } from "./modules/live/ports.js";
 import {
+  createKillSwitch,
   createMeteringService,
   createQuotaChecker,
+  type KillSwitch,
   type MeteringService,
   type QuotaChecker,
 } from "./modules/metering/index.js";
@@ -84,6 +86,27 @@ export function maybeCreateQuotaChecker(
 }
 
 /**
+ * ONE kill-switch per process (module-memoised like the pools): its
+ * once-per-UTC-day alert dedupe is a PROCESS-level guarantee, and both the
+ * app-level consumers (worker claim gate, follow-up) and the live transport
+ * must share the same dedupe state. The first builder's logger wins (the alert
+ * is process-scoped, not request-scoped).
+ */
+let cachedKillSwitch: KillSwitch | undefined;
+
+export function maybeCreateKillSwitch(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): KillSwitch | undefined {
+  if (!metering) return undefined;
+  cachedKillSwitch ??= createKillSwitch({
+    spendTodayUsd: () => metering.spendTodayUsd(),
+    logger: app.log,
+  });
+  return cachedKillSwitch;
+}
+
+/**
  * Adapt the metering service + quota checker onto the live module's
  * {@link LiveMetering} seam (modules stay islands — the session types against
  * its own port, this wiring bridges them): relayed-audio spans land as
@@ -94,7 +117,8 @@ export function maybeCreateLiveMetering(
 ): LiveMetering | undefined {
   const metering = maybeCreateMetering(app);
   const quota = maybeCreateQuotaChecker(app, metering);
-  if (!metering || !quota) return undefined;
+  const killSwitch = maybeCreateKillSwitch(app, metering);
+  if (!metering || !quota || !killSwitch) return undefined;
   return {
     recordSttSeconds: ({ userId, meetingId, vendor, seconds }) =>
       metering.record({
@@ -105,5 +129,6 @@ export function maybeCreateLiveMetering(
         amount: seconds,
       }),
     isOverSttQuota: (userId) => quota.isOverQuota(userId, "stt_seconds"),
+    isOverDailyCap: () => killSwitch.isTripped(),
   };
 }

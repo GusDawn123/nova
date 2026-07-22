@@ -112,6 +112,8 @@ export interface LiveSttUsage {
 export interface LiveMetering {
   recordSttSeconds(usage: LiveSttUsage): Promise<void>;
   isOverSttQuota(userId: string): Promise<boolean>;
+  /** true = the GLOBAL daily spend kill-switch is tripped (adr-0007 §5). */
+  isOverDailyCap(): Promise<boolean>;
 }
 
 /**

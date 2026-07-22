@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import type { ClaimedJob, NotesJobStore } from "../../db/jobs.js";
 
-import { computeBackoff, notesConfigSchema, type NotesConfig } from "./config.js";
+import {
+  computeBackoff,
+  notesConfigSchema,
+  type NotesConfig,
+} from "./config.js";
 import type { NotesJobHandler, NotesLogger, NotesWorker } from "./ports.js";
 
 /**
@@ -26,6 +30,14 @@ export interface NotesWorkerDeps {
   readonly config?: Partial<NotesConfig>;
   /** Lease owner id; a random one is minted when omitted. */
   readonly workerId?: string;
+  /**
+   * The global daily-spend kill-switch (Phase 6, adr-0007 §5), gating the CLAIM
+   * itself: tripped → the tick returns without touching the store, so no
+   * attempts are burned and queued jobs simply wait out the day (nothing lost,
+   * nothing dead-letters); in-flight jobs finish (the gate is per-tick, never
+   * mid-job). Optional (keyless posture) and fail-open on an internal failure.
+   */
+  readonly isDailyCapReached?: () => Promise<boolean>;
 }
 
 /** Best-effort message from an unknown thrown value (never leaks a stack to logs). */
@@ -47,7 +59,11 @@ export function createNotesWorker(deps: NotesWorkerDeps): NotesWorker {
 
   /** Map one claimed job's handler outcome onto a store transition. */
   async function processOne(job: ClaimedJob): Promise<void> {
-    const base = { worker_id: workerId, job_id: job.id, meeting_id: job.meetingId };
+    const base = {
+      worker_id: workerId,
+      job_id: job.id,
+      meeting_id: job.meetingId,
+    };
 
     let outcome: Awaited<ReturnType<NotesJobHandler["handle"]>>;
     try {
@@ -61,7 +77,10 @@ export function createNotesWorker(deps: NotesWorkerDeps): NotesWorker {
     switch (outcome.outcome) {
       case "completed":
         await store.complete(job.id, outcome.usage);
-        logger.info({ ...base, usage: outcome.usage.length }, "notes.job.completed");
+        logger.info(
+          { ...base, usage: outcome.usage.length },
+          "notes.job.completed",
+        );
         return;
       case "retry":
         if (job.attempts >= job.maxAttempts) {
@@ -72,8 +91,15 @@ export function createNotesWorker(deps: NotesWorkerDeps): NotesWorker {
         }
         {
           const delayMs = computeBackoff(job.attempts, config);
-          await store.retry(job.id, outcome.error, new Date(Date.now() + delayMs));
-          logger.info({ ...base, attempts: job.attempts, delay_ms: delayMs }, "notes.job.retry");
+          await store.retry(
+            job.id,
+            outcome.error,
+            new Date(Date.now() + delayMs),
+          );
+          logger.info(
+            { ...base, attempts: job.attempts, delay_ms: delayMs },
+            "notes.job.retry",
+          );
         }
         return;
       case "failed":
@@ -89,6 +115,20 @@ export function createNotesWorker(deps: NotesWorkerDeps): NotesWorker {
   }
 
   async function tickOnce(): Promise<number> {
+    // Daily-cap claim gate (see deps doc). Fail OPEN: the kill-switch logs its
+    // own failure loudly; a broken sum must not stall the queue.
+    if (deps.isDailyCapReached) {
+      let capReached = false;
+      try {
+        capReached = await deps.isDailyCapReached();
+      } catch (err) {
+        logger.error(
+          { worker_id: workerId, err },
+          "notes.daily_cap_check_failed",
+        );
+      }
+      if (capReached) return 0;
+    }
     const claimed = await store.claim(workerId);
     if (claimed === null) return 0;
     await processOne(claimed);
@@ -115,7 +155,10 @@ export function createNotesWorker(deps: NotesWorkerDeps): NotesWorker {
       const requeued = await store.reapExpired(config.leaseMs);
       const swept = await store.sweepEnqueue(config.sweepBatchSize);
       if (requeued > 0 || swept > 0) {
-        logger.info({ worker_id: workerId, reaped: requeued, swept }, "notes.reaper.tick");
+        logger.info(
+          { worker_id: workerId, reaped: requeued, swept },
+          "notes.reaper.tick",
+        );
       }
     })()
       .catch((err: unknown) => {

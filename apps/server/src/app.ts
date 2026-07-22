@@ -27,12 +27,14 @@ import {
   createNotesWriter,
 } from "./db/notes.js";
 import {
+  maybeCreateKillSwitch,
   maybeCreateMetering,
   maybeCreateQuotaChecker,
   voyageMeteringSink,
 } from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
 import {
+  type KillSwitch,
   type MeteringService,
   type QuotaChecker,
 } from "./modules/metering/index.js";
@@ -125,6 +127,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // invariant: no vendor path behind a noop sink).
   const metering = maybeCreateMetering(app);
   const quota = maybeCreateQuotaChecker(app, metering);
+  const killSwitch = maybeCreateKillSwitch(app, metering);
 
   // Auto-index sweeper: closes the memory loop (call ends → chunks queryable
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
@@ -137,12 +140,12 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
   // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
-  maybeStartNotesWorker(app, metering, quota);
+  maybeStartNotesWorker(app, metering, quota, killSwitch);
 
   // Post-call notes REST surface (read / regenerate / follow-up). Registered only
   // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
   // broken routes (it just doesn't expose them — /health still serves).
-  maybeRegisterNotesRoutes(app, metering, quota);
+  maybeRegisterNotesRoutes(app, metering, quota, killSwitch);
 
   // Direct root routes are declared inside `after()` so they register only once
   // the queued plugins (rate limit above all — it protects routes via an
@@ -284,6 +287,7 @@ function maybeStartNotesWorker(
   app: FastifyInstance,
   metering: MeteringService | undefined,
   quota: QuotaChecker | undefined,
+  killSwitch: KillSwitch | undefined,
 ): void {
   if (
     !isNotesWorkerEnabled(process.env) ||
@@ -333,7 +337,14 @@ function maybeStartNotesWorker(
         }
       : {}),
   });
-  const worker = createNotesWorker({ store, handler, logger: app.log });
+  const worker = createNotesWorker({
+    store,
+    handler,
+    logger: app.log,
+    // Kill-switch claim gate (adr-0007 §5): tripped → no NEW claims, queued
+    // jobs wait out the day, in-flight finishes.
+    ...(killSwitch ? { isDailyCapReached: () => killSwitch.isTripped() } : {}),
+  });
   worker.start();
   app.addHook("onClose", (_instance, done) => {
     worker.stop();
@@ -355,6 +366,7 @@ function maybeRegisterNotesRoutes(
   app: FastifyInstance,
   metering: MeteringService | undefined,
   quota: QuotaChecker | undefined,
+  killSwitch: KillSwitch | undefined,
 ): void {
   if (
     !isSupabaseConfigured(process.env) ||
@@ -397,6 +409,10 @@ function maybeRegisterNotesRoutes(
             isOverLlmQuota: (userId: string) =>
               quota.isOverQuota(userId, "llm_tokens"),
           }
+        : {}),
+      // Kill-switch gate for follow-up (typed 503 daily_cap_reached).
+      ...(killSwitch
+        ? { isDailyCapReached: () => killSwitch.isTripped() }
         : {}),
     }),
   );

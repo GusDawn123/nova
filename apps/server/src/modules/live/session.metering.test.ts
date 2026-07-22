@@ -108,6 +108,8 @@ function fakeMetering(): {
       if (quotaError) return Promise.reject(quotaError);
       return Promise.resolve(over);
     },
+    // The daily cap is exercised by session.cap.test.ts; here it never trips.
+    isOverDailyCap: () => Promise.resolve(false),
   };
   return {
     metering,

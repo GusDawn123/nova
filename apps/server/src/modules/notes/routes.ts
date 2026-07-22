@@ -47,6 +47,12 @@ export interface NotesRoutesDeps {
    * internal failure.
    */
   readonly isOverLlmQuota?: (userId: string) => Promise<boolean>;
+  /**
+   * The global daily-spend kill-switch (Phase 6, adr-0007 §5): tripped → typed
+   * 503 `daily_cap_reached` BEFORE any provider call (a service-side stop, not
+   * the caller's fault — hence 503, not 429). Optional; fail-open.
+   */
+  readonly isDailyCapReached?: () => Promise<boolean>;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -159,6 +165,27 @@ export function createNotesRoutes(
         // (or still generating/failed) → typed 409, not a draft from thin air.
         if (model.notes === null || model.notesStatus !== "completed") {
           return reply.code(409).send({ error: "notes_not_ready" });
+        }
+
+        // Kill-switch gate (Phase 6, adr-0007 §5) — global/cheap before the
+        // per-user quota below. Fail-open (the kill-switch logs loudly itself).
+        if (deps.isDailyCapReached) {
+          let capReached = false;
+          try {
+            capReached = await deps.isDailyCapReached();
+          } catch (err) {
+            logger.error(
+              { user_id: userId, meeting_id: meetingId, err },
+              "notes.follow_up.daily_cap_check_failed",
+            );
+          }
+          if (capReached) {
+            logger.info(
+              { user_id: userId, meeting_id: meetingId },
+              "notes.follow_up.daily_cap_reached",
+            );
+            return reply.code(503).send({ error: "daily_cap_reached" });
+          }
         }
 
         // Quota gate (Phase 6, adr-0007 §4) — BEFORE the paid call. Fail-open on

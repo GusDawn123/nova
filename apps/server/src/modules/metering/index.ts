@@ -39,3 +39,9 @@ export {
   type QuotaKind,
   type PlanReader,
 } from "./quota.js";
+
+export {
+  createKillSwitch,
+  type KillSwitch,
+  type KillSwitchDeps,
+} from "./kill-switch.js";

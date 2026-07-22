@@ -165,6 +165,7 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     followUpRouter: LlmRouter,
     log: NotesLogger,
     isOverLlmQuota?: (userId: string) => Promise<boolean>,
+    isDailyCapReached?: () => Promise<boolean>,
   ): FastifyInstance {
     const app = Fastify({ logger: false });
     void app.register(
@@ -176,6 +177,7 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
         logger: log,
         now: () => new Date("2026-07-22T18:00:00Z"),
         ...(isOverLlmQuota ? { isOverLlmQuota } : {}),
+        ...(isDailyCapReached ? { isDailyCapReached } : {}),
       }),
     );
     return app;
@@ -406,6 +408,24 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     });
     expect(res.statusCode).toBe(429);
     expect(res.json()).toEqual({ error: "quota_exceeded" });
+  });
+
+  it("follow-up under a tripped daily cap is a typed 503 daily_cap_reached (no call made)", async () => {
+    const meetingId = await newMeeting(userAId);
+    await completeNotes(meetingId);
+
+    // A router that would blow up if the cap gate let the call through.
+    const capApp = buildApp(throwingRouter(), okLog.logger, undefined, () =>
+      Promise.resolve(true),
+    );
+    const res = await capApp.inject({
+      method: "POST",
+      url: `/meetings/${meetingId}/follow-up`,
+      headers: auth(tokenA),
+      payload: { tone: "warm" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "daily_cap_reached" });
   });
 
   it("follow-up on a foreign meeting is a uniform 404", async () => {
