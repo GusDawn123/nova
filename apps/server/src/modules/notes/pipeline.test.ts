@@ -6,6 +6,7 @@ import { doneWith, makeRouter, tok } from "../llm/testing/router-harness.js";
 
 import { createNotesPipeline } from "./pipeline.js";
 import type { NotesLogger, NotesMeetingMeta, TranscriptTurn } from "./ports.js";
+import { makeNotesRouter } from "./testing/mock-notes-router.js";
 
 /**
  * Single-pass pipeline behaviour vs scripted mock providers. The mock consumes one
@@ -176,6 +177,39 @@ describe("createNotesPipeline — single pass", () => {
     expect(notes.source).toBe("fallback");
     expect(usage).toHaveLength(0);
     expect(provider.calls).toHaveLength(0);
+  });
+});
+
+describe("createNotesPipeline — single-pass ↔ map-reduce gate", () => {
+  it("keeps a short transcript single-pass under the default gate", async () => {
+    // Prompt-reading router: classify → 'sales', generate → valid sales notes.
+    const router = makeNotesRouter({ generate: () => SALES_NOTES });
+    const pipeline = createNotesPipeline({ router, logger: NOOP_LOGGER });
+
+    const { notes } = await pipeline.generate(META, TURNS);
+
+    expect(() => meetingNotesSchema.parse(notes)).not.toThrow();
+    // Exactly the single-pass call sequence — no map/reduce.
+    expect(router.calls.map((c) => c.stage)).toEqual(["classify", "generate"]);
+  });
+
+  it("forces map-reduce when maxSinglePassTokens is lowered (spy on router stages)", async () => {
+    // Same short transcript, but a gate below its estimated size → map-reduce arm.
+    const router = makeNotesRouter({});
+    const pipeline = createNotesPipeline({
+      router,
+      logger: NOOP_LOGGER,
+      config: { maxSinglePassTokens: 10, mapChunkTokens: 100, mapOverlapRatio: 0.15 },
+    });
+
+    const { notes } = await pipeline.generate(META, TURNS);
+
+    expect(() => meetingNotesSchema.parse(notes)).not.toThrow();
+    const stages = router.calls.map((c) => c.stage);
+    expect(stages[0]).toBe("classify");
+    expect(stages).toContain("map");
+    expect(stages).toContain("reduce");
+    expect(stages).not.toContain("generate"); // never the single-pass call
   });
 });
 

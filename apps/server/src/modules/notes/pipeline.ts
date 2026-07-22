@@ -11,7 +11,9 @@ import type { JobUsage } from "../../db/jobs.js";
 import type { LlmRouter } from "../llm/index.js";
 
 import { notesConfigSchema, type NotesConfig } from "./config.js";
+import { formatTranscript } from "./format.js";
 import { bufferStream, runLadder } from "./ladder.js";
+import { runMapReduce } from "./map-reduce.js";
 import type {
   NotesLogger,
   NotesMeetingMeta,
@@ -20,6 +22,7 @@ import type {
 } from "./ports.js";
 import { buildClassifyMessages, buildGenerateMessages } from "./prompts/types.js";
 import { buildNotesRepairMessages } from "./prompts/repair.js";
+import { CHARS_PER_TOKEN, estimateTokens } from "./tokens.js";
 import { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
 
 /**
@@ -58,7 +61,7 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
   async function generate(
     meta: NotesMeetingMeta,
     turns: TranscriptTurn[],
-  ): Promise<{ notes: MeetingNotes; usage: JobUsage[] }> {
+  ): Promise<{ notes: MeetingNotes; usage: JobUsage[]; rawText?: string }> {
     const usage: JobUsage[] = [];
     const transcriptText = joinTranscriptText(turns);
 
@@ -74,6 +77,35 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
 
     const type = await classify(turns, usage);
     const { callDate, weekday } = resolveCallDate(meta.startedAt, now);
+
+    // Threshold gate (adr §5): a transcript over `maxSinglePassTokens` degrades
+    // effective-context recall (itemized extraction dies first), so it takes the
+    // map-reduce arm instead of one over-stuffed single-pass call.
+    if (estimateTokens(formatTranscript(turns)) > config.maxSinglePassTokens) {
+      const mr = await runMapReduce({
+        deps: { router, config, logger },
+        meta,
+        turns,
+        type,
+        callDate,
+        weekday,
+        transcriptText,
+      });
+      usage.push(...mr.usage);
+      logger.info(
+        {
+          meeting_id: meta.id,
+          conversation_type: mr.notes.conversationType,
+          path: "map_reduce",
+          model_calls: usage.length,
+        },
+        "notes.pipeline.generated",
+      );
+      return mr.rawText !== undefined
+        ? { notes: mr.notes, usage, rawText: mr.rawText }
+        : { notes: mr.notes, usage };
+    }
+
     const messages = buildGenerateMessages({
       type,
       transcript: formatTranscript(turns),
@@ -109,7 +141,12 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
       "notes.pipeline.generated",
     );
 
-    return { notes, usage };
+    // Surface the last raw model text when the ladder fell back, so a terminal
+    // handler path can hand it to `jobs.raw_output` (adr §7 — malformed JSON off
+    // the typed notes column). Omitted on the clean path (nothing to keep).
+    return ladder.telemetry.fellBack
+      ? { notes, usage, rawText: ladder.rawText }
+      : { notes, usage };
   }
 
   /**
@@ -122,7 +159,7 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
     turns: TranscriptTurn[],
     usage: JobUsage[],
   ): Promise<ConversationType> {
-    const headChars = config.classifyHeadTokens * 4;
+    const headChars = config.classifyHeadTokens * CHARS_PER_TOKEN;
     const head = formatTranscript(turns).slice(0, headChars);
     try {
       const { text, usage: callUsage } = await bufferStream(
@@ -197,23 +234,4 @@ function resolveCallDate(
     timeZone: "UTC",
   }).format(base);
   return { callDate, weekday };
-}
-
-/** Render diarized turns as `[mm:ss] Speaker: text` lines for the prompt. */
-function formatTranscript(turns: TranscriptTurn[]): string {
-  return turns
-    .map((turn) => {
-      const who = turn.speaker ?? "Unknown";
-      const stamp = turn.tsMs !== null ? `[${formatTimestamp(turn.tsMs)}] ` : "";
-      return `${stamp}${who}: ${turn.text}`;
-    })
-    .join("\n");
-}
-
-/** `mm:ss` from a millisecond offset. */
-function formatTimestamp(tsMs: number): string {
-  const totalSeconds = Math.floor(tsMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }

@@ -14,7 +14,7 @@ import { CLASSIFY_SYSTEM_PROMPT, NOTES_SYSTEM_PROMPT } from "./system.js";
  */
 
 /** The `typeInsights` arm text for each conversation type. */
-const INSIGHTS_ARM: Record<ConversationType, string> = {
+export const INSIGHTS_ARM: Record<ConversationType, string> = {
   sales:
     '{ "kind": "sales", "objections": string[], "buyingSignals": string[] }  // concerns raised; signals of intent to buy',
   interview:
@@ -23,7 +23,7 @@ const INSIGHTS_ARM: Record<ConversationType, string> = {
 };
 
 /** One short paragraph of type-specific guidance, injected above the schema. */
-const TYPE_GUIDANCE: Record<ConversationType, string> = {
+export const TYPE_GUIDANCE: Record<ConversationType, string> = {
   sales:
     "This was a SALES call. Capture pricing, objections, and buying signals precisely; action items are commitments (who sends what, by when).",
   interview:

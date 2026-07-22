@@ -79,13 +79,16 @@ export interface NotesLogger {
  * that still yields valid notes — it throws only on transport/all-providers
  * failures (`LlmError`/`AllProvidersFailedError`), which the worker classifies as a
  * retry (adr-0006 §3). `usage` carries one {@link JobUsage} per model call
- * (classify, generate, and the repair round-trip when spent).
+ * (classify, generate/map/reduce, and any repair round-trip). `rawText` is the
+ * last raw model text, surfaced ONLY when the ladder fell back (Task 4) so a
+ * terminal handler path can hand it to `jobs.raw_output` — omitted on the clean
+ * path.
  */
 export interface NotesPipeline {
   generate(
     meta: NotesMeetingMeta,
     turns: TranscriptTurn[],
-  ): Promise<{ notes: MeetingNotes; usage: JobUsage[] }>;
+  ): Promise<{ notes: MeetingNotes; usage: JobUsage[]; rawText?: string }>;
 }
 
 /** The worker handle: background lifecycle + a directly-drivable single poll tick. */
