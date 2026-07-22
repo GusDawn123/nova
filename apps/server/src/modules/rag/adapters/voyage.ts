@@ -41,6 +41,15 @@ const RERANK_URL = "https://api.voyageai.com/v1/rerank";
 const DOCUMENT_MODEL = "voyage-4";
 /** Cheaper/faster model for hot-path query embedding (same embedding space). */
 const QUERY_MODEL = "voyage-4-lite";
+/**
+ * The embedding-SPACE identifier `embed()` reports for BOTH kinds (adr-0005 §2).
+ * Space membership — not the per-call vendor model — governs vector
+ * comparability, so this one name is what ingest stores in `embeddings.model`
+ * and what search filters on. Reporting the per-kind vendor model here would
+ * store rows under `voyage-4` but search under `voyage-4-lite` → zero hits by
+ * construction. The TRUE per-call vendor model still goes to the usage log.
+ */
+const EMBEDDING_SPACE_MODEL = "voyage-4";
 /** Deliberate-tier reranker (adr §5: live NEVER reranks — enforced by the service). */
 const RERANK_MODEL = "rerank-2.5-lite";
 /** Matryoshka output dimensionality — MUST match the `halfvec(1024)` column. */
@@ -211,7 +220,9 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
 
       const vectors: number[][] = [];
       let tokens = 0;
-      let reportedModel = requestModel;
+      // The TRUE per-call vendor model, for the usage log (metering accuracy);
+      // the RETURNED `model` is the space id below (adr-0005 §2).
+      let vendorModel = requestModel;
 
       for (const batch of batches) {
         if (batch.length === 0) continue;
@@ -233,7 +244,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
             { cause: parsed.error },
           );
         }
-        reportedModel = parsed.data.model;
+        vendorModel = parsed.data.model;
         tokens += parsed.data.usage.total_tokens;
         // Voyage returns in request order, but sort by `index` to be certain.
         const ordered = [...parsed.data.data].sort((a, b) => a.index - b.index);
@@ -252,12 +263,19 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
 
       logUsage({
         vendor: "voyage",
-        model: reportedModel,
+        model: vendorModel,
         tokens,
         user_id: embedOpts.userId ?? null,
       });
 
-      return { vectors, model: reportedModel, dims: EMBED_DIMS, usage: { tokens } };
+      // `model` = the embedding-space id, identical for both kinds (adr-0005 §2)
+      // so ingest-stored rows and search filters agree by construction.
+      return {
+        vectors,
+        model: EMBEDDING_SPACE_MODEL,
+        dims: EMBED_DIMS,
+        usage: { tokens },
+      };
     },
   };
 

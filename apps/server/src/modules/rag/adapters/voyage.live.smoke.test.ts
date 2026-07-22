@@ -42,11 +42,14 @@ describe.skipIf(!key)("voyage live smoke", () => {
     const contents = ["cat", "kitten", "financial derivatives"];
     const docs = await embedder.embed(contents, { kind: "document" });
     expect(docs.dims).toBe(1024);
-    expect(docs.model).toContain("voyage");
     expect(docs.vectors).toHaveLength(3);
 
     const query = await embedder.embed(["small cat"], { kind: "query" });
     expect(query.dims).toBe(1024);
+    // Both kinds report the shared embedding-space id (adr-0005 §2) — the value
+    // ingest stores in embeddings.model AND search filters on.
+    expect(docs.model).toBe("voyage-4");
+    expect(query.model).toBe("voyage-4");
     const q = query.vectors[0];
     const kitten = docs.vectors[1];
     const derivatives = docs.vectors[2];

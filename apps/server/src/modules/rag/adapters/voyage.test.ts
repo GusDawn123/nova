@@ -81,7 +81,10 @@ describe("voyage embedder — request shape", () => {
 
     expect(res.vectors).toHaveLength(1);
     expect(res.dims).toBe(1024);
-    expect(res.model).toBe("voyage-4-lite");
+    // Returned `model` is the embedding-SPACE id (adr-0005 §2): "voyage-4" even
+    // for a query embedded via voyage-4-lite — storage/search filter on the
+    // space, the per-call vendor model lives in the usage log only.
+    expect(res.model).toBe("voyage-4");
     expect(res.usage.tokens).toBe(7);
   });
 
@@ -94,11 +97,13 @@ describe("voyage embedder — request shape", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    await embedder.embed(["a document"], { kind: "document" });
+    const res = await embedder.embed(["a document"], { kind: "document" });
 
     const body = bodyOf(fetchMock.mock.calls[0] ?? []);
     expect(body.model).toBe("voyage-4");
     expect(body.input_type).toBe("document");
+    // Both kinds report the same space id — the seam Task 4's service relies on.
+    expect(res.model).toBe("voyage-4");
   });
 });
 
@@ -234,6 +239,8 @@ describe("voyage embedder — usage log", () => {
     await embedder.embed(["hello"], { kind: "query", userId: "user-123" });
 
     expect(logUsage).toHaveBeenCalledTimes(1);
+    // The usage line keeps the TRUE per-call vendor model (metering accuracy),
+    // unlike the returned space id — adr-0005 §2.
     expect(logUsage).toHaveBeenCalledWith({
       vendor: "voyage",
       model: "voyage-4-lite",

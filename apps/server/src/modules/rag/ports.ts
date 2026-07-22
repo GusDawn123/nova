@@ -132,6 +132,11 @@ export interface Chunker {
  * `input_type` and model tier — `query` (hot path, cheaper/faster model) vs
  * `document` (batched background indexing). `userId` threads through for usage
  * metering. Failure is signalled by throwing a `RagError`.
+ *
+ * The returned `model` is the **embedding-space identifier** (adr-0005 §2) —
+ * the one name used for storage (`embeddings.model`) and search filtering,
+ * identical across both kinds of a shared-space family. The per-call vendor
+ * model appears in usage logs only, never here.
  */
 export interface Embedder {
   embed(
