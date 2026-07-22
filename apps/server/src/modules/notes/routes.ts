@@ -164,6 +164,9 @@ export function createNotesRoutes(
             notes: model.notes,
             tone,
             meetingTitle: model.notes.title,
+            // Metering attribution (Phase 6) — ids only, never content.
+            userId,
+            meetingId,
           });
         } catch (err) {
           // Transport/all-providers failures → typed 503 (never a 500 stack leak).

@@ -1,6 +1,7 @@
 import type {
   ChatRequest,
   LlmStreamEvent,
+  Meter,
 } from "../../llm/index.js";
 import type { LlmRouter } from "../../llm/index.js";
 
@@ -24,6 +25,8 @@ export type NotesStage = "classify" | "map" | "reduce" | "generate" | "repair";
 export interface NotesRouterCall {
   readonly stage: NotesStage;
   readonly userContent: string;
+  /** The per-call meter the caller threaded via `opts.meter` (Phase 6), if any. */
+  readonly meter?: Meter;
 }
 
 export interface NotesRouterHandlers {
@@ -87,10 +90,17 @@ export function makeNotesRouter(
 ): MockNotesRouter {
   const calls: NotesRouterCall[] = [];
 
-  async function* stream(req: ChatRequest): AsyncGenerator<LlmStreamEvent> {
+  async function* stream(
+    req: ChatRequest,
+    opts?: { signal?: AbortSignal; meter?: Meter },
+  ): AsyncGenerator<LlmStreamEvent> {
     const stage = stageOf(req);
     const userContent = userContentOf(req);
-    calls.push({ stage, userContent });
+    calls.push(
+      opts?.meter
+        ? { stage, userContent, meter: opts.meter }
+        : { stage, userContent },
+    );
     await Promise.resolve(); // async generator: yields on the microtask queue
 
 
