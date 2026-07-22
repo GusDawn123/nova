@@ -1,3 +1,5 @@
+import type { MeetingNotes } from "@nova/shared";
+
 import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
 
 /**
@@ -12,6 +14,31 @@ import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
 
 /** Re-export the store's boundary types so consumers import notes contracts in one place. */
 export type { ClaimedJob, JobUsage } from "../../db/jobs.js";
+
+/**
+ * One diarized transcript turn the pipeline reasons over (Task 3). Defined HERE,
+ * not imported from `modules/rag` — modules are islands (RULES §2), so notes owns
+ * its own transcript shape even though it mirrors the rag turn's fields. `speaker`
+ * is the diarized label (null when the STT layer could not attribute the line);
+ * `tsMs` is the turn's start offset in ms (null when unknown).
+ */
+export interface TranscriptTurn {
+  readonly speaker: string | null;
+  readonly text: string;
+  readonly tsMs: number | null;
+}
+
+/**
+ * The meeting metadata the pipeline needs to generate notes — a projection of the
+ * meetings row (no transcript here; turns are passed separately). `startedAt` (ISO)
+ * anchors relative-deadline resolution; a null falls back to the injected clock.
+ */
+export interface NotesMeetingMeta {
+  readonly id: string;
+  readonly userId: string;
+  readonly title: string;
+  readonly startedAt: string | null;
+}
 
 /**
  * The generation step the worker delegates each claimed job to. A discriminated
@@ -44,6 +71,21 @@ export interface NotesJobHandler {
 export interface NotesLogger {
   info(fields: Record<string, unknown>, msg: string): void;
   error(fields: Record<string, unknown>, msg: string): void;
+}
+
+/**
+ * The generation core (Task 3 single-pass; Task 4 adds map-reduce). `generate`
+ * NEVER throws for content reasons — the ladder ends in a deterministic fallback
+ * that still yields valid notes — it throws only on transport/all-providers
+ * failures (`LlmError`/`AllProvidersFailedError`), which the worker classifies as a
+ * retry (adr-0006 §3). `usage` carries one {@link JobUsage} per model call
+ * (classify, generate, and the repair round-trip when spent).
+ */
+export interface NotesPipeline {
+  generate(
+    meta: NotesMeetingMeta,
+    turns: TranscriptTurn[],
+  ): Promise<{ notes: MeetingNotes; usage: JobUsage[] }>;
 }
 
 /** The worker handle: background lifecycle + a directly-drivable single poll tick. */
