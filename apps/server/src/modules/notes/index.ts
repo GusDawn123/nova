@@ -18,14 +18,21 @@ export {
   type FollowUpResult,
 } from "./follow-up.js";
 export {
+  createNotesRoutes,
+  type NotesRoutesDeps,
+} from "./routes.js";
+export {
   type NotesJobHandler,
   type NotesLogger,
   type NotesWorker,
   type NotesPipeline,
   type NotesMeetingMeta,
+  type NotesReader,
+  type NotesReadModel,
   type NotesSource,
   type NotesSourceMeeting,
   type NotesWriter,
+  type FollowUpWriter,
   type TranscriptTurn,
   type ClaimedJob,
   type JobUsage,

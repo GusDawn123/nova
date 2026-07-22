@@ -1,4 +1,9 @@
-import type { MeetingNotes } from "@nova/shared";
+import type {
+  FollowUpDraft,
+  FollowUpStored,
+  MeetingNotes,
+  NotesStatus,
+} from "@nova/shared";
 
 import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
 
@@ -135,6 +140,45 @@ export interface NotesWriter {
     meetingId: string,
     userId: string,
     notes: MeetingNotes,
+    generatedAt: Date,
+  ): Promise<void>;
+}
+
+/**
+ * The meeting read model the REST surface returns (Task 5). A projection of the
+ * meeting's notes columns, user-scoped and soft-delete-aware at the adapter: a
+ * `null` from {@link NotesReader.readNotes} means unknown/foreign/soft-deleted (the
+ * routes answer a uniform 404 — no existence leak). `notes`/`followUp` are null
+ * until generation completes.
+ */
+export interface NotesReadModel {
+  readonly notesStatus: NotesStatus;
+  readonly notes: MeetingNotes | null;
+  readonly followUp: FollowUpStored | null;
+  readonly notesGeneratedAt: string | null;
+}
+
+/**
+ * Read seam for the REST surface: the meeting's notes read model, user-scoped and
+ * `deleted_at`-aware (the adapter in `db/notes.ts` returns null for a soft-deleted
+ * meeting so a deleted/foreign/missing row all 404 identically). Explicit-column
+ * read, re-parsed at the boundary (RULES §1).
+ */
+export interface NotesReader {
+  readNotes(meetingId: string, userId: string): Promise<NotesReadModel | null>;
+}
+
+/**
+ * Write seam for the follow-up endpoint: persist the latest draft to
+ * `meetings.follow_up` (jsonb `{tone, subject, body, generated_at}`), user-scoped and
+ * soft-delete-guarded (adr-0006 §8 — the draft is stored then returned). Overwrites
+ * the previous draft; the endpoint is synchronous, one draft per request.
+ */
+export interface FollowUpWriter {
+  writeFollowUp(
+    meetingId: string,
+    userId: string,
+    draft: FollowUpDraft,
     generatedAt: Date,
   ): Promise<void>;
 }

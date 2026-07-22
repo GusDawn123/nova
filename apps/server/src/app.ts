@@ -14,15 +14,20 @@ import Fastify, {
 } from "fastify";
 
 import { queueAccountDeletion } from "./db/account.js";
-import { SupabaseConfigError } from "./db/client.js";
+import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
 import { createStaleCallReaper } from "./db/stale-call-reaper.js";
 import { isNotesWorkerEnabled } from "./env.js";
 import { createNotesSource } from "./db/notes-source.js";
-import { createNotesWriter } from "./db/notes.js";
+import {
+  createFollowUpWriter,
+  createNotesReader,
+  createNotesWriter,
+} from "./db/notes.js";
 import { liveRoutes } from "./modules/live/routes.js";
 import {
+  AllProvidersFailedError,
   createLlmRouter,
   createProvidersFromEnv,
   llmConfigSchema,
@@ -31,7 +36,11 @@ import {
 import {
   createNotesJobHandler,
   createNotesPipeline,
+  createNotesRoutes,
   createNotesWorker,
+  generateFollowUp,
+  type FollowUpInput,
+  type FollowUpResult,
 } from "./modules/notes/index.js";
 import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
@@ -97,6 +106,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Post-call notes worker (poll loop + lease reaper + sweep backstop). Gated behind
   // NOTES_WORKER_ENABLED, so it stays off in tests/keyless boots unless opted in.
   maybeStartNotesWorker(app);
+
+  // Post-call notes REST surface (read / regenerate / follow-up). Registered only
+  // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
+  // broken routes (it just doesn't expose them — /health still serves).
+  maybeRegisterNotesRoutes(app);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -254,4 +268,46 @@ function maybeStartNotesWorker(app: FastifyInstance): void {
     worker.stop();
     done();
   });
+}
+
+/**
+ * Register the notes REST surface when BOTH the supabase-js read/write seam
+ * (SUPABASE_URL + SERVICE_ROLE_KEY) and the pg-Pool job store (SUPABASE_DB_URL) are
+ * configured — otherwise a keyless/DB-less boot would mount routes whose seams throw
+ * on first use. The follow-up call needs an LLM router: when no provider key is
+ * present the GET/regenerate routes still work and follow-up cleanly returns the
+ * typed 503 `provider_unavailable` (an injected runner that rejects with
+ * `AllProvidersFailedError`, mapped by the route). Request-scoped, so — unlike the
+ * background worker — it is NOT gated on NODE_ENV.
+ */
+function maybeRegisterNotesRoutes(app: FastifyInstance): void {
+  if (
+    !isSupabaseConfigured(process.env) ||
+    !isJobStoreConfigured(process.env)
+  ) {
+    return;
+  }
+
+  const providers = createProvidersFromEnv(llmProviderEnv(process.env));
+  const followUp: (input: FollowUpInput) => Promise<FollowUpResult> =
+    providers.length > 0
+      ? generateFollowUp({
+          router: createLlmRouter({
+            providers,
+            config: llmConfigSchema.parse({}),
+          }),
+          logger: app.log,
+        })
+      : () => Promise.reject(new AllProvidersFailedError([]));
+
+  const { store } = notesJobStoreFromEnv(process.env);
+  void app.register(
+    createNotesRoutes({
+      reader: createNotesReader(),
+      followUpWriter: createFollowUpWriter(),
+      store,
+      followUp,
+      logger: app.log,
+    }),
+  );
 }

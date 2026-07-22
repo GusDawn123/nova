@@ -112,6 +112,47 @@ export const followUpDraftSchema = z.object({
 });
 export type FollowUpDraft = z.infer<typeof followUpDraftSchema>;
 
+/** The read-model status the product observes without joining the jobs queue. */
+export const notesStatusSchema = z.enum([
+  "none",
+  "queued",
+  "processing",
+  "completed",
+  "failed",
+]);
+export type NotesStatus = z.infer<typeof notesStatusSchema>;
+
+/**
+ * The follow-up draft AS STORED on `meetings.follow_up` and returned on GET — the
+ * draft plus the moment it was generated (`generated_at`, ISO). The POST /follow-up
+ * response itself is the bare {@link followUpDraftSchema} (no timestamp); the stored
+ * shape adds it so a reader can show when the draft was written.
+ */
+export const followUpStoredSchema = followUpDraftSchema.extend({
+  generated_at: z.string(),
+});
+export type FollowUpStored = z.infer<typeof followUpStoredSchema>;
+
+/**
+ * `GET /meetings/:id/notes` response — the meeting's read model. `notes`/`follow_up`
+ * are null until generation completes; `notes_status` drives the mobile UI (a
+ * `failed`/`fallback` state keys a retry affordance). A missing/foreign/soft-deleted
+ * meeting returns a uniform 404 instead of this shape (no existence leak).
+ */
+export const notesReadResponseSchema = z.object({
+  notes_status: notesStatusSchema,
+  notes: meetingNotesSchema.nullable(),
+  follow_up: followUpStoredSchema.nullable(),
+  notes_generated_at: z.string().nullable(),
+});
+export type NotesReadResponse = z.infer<typeof notesReadResponseSchema>;
+
+/** `POST /meetings/:id/notes/regenerate` 202 body — the job was (re)queued. */
+export const regenerateResponseSchema = z.object({
+  status: z.literal("queued"),
+});
+export type RegenerateResponse = z.infer<typeof regenerateResponseSchema>;
+
 /** The tldr the deterministic fallback always carries; the UI can surface a retry. */
 export const FALLBACK_TLDR =
   "Automatic notes are unavailable for this call." as const;
