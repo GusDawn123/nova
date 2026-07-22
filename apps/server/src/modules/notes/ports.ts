@@ -91,6 +91,54 @@ export interface NotesPipeline {
   ): Promise<{ notes: MeetingNotes; usage: JobUsage[]; rawText?: string }>;
 }
 
+/**
+ * The meeting row projection the source loads (Task 4). Mirrors {@link
+ * NotesMeetingMeta} plus `deletedAt`, so the handler can distinguish a soft-deleted
+ * meeting (complete the job as a no-op — REST 404s it anyway) from a genuinely
+ * missing row (terminal fail). A `null` from {@link NotesSource.loadMeeting} means
+ * no row at all.
+ */
+export interface NotesSourceMeeting {
+  readonly id: string;
+  readonly userId: string;
+  readonly title: string;
+  readonly startedAt: string | null;
+  readonly deletedAt: string | null;
+}
+
+/**
+ * Read seam for the handler: the meeting meta + its final transcript turns (Task 4).
+ * The DB adapter lives in `db/notes-source.ts` (supabase-js stays in `db/`), so no
+ * SDK detail enters the module. Both reads are user-scoped; `loadTranscript` is
+ * `deleted_at`-aware (soft-deleted finals are excluded).
+ */
+export interface NotesSource {
+  /** The meeting row (incl. `deletedAt`), or null when no such row exists. */
+  loadMeeting(
+    meetingId: string,
+    userId: string,
+  ): Promise<NotesSourceMeeting | null>;
+  /** The ordered final transcript turns (deleted finals excluded). */
+  loadTranscript(meetingId: string, userId: string): Promise<TranscriptTurn[]>;
+}
+
+/**
+ * Write seam for the handler: persist the generated notes + flip the read model
+ * (Task 4). The adapter (`db/notes.ts`) UPSERTs `meetings.notes`, sets
+ * `notes_status='completed'` and `notes_generated_at`, user-scoped and idempotent
+ * (a re-run overwrites identically — at-least-once execution stays correct). This is
+ * the ONLY place `notes_status` flips to 'completed' (adr §2 — atomic with the write,
+ * so a completed job whose notes write failed can never masquerade as ready).
+ */
+export interface NotesWriter {
+  writeNotes(
+    meetingId: string,
+    userId: string,
+    notes: MeetingNotes,
+    generatedAt: Date,
+  ): Promise<void>;
+}
+
 /** The worker handle: background lifecycle + a directly-drivable single poll tick. */
 export interface NotesWorker {
   /** Begin the poll + reaper loops. Exactly-once — a second call is a no-op. */

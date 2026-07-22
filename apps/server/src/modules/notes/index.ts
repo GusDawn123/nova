@@ -5,10 +5,21 @@
  */
 
 export { createNotesWorker, type NotesWorkerDeps } from "./worker.js";
+export { createNotesPipeline, type NotesPipelineDeps } from "./pipeline.js";
+export {
+  createNotesJobHandler,
+  type NotesJobHandlerDeps,
+} from "./handler.js";
 export {
   type NotesJobHandler,
   type NotesLogger,
   type NotesWorker,
+  type NotesPipeline,
+  type NotesMeetingMeta,
+  type NotesSource,
+  type NotesSourceMeeting,
+  type NotesWriter,
+  type TranscriptTurn,
   type ClaimedJob,
   type JobUsage,
 } from "./ports.js";
