@@ -3,16 +3,21 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 3 streaming STT gateway built on `dev-claude-stt` (live vendor accuracy bars
-> pending API keys). Phases 0-2 are all merged into `development`: Phase 0 scaffold (PR #1),
-> Phase 1 auth (PR #2), Phase 2 `modules/llm` (PR #3, merged 2026-07-20). Phase 2's llm router
-> is now in this branch's tree via the development→`dev-claude-stt` merge; its live smoke stays
-> pending vendor keys.** On top of the auth domain, this branch adds the live-call spine: the
-> shared WebSocket wire protocol, an authenticated `GET /live` socket + per-call session, and the
-> `modules/stt` gateway (engine + AssemblyAI/Deepgram adapters). The `llm` failover router + four
-> real provider adapters exist server-side (no transport wired to them yet). The RAG/notes/metering
-> modules remain design-only — see "Built so far" for what exists and `DESIGN/live-pipeline.md`
-> for the live-pipeline spec.
+> **Status: Phase 4 RAG memory built on `dev-claude-rag` (branched off `development`, which now
+> carries Phases 0-3). Phases 0-3 are merged into `development`: Phase 0 scaffold (PR #1), Phase 1
+> auth (PR #2), Phase 2 `modules/llm` (PR #3), Phase 3 streaming STT gateway (PR #4). Phase 4 adds
+> `modules/rag`: the pure chunker, the four ports (Chunker/Embedder/VectorStore/Reranker), the
+> Voyage + pgvector adapters, `RagService`, and the marker-and-sweep auto-indexer over the
+> `chunks`/`embeddings` (halfvec 1024, HNSW) tables. What runs GREEN: the mock/DB suites, the RLS
+> isolation tests, the freshness exit bar (auto-index queryable in ~0.7s vs the <60s bar), and the
+> store-level latency bar (p95 7.2ms over a 40k-chunk corpus vs the <300ms bar). What is KEY-GATED
+> and SKIPPED pending `VOYAGE_API_KEY`: the live Voyage smoke and the top-3 retrieval accuracy
+> gate.** On the live-call spine below, this tree also carries the shared WebSocket wire protocol,
+> the authenticated `GET /live` socket + per-call session, the `modules/stt` gateway (engine +
+> AssemblyAI/Deepgram adapters, live accuracy bars GREEN), and the `llm` failover router + four
+> real provider adapters (no transport wired to them yet). The notes/metering modules remain
+> design-only — see "Built so far" for what exists and `DESIGN/live-pipeline.md` for the
+> live-pipeline spec.
 
 ## What Nova is
 
@@ -113,15 +118,14 @@ nova/
 Module anatomy (every server module follows it):
 ```
 modules/<name>/
-├── ports.ts        # interfaces the module needs from the outside world
+├── ports.ts        # interfaces + module-local zod (shared wire types in packages/shared)
 ├── adapters/       # vendor implementations of ports (ONLY place SDKs are imported)
 ├── service.ts      # business logic, exported interface for other modules
-├── routes.ts       # HTTP/WS surface, zod-parsed in and out
-├── schemas.ts      # module-local zod (shared ones live in packages/shared)
-└── __tests__/      # behavior tests, fixtures in __tests__/fixtures/
+└── routes.ts       # HTTP/WS surface, zod-parsed in and out
+# tests are co-located as *.test.ts beside the code; fixtures live in apps/server/fixtures/
 ```
 
-### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway)
+### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory)
 
 The tree above is the target. What exists today is the skeleton, the `/health` vertical
 slice, the **Phase 1 auth domain**, the **Phase 2 LLM provider router**, and the **Phase 3
@@ -155,8 +159,14 @@ not auto-expose new tables to the Data API.
   `profiles(id)` with `NO ACTION` (so the purge worker deletes children before the auth row).
 - `deletion_requests` — the account-deletion purge queue. RLS enabled with **zero policies**
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
-  tombstone; the migration header carries the purge-worker FK-ordering contract
-  (transcripts → meetings → context_docs → deletion_requests → auth.users).
+  tombstone. The purge-worker FK-ordering contract (deepest child first, every FK
+  `NO ACTION`) is: **embeddings → chunks → transcripts → meetings → context_docs →
+  deletion_requests → auth.users** — the Phase 4 RAG tables (`chunks` → meetings /
+  context_docs / profiles; `embeddings` → chunks / profiles) must be purged BEFORE the
+  meetings/context_docs they hang off. NOTE: the `deletion_requests` migration header
+  predates the RAG tables and still lists the shorter `transcripts → meetings →
+  context_docs → deletion_requests → auth.users` order; an applied migration is law and
+  is not edited (RULES §4) — this doc carries the current contract.
   **Resolved (Phase 3, migration `20260720150000_enforce_transcript_parentage.sql`):** the
   original transcript write policies checked only `user_id = auth.uid()`, not that the referenced
   `meeting_id` belonged to the writer — so an authenticated user could insert a transcript they
@@ -168,6 +178,18 @@ not auto-expose new tables to the Data API.
   in `apps/server/src/db/transcript-parentage.integration.test.ts` (`[parentage-spoof]` rejects a
   cross-user parent, `[parentage-happy]` allows an own live meeting, `[parentage-soft-deleted]`
   rejects a tombstoned parent).
+  **Fully guarded on BOTH write paths (Phase 4 review C1):** the RLS `with_check` above covers only
+  Data-API/JWT writes; the live product write path (`modules/live` → the service-role
+  `TranscriptPersister` in `db/transcripts.ts`) BYPASSES RLS, so it is guarded independently by an
+  in-session ownership check — at `session.start`, before any STT starts or any transcript is
+  written, `verifyMeetingOwnership` confirms the client-supplied `meeting_id` names a live meeting
+  owned by the authenticated caller (missing/wrong-owner/tombstoned → typed `meeting_forbidden`
+  error + policy-close; a DB error fails CLOSED). Enforced only when a persister is wired (a
+  keyless/DB-less dev session streams without persistence and thus without the guard). Proven by the
+  DB-gated A/B case in `apps/server/src/modules/live/live.auth.integration.test.ts`
+  (`[ownership-spoof]`: B cannot open a session on A's meeting and no transcript row lands) plus the
+  `session.test.ts` unit guard tests. Net: the product write path is now guarded by the in-session
+  ownership check (service-role writes) AND the RLS `with_check` (Data API).
 
 **Server auth layer (Phase 1 — live):**
 - `auth/verify-token.ts` — the only module that knows how a Supabase access token is
@@ -285,19 +307,60 @@ live spine — design spec in `DESIGN/live-pipeline.md`.
   disk** — enforced by a static + runtime `[no-disk]` audit pair
   (`engine.no-disk.test.ts`, `no-disk.audit.test.ts`).
 
+**Phase 4 — `modules/rag/` (per-user RAG memory, built on `dev-claude-rag`):**
+- **Ports + pure chunker** (`ports.ts`, `chunker.ts`, `config.ts`) — four swappable seams
+  (`Chunker` / `Embedder` / `VectorStore` / `Reranker`) plus the typed `RagError` taxonomy
+  (`RAG_NOT_CONFIGURED` / `EMBEDDER_FAILED` / `STORE_FAILED` / `SOURCE_TOO_LARGE`). The chunker is
+  pure and deterministic (zero I/O, zero clock): transcripts pack by diarized turn, docs by
+  paragraph, each chunk carrying a contextual header for both embedding and full-text indexing.
+- **Embeddings adapter** (`adapters/voyage.ts`, `VOYAGE_API_KEY`) — Voyage `voyage-4`/`voyage-4-lite`
+  at 1024 dims behind the `Embedder` port (SDK-free HTTP; RULES §5). Stores under the
+  **embedding-SPACE id** `voyage-4` (adr-0005 §2) so the query (fast) and document (batched) tiers
+  share one search filter; the per-call vendor model appears only in usage logs. **Key-gated:** with
+  no key the server still boots and ingest/live retrieval degrade explicitly (same posture as
+  keyless STT).
+- **Vector store** (`adapters/pgvector.ts`) — the ONLY RAG hot path to Postgres, over a direct `pg`
+  Pool on `SUPABASE_DB_URL` (adr-0005 §4: PostgREST ~triples p95). `search` runs hybrid retrieval
+  (semantic cosine + full-text) fused by **reciprocal-rank fusion in ONE round trip**; `replaceSource`
+  is the idempotent soft-delete-then-insert upsert. Every leg carries an explicit `user_id`
+  predicate (tenant isolation is the WHERE clause; RLS is defense-in-depth), and `hnsw.iterative_scan
+  = relaxed_order` keeps filtered-ANN recall honest on a small per-user slice of a big global table.
+- **Service + auto-indexer** (`service.ts`, `indexer.ts`, `db/rag-indexer.ts`) — `RagService`
+  orchestrates chunk→embed→store for ingest and embed→search(+rerank) for retrieval. The
+  marker-and-sweep indexer polls finished-but-unindexed meetings (`ended_at` set, `indexed_at`
+  null), chunks + embeds + stores each transcript, and stamps `indexed_at` — idempotent, oldest
+  completion first, bounded batch per tick.
+- **Exit bars.** Freshness (`rag.freshness.integration.test.ts`) proves a finished call is queryable
+  in **~0.7s vs the <60s** bar through the real sweeper + real store (deterministic mock embedder, no
+  key). Store latency (`scripts/bench-rag.ts`, `npm run bench:rag`) seeds 10k chunks for one user +
+  30k noise across 3 others and measures 100 hybrid `search` calls: **p50 5.2ms / p95 7.2ms / max
+  9.6ms vs the <300ms** bar — no vendor key (seeded pseudo-random unit vectors). The **top-3 retrieval
+  accuracy gate** (`rag.accuracy.test.ts`) and the **live Voyage smoke** (`voyage.live.smoke.test.ts`)
+  are **key-gated (`describe.skipIf`) and UNRUN** — they need a real `VOYAGE_API_KEY` (Gustavo action
+  item), exactly like Phase 2's llm smoke and Phase 3's STT accuracy bars were before their keys
+  landed. A store-query-embed split is deliberate: this p95 bar governs the store only; query-embed
+  latency is vendor-side and reported separately by the key-gated smoke.
+
 ## Data model
 
 The auth-domain tables (`profiles`, `meetings`, `transcripts`, `context_docs`,
-`deletion_requests`) are **built** as of Phase 1 — see "Built so far" for their live shape
-and RLS posture. The rest below is the v0 sketch that becomes real in later phases.
+`deletion_requests`) are **built** as of Phase 1, and the RAG tables (`chunks`, `embeddings`)
+plus the Phase 4 column expansions are **built** as of Phase 4 — see "Built so far" for their
+live shape and RLS posture. The `usage_events` sketch below becomes real in Phase 6.
 
 - `profiles` — user profile + plan (1:1 with auth.users)
-- `meetings` — id, user_id, title, started_at, duration, status
-  (queued|processing|completed|failed), notes jsonb, deleted_at
-- `transcripts` — meeting_id, speaker, text, ts_ms, is_final
-- `context_docs` / `chunks` / `embeddings(vector)` — the RAG memory, embedding-model
-  versioned
-- `usage_events` — user_id, vendor, kind (stt_seconds|llm_tokens), amount, cost_estimate
+- `meetings` — id, user_id, title, started_at, **`ended_at`** (call completion), **`indexed_at`**
+  (RAG sweeper marker: finished + null → unindexed backlog), notes jsonb, deleted_at
+- `transcripts` — meeting_id, user_id, content, **`speaker`** (diarized label, nullable),
+  **`ts_ms`** (turn time, nullable), created_at, deleted_at
+- `context_docs` — user_id, title, content — a RAG source (the "your life" library)
+- `chunks` — **built (Phase 4):** one retrievable text unit parented to EXACTLY ONE source
+  (context_doc XOR meeting, CHECK-enforced), `content` + `header`, a STORED `fts` tsvector
+  (lexical leg), soft delete
+- `embeddings` — **built (Phase 4):** a chunk's vector under a named embedding-space `model`,
+  `dims`, `embedding halfvec(1024)`, unique `(chunk_id, model)`; **HNSW** index (cosine) for ANN;
+  denormalized `user_id` so the RLS/where predicate stays a flat owner check
+- `usage_events` *(Phase 6)* — user_id, vendor, kind (stt_seconds|llm_tokens), amount, cost_estimate
 - All user tables: RLS ON at creation, `deleted_at` soft delete (RULES §3, §4.9)
 
 ## Environments
@@ -323,3 +386,8 @@ Details in `GIT_WORKFLOW.md`.
 - **ADR-0004** — LLM routing, latency tiers, and prompt-cache strategy (see DECISIONS/); the
   Phase 3 STT engine reuses its sequential-cascade + SDK-retries-off shape. Companion live-pipeline
   build spec: `DESIGN/live-pipeline.md`.
+- **ADR-0005** — RAG memory: Voyage `voyage-4`/`voyage-4-lite` @1024 halfvec, model column is the
+  embedding-SPACE id (two-speed query/document tiers share one search filter), HNSW +
+  `iterative_scan`, hybrid RRF in one round trip over a direct `pg` Pool (not PostgREST),
+  rerank deliberate-tier-only, marker-and-sweep auto-indexer (`ended_at`/`indexed_at`),
+  turn-window chunking with metadata headers. Design: `DESIGN/rag-memory.md`.

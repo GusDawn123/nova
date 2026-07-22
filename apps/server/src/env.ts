@@ -35,6 +35,20 @@ const envSchema = z.object({
   // never logged, never in the repo.
   ASSEMBLYAI_API_KEY: z.string().min(1).optional(),
   DEEPGRAM_API_KEY: z.string().min(1).optional(),
+  // RAG embeddings vendor (Phase 4). OPTIONAL: keyless deploys degrade to a typed
+  // `RAG_NOT_CONFIGURED` (ingest + live retrieval skip cleanly), never a crash —
+  // same posture as the STT/LLM keys. Consumed only via `modules/rag/adapters/
+  // voyage.ts` (re-parsed there at its own boundary). Company-held secret: never
+  // logged, never in the repo, never shipped to the mobile app.
+  VOYAGE_API_KEY: z.string().min(1).optional(),
+  // Direct Postgres connection for the pgvector RAG adapter (adr-0005 §4). The hot
+  // retrieval path bypasses PostgREST and talks to Postgres over a `pg` Pool for
+  // latency, so it needs a libpq-style connection string. OPTIONAL: the pgvector
+  // store demands it lazily and throws `RAG_NOT_CONFIGURED` on first use when
+  // absent (like the Supabase db client). Local stack default:
+  // `postgresql://postgres:postgres@127.0.0.1:54322/postgres` (`supabase status`
+  // → DB_URL). Treated as a secret (carries the DB password); never logged.
+  SUPABASE_DB_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

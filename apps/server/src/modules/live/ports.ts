@@ -39,6 +39,53 @@ export interface Disposer {
   readonly disposed: boolean;
 }
 
+/**
+ * A committed (FINAL) transcript utterance to persist. Partials are NEVER
+ * persisted (RULES: raw audio never stored; transcript TEXT finals only). `speaker`
+ * / `tsMs` are nullable — the STT vendor may not diarize or timestamp every final.
+ */
+export interface TranscriptFinalRow {
+  readonly meetingId: string;
+  readonly userId: string;
+  readonly content: string;
+  readonly speaker: string | null;
+  readonly tsMs: number | null;
+}
+
+/**
+ * Persistence seam the live session writes durable memory through: store each FINAL
+ * transcript, and stamp call completion (`meetings.ended_at`). Implemented by the
+ * supabase adapter in `db/transcripts.ts` (service-role). Both methods may reject —
+ * the session treats writes as fire-and-forget with error logging, because a DB
+ * hiccup must NEVER stall or kill the socket relay (RULES). `markEnded` is idempotent
+ * (only sets `ended_at` where currently null).
+ *
+ * `verifyMeetingOwnership` is the session-start parentage guard (Phase 4 review C1):
+ * because these writes go through the SERVICE ROLE (which bypasses RLS and the DB
+ * `with_check` parentage guard from migration 20260720150000), the socket transport
+ * must itself confirm the client-supplied `meeting_id` names a LIVE meeting owned by
+ * the authenticated caller BEFORE any STT starts or any transcript is written —
+ * otherwise user B could stream a call onto user A's meeting_id (FK satisfied, RLS
+ * bypassed), wedging A's delete/purge with foreign child rows. It resolves `true`
+ * only for an existing, own, `deleted_at is null` meeting, `false` for
+ * missing/wrong-owner/tombstoned, and REJECTS on a DB error so the session fails
+ * CLOSED (a DB-unavailable start is refused, never silently accepted).
+ */
+export interface TranscriptPersister {
+  saveFinal(row: TranscriptFinalRow): Promise<void>;
+  markEnded(meetingId: string, userId: string): Promise<void>;
+  verifyMeetingOwnership(meetingId: string, userId: string): Promise<boolean>;
+}
+
+/**
+ * Minimal structured-error log sink (Fastify `app.log` shape). The session logs
+ * persistence failures through it with `user_id` / `meeting_id` — NEVER transcript
+ * content (RULES §6).
+ */
+export interface LiveLogger {
+  error(fields: Record<string, unknown>, msg: string): void;
+}
+
 /** Build a fresh {@link Disposer}. */
 export function createDisposer(): Disposer {
   const cleanups: (() => void)[] = [];

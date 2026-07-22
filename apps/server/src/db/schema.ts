@@ -31,6 +31,42 @@ export const deletionRequestRowSchema = z.object({
 
 export type DeletionRequestRow = z.infer<typeof deletionRequestRowSchema>;
 
+/**
+ * Runtime shape of a `meetings` row (the columns the server adapters touch). The
+ * RAG columns `ended_at` (call finished) and `indexed_at` (memory caught up) drive
+ * the completion sweeper; `started_at` seeds the meeting chunk header's date.
+ */
+export const meetingRowSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  title: z.string(),
+  started_at: z.string().nullable(),
+  ended_at: z.string().nullable(),
+  indexed_at: z.string().nullable(),
+  created_at: z.string(),
+  deleted_at: z.string().nullable(),
+});
+
+export type MeetingRow = z.infer<typeof meetingRowSchema>;
+
+/**
+ * Runtime shape of a `transcripts` row. `speaker` / `ts_ms` are the diarization +
+ * turn timing the live session persists for FINAL utterances (nullable — the STT
+ * vendor may omit either); reads order by `ts_ms` (fallback `created_at`).
+ */
+export const transcriptRowSchema = z.object({
+  id: z.string().uuid(),
+  meeting_id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  content: z.string(),
+  speaker: z.string().nullable(),
+  ts_ms: z.number().nullable(),
+  created_at: z.string(),
+  deleted_at: z.string().nullable(),
+});
+
+export type TranscriptRow = z.infer<typeof transcriptRowSchema>;
+
 export interface Database {
   public: {
     Tables: {
@@ -78,6 +114,36 @@ export interface Database {
           processed_at?: string | null;
         };
         Update: Partial<DeletionRequestRow>;
+        Relationships: [];
+      };
+      meetings: {
+        Row: MeetingRow;
+        Insert: {
+          user_id: string;
+          title: string;
+          id?: string;
+          started_at?: string | null;
+          ended_at?: string | null;
+          indexed_at?: string | null;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: Partial<MeetingRow>;
+        Relationships: [];
+      };
+      transcripts: {
+        Row: TranscriptRow;
+        Insert: {
+          meeting_id: string;
+          user_id: string;
+          content: string;
+          speaker?: string | null;
+          ts_ms?: number | null;
+          id?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: Partial<TranscriptRow>;
         Relationships: [];
       };
     };

@@ -56,6 +56,17 @@ const supabaseEnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1),
 });
 
+/**
+ * Presence-only check: are the Supabase env vars set + well-formed? Used by callers
+ * that must decide whether to WIRE a DB-backed feature (e.g. transcript persistence)
+ * without triggering the throwing {@link getSupabaseClient} on a keyless deploy.
+ */
+export function isSupabaseConfigured(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return supabaseEnvSchema.safeParse(env).success;
+}
+
 let cached: Db | undefined;
 
 /**

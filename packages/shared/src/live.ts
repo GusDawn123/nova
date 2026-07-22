@@ -158,6 +158,12 @@ export const liveErrorCodeSchema = z.enum([
   "invalid_event",
   "audio_before_start",
   "already_started",
+  // The `session.start` meeting_id does not name a live meeting owned by the
+  // authenticated caller (missing / wrong-owner / soft-deleted). Emitted just
+  // before the server policy-closes the socket — a spoofed parent never starts a
+  // session (Phase 4 review C1). "Forbidden" is deliberately undifferentiated
+  // from "not found" so the code leaks nothing about another user's meeting ids.
+  "meeting_forbidden",
   "internal",
 ]);
 

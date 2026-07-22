@@ -3,6 +3,8 @@ import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { RawData } from "ws";
 import { z } from "zod";
 
+import { isSupabaseConfigured } from "../../db/client.js";
+import { createTranscriptPersister } from "../../db/transcripts.js";
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
 import { defaultSttConfig } from "../stt/config.js";
 import { createSttEngine } from "../stt/engine.js";
@@ -79,6 +81,14 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
     createSttVendorsFromEnv(process.env),
   );
 
+  // Durable transcript memory. Wired only when the DB is configured; otherwise the
+  // session still streams to the phone, just without persistence (same keyless
+  // posture as STT). A DB write never blocks the relay (fire-and-forget in the
+  // session), so a slow/absent DB can never stall or drop a socket frame.
+  const persister = isSupabaseConfigured(process.env)
+    ? createTranscriptPersister()
+    : null;
+
   app.get("/live", { websocket: true }, (socket: WebSocket, req) => {
     // Header is primary; query param is the documented fallback.
     const token =
@@ -145,6 +155,12 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
         // echo mode is a test affordance only — never honored in production.
         allowEcho: process.env.NODE_ENV !== "production",
         sttEngine,
+        // Persist finals + stamp ended_at for the authenticated owner (when the DB
+        // is wired). app.log carries persistence-failure logs (ids only, no content).
+        ...(persister !== null
+          ? { persister, userId: auth.user.id }
+          : {}),
+        logger: app.log,
       });
 
       // Closing the socket is itself a session-scoped resource. Registering it
