@@ -30,7 +30,12 @@ export {
   type Pricer,
 } from "./pricing.js";
 
+export { createMeteringService, type MeteringServiceDeps } from "./service.js";
+
 export {
-  createMeteringService,
-  type MeteringServiceDeps,
-} from "./service.js";
+  createQuotaChecker,
+  type QuotaChecker,
+  type QuotaCheckerDeps,
+  type QuotaKind,
+  type PlanReader,
+} from "./quota.js";
