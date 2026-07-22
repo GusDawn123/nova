@@ -1,10 +1,18 @@
 import type { ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it, vi } from "vitest";
 
+import type { SttEmit, SttEngine } from "../stt/ports.js";
+
+import type {
+  LiveLogger,
+  TranscriptFinalRow,
+  TranscriptPersister,
+} from "./ports.js";
 import { LiveSession, type LiveSessionDeps } from "./session.js";
 
 const MEETING_ID = "11111111-1111-4111-8111-111111111111";
 const FIXED_SESSION_ID = "22222222-2222-4222-8222-222222222222";
+const USER_ID = "33333333-3333-4333-8333-333333333333";
 
 /** Build a session whose emitted events are captured for assertions. */
 function makeSession(overrides: Partial<LiveSessionDeps> = {}): {
@@ -107,6 +115,216 @@ describe("LiveSession binary audio path", () => {
     session.handleBinaryMessage(Buffer.from([1, 2, 3, 4, 5]));
 
     expect(sent.some((e) => e.type === "audio.echo")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Transcript-persistence harness: a fake STT engine whose emit sink the test can
+// drive directly, plus a controllable persister + logger.
+// ---------------------------------------------------------------------------
+
+interface FakeEngine {
+  engine: SttEngine;
+  /** Push an event as if the vendor emitted it (into the session's real sink). */
+  emit: (event: ServerLiveEvent) => void;
+  /** How many times the per-session handle's stop() was called. */
+  stops: () => number;
+}
+
+function makeFakeEngine(): FakeEngine {
+  let captured: SttEmit | null = null;
+  let stops = 0;
+  const engine: SttEngine = {
+    startSession(_info, emit) {
+      captured = emit;
+      return {
+        onAudioFrame() {
+          /* not exercised here */
+        },
+        stop() {
+          stops += 1;
+        },
+      };
+    },
+  };
+  return {
+    engine,
+    emit: (event) => {
+      if (captured) captured(event);
+    },
+    stops: () => stops,
+  };
+}
+
+interface Deferred {
+  promise: Promise<void>;
+  resolve: () => void;
+}
+
+function defer(): Deferred {
+  let resolve!: () => void;
+  const promise = new Promise<void>((res) => {
+    resolve = res;
+  });
+  return { promise, resolve };
+}
+
+class FakePersister implements TranscriptPersister {
+  readonly saveCalls: TranscriptFinalRow[] = [];
+  readonly markEndedCalls: { meetingId: string; userId: string }[] = [];
+  /** When set, `saveFinal` returns this pending promise instead of resolving. */
+  saveGate: Deferred | null = null;
+  /** When set, `saveFinal` rejects with it. */
+  saveError: Error | null = null;
+
+  saveFinal(row: TranscriptFinalRow): Promise<void> {
+    this.saveCalls.push(row);
+    if (this.saveError) return Promise.reject(this.saveError);
+    return this.saveGate ? this.saveGate.promise : Promise.resolve();
+  }
+
+  markEnded(meetingId: string, userId: string): Promise<void> {
+    this.markEndedCalls.push({ meetingId, userId });
+    return Promise.resolve();
+  }
+}
+
+const finalEvent = (
+  text: string,
+  speaker: string | null = "spk_0",
+  ts_ms = 100,
+): ServerLiveEvent => ({
+  v: 1,
+  type: "transcript.final",
+  text,
+  speaker,
+  ts_ms,
+  is_final: true,
+});
+
+const partialEvent = (text: string): ServerLiveEvent => ({
+  v: 1,
+  type: "transcript.partial",
+  text,
+  speaker: "spk_0",
+  ts_ms: 100,
+});
+
+/** Let queued microtasks + one macrotask settle (fire-and-forget writes resolve). */
+const flush = (): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("LiveSession transcript persistence", () => {
+  it("persists FINAL transcripts and never partials", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+    });
+    session.handleTextMessage(startFrame());
+
+    fake.emit(partialEvent("interim"));
+    fake.emit(finalEvent("committed one"));
+    fake.emit(partialEvent("more interim"));
+    fake.emit(finalEvent("committed two", null, 250));
+    await flush();
+
+    expect(persister.saveCalls.map((c) => c.content)).toEqual([
+      "committed one",
+      "committed two",
+    ]);
+    expect(persister.saveCalls[0]).toEqual({
+      meetingId: MEETING_ID,
+      userId: USER_ID,
+      content: "committed one",
+      speaker: "spk_0",
+      tsMs: 100,
+    });
+    // Nullable diarization/timing flow through unchanged.
+    expect(persister.saveCalls[1]).toMatchObject({ speaker: null, tsMs: 250 });
+  });
+
+  it("flushes pending final writes BEFORE marking the call ended", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const gate = defer();
+    persister.saveGate = gate;
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+    });
+    session.handleTextMessage(startFrame());
+    fake.emit(finalEvent("still writing"));
+
+    session.close(); // disposal kicks off finalize (await writes → markEnded)
+    await flush();
+    // The write is still gated, so markEnded must not have fired yet.
+    expect(persister.markEndedCalls).toHaveLength(0);
+
+    gate.resolve();
+    await flush();
+    expect(persister.markEndedCalls).toEqual([
+      { meetingId: MEETING_ID, userId: USER_ID },
+    ]);
+  });
+
+  it("logs a persist failure and leaves the socket relay unaffected", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    persister.saveError = new Error("db down");
+    const errors: { fields: Record<string, unknown>; msg: string }[] = [];
+    const logger: LiveLogger = {
+      error: (fields, msg) => errors.push({ fields, msg }),
+    };
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      persister,
+      userId: USER_ID,
+      logger,
+    });
+    session.handleTextMessage(startFrame());
+    fake.emit(finalEvent("still delivered"));
+    await flush();
+
+    // Relay unaffected: the final still reached the socket.
+    expect(
+      sent.some(
+        (e) => e.type === "transcript.final" && e.text === "still delivered",
+      ),
+    ).toBe(true);
+    // Failure logged with ids only — never transcript content (RULES §6).
+    expect(errors).toHaveLength(1);
+    expect(errors[0]?.msg).toBe("live.transcript_persist_failed");
+    expect(errors[0]?.fields).toMatchObject({
+      user_id: USER_ID,
+      meeting_id: MEETING_ID,
+    });
+    expect(JSON.stringify(errors[0]?.fields)).not.toContain("still delivered");
+  });
+
+  it("marks ended once across every disposal call after start", async () => {
+    const persister = new FakePersister();
+    const { session } = makeSession({ persister, userId: USER_ID });
+    session.handleTextMessage(startFrame());
+
+    session.handleTextMessage(JSON.stringify({ v: 1, type: "session.end" }));
+    session.close(); // belt-and-suspenders transport close
+    await flush();
+
+    expect(persister.markEndedCalls).toEqual([
+      { meetingId: MEETING_ID, userId: USER_ID },
+    ]);
+  });
+
+  it("does not mark ended when the session never started", async () => {
+    const persister = new FakePersister();
+    const { session } = makeSession({ persister, userId: USER_ID });
+    session.close();
+    await flush();
+    expect(persister.markEndedCalls).toHaveLength(0);
   });
 });
 

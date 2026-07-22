@@ -15,7 +15,10 @@ import Fastify, {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { SupabaseConfigError } from "./db/client.js";
+import { createRagIndexerDb } from "./db/rag-indexer.js";
 import { liveRoutes } from "./modules/live/routes.js";
+import { createRagIndexer } from "./modules/rag/indexer.js";
+import { createRagFromEnv } from "./modules/rag/index.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import { withLogRedaction } from "./plugins/log-redaction.js";
 import {
@@ -65,6 +68,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // then declares GET /live. Auth is enforced per-connection inside liveRoutes
   // (WS-close codes, not HTTP status), so no preHandler here.
   void app.register(liveRoutes);
+
+  // Auto-index sweeper: closes the memory loop (call ends → chunks queryable
+  // < 60s). Started only when RAG is configured AND not under test — unit/DB
+  // suites drive the sweeper explicitly, never the boot-wired background one.
+  maybeStartRagIndexer(app);
 
   app.get("/health", (): HealthResponse => {
     // zod-parse the boundary even on the way out — the response shape is a
@@ -126,4 +134,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   );
 
   return app;
+}
+
+/**
+ * Start the RAG completion sweeper on boot, but ONLY when RAG is configured
+ * (`VOYAGE_API_KEY` + `SUPABASE_DB_URL` present) AND we are not under test — the
+ * test suites construct and drive their own indexer. Stopped on server close.
+ */
+function maybeStartRagIndexer(app: FastifyInstance): void {
+  const env = process.env;
+  const ragConfigured =
+    Boolean(env.VOYAGE_API_KEY) && Boolean(env.SUPABASE_DB_URL);
+  if (!ragConfigured || env.NODE_ENV === "test") return;
+
+  const ragService = createRagFromEnv(env, { logger: app.log });
+  const indexer = createRagIndexer({
+    ragService,
+    db: createRagIndexerDb(),
+    logger: app.log,
+  });
+  indexer.start();
+  app.addHook("onClose", (_instance, done) => {
+    indexer.stop();
+    done();
+  });
 }

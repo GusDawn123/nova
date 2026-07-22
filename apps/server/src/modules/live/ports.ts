@@ -39,6 +39,41 @@ export interface Disposer {
   readonly disposed: boolean;
 }
 
+/**
+ * A committed (FINAL) transcript utterance to persist. Partials are NEVER
+ * persisted (RULES: raw audio never stored; transcript TEXT finals only). `speaker`
+ * / `tsMs` are nullable — the STT vendor may not diarize or timestamp every final.
+ */
+export interface TranscriptFinalRow {
+  readonly meetingId: string;
+  readonly userId: string;
+  readonly content: string;
+  readonly speaker: string | null;
+  readonly tsMs: number | null;
+}
+
+/**
+ * Persistence seam the live session writes durable memory through: store each FINAL
+ * transcript, and stamp call completion (`meetings.ended_at`). Implemented by the
+ * supabase adapter in `db/transcripts.ts` (service-role). Both methods may reject —
+ * the session treats writes as fire-and-forget with error logging, because a DB
+ * hiccup must NEVER stall or kill the socket relay (RULES). `markEnded` is idempotent
+ * (only sets `ended_at` where currently null).
+ */
+export interface TranscriptPersister {
+  saveFinal(row: TranscriptFinalRow): Promise<void>;
+  markEnded(meetingId: string, userId: string): Promise<void>;
+}
+
+/**
+ * Minimal structured-error log sink (Fastify `app.log` shape). The session logs
+ * persistence failures through it with `user_id` / `meeting_id` — NEVER transcript
+ * content (RULES §6).
+ */
+export interface LiveLogger {
+  error(fields: Record<string, unknown>, msg: string): void;
+}
+
 /** Build a fresh {@link Disposer}. */
 export function createDisposer(): Disposer {
   const cleanups: (() => void)[] = [];

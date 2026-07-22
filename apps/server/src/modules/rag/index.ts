@@ -112,3 +112,12 @@ export {
 } from "./ports.js";
 
 export { ragConfig, type RagConfig } from "./config.js";
+
+export {
+  createRagIndexer,
+  type RagIndexer,
+  type RagIndexerDb,
+  type RagIndexerDeps,
+  type UnindexedMeeting,
+  type IndexerLogger,
+} from "./indexer.js";
