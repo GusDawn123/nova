@@ -89,6 +89,41 @@ describe("createNotesJobHandler", () => {
     );
   });
 
+  it("logs one per-user usage line summing usage[] on completion (Phase 6 metering seam)", async () => {
+    // Two model calls (classify + generate) — the log must SUM them, not count 1.
+    const multiUsage: JobUsage[] = [
+      { inputTokens: 100, outputTokens: 20 },
+      { inputTokens: 40, outputTokens: 15 },
+    ];
+    const info = vi.fn();
+    const logger: NotesLogger = { info, error: () => {} };
+    const handler = createNotesJobHandler({
+      pipeline: fakePipeline(() =>
+        Promise.resolve({ notes: NOTES, usage: multiUsage }),
+      ),
+      source: fakeSource(),
+      writer: { writeNotes: () => Promise.resolve() },
+      logger,
+    });
+
+    await handler.handle(JOB);
+
+    const completed = info.mock.calls.find(
+      (call) => call[1] === "notes.handler.completed",
+    );
+    expect(completed).toBeDefined();
+    expect(completed?.[0]).toEqual(
+      expect.objectContaining({
+        job_id: "job-1",
+        meeting_id: "meeting-1",
+        user_id: "user-1",
+        input_tokens: 140,
+        output_tokens: 35,
+        calls: 2,
+      }),
+    );
+  });
+
   it("fails terminally when the meeting row is missing", async () => {
     const writeNotes = vi.fn(() => Promise.resolve());
     const handler = createNotesJobHandler({

@@ -52,6 +52,14 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }
 
+/** Sum one token field across the per-call usage entries (undefined → 0). */
+function sumTokens(
+  usage: readonly JobUsage[],
+  field: "inputTokens" | "outputTokens",
+): number {
+  return usage.reduce((total, entry) => total + (entry[field] ?? 0), 0);
+}
+
 /** Build the real pipeline-backed {@link NotesJobHandler} over explicit deps. */
 export function createNotesJobHandler(
   deps: NotesJobHandlerDeps,
@@ -92,8 +100,19 @@ export function createNotesJobHandler(
       const { notes, usage } = await pipeline.generate(meta, turns);
       await writer.writeNotes(job.meetingId, job.userId, notes, now());
 
+      // The per-user cost line (playbook "token usage per summary logged per user";
+      // the Phase 6 metering seam). Ids + counts ONLY — never transcript content
+      // (RULES §6). The per-call breakdown persists on `jobs.usage` (jsonb) via the
+      // store's `complete()`; this log is its observable summary.
       logger.info(
-        { ...base, notes_source: notes.source, usage: usage.length },
+        {
+          ...base,
+          user_id: job.userId,
+          input_tokens: sumTokens(usage, "inputTokens"),
+          output_tokens: sumTokens(usage, "outputTokens"),
+          calls: usage.length,
+          notes_source: notes.source,
+        },
         "notes.handler.completed",
       );
       return { outcome: "completed", usage };
