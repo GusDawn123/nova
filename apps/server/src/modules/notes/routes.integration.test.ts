@@ -45,7 +45,8 @@ const COMPLETED_NOTES: MeetingNotes = {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Agreed to renew on the Growth plan next quarter.",
-  overview: "The rep and customer reviewed terms and aligned on the renewal path.",
+  overview:
+    "The rep and customer reviewed terms and aligned on the renewal path.",
   decisions: [{ text: "Renew on the Growth plan.", quote: null }],
   actionItems: [
     {
@@ -134,7 +135,10 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     const anon = createClient(url, anonKey, noPersist);
     const signIn = await anon.auth.signInWithPassword({ email, password });
     if (signIn.error) throw new Error(`signIn: ${signIn.error.message}`);
-    return { id: created.data.user.id, token: signIn.data.session.access_token };
+    return {
+      id: created.data.user.id,
+      token: signIn.data.session.access_token,
+    };
   }
 
   async function newMeeting(ownerId: string): Promise<string> {

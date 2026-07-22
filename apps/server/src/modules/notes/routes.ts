@@ -5,11 +5,7 @@ import {
   regenerateResponseSchema,
   type NotesReadResponse,
 } from "@nova/shared";
-import type {
-  FastifyInstance,
-  FastifyReply,
-  FastifyRequest,
-} from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { NotesJobStore } from "../../db/jobs.js";
@@ -198,7 +194,10 @@ export function createNotesRoutes(
           });
         } catch (err) {
           // Transport/all-providers failures → typed 503 (never a 500 stack leak).
-          if (err instanceof LlmError || err instanceof AllProvidersFailedError) {
+          if (
+            err instanceof LlmError ||
+            err instanceof AllProvidersFailedError
+          ) {
             logger.error(
               { user_id: userId, meeting_id: meetingId },
               "notes.follow_up.provider_unavailable",
