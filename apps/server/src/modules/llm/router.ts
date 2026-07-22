@@ -30,11 +30,17 @@ export interface LlmRouterDeps {
  * The failover router surface consumed by the transport layer: a single
  * `stream` that races/falls-over across the configured providers and yields the
  * winner's events, or throws a typed {@link LlmError} when none survive.
+ *
+ * `opts.meter` (Phase 6, adr-0007 §2) is the PER-CALL metering override: user
+ * attribution travels with the call (via `metering.meterFor(userId, meetingId)`)
+ * while the router — and its breaker/bench state — stays process-global. When
+ * absent, the constructed default meter accounts the call. Exactly-once-at-`done`
+ * semantics are identical either way.
  */
 export interface LlmRouter {
   stream(
     req: ChatRequest,
-    opts?: { signal?: AbortSignal },
+    opts?: { signal?: AbortSignal; meter?: Meter },
   ): AsyncIterable<LlmStreamEvent>;
 }
 
@@ -61,7 +67,7 @@ interface AttemptContext {
  */
 export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
   const { providers, config } = deps;
-  const meter = deps.meter ?? noopMeter;
+  const constructedMeter = deps.meter ?? noopMeter;
   const health = createProviderHealth(config);
   const byId = new Map<ProviderId, LlmProvider>(
     providers.map((provider) => [provider.id, provider]),
@@ -69,8 +75,10 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
 
   async function* stream(
     req: ChatRequest,
-    opts?: { signal?: AbortSignal },
+    opts?: { signal?: AbortSignal; meter?: Meter },
   ): AsyncGenerator<LlmStreamEvent> {
+    // Per-call meter wins (adr-0007 §2): attribution travels with the call.
+    const meter = opts?.meter ?? constructedMeter;
     const callerSignal = opts?.signal;
     if (callerSignal?.aborted) {
       throw LlmError.aborted();
@@ -323,4 +331,20 @@ function recordUsage(
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Bind a {@link Meter} onto every `stream` call of a router — the convenience
+ * consumers (notes pipeline, follow-up) use to thread `metering.meterFor(...)`
+ * through code that only sees an {@link LlmRouter}. Purely additive: any explicit
+ * `opts` (signal) pass through; an explicit per-call `opts.meter` on the wrapped
+ * router would be overridden by design (the closest binding wins is NOT wanted
+ * here — the wrapper IS the per-call meter).
+ */
+export function withMeter(router: LlmRouter, meter: Meter): LlmRouter {
+  return {
+    stream(req, opts) {
+      return router.stream(req, { ...opts, meter });
+    },
+  };
 }
