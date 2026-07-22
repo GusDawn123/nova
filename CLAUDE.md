@@ -20,9 +20,11 @@ store over a direct `pg` Pool, `RagService`, and the marker-and-sweep auto-index
 `chunks`/`embeddings` tables (halfvec 1024, HNSW). GREEN: the mock/DB suites + RLS isolation, the
 freshness exit bar (auto-index queryable ~0.7s vs the <60s bar), and the store latency exit bar
 (`npm run bench:rag` — p50 5.2 / p95 7.2 / max 9.6 ms over a 40k-chunk corpus vs the <300ms bar,
-no vendor key). KEY-GATED and SKIPPED pending `VOYAGE_API_KEY` (Gustavo action item): the live
-Voyage smoke and the top-3 retrieval accuracy gate — both self-skip keyless, exactly as the
-Phase 2/3 live gates did before their keys landed.**
+no vendor key). Live gates RAN and GREEN (2026-07-22, `VOYAGE_API_KEY` landed): Voyage smoke
+passed and the top-3 retrieval accuracy gate passed — `acme-pricing` ranked #1 on both tiers,
+user-B isolation 0 snippets, all embeddings rows `voyage-4`/1024 (suites stay key-gated so
+keyless CI self-skips). Voyage 429s now retry with backoff on the background tier only; query
+embeds stay fail-fast (adr-0005 §8).**
 Phase 3 streaming STT gateway is done and merged: live accuracy gates RAN and GREEN (word-overlap
 87.8–96.3% vs 80/70 bars, both vendors ≥2 speakers, dead-vendor failover proven; turn-boundary
 alignment per-vendor, real-audio re-test rides Phase 9). Phase 2 `modules/llm` live smoke PASSED

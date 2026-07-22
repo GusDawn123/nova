@@ -73,7 +73,7 @@
 | # | Capability | Nova phase | Verified by | Status |
 |---|---|---|---|---|
 | 23 | Meeting history list + detail view (notes / transcript tabs) | 8 | screen loop checklists | ⬜ |
-| 24 | Per-user context library ("your life": docs, profile, notes) | 4 | seed + top-3 retrieval test | 🔨 † |
+| 24 | Per-user context library ("your life": docs, profile, notes) | 4 | seed + top-3 retrieval test | ✅ |
 | 25 | Past calls auto-indexed into memory | 4 | freshness test (<60s) | ✅ † |
 | 26 | Chat with a past meeting | post-MVP | — | ⬜ |
 | 27 | Cross-meeting recall ("still open from last time") | post-MVP | — | ⬜ |
@@ -170,16 +170,17 @@
 > hybrid-search + isolation + soft-delete in `pgvector.integration.test.ts`, service orchestration
 > in `service.test.ts`, RLS A/B in `db/rag-isolation.integration.test.ts`). The **live Voyage smoke**
 > (`voyage.live.smoke.test.ts`) and the **top-3 retrieval accuracy gate** (`rag.accuracy.test.ts`)
-> are **key-gated (`describe.skipIf`) and UNRUN** — they need a real `VOYAGE_API_KEY` (Gustavo action
-> item), exactly the Phase 2/3 convention where a live gate stays skipped-pending-key until the key
-> lands. † here flags a claim whose live proof is pending that key, not a code gap.
-> - **24 (context library / top-3 retrieval)** — 🔨 the ingest→embed→hybrid-search path is built and
->   proven end to end against real Postgres with deterministic vectors (nearest-neighbor order, a
->   rare-token full-text rescue, RRF fusing both legs, cross-user isolation, soft-delete exclusion in
->   `pgvector.integration.test.ts`). **†** the **top-3-by-source-id retrieval bar** over the committed
->   20-doc fixture corpus (`fixtures/rag/context-docs.json`, always-on fixture guard in
->   `rag.accuracy.test.ts`) runs ONLY with a real Voyage key — it is **skipped pending
->   `VOYAGE_API_KEY`**, so the row stays in-progress on the live-embedding-quality leg.
+> both **RAN and PASSED 2026-07-22** once `VOYAGE_API_KEY` landed (they remain key-gated so keyless
+> CI self-skips them — same convention as the Phase 2/3 live gates).
+> - **24 (context library / top-3 retrieval)** — ✅ the ingest→embed→hybrid-search path is proven end
+>   to end against real Postgres with deterministic vectors (nearest-neighbor order, a rare-token
+>   full-text rescue, RRF fusing both legs, cross-user isolation, soft-delete exclusion in
+>   `pgvector.integration.test.ts`) AND the **live gate passed against the real Voyage API**
+>   (2026-07-22): over the committed 20-doc fixture corpus, "what pricing did we offer Acme?" ranked
+>   `acme-pricing` **#1 on both tiers** (deliberate hard bar top-3 ✅; live-tier soft check also
+>   top-3), user-B isolation returned **0** snippets, and every embeddings row carried
+>   `model=voyage-4 dims=1024` (versioning bar). The run rode Voyage's free-tier rate limiter via the
+>   adapter's 429 backoff (background tier only; query embeds stay fail-fast per adr-0005 §8).
 > - **25 (auto-index freshness)** — ✅ the marker-and-sweep indexer makes a finished call queryable
 >   **~0.7s after `ended_at` vs the <60s** exit bar, proven end to end through the REAL sweeper + REAL
 >   pgvector store in `rag.freshness.integration.test.ts` (idempotent re-sweep + empty-transcript edge
