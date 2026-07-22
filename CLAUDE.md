@@ -13,26 +13,28 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 3 streaming STT gateway complete on `dev-claude-stt` — live accuracy gates RUN
-and GREEN (2026-07-21): word-overlap 87.8–96.3% vs 80/70 bars, both vendors ≥2 speakers,
-dead-vendor failover proven; turn-boundary alignment is per-vendor (Deepgram strict 7/7,
-AssemblyAI relaxed ≥1 on synthetic TTS — real-audio re-test rides Phase 9).**
-Phases 0-2 are all **merged into `development`**: Phase 0 scaffold (PR #1), Phase 1 auth (PR #2),
-and Phase 2 `modules/llm` (PR #3, merged 2026-07-20) — the last is now in this branch's tree via
-the development→`dev-claude-stt` merge, so `modules/llm` lives here alongside the STT work. Its
-live smoke has now **PASSED** (2026-07-21: anthropic + openai + google; google default model
-bumped to `gemini-2.5-flash`, thinking off; groq unkeyed → skips). Phase 3 adds the live-call spine on top of
-the auth domain: the shared WebSocket wire protocol (`packages/shared/src/live.ts`, versioned zod
-unions), an authenticated `GET /live` socket + per-call `LiveSession` (`modules/live/`), and the
-`modules/stt` gateway — a vendor-agnostic failover/reconnect/silence engine with AssemblyAI
-(primary) + Deepgram (fallback) adapters. Both STT keys are OPTIONAL: the server boots without
-them and a keyless live session returns a typed `error` instead of transcribing. Behavior is
-green vs scriptable mock vendors AND the key-gated live accuracy suite passes against both real
-vendors (the suite self-skips keyless, e.g. in CI — with keys it paces audio at real time). Raw
-audio is **never persisted** (static + runtime `[no-disk]` audits). Phase 1 carry-overs still
-hold: Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only**
-(cloud project deferred), iOS-simulator verification deferred (Expo web + Playwright instead).
-Phases 4+ of `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
+**Status: Phase 4 RAG memory built on `dev-claude-rag` (branched off `development`, which now
+carries Phases 0-3 via PRs #1-#4). `modules/rag` ships: the pure chunker + four ports
+(Chunker/Embedder/VectorStore/Reranker), the Voyage embeddings adapter, the pgvector hybrid-RRF
+store over a direct `pg` Pool, `RagService`, and the marker-and-sweep auto-indexer, all over the
+`chunks`/`embeddings` tables (halfvec 1024, HNSW). GREEN: the mock/DB suites + RLS isolation, the
+freshness exit bar (auto-index queryable ~0.7s vs the <60s bar), and the store latency exit bar
+(`npm run bench:rag` — p50 5.2 / p95 7.2 / max 9.6 ms over a 40k-chunk corpus vs the <300ms bar,
+no vendor key). KEY-GATED and SKIPPED pending `VOYAGE_API_KEY` (Gustavo action item): the live
+Voyage smoke and the top-3 retrieval accuracy gate — both self-skip keyless, exactly as the
+Phase 2/3 live gates did before their keys landed.**
+Phase 3 streaming STT gateway is done and merged: live accuracy gates RAN and GREEN (word-overlap
+87.8–96.3% vs 80/70 bars, both vendors ≥2 speakers, dead-vendor failover proven; turn-boundary
+alignment per-vendor, real-audio re-test rides Phase 9). Phase 2 `modules/llm` live smoke PASSED
+(anthropic + openai + google on `gemini-2.5-flash`; groq unkeyed → skips). The live-call spine —
+the shared WebSocket wire protocol (`packages/shared/src/live.ts`), an authenticated `GET /live`
+socket + per-call `LiveSession` (`modules/live/`), and the `modules/stt` failover/reconnect/silence
+engine (AssemblyAI + Deepgram adapters) — all lives in this tree; raw audio is **never persisted**
+(static + runtime `[no-disk]` audits). All vendor keys (STT, LLM, Voyage) are OPTIONAL: the server
+boots without them and the affected path degrades to a typed error. Phase 1 carry-overs still hold:
+Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only** (cloud project
+deferred), iOS-simulator verification deferred (Expo web + Playwright instead). Phases 5+ of
+`docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
 
 ## Read before doing ANYTHING
 
@@ -79,6 +81,12 @@ npm run db:reset       # supabase db reset  (re-applies migrations from scratch)
 # Server workspace (apps/server, Fastify)
 npm run dev   --workspace apps/server   # tsx watch — GET /health => { ok, version }
 npm run start --workspace apps/server   # node dist/index.js (after a build)
+npm run bench:rag --workspace apps/server  # RAG store p95 latency bar (DB-required, no
+                                           #   vendor key). Needs the stack up + its env
+                                           #   exported: `eval "$(supabase status -o env)"`
+                                           #   then SUPABASE_DB_URL/URL/SERVICE_ROLE_KEY.
+                                           #   Seeds 40k chunks, prints p50/p95/max vs <300ms,
+                                           #   non-zero exit on FAIL, cleans up after itself.
 
 # Mobile workspace (apps/mobile, Expo)
 npm run start --workspace apps/mobile   # expo start (add --web / --ios / --android)
