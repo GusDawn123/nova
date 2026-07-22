@@ -45,6 +45,14 @@ export interface NotesJobHandlerDeps {
   readonly logger: NotesLogger;
   /** Injected clock for `notes_generated_at` (deterministic in tests). */
   readonly now?: () => Date;
+  /**
+   * Claim-time llm-token quota gate (Phase 6, adr-0007 §4). Over → the job is
+   * REFUSED as `failed` with 'quota_exceeded' (dead-letter + notes_status
+   * 'failed' — the paywall stays visible; silently producing fallback notes
+   * would hide it; regenerate after upgrade re-enqueues). Optional (keyless
+   * posture) and fail-open on an internal failure.
+   */
+  readonly isOverLlmQuota?: (userId: string) => Promise<boolean>;
 }
 
 /** Best-effort message from an unknown thrown value (never leaks a stack to logs). */
@@ -75,6 +83,29 @@ export function createNotesJobHandler(
     | { outcome: "failed"; error: string; rawOutput?: string }
   > {
     const base = { job_id: job.id, meeting_id: job.meetingId };
+
+    // Claim-time quota gate (adr-0007 §4) — BEFORE any load or paid work. A
+    // check failure FAILS OPEN (logged): quota protects spend, and the metering
+    // DB being down must not dead-letter every job on the platform.
+    if (deps.isOverLlmQuota) {
+      let overQuota = false;
+      try {
+        overQuota = await deps.isOverLlmQuota(job.userId);
+      } catch (err) {
+        logger.error(
+          { ...base, user_id: job.userId, error: errorMessage(err) },
+          "notes.handler.quota_check_failed",
+        );
+      }
+      if (overQuota) {
+        logger.info(
+          { ...base, user_id: job.userId },
+          "notes.handler.quota_exceeded",
+        );
+        return { outcome: "failed", error: "quota_exceeded" };
+      }
+    }
+
     try {
       const meeting = await source.loadMeeting(job.meetingId, job.userId);
       if (meeting === null) {

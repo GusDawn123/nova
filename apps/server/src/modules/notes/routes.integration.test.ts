@@ -157,7 +157,11 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     );
   }
 
-  function buildApp(followUpRouter: LlmRouter, log: NotesLogger): FastifyInstance {
+  function buildApp(
+    followUpRouter: LlmRouter,
+    log: NotesLogger,
+    isOverLlmQuota?: (userId: string) => Promise<boolean>,
+  ): FastifyInstance {
     const app = Fastify({ logger: false });
     void app.register(
       createNotesRoutes({
@@ -167,6 +171,7 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
         followUp: generateFollowUp({ router: followUpRouter, logger: log }),
         logger: log,
         now: () => new Date("2026-07-22T18:00:00Z"),
+        ...(isOverLlmQuota ? { isOverLlmQuota } : {}),
       }),
     );
     return app;
@@ -378,6 +383,25 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: "provider_unavailable" });
+  });
+
+  it("follow-up over the llm quota is a typed 429 quota_exceeded (paywall; no call made)", async () => {
+    const meetingId = await newMeeting(userAId);
+    await completeNotes(meetingId);
+
+    // A router that would blow up if the quota gate let the call through.
+    const quotaApp = buildApp(throwingRouter(), okLog.logger, (userId) => {
+      expect(userId).toBe(userAId);
+      return Promise.resolve(true);
+    });
+    const res = await quotaApp.inject({
+      method: "POST",
+      url: `/meetings/${meetingId}/follow-up`,
+      headers: auth(tokenA),
+      payload: { tone: "warm" },
+    });
+    expect(res.statusCode).toBe(429);
+    expect(res.json()).toEqual({ error: "quota_exceeded" });
   });
 
   it("follow-up on a foreign meeting is a uniform 404", async () => {

@@ -44,6 +44,13 @@ export interface NotesRoutesDeps {
   readonly logger: NotesLogger;
   /** Injected clock for the stored `generated_at` (deterministic in tests). */
   readonly now?: () => Date;
+  /**
+   * Request-time llm-token quota gate for the synchronous follow-up call (Phase
+   * 6, adr-0007 §4): over → typed 429 `quota_exceeded` (the paywall state)
+   * BEFORE any provider call. Optional (keyless posture); fail-open on an
+   * internal failure.
+   */
+  readonly isOverLlmQuota?: (userId: string) => Promise<boolean>;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -156,6 +163,27 @@ export function createNotesRoutes(
         // (or still generating/failed) → typed 409, not a draft from thin air.
         if (model.notes === null || model.notesStatus !== "completed") {
           return reply.code(409).send({ error: "notes_not_ready" });
+        }
+
+        // Quota gate (Phase 6, adr-0007 §4) — BEFORE the paid call. Fail-open on
+        // an internal failure (logged): quota protects spend, not availability.
+        if (deps.isOverLlmQuota) {
+          let overQuota = false;
+          try {
+            overQuota = await deps.isOverLlmQuota(userId);
+          } catch (err) {
+            logger.error(
+              { user_id: userId, meeting_id: meetingId, err },
+              "notes.follow_up.quota_check_failed",
+            );
+          }
+          if (overQuota) {
+            logger.info(
+              { user_id: userId, meeting_id: meetingId },
+              "notes.follow_up.quota_exceeded",
+            );
+            return reply.code(429).send({ error: "quota_exceeded" });
+          }
         }
 
         let result: FollowUpResult;
