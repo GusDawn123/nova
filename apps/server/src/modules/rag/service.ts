@@ -261,7 +261,8 @@ export function createRagService(deps: RagServiceDeps): RagService {
       const tierK = opts.tier === "live" ? config.kLive : config.kDeliberate;
       const reranked =
         opts.tier === "deliberate" && reranker
-          ? await reranker.rerank(text, candidates, config.kDeliberate)
+          ? // userId threaded for usage metering (Phase 6 — the Reranker opener).
+            await reranker.rerank(text, candidates, config.kDeliberate, userId)
           : candidates;
 
       // 4. Trim to the tier/override count, then to the token budget.

@@ -123,6 +123,8 @@ export interface RecordedRerank {
   readonly query: string;
   readonly hits: RagHit[];
   readonly k: number;
+  /** The metering attribution threaded through the port (Phase 6). */
+  readonly userId?: string;
 }
 
 /**
@@ -133,8 +135,17 @@ export interface RecordedRerank {
 export class SpyReranker implements Reranker {
   readonly calls: RecordedRerank[] = [];
 
-  rerank(query: string, hits: RagHit[], k: number): Promise<RagHit[]> {
-    this.calls.push({ query, hits: [...hits], k });
+  rerank(
+    query: string,
+    hits: RagHit[],
+    k: number,
+    userId?: string,
+  ): Promise<RagHit[]> {
+    this.calls.push(
+      userId === undefined
+        ? { query, hits: [...hits], k }
+        : { query, hits: [...hits], k, userId },
+    );
     return Promise.resolve([...hits].reverse().slice(0, k));
   }
 }

@@ -211,8 +211,15 @@ export interface VectorStore {
 /**
  * The deliberate-tier reranker port (Voyage rerank adapter satisfies it). The
  * default implementation is identity — a keyless deploy still works, and the
- * live tier never reranks. Failure throws `RagError`.
+ * live tier never reranks. Failure throws `RagError`. `userId` (Phase 6 —
+ * closing the standing opener) threads the caller's attribution through for
+ * usage metering; `RagService.query` always supplies it.
  */
 export interface Reranker {
-  rerank(query: string, hits: RagHit[], k: number): Promise<RagHit[]>;
+  rerank(
+    query: string,
+    hits: RagHit[],
+    k: number,
+    userId?: string,
+  ): Promise<RagHit[]>;
 }

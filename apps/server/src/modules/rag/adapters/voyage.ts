@@ -105,9 +105,15 @@ const rerankResponseSchema = z.object({
 // Usage logging (metering-ready; never carries input text).
 // ---------------------------------------------------------------------------
 
-/** One structured usage line. `user_id` is null when the port carries no owner. */
+/**
+ * One structured usage line. `user_id` is null when the port carries no owner.
+ * `kind` (Phase 6) lets the app.ts metering sink map the line to its ledger kind
+ * (`embedding_tokens` vs `rerank_requests`) without sniffing model names; `model`
+ * stays the TRUE per-call vendor model (per tier), for metering accuracy.
+ */
 export interface VoyageUsageLog {
   readonly vendor: "voyage";
+  readonly kind: "embedding" | "rerank";
   readonly model: string;
   readonly tokens: number;
   readonly user_id: string | null;
@@ -232,6 +238,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
 
       logUsage({
         vendor: "voyage",
+        kind: "embedding",
         model: vendorModel,
         tokens,
         user_id: embedOpts.userId ?? null,
@@ -249,7 +256,7 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
   };
 
   const reranker: Reranker = {
-    async rerank(query, hits, k) {
+    async rerank(query, hits, k, userId) {
       if (hits.length === 0) return [];
       const topK = Math.min(k, hits.length);
       // Rerank is deliberate-tier (post-call, off the hot path — adr §5), so it
@@ -277,9 +284,10 @@ export function createVoyageAdapter(opts: VoyageAdapterOptions): {
 
       logUsage({
         vendor: "voyage",
+        kind: "rerank",
         model: parsed.data.model,
         tokens: parsed.data.usage.total_tokens,
-        user_id: null,
+        user_id: userId ?? null,
       });
 
       const reordered: RagHit[] = [];

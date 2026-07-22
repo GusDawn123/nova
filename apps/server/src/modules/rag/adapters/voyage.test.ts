@@ -255,6 +255,7 @@ describe("voyage embedder — usage log", () => {
     // unlike the returned space id — adr-0005 §2.
     expect(logUsage).toHaveBeenCalledWith({
       vendor: "voyage",
+      kind: "embedding",
       model: "voyage-4-lite",
       tokens: 11,
       user_id: "user-123",
