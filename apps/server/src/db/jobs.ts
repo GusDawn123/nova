@@ -14,14 +14,13 @@ import { z } from "zod";
  *   - claim   → 'processing'
  *   - fail / reap-to-dead → 'failed'
  * `complete()` deliberately does NOT flip `notes_status`: the 'completed' flip
- * happens in Task 4, atomically with the notes write (an upsert keyed by meeting),
- * so a completed job whose notes write failed can never masquerade as ready.
- * `retry()` and reap-to-requeue leave `notes_status='processing'` — the meeting is
- * still in flight, and the next claim re-mirrors 'processing' (a harmless no-op).
+ * happens in Task 4, atomically with the notes write, so a completed job whose notes
+ * write failed can never masquerade as ready. `retry()` and reap-to-requeue leave
+ * `notes_status='processing'` (still in flight; the next claim re-mirrors it).
  *
  * Delivery contract (adr §3): exactly-once CLAIM within a lease window (the single
  * atomic `UPDATE … FOR UPDATE SKIP LOCKED` below), at-least-once execution,
- * idempotent effects. Claim is multi-instance-safe from day one.
+ * idempotent effects — multi-instance-safe from day one.
  */
 
 const JOB_KIND = "generate_notes";
