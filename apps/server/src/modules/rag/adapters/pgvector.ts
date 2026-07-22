@@ -59,7 +59,10 @@ const searchRowSchema = z.object({
 /**
  * Hybrid RRF: semantic (cosine) + full-text legs fused in ONE round trip.
  * Params: $1 vec, $2 user_id, $3 model, $4 candidates/leg, $5 query text,
- * $6 rrf_k, $7 k. Both legs carry the explicit `user_id` predicate (adr §4).
+ * $6 rrf_k, $7 k. Both legs carry the explicit `user_id` predicate (adr §4) AND
+ * the final join-back re-asserts it — `embeddings.user_id` is a denormalized
+ * copy with no composite FK, so a mis-denormalized row must not be able to
+ * surface another tenant's chunk.
  */
 const HYBRID_SQL = `
 with semantic as (
@@ -84,7 +87,7 @@ select c.id, c.content, c.header, c.context_doc_id, c.meeting_id,
 from semantic s
 full outer join full_text f using (chunk_id)
 join chunks c on c.id = coalesce(s.chunk_id, f.chunk_id)
-where c.deleted_at is null
+where c.user_id = $2 and c.deleted_at is null
 order by score desc
 limit $7
 `;
@@ -107,7 +110,7 @@ select c.id, c.content, c.header, c.context_doc_id, c.meeting_id,
   coalesce(1.0 / ($5 + s.rank_ix), 0) as score
 from semantic s
 join chunks c on c.id = s.chunk_id
-where c.deleted_at is null
+where c.user_id = $2 and c.deleted_at is null
 order by score desc
 limit $6
 `;
