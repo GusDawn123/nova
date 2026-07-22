@@ -4,6 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { meetingNotesSchema } from "@nova/shared";
+
 import { createUsageEventsDb } from "../../db/usage-events.js";
 import { createNotesSource } from "../../db/notes-source.js";
 import { createNotesWriter } from "../../db/notes.js";
@@ -18,6 +20,7 @@ import { createNotesPipeline } from "../notes/pipeline.js";
 import { createNotesWorker } from "../notes/worker.js";
 import type { NotesLogger, NotesPipeline } from "../notes/ports.js";
 
+import { createKillSwitch } from "./kill-switch.js";
 import { createMeteringService } from "./service.js";
 import type { MeteringLogger } from "./ports.js";
 
@@ -60,6 +63,13 @@ const SALES_NOTES = {
   risks: [],
   typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
 };
+
+// Parsed through the shared schema so the cap-e2e handler returns typed notes.
+const SALES_NOTES_PARSED = meetingNotesSchema.parse({
+  version: 1,
+  source: "generated",
+  ...SALES_NOTES,
+});
 
 interface UsageRow {
   vendor: string;
@@ -282,6 +292,94 @@ describe.skipIf(!hasStack)(
       );
       expect(m.rows[0]?.notes_status).toBe("failed");
       expect(m.rows[0]?.notes).toBeNull();
+    });
+
+    it("[cap-e2e] seeded spend past the cap: claims refused, job stays queued, in-flight finishes, ONE alert", async () => {
+      // Seed TODAY's ledger past the $50 default cap (global, any user).
+      await pool.query(
+        `insert into usage_events (user_id, vendor, kind, amount, cost_estimate_usd)
+         values ($1, 'openai', 'llm_tokens', 1, 60)`,
+        [userId],
+      );
+      const metering = createMeteringService({
+        db: createUsageEventsDb(pool),
+        logger: NOOP_METERING_LOGGER,
+      });
+      const alerts: string[] = [];
+      const killSwitch = createKillSwitch({
+        spendTodayUsd: () => metering.spendTodayUsd(),
+        logger: {
+          info: () => {},
+          warn: () => {},
+          error: (_f, msg) => alerts.push(msg),
+        },
+      });
+
+      // Tripped over the REAL ledger, alerting exactly once for the day.
+      expect(await killSwitch.isTripped()).toBe(true);
+      expect(await killSwitch.isTripped()).toBe(true);
+      expect(
+        alerts.filter((m2) => m2 === "metering.daily_cap_tripped"),
+      ).toHaveLength(1);
+
+      // A queued job survives untouched while the cap gates the claim.
+      const meeting = await pool.query<{ id: string }>(
+        `insert into meetings (user_id, title, started_at, ended_at)
+         values ($1, $2, now(), now()) returning id`,
+        [userId, "Capped-day call"],
+      );
+      const capMeetingId = meeting.rows[0]?.id;
+      if (capMeetingId === undefined) throw new Error("meeting insert failed");
+      const store = createNotesJobStore(pool);
+      expect(await store.enqueue(capMeetingId, userId)).toBe("enqueued");
+      await pool.query(
+        "update jobs set run_at = now() - interval '3 days' where meeting_id = $1",
+        [capMeetingId],
+      );
+
+      // In-flight-finishes mechanics: the gate is PER-TICK. Tick 1 runs with
+      // the cap not yet tripped → claims + the (mock) call finishes even
+      // though the cap trips right after the claim; later ticks are refused.
+      let capNow = false;
+      const handler = createNotesJobHandler({
+        pipeline: {
+          generate: () => {
+            capNow = true; // the cap trips WHILE the job is in flight
+            return Promise.resolve({ notes: SALES_NOTES_PARSED, usage: [] });
+          },
+        },
+        source: createNotesSource(),
+        writer: createNotesWriter(),
+        logger: NOOP_NOTES_LOGGER,
+      });
+      const worker = createNotesWorker({
+        store,
+        handler,
+        logger: NOOP_NOTES_LOGGER,
+        isDailyCapReached: () =>
+          capNow ? killSwitch.isTripped() : Promise.resolve(false),
+      });
+
+      expect(await worker.tickOnce()).toBe(1); // in-flight work FINISHED
+      const done = await pool.query<{ status: string }>(
+        "select status from jobs where meeting_id = $1",
+        [capMeetingId],
+      );
+      expect(done.rows[0]?.status).toBe("completed");
+
+      // A NEW queued job is refused while tripped and stays queued, unburned.
+      expect(await store.enqueue(capMeetingId, userId)).toBe("enqueued");
+      await pool.query(
+        "update jobs set run_at = now() - interval '3 days' where meeting_id = $1 and status = 'queued'",
+        [capMeetingId],
+      );
+      expect(await worker.tickOnce()).toBe(0);
+      const queued = await pool.query<{ status: string; attempts: number }>(
+        "select status, attempts from jobs where meeting_id = $1 and status = 'queued'",
+        [capMeetingId],
+      );
+      expect(queued.rowCount).toBe(1);
+      expect(queued.rows[0]?.attempts).toBe(0); // nothing burned, nothing lost
     });
   },
 );
