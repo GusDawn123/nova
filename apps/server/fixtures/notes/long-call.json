@@ -1,0 +1,2358 @@
+{
+  "meta": {
+    "title": "Northwind renewal & expansion call",
+    "startedAt": "2026-07-20T15:00:00Z"
+  },
+  "turns": [
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we usually see adoption climb once the shared templates are in place. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 0
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we usually see adoption climb once the shared templates are in place. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 12598
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 22571
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 37435
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the rate ceiling is generous enough for the volume you're projecting next year. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 49081
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 62744
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the rate ceiling is generous enough for the volume you're projecting next year. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 75159
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the dashboards refresh every few minutes and the latency has stayed well within range. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 86365
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 97734
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 111792
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the sync runs incrementally so the load on your database stays light. And the finance review tends to land near the very end of the period.",
+      "tsMs": 122063
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, we usually see adoption climb once the shared templates are in place. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 132135
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 143326
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, the sync runs incrementally so the load on your database stays light. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 152547
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, we can map the existing fields across without much manual cleanup on your side. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 162205
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, your admins keep full control over roles and permissions throughout. And the finance review tends to land near the very end of the period.",
+      "tsMs": 174720
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the sync runs incrementally so the load on your database stays light. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 183003
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 197871
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, we can map the existing fields across without much manual cleanup on your side. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 207068
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 218069
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the dashboards refresh every few minutes and the latency has stayed well within range. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 226494
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 238204
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Okay, we've talked it through internally and we're going with the Enterprise tier for the full rollout.",
+      "tsMs": 246712
+    },
+    {
+      "speaker": "Alex",
+      "text": "I'll send over the signed order form by this Friday and loop in your procurement lead.",
+      "tsMs": 255712
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 266712
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 278604
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the sync runs incrementally so the load on your database stays light. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 290192
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, most teams get comfortable with the interface inside a couple of sessions. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 305003
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 315302
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 329105
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 338887
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the finance review tends to land near the very end of the period. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 353480
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 364409
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 373632
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the webhook events line up closely with what your team already tracks today. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 384972
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 395334
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the current tool starts to struggle once you push past a few thousand records. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 407484
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, records stay available for the entire contracted window with no extra steps. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 416030
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the rate ceiling is generous enough for the volume you're projecting next year. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 425407
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, records stay available for the entire contracted window with no extra steps. And the finance review tends to land near the very end of the period.",
+      "tsMs": 433505
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, we'd stage the rollout across two regions before opening it up more widely. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 445913
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 454739
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 465949
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the sync runs incrementally so the load on your database stays light. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 474583
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 487150
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the dashboards refresh every few minutes and the latency has stayed well within range. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 499767
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the dashboards refresh every few minutes and the latency has stayed well within range. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 514706
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, most teams get comfortable with the interface inside a couple of sessions. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 526467
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the webhook events line up closely with what your team already tracks today. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 540817
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And the finance review tends to land near the very end of the period.",
+      "tsMs": 551491
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, we usually see adoption climb once the shared templates are in place. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 562469
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we can map the existing fields across without much manual cleanup on your side. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 570715
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 585525
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 595358
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, records stay available for the entire contracted window with no extra steps. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 604785
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 619654
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 632834
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we can map the existing fields across without much manual cleanup on your side. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 642756
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 656097
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 669536
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 680125
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the rate ceiling is generous enough for the volume you're projecting next year. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 694635
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, your admins keep full control over roles and permissions throughout. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 706122
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, most teams get comfortable with the interface inside a couple of sessions. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 720965
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 734730
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 745050
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, most teams get comfortable with the interface inside a couple of sessions. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 757353
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the dashboards refresh every few minutes and the latency has stayed well within range. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 771684
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 785155
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 795639
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the rate ceiling is generous enough for the volume you're projecting next year. And the finance review tends to land near the very end of the period.",
+      "tsMs": 804811
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, your admins keep full control over roles and permissions throughout. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 816368
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the rate ceiling is generous enough for the volume you're projecting next year. And the finance review tends to land near the very end of the period.",
+      "tsMs": 828705
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 841015
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And the finance review tends to land near the very end of the period.",
+      "tsMs": 855705
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, records stay available for the entire contracted window with no extra steps. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 869770
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 879219
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 889633
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, we can map the existing fields across without much manual cleanup on your side. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 901050
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the webhook events line up closely with what your team already tracks today. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 911485
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 922937
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the webhook events line up closely with what your team already tracks today. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 936630
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, we usually see adoption climb once the shared templates are in place. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 950510
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, we'd stage the rollout across two regions before opening it up more widely. And the finance review tends to land near the very end of the period.",
+      "tsMs": 965159
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 973510
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the dashboards refresh every few minutes and the latency has stayed well within range. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 982565
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 997001
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, we can map the existing fields across without much manual cleanup on your side. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1008459
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 1020013
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the rate ceiling is generous enough for the volume you're projecting next year. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1030362
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1042252
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1053996
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, we usually see adoption climb once the shared templates are in place. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 1067457
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the dashboards refresh every few minutes and the latency has stayed well within range. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1079133
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the dashboards refresh every few minutes and the latency has stayed well within range. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1093492
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the rate ceiling is generous enough for the volume you're projecting next year. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1107220
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the finance review tends to land near the very end of the period. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1116475
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the rate ceiling is generous enough for the volume you're projecting next year. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1125513
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1140117
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1151949
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, we can map the existing fields across without much manual cleanup on your side. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1161594
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the dashboards refresh every few minutes and the latency has stayed well within range. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1175798
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1187032
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1197577
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1207477
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we'd stage the rollout across two regions before opening it up more widely. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1217169
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And the finance review tends to land near the very end of the period.",
+      "tsMs": 1231573
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, your admins keep full control over roles and permissions throughout. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1241436
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, most teams get comfortable with the interface inside a couple of sessions. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1251541
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, most teams get comfortable with the interface inside a couple of sessions. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1264184
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1275638
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, most teams get comfortable with the interface inside a couple of sessions. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1287873
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, the sync runs incrementally so the load on your database stays light. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1297047
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the dashboards refresh every few minutes and the latency has stayed well within range. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1307394
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the dashboards refresh every few minutes and the latency has stayed well within range. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1317757
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the dashboards refresh every few minutes and the latency has stayed well within range. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1327724
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1342619
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, we usually see adoption climb once the shared templates are in place. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1354177
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, we'd stage the rollout across two regions before opening it up more widely. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1367899
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the webhook events line up closely with what your team already tracks today. And the finance review tends to land near the very end of the period.",
+      "tsMs": 1380751
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the dashboards refresh every few minutes and the latency has stayed well within range. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 1394125
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1407953
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, your admins keep full control over roles and permissions throughout. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1417843
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, most teams get comfortable with the interface inside a couple of sessions. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1431367
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1444651
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1456934
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1471314
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1479935
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the finance review tends to land near the very end of the period. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 1491684
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1505930
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the finance review tends to land near the very end of the period. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1515769
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1524141
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1535480
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we usually see adoption climb once the shared templates are in place. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1543738
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, your admins keep full control over roles and permissions throughout. And the finance review tends to land near the very end of the period.",
+      "tsMs": 1555329
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the current tool starts to struggle once you push past a few thousand records. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1569474
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, the webhook events line up closely with what your team already tracks today. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 1581818
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, records stay available for the entire contracted window with no extra steps. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1596501
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the rate ceiling is generous enough for the volume you're projecting next year. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1604920
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the sync runs incrementally so the load on your database stays light. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1613344
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, we can map the existing fields across without much manual cleanup on your side. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1626042
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the finance review tends to land near the very end of the period. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 1640367
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the current tool starts to struggle once you push past a few thousand records. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1653787
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1663562
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the finance review tends to land near the very end of the period. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1676491
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1685553
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, we usually see adoption climb once the shared templates are in place. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1697281
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, most teams get comfortable with the interface inside a couple of sessions. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1706967
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1716622
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 1728954
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the webhook events line up closely with what your team already tracks today. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1739895
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we can map the existing fields across without much manual cleanup on your side. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1753531
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the rate ceiling is generous enough for the volume you're projecting next year. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1763671
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the webhook events line up closely with what your team already tracks today. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1774495
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we usually see adoption climb once the shared templates are in place. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1785604
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the webhook events line up closely with what your team already tracks today. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 1799023
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, records stay available for the entire contracted window with no extra steps. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1812464
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the webhook events line up closely with what your team already tracks today. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 1820878
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 1830160
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 1841122
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the dashboards refresh every few minutes and the latency has stayed well within range. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1850514
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1860509
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the webhook events line up closely with what your team already tracks today. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 1874075
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 1884984
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1894695
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the current tool starts to struggle once you push past a few thousand records. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 1906773
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1917847
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, we can map the existing fields across without much manual cleanup on your side. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1926803
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1937048
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1946831
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, we'd stage the rollout across two regions before opening it up more widely. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 1959636
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the rate ceiling is generous enough for the volume you're projecting next year. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 1969011
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 1979869
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the webhook events line up closely with what your team already tracks today. And the finance review tends to land near the very end of the period.",
+      "tsMs": 1992384
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2001371
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, the dashboards refresh every few minutes and the latency has stayed well within range. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2013365
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we usually see adoption climb once the shared templates are in place. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2026905
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the rate ceiling is generous enough for the volume you're projecting next year. And the finance review tends to land near the very end of the period.",
+      "tsMs": 2041675
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2053726
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2062595
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, most teams get comfortable with the interface inside a couple of sessions. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2077422
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, records stay available for the entire contracted window with no extra steps. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2089537
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the sync runs incrementally so the load on your database stays light. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2102263
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we can map the existing fields across without much manual cleanup on your side. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2112723
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2124419
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2134520
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the current tool starts to struggle once you push past a few thousand records. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2142582
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the finance review tends to land near the very end of the period. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2154057
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we can map the existing fields across without much manual cleanup on your side. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2163413
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the dashboards refresh every few minutes and the latency has stayed well within range. And the finance review tends to land near the very end of the period.",
+      "tsMs": 2171848
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And the finance review tends to land near the very end of the period.",
+      "tsMs": 2180987
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, your admins keep full control over roles and permissions throughout. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2195071
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the dashboards refresh every few minutes and the latency has stayed well within range. And the finance review tends to land near the very end of the period.",
+      "tsMs": 2207660
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, we can map the existing fields across without much manual cleanup on your side. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2222047
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the webhook events line up closely with what your team already tracks today. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2230389
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2244593
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the finance review tends to land near the very end of the period. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2253946
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, we usually see adoption climb once the shared templates are in place. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2268379
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, most teams get comfortable with the interface inside a couple of sessions. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2279185
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, we usually see adoption climb once the shared templates are in place. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2292317
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2302239
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the dashboards refresh every few minutes and the latency has stayed well within range. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2313736
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, we usually see adoption climb once the shared templates are in place. And the finance review tends to land near the very end of the period.",
+      "tsMs": 2326665
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the rate ceiling is generous enough for the volume you're projecting next year. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2335403
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2347627
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the sync runs incrementally so the load on your database stays light. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2357666
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2368231
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we usually see adoption climb once the shared templates are in place. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2376414
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2385940
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2396982
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2407162
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2416571
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the current tool starts to struggle once you push past a few thousand records. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2430087
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the rate ceiling is generous enough for the volume you're projecting next year. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2438730
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2451901
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the rate ceiling is generous enough for the volume you're projecting next year. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2466013
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 2475623
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, your admins keep full control over roles and permissions throughout. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2488373
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, records stay available for the entire contracted window with no extra steps. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2498749
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2512089
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, your admins keep full control over roles and permissions throughout. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2525975
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 2538089
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, most teams get comfortable with the interface inside a couple of sessions. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2553067
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, we'd stage the rollout across two regions before opening it up more widely. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2565257
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2580233
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2592261
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, your admins keep full control over roles and permissions throughout. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2604513
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2614720
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2628537
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2639722
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2654421
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we'd stage the rollout across two regions before opening it up more widely. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2663990
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the current tool starts to struggle once you push past a few thousand records. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2672527
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2687003
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2699501
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2710683
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, the sync runs incrementally so the load on your database stays light. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2724693
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the finance review tends to land near the very end of the period. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2736284
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the dashboards refresh every few minutes and the latency has stayed well within range. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 2749339
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2762265
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2771681
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2784039
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the dashboards refresh every few minutes and the latency has stayed well within range. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2798338
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, we usually see adoption climb once the shared templates are in place. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 2811541
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the rate ceiling is generous enough for the volume you're projecting next year. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 2819836
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the current tool starts to struggle once you push past a few thousand records. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2828046
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, most teams get comfortable with the interface inside a couple of sessions. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 2840306
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2849532
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, most teams get comfortable with the interface inside a couple of sessions. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2860573
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the rate ceiling is generous enough for the volume you're projecting next year. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2870354
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the finance review tends to land near the very end of the period. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 2880217
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the sync runs incrementally so the load on your database stays light. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 2892833
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, most teams get comfortable with the interface inside a couple of sessions. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2906282
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the current tool starts to struggle once you push past a few thousand records. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 2920749
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, records stay available for the entire contracted window with no extra steps. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 2929373
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 2942474
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2956169
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the webhook events line up closely with what your team already tracks today. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 2964747
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 2977851
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 2987400
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we can map the existing fields across without much manual cleanup on your side. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3000933
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, we'd stage the rollout across two regions before opening it up more widely. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3011996
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3026023
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the webhook events line up closely with what your team already tracks today. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3034715
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3045203
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, records stay available for the entire contracted window with no extra steps. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3057149
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3067337
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3078254
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the finance review tends to land near the very end of the period. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3090437
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3102266
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3112604
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, we usually see adoption climb once the shared templates are in place. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3127041
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3138592
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, records stay available for the entire contracted window with no extra steps. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 3149544
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, most teams get comfortable with the interface inside a couple of sessions. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3160659
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3172514
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3184167
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the dashboards refresh every few minutes and the latency has stayed well within range. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3197425
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, we usually see adoption climb once the shared templates are in place. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3209248
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the webhook events line up closely with what your team already tracks today. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3218282
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the webhook events line up closely with what your team already tracks today. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 3232099
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, your admins keep full control over roles and permissions throughout. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3241395
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, most teams get comfortable with the interface inside a couple of sessions. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3251214
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, your admins keep full control over roles and permissions throughout. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3261500
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3269972
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3278153
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3287674
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3297947
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, most teams get comfortable with the interface inside a couple of sessions. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3312299
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the rate ceiling is generous enough for the volume you're projecting next year. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3324207
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3334803
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, most teams get comfortable with the interface inside a couple of sessions. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3346372
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3358231
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the current tool starts to struggle once you push past a few thousand records. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3370988
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 3380267
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, records stay available for the entire contracted window with no extra steps. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3392629
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3406312
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 3416145
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the dashboards refresh every few minutes and the latency has stayed well within range. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3427650
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we can map the existing fields across without much manual cleanup on your side. And the finance review tends to land near the very end of the period.",
+      "tsMs": 3439235
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the current tool starts to struggle once you push past a few thousand records. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 3452344
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, records stay available for the entire contracted window with no extra steps. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3464075
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, records stay available for the entire contracted window with no extra steps. And the finance review tends to land near the very end of the period.",
+      "tsMs": 3473994
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3483038
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3497976
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 3506514
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the sync runs incrementally so the load on your database stays light. And the finance review tends to land near the very end of the period.",
+      "tsMs": 3518022
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, your admins keep full control over roles and permissions throughout. And the finance review tends to land near the very end of the period.",
+      "tsMs": 3526501
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the webhook events line up closely with what your team already tracks today. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3534698
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, the finance review tends to land near the very end of the period. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3542974
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, we can map the existing fields across without much manual cleanup on your side. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 3553140
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, the current tool starts to struggle once you push past a few thousand records. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3563793
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, your admins keep full control over roles and permissions throughout. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3571874
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the current tool starts to struggle once you push past a few thousand records. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3582361
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3592901
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, we can map the existing fields across without much manual cleanup on your side. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 3606372
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3617691
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, we'd stage the rollout across two regions before opening it up more widely. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3630133
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3642490
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, most teams get comfortable with the interface inside a couple of sessions. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3652821
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3665962
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we can map the existing fields across without much manual cleanup on your side. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3675523
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3685750
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the finance review tends to land near the very end of the period. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3695190
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the sync runs incrementally so the load on your database stays light. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3708499
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3719013
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, your admins keep full control over roles and permissions throughout. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3731628
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the current tool starts to struggle once you push past a few thousand records. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3744488
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3756262
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3764263
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3772746
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3781597
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, your admins keep full control over roles and permissions throughout. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3792600
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the rate ceiling is generous enough for the volume you're projecting next year. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3806233
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, the rate ceiling is generous enough for the volume you're projecting next year. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 3817454
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the current tool starts to struggle once you push past a few thousand records. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3826468
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, we can map the existing fields across without much manual cleanup on your side. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 3837347
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3849959
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, the rate ceiling is generous enough for the volume you're projecting next year. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 3863031
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3873764
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, your admins keep full control over roles and permissions throughout. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 3881827
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the sync runs incrementally so the load on your database stays light. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 3891707
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the current tool starts to struggle once you push past a few thousand records. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 3901170
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 3914336
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the rate ceiling is generous enough for the volume you're projecting next year. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3927560
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, records stay available for the entire contracted window with no extra steps. And the finance review tends to land near the very end of the period.",
+      "tsMs": 3940409
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the webhook events line up closely with what your team already tracks today. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 3955401
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 3965728
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the webhook events line up closely with what your team already tracks today. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3980273
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 3989765
+    },
+    {
+      "speaker": "Alex",
+      "text": "Looking at the current setup, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4003649
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4013416
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, most teams get comfortable with the interface inside a couple of sessions. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 4023047
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, your admins keep full control over roles and permissions throughout. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4036178
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, your admins keep full control over roles and permissions throughout. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4046250
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the rate ceiling is generous enough for the volume you're projecting next year. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4059050
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, your admins keep full control over roles and permissions throughout. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4070921
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4080137
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4089868
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the rate ceiling is generous enough for the volume you're projecting next year. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4104863
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the current tool starts to struggle once you push past a few thousand records. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4114022
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, we'd stage the rollout across two regions before opening it up more widely. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4123654
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4135428
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the dashboards refresh every few minutes and the latency has stayed well within range. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4148429
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, records stay available for the entire contracted window with no extra steps. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4160111
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, we usually see adoption climb once the shared templates are in place. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4175054
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4189672
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, we usually see adoption climb once the shared templates are in place. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4201168
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, the finance review tends to land near the very end of the period. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4214405
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, the webhook events line up closely with what your team already tracks today. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4222733
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the rate ceiling is generous enough for the volume you're projecting next year. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 4231826
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the rate ceiling is generous enough for the volume you're projecting next year. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4242256
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4257154
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the sync runs incrementally so the load on your database stays light. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4268880
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4281141
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, your admins keep full control over roles and permissions throughout. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4293916
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, we usually see adoption climb once the shared templates are in place. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4306473
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, records stay available for the entire contracted window with no extra steps. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4321464
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the webhook events line up closely with what your team already tracks today. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4330530
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the sync runs incrementally so the load on your database stays light. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4343306
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, most teams get comfortable with the interface inside a couple of sessions. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4357407
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4370416
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4379590
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4394392
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, the finance review tends to land near the very end of the period. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4406228
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4415565
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the current tool starts to struggle once you push past a few thousand records. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4430319
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the rate ceiling is generous enough for the volume you're projecting next year. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4444531
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the current tool starts to struggle once you push past a few thousand records. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4457851
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, records stay available for the entire contracted window with no extra steps. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4471543
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the sync runs incrementally so the load on your database stays light. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4480293
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, records stay available for the entire contracted window with no extra steps. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4493375
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, we usually see adoption climb once the shared templates are in place. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4502872
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, your admins keep full control over roles and permissions throughout. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4511357
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4520154
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, most teams get comfortable with the interface inside a couple of sessions. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4530035
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the current tool starts to struggle once you push past a few thousand records. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4538283
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, most teams get comfortable with the interface inside a couple of sessions. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4548255
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the finance review tends to land near the very end of the period. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4558798
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, your admins keep full control over roles and permissions throughout. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4569519
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4583131
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the finance review tends to land near the very end of the period. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4593755
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, most teams get comfortable with the interface inside a couple of sessions. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4606170
+    },
+    {
+      "speaker": "Morgan",
+      "text": "As for the migration plan, the finance review tends to land near the very end of the period. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4621067
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the webhook events line up closely with what your team already tracks today. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4633664
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, we can map the existing fields across without much manual cleanup on your side. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4641671
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we can map the existing fields across without much manual cleanup on your side. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4654358
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4663680
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the dashboards refresh every few minutes and the latency has stayed well within range. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4675836
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, we usually see adoption climb once the shared templates are in place. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4688254
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, the dashboards refresh every few minutes and the latency has stayed well within range. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4698151
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4709871
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the sync runs incrementally so the load on your database stays light. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4722508
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, records stay available for the entire contracted window with no extra steps. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 4730710
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4740783
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, the rate ceiling is generous enough for the volume you're projecting next year. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4749761
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the dashboards refresh every few minutes and the latency has stayed well within range. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4758446
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the current tool starts to struggle once you push past a few thousand records. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4772151
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, we'd stage the rollout across two regions before opening it up more widely. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 4780973
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the dashboards refresh every few minutes and the latency has stayed well within range. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 4792367
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, records stay available for the entire contracted window with no extra steps. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4804744
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the analytics side, we can map the existing fields across without much manual cleanup on your side. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4816496
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, your admins keep full control over roles and permissions throughout. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4829932
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, the dashboards refresh every few minutes and the latency has stayed well within range. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4842970
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 4856723
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, your admins keep full control over roles and permissions throughout. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4868350
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, we can map the existing fields across without much manual cleanup on your side. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 4882295
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, records stay available for the entire contracted window with no extra steps. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4894367
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the sync runs incrementally so the load on your database stays light. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 4907833
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the sync runs incrementally so the load on your database stays light. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4922364
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, most teams get comfortable with the interface inside a couple of sessions. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 4936214
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, your admins keep full control over roles and permissions throughout. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 4948676
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, most teams get comfortable with the interface inside a couple of sessions. And your admins keep full control over roles and permissions throughout.",
+      "tsMs": 4957979
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the data-retention question, your admins keep full control over roles and permissions throughout. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 4970155
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 4981238
+    },
+    {
+      "speaker": "Morgan",
+      "text": "In terms of the budget cycle, the current tool starts to struggle once you push past a few thousand records. And the finance review tends to land near the very end of the period.",
+      "tsMs": 4993996
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, we usually see adoption climb once the shared templates are in place. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 5003930
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, we'd stage the rollout across two regions before opening it up more widely. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 5014737
+    },
+    {
+      "speaker": "Alex",
+      "text": "About the API limits, your admins keep full control over roles and permissions throughout. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 5027165
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Regarding the reporting workflow, we'd stage the rollout across two regions before opening it up more widely. And the finance review tends to land near the very end of the period.",
+      "tsMs": 5036528
+    },
+    {
+      "speaker": "Alex",
+      "text": "When we think about scale, the sync runs incrementally so the load on your database stays light. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 5044548
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the webhook events line up closely with what your team already tracks today. And we can map the existing fields across without much manual cleanup on your side.",
+      "tsMs": 5056491
+    },
+    {
+      "speaker": "Alex",
+      "text": "As for the migration plan, the sync runs incrementally so the load on your database stays light. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 5070810
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the current tool starts to struggle once you push past a few thousand records. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 5083841
+    },
+    {
+      "speaker": "Alex",
+      "text": "For the pilot group, the dashboards refresh every few minutes and the latency has stayed well within range. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 5096185
+    },
+    {
+      "speaker": "Alex",
+      "text": "Great, then it's settled — we'll schedule the technical onboarding for the first week of next quarter.",
+      "tsMs": 5107266
+    },
+    {
+      "speaker": "Morgan",
+      "text": "I'll email you the security questionnaire by next Wednesday so legal can get started on their side.",
+      "tsMs": 5116266
+    },
+    {
+      "speaker": "Morgan",
+      "text": "For the pilot group, the sync runs incrementally so the load on your database stays light. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 5127266
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, the rate ceiling is generous enough for the volume you're projecting next year. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 5140057
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the dashboards refresh every few minutes and the latency has stayed well within range. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 5154257
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, records stay available for the entire contracted window with no extra steps. And the webhook events line up closely with what your team already tracks today.",
+      "tsMs": 5163415
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 5172995
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the data-retention question, the sync runs incrementally so the load on your database stays light. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 5185399
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, we'd stage the rollout across two regions before opening it up more widely. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 5199955
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, we usually see adoption climb once the shared templates are in place. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 5213950
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, the finance review tends to land near the very end of the period. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 5225686
+    },
+    {
+      "speaker": "Alex",
+      "text": "In terms of the budget cycle, most teams get comfortable with the interface inside a couple of sessions. And records stay available for the entire contracted window with no extra steps.",
+      "tsMs": 5238101
+    },
+    {
+      "speaker": "Morgan",
+      "text": "About the API limits, we'd stage the rollout across two regions before opening it up more widely. And we usually see adoption climb once the shared templates are in place.",
+      "tsMs": 5248137
+    },
+    {
+      "speaker": "Alex",
+      "text": "Coming back to performance, the rate ceiling is generous enough for the volume you're projecting next year. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 5262510
+    },
+    {
+      "speaker": "Morgan",
+      "text": "When we think about scale, the current tool starts to struggle once you push past a few thousand records. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 5274052
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, your admins keep full control over roles and permissions throughout. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 5284601
+    },
+    {
+      "speaker": "Morgan",
+      "text": "On the topic of team access, the finance review tends to land near the very end of the period. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 5298433
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the analytics side, the webhook events line up closely with what your team already tracks today. And most teams get comfortable with the interface inside a couple of sessions.",
+      "tsMs": 5307214
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Looking at the current setup, we usually see adoption climb once the shared templates are in place. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 5316336
+    },
+    {
+      "speaker": "Alex",
+      "text": "On the topic of team access, records stay available for the entire contracted window with no extra steps. And the current tool starts to struggle once you push past a few thousand records.",
+      "tsMs": 5330394
+    },
+    {
+      "speaker": "Morgan",
+      "text": "Coming back to performance, the finance review tends to land near the very end of the period. And the rate ceiling is generous enough for the volume you're projecting next year.",
+      "tsMs": 5344498
+    },
+    {
+      "speaker": "Alex",
+      "text": "From an integration standpoint, the sync runs incrementally so the load on your database stays light. And the dashboards refresh every few minutes and the latency has stayed well within range.",
+      "tsMs": 5354634
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, most teams get comfortable with the interface inside a couple of sessions. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 5368141
+    },
+    {
+      "speaker": "Alex",
+      "text": "Regarding the reporting workflow, the dashboards refresh every few minutes and the latency has stayed well within range. And we'd stage the rollout across two regions before opening it up more widely.",
+      "tsMs": 5378920
+    },
+    {
+      "speaker": "Morgan",
+      "text": "From an integration standpoint, we usually see adoption climb once the shared templates are in place. And the sync runs incrementally so the load on your database stays light.",
+      "tsMs": 5390769
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "title": "Northwind renewal & expansion call",
+    "startedAt": "2026-07-20T15:00:00Z"
+  },
+  "totalTurns": 470,
+  "firstFact": {
+    "positionMs": 255712,
+    "decisionKeyword": "enterprise tier",
+    "decisionQuote": "Okay, we've talked it through internally and we're going with the Enterprise tier for the full rollout.",
+    "actionItemKeyword": "signed order form",
+    "actionQuote": "I'll send over the signed order form by this Friday and loop in your procurement lead.",
+    "ownerKeyword": "alex",
+    "deadlineRawKeyword": "friday"
+  },
+  "lastFact": {
+    "positionMs": 5116266,
+    "decisionKeyword": "technical onboarding",
+    "decisionQuote": "Great, then it's settled — we'll schedule the technical onboarding for the first week of next quarter.",
+    "actionItemKeyword": "security questionnaire",
+    "actionQuote": "I'll email you the security questionnaire by next Wednesday so legal can get started on their side.",
+    "ownerKeyword": "morgan",
+    "deadlineRawKeyword": "wednesday"
+  }
+}

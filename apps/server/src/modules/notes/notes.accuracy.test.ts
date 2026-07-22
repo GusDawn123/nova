@@ -240,3 +240,72 @@ describe.skipIf(!canRun)("notes accuracy gate (live)", () => {
     expect(kinds.size).toBe(3);
   });
 });
+
+/**
+ * KEY-GATED live LONG-CALL bar (playbook VERIFY row 15, live tier). Runs the REAL
+ * pipeline over the committed ~90-min `long-call.json` fixture with a lowered
+ * `maxSinglePassTokens` that forces the MAP-REDUCE arm, then asserts the two planted
+ * facts — one in the FIRST ten minutes, one in the LAST — both survive into the
+ * final notes (the boundary-loss bar against real models). Skips without an LLM key;
+ * RUN in Task 6. The mock-provider version of this bar lives in `long-call.test.ts`.
+ */
+const longCallManifestSchema = z.object({
+  firstFact: z.object({
+    decisionKeyword: z.string(),
+    actionItemKeyword: z.string(),
+    ownerKeyword: z.string(),
+    deadlineRawKeyword: z.string(),
+  }),
+  lastFact: z.object({
+    decisionKeyword: z.string(),
+    actionItemKeyword: z.string(),
+    ownerKeyword: z.string(),
+    deadlineRawKeyword: z.string(),
+  }),
+});
+
+describe.skipIf(!canRun)("notes long-call accuracy gate (live)", () => {
+  let notes: MeetingNotes | undefined;
+  const manifest = longCallManifestSchema.parse(
+    JSON.parse(readFileSync(join(FIXTURE_DIR, "long-call.expected.json"), "utf8")),
+  );
+
+  beforeAll(async () => {
+    const providers = createProvidersFromEnv(providerEnv());
+    const config = llmConfigSchema.parse({
+      ttftTimeoutMs: 30_000,
+      stallTimeoutMs: 60_000,
+    });
+    const router = createLlmRouter({ providers, config });
+    // Force the map-reduce arm well below the fixture's ~21k tokens.
+    const pipeline = createNotesPipeline({
+      router,
+      logger: NOOP_LOGGER,
+      config: { maxSinglePassTokens: 8_000 },
+    });
+
+    const fixture = fixtureSchema.parse(
+      JSON.parse(readFileSync(join(FIXTURE_DIR, "long-call.json"), "utf8")),
+    );
+    const meta: NotesMeetingMeta = {
+      id: "fixture-long-call",
+      userId: "fixture-user",
+      title: fixture.meta.title,
+      startedAt: fixture.meta.startedAt,
+    };
+    const result = await pipeline.generate(meta, fixture.turns);
+    notes = result.notes;
+  });
+
+  it("keeps both the first-10-min and last-10-min planted facts (map-reduce)", () => {
+    expect(notes).toBeDefined();
+    if (!notes) return;
+    const blob = notesTextBlob(notes);
+    // First-10-min fact.
+    expect(blob, "first-chunk decision keyword").toContain(manifest.firstFact.decisionKeyword);
+    expect(blob, "first-chunk action keyword").toContain(manifest.firstFact.actionItemKeyword);
+    // Last-10-min fact.
+    expect(blob, "last-chunk decision keyword").toContain(manifest.lastFact.decisionKeyword);
+    expect(blob, "last-chunk action keyword").toContain(manifest.lastFact.actionItemKeyword);
+  });
+});
