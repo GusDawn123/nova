@@ -19,6 +19,6 @@
   "casual": {
     "expectedType": "casual",
     "factKeywords": [],
-    "maxActionItems": 1
+    "maxActionItems": 2
   }
 }

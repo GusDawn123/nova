@@ -55,6 +55,32 @@ function compactSchema(type: ConversationType): string {
   ].join("\n");
 }
 
+/**
+ * A deterministic next-7-days weekday→ISO-date table anchored on the call date
+ * (UTC). Injected under the call-date line so relative-deadline resolution ("by
+ * Friday") is a LOOKUP, not model date arithmetic — the live gate caught a real
+ * model resolving Friday off-by-one (Task 6 round 1). Computed in code from
+ * `callDate`; prompt content only, no tokenizer/model dependency.
+ */
+export function calendarTable(callDate: string): string {
+  const base = new Date(`${callDate}T00:00:00Z`);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    timeZone: "UTC",
+  });
+  const rows: string[] = [];
+  for (let offset = 0; offset <= 7; offset += 1) {
+    const day = new Date(base.getTime() + offset * 86_400_000);
+    const iso = day.toISOString().slice(0, 10);
+    const label = offset === 0 ? " (the day of the call)" : "";
+    rows.push(`- ${fmt.format(day)} = ${iso}${label}`);
+  }
+  return [
+    "Calendar for resolving relative dates (look dates up here, do not compute them):",
+    ...rows,
+  ].join("\n");
+}
+
 /** Build the generate messages: system + a user turn (transcript top, schema bottom). */
 export function buildGenerateMessages(params: {
   type: ConversationType;
@@ -71,7 +97,8 @@ export function buildGenerateMessages(params: {
     "",
     TYPE_GUIDANCE[type],
     "",
-    `The call took place on ${weekday}, ${callDate}. Resolve any relative dates (e.g. "by Friday", "next Tuesday") to an ISO calendar date relative to that day. If no date was stated for an action item, set both deadline and deadlineRaw to null.`,
+    `The call took place on ${weekday}, ${callDate}. Resolve any relative dates (e.g. "by Friday", "next Tuesday") to an ISO calendar date using the calendar below. If no date was stated for an action item, set both deadline and deadlineRaw to null.`,
+    calendarTable(callDate),
     "",
     "Return a JSON object of exactly this shape:",
     compactSchema(type),

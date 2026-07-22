@@ -1,6 +1,7 @@
 import type { ChatMessage } from "../../llm/index.js";
 
 import { REPAIR_SYSTEM_PROMPT } from "./system.js";
+import { calendarTable } from "./types.js";
 
 /**
  * The MAP-step prompt (adr-0006 §5). Each chunk of an over-budget transcript is
@@ -61,7 +62,8 @@ export function buildMapMessages(params: {
     "",
     "---",
     "",
-    `The call took place on ${weekday}, ${callDate}. Resolve any relative dates (e.g. "by Monday") to an ISO calendar date relative to that day; if this segment stated no date for an action item, set both deadline and deadlineRaw to null.`,
+    `The call took place on ${weekday}, ${callDate}. Resolve any relative dates (e.g. "by Monday") to an ISO calendar date using the calendar below; if this segment stated no date for an action item, set both deadline and deadlineRaw to null.`,
+    calendarTable(callDate),
     "",
     "Return a JSON object of exactly this shape:",
     MAP_SCHEMA,
