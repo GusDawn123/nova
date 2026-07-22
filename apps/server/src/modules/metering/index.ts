@@ -45,3 +45,13 @@ export {
   type KillSwitch,
   type KillSwitchDeps,
 } from "./kill-switch.js";
+
+export {
+  revenueCatEnvelopeSchema,
+  createRevenueCatHandler,
+  createRevenueCatRoutes,
+  type RevenueCatEvent,
+  type RevenueCatHandlerDeps,
+  type RevenueCatRoutesDeps,
+  type PlanWriter,
+} from "./revenuecat.js";

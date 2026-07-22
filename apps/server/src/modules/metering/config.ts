@@ -42,6 +42,14 @@ export const meteringConfigSchema = z
     dailyGlobalCapUsd: z.number().positive().default(50),
     /** Mid-stream quota recheck cadence in seconds of METERED audio (adr-0007 §4). */
     quotaRecheckSeconds: z.number().int().positive().default(15),
+    /**
+     * RevenueCat product_id → the plan it GRANTS (adr-0007 §7). Purchases of a
+     * mapped product upgrade to its plan; its EXPIRATION downgrades to 'free'.
+     * Unknown products never error — the webhook answers {applied:false} + warn.
+     */
+    revenuecatProducts: z
+      .record(z.string(), z.enum(["free", "pro"]))
+      .default({ nova_pro_monthly: "pro" }),
   })
   .strict()
   .default({});

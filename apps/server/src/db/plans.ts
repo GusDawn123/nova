@@ -1,13 +1,15 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 
+import type { PlanId } from "../modules/metering/config.js";
+import type { PlanWriter } from "../modules/metering/revenuecat.js";
 import type { PlanReader } from "../modules/metering/quota.js";
 
 /**
- * `PlanReader` over a direct `pg` Pool — the user-scoped `profiles.plan` lookup
- * the quota checker binds limits with (adr-0007 §4). House db-seam style:
- * explicit columns, rows re-parsed at the boundary. Read-only; the plan WRITER
- * (RevenueCat webhook) arrives in Task 5.
+ * `PlanReader`/`PlanWriter` over a direct `pg` Pool — the user-scoped
+ * `profiles.plan` seams (adr-0007 §4/§7). House db-seam style: explicit
+ * columns, rows re-parsed at the boundary. The reader binds quota limits; the
+ * writer applies RevenueCat plan changes.
  */
 
 /** Matches the `profiles_plan_check` CHECK — the DB is the source of truth. */
@@ -27,6 +29,21 @@ export function createPlanReader(pool: Pool): PlanReader {
         return "free";
       }
       return planRowSchema.parse(res.rows[0]).plan;
+    },
+  };
+}
+
+/** Build a {@link PlanWriter} over an explicit pool (pure of env). */
+export function createPlanWriter(pool: Pool): PlanWriter {
+  return {
+    async setPlan(userId: string, plan: PlanId) {
+      // Live-profile-scoped: a deleted account's replayed webhook is a
+      // `user_missing`, never an error (the caller warns + answers 200).
+      const res = await pool.query(
+        `update profiles set plan = $1 where id = $2 and deleted_at is null`,
+        [plan, userId],
+      );
+      return (res.rowCount ?? 0) === 1 ? "applied" : "user_missing";
     },
   };
 }
