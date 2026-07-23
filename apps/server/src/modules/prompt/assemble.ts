@@ -101,8 +101,9 @@ export function assemble(
   // Parse the boundary — hostile/garbled input never reaches assembly untyped.
   const ctx = promptContextSchema.parse(context);
 
-  // `mode` is typed to the authored set; the switch keeps future modes honest.
-  const stablePrefix = systemPromptFor(mode);
+  // `mode` is typed to the authored set; the record keeps future modes honest —
+  // adding an enum member without its content file breaks the build here.
+  const stablePrefix = MODE_BODIES[mode];
 
   const sections: string[] = [];
 
@@ -133,15 +134,11 @@ export function assemble(
   return { stablePrefix, dynamicSuffix: sections.join("\n\n") };
 }
 
-/** Select the authored system prompt for a mode (exhaustive over the enum). */
-function systemPromptFor(mode: PromptMode): string {
-  switch (mode) {
-    case "general":
-      return LIVE_SYSTEM_PROMPT_GENERAL;
-    default: {
-      // Exhaustiveness guard: a new mode member breaks the build until authored.
-      const never: never = mode;
-      throw new Error(`unhandled prompt mode: ${String(never)}`);
-    }
-  }
-}
+/**
+ * The authored system prompt per mode. A `Record<PromptMode, string>` so a new
+ * mode enum member without its content file is a compile error — exhaustiveness
+ * without an unreachable switch default.
+ */
+const MODE_BODIES: Record<PromptMode, string> = {
+  general: LIVE_SYSTEM_PROMPT_GENERAL,
+};
