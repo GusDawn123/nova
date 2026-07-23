@@ -262,10 +262,24 @@ export function useLiveSession(): UseLiveSession {
         setErrorMessage('connection error — is the server running?');
       }
     };
-    socket.onclose = (): void => {
+    socket.onclose = (event: WebSocketCloseEvent): void => {
       if (socketRef.current === socket) {
         socketRef.current = null;
-        setStatus('closed');
+        // A close the USER didn't ask for must say why (policy closes carry an
+        // app code + reason, e.g. 4401 auth / 4503 unavailable) — a silent
+        // "session ended" right after Start is undebuggable from the phone.
+        if (event.code !== 1000) {
+          setStatus('error');
+          setErrorMessage(
+            `session closed by server (${String(event.code)}${
+              typeof event.reason === 'string' && event.reason !== ''
+                ? `: ${event.reason}`
+                : ''
+            })`,
+          );
+        } else {
+          setStatus('closed');
+        }
       }
     };
   }, [auth, stop, reset, applyEvent]);
