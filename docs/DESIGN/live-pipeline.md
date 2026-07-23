@@ -81,9 +81,18 @@ Zod discriminated union, versioned:
 
 ## Mobile (Phase 7/8)
 - `use-live-session` hook owns the socket; screens stay dumb (RULES §10).
+- **One streaming focal pane** (decision 2026-07-22): the copilot renders as a single
+  fixed pane — the overlay mental model, one place to glance under stress — NOT a
+  stack of cards. Behavior maps 1:1 onto wire events:
+  - `suggestion.delta` → append to the pane as tokens arrive (first tokens visible
+    immediately; never buffer until `done`)
+  - `suggestion.start` → replace the pane content in place
+  - `suggestion.discard` → clear the pane instantly (no zombie text)
+  - transcript stays a separate scrolling region; the copilot pane is fixed
 - **Frame-cadence rendering**: deltas append to a ref buffer; one throttled flush
   per frame; plain text while streaming; single format upgrade on `done`.
-- One `SuggestionCard` component, variants by `kind`.
+- Cards survive only as an optional secondary affordance for discrete suggested
+  replies (Phase 8+, by `kind`); they are not the default copilot surface.
 
 ## Latency is a tested contract
 Budgets live in config and are enforced by fake-timer tests like the Phase 2 router
@@ -91,4 +100,12 @@ suite, plus stage-timing benchmarks that print p50/p95:
 - final utterance → suggestion visible: **p50 < 1.5s**
 - speculation hit → visible: **p50 < 500ms**
 - playbook Phase 7 gate: question moment → first token p50 < 2s, p95 < 4s.
+- client render budget (Phase 8): `suggestion.delta` received → pixels updated
+  within **one frame (~16ms)** — the ref-buffer flush, made a tested number so
+  rendering can't silently eat the server-side budgets.
+
+"Visible" always means **first token**, not full response. Sub-second feel on the
+happy path comes from the speculation manager (fires on a confident partial, before
+the utterance ends); the 1.5s budget is the no-speculation fallback. The metric to
+maximize is therefore **speculation hit rate**, tracked alongside the latency bars.
 Speed is provable, not promised.
