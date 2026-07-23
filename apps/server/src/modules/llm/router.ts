@@ -84,9 +84,13 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
       throw LlmError.aborted();
     }
 
-    // Order = per-request override (if any) else config default, filtered to the
+    // Order precedence: an explicit per-request `providerOrder` wins; else the
+    // latency tier selects the cascade (live → cheapest-first `liveOrder`,
+    // deliberate/absent → quality-first `defaultOrder`). Filtered to the
     // providers actually supplied; names not supplied are silently skipped.
-    const order = req.providerOrder ?? config.defaultOrder;
+    const tierOrder =
+      req.latencyTier === "live" ? config.liveOrder : config.defaultOrder;
+    const order = req.providerOrder ?? tierOrder;
     const ordered = order
       .map((id) => byId.get(id))
       .filter((provider): provider is LlmProvider => provider !== undefined);
