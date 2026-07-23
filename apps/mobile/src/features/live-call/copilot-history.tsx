@@ -10,6 +10,7 @@ import {
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
+import { MarkdownLite } from '@/features/live-call/markdown-lite';
 import type { LiveStatus, LiveSuggestion } from '@/hooks/use-live-session';
 
 /**
@@ -60,11 +61,19 @@ export function CopilotHistory({
         keyExtractor={(s) => s.id}
         contentContainerStyle={styles.content}
         onScroll={onScroll}
-        scrollEventThrottle={64}
+        scrollEventThrottle={16}
+        // The instant a finger starts dragging, STOP following the stream —
+        // waiting for the pin-distance check let scrollToEnd fight the drag
+        // and yank the user back down mid-stream (Gustavo, 2026-07-23).
+        // onScroll re-pins only when they return to the bottom.
+        onScrollBeginDrag={() => {
+          pinnedRef.current = false;
+        }}
         onContentSizeChange={() => {
           // New tokens/entries grow the content; follow only while pinned.
+          // animated:false — queued animations also fought active touches.
           if (pinnedRef.current) {
-            listRef.current?.scrollToEnd({ animated: true });
+            listRef.current?.scrollToEnd({ animated: false });
           }
         }}
         renderItem={({ item }) => (
@@ -80,7 +89,7 @@ export function CopilotHistory({
               ) : null}
             </View>
             <ThemedText type="default" style={styles.entryBody}>
-              {item.text || '…'}
+              {item.text === '' ? '…' : <MarkdownLite text={item.text} />}
             </ThemedText>
           </View>
         )}
