@@ -1,0 +1,147 @@
+import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
+import { approxTokens, promptConfig, type PromptConfig } from "./config.js";
+import {
+  promptContextSchema,
+  type AssembledPrompt,
+  type PromptContext,
+  type PromptMode,
+  type PromptRagSnippet,
+  type PromptTranscriptTurn,
+} from "./ports.js";
+
+/**
+ * The one pure entry point of modules/prompt: split the byte-stable system
+ * prompt (the cacheable prefix) from the per-turn dynamic suffix. No I/O, no
+ * clock, no vendor — the conductor calls it every trigger and streams the result
+ * through the llm router. Code assembles; the persona/rule prose is Gustavo's
+ * authored, verbatim `stablePrefix` (RULES §9).
+ *
+ * Suffix layout (transcript LAST — the prompt reasons about "the end of the
+ * transcript"):
+ *   1. user context   — delimited DATA following the prefix's own
+ *                        "User-provided context (defer to this…)" trailer
+ *   2. memory snippets — RAG grounding, ranked, under a hard token budget
+ *   3. transcript      — windowed, most-recent turns, ends the whole prompt
+ * Any block absent → its section is omitted entirely (no empty labels).
+ */
+
+/** Delimiters that fence untrusted DATA so it can't blend into instructions. */
+const BLOCK_OPEN = "<<<";
+const BLOCK_CLOSE = ">>>";
+
+/** Map a diarized label onto the prompt's me:/them: convention, else pass raw. */
+function speakerLabel(speaker: string | null): string {
+  if (speaker === null || speaker === "") return "them";
+  const lower = speaker.toLowerCase();
+  if (lower === "me" || lower === "them" || lower === "assistant") return lower;
+  return speaker;
+}
+
+/** Render one transcript turn as `label: text`. */
+function renderTurn(turn: PromptTranscriptTurn): string {
+  return `${speakerLabel(turn.speaker)}: ${turn.text}`;
+}
+
+/**
+ * Keep the most-recent transcript turns whose cumulative tokens stay within
+ * `budget` (oldest dropped first — the tail is the current moment). Returns the
+ * kept turns in chronological order.
+ */
+function windowTranscript(
+  turns: PromptTranscriptTurn[],
+  budget: number,
+): PromptTranscriptTurn[] {
+  const kept: PromptTranscriptTurn[] = [];
+  let acc = 0;
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    const turn = turns[i];
+    if (turn === undefined) continue;
+    const cost = approxTokens(renderTurn(turn));
+    if (acc + cost > budget && kept.length > 0) break;
+    kept.push(turn);
+    acc += cost;
+    // A single turn bigger than the whole budget is still kept once (the current
+    // moment must never vanish); further turns then stop on the next iteration.
+    if (acc > budget) break;
+  }
+  return kept.reverse();
+}
+
+/** Keep leading snippets whose cumulative tokens fit `budget` (ranked best-first). */
+function trimSnippets(
+  snippets: PromptRagSnippet[],
+  budget: number,
+): PromptRagSnippet[] {
+  const kept: PromptRagSnippet[] = [];
+  let acc = 0;
+  for (const snippet of snippets) {
+    const cost = approxTokens(`${snippet.header}\n${snippet.content}`);
+    if (acc + cost > budget) break;
+    kept.push(snippet);
+    acc += cost;
+  }
+  return kept;
+}
+
+/** Truncate user context to a token budget (chars), never dropping it whole. */
+function trimUserContext(text: string, budget: number): string {
+  const maxChars = budget * 4;
+  return text.length <= maxChars ? text : text.slice(0, maxChars);
+}
+
+/**
+ * Assemble the prompt for one turn. `mode` selects the authored mode body
+ * (`"general"` only today). The context boundary is zod-parsed (RULES §1).
+ */
+export function assemble(
+  mode: PromptMode,
+  context: PromptContext,
+  config: PromptConfig = promptConfig,
+): AssembledPrompt {
+  // Parse the boundary — hostile/garbled input never reaches assembly untyped.
+  const ctx = promptContextSchema.parse(context);
+
+  // `mode` is typed to the authored set; the switch keeps future modes honest.
+  const stablePrefix = systemPromptFor(mode);
+
+  const sections: string[] = [];
+
+  if (ctx.userContext !== undefined && ctx.userContext.trim() !== "") {
+    const trimmed = trimUserContext(
+      ctx.userContext.trim(),
+      config.userContextBudgetTokens,
+    );
+    sections.push(
+      ["USER CONTEXT", `${BLOCK_OPEN}\n${trimmed}\n${BLOCK_CLOSE}`].join("\n"),
+    );
+  }
+
+  const snippets = trimSnippets(ctx.ragSnippets ?? [], config.ragBudgetTokens);
+  if (snippets.length > 0) {
+    const rendered = snippets
+      .map((s) => `${BLOCK_OPEN}\n${s.header}\n${s.content}\n${BLOCK_CLOSE}`)
+      .join("\n");
+    sections.push(["RELEVANT CONTEXT FROM MEMORY", rendered].join("\n"));
+  }
+
+  const window = windowTranscript(ctx.transcript, config.transcriptBudgetTokens);
+  const transcriptText = window.map(renderTurn).join("\n");
+  // Transcript label is always present (even when empty) so the model always
+  // sees where the current moment is.
+  sections.push(["TRANSCRIPT", transcriptText].join("\n"));
+
+  return { stablePrefix, dynamicSuffix: sections.join("\n\n") };
+}
+
+/** Select the authored system prompt for a mode (exhaustive over the enum). */
+function systemPromptFor(mode: PromptMode): string {
+  switch (mode) {
+    case "general":
+      return LIVE_SYSTEM_PROMPT_GENERAL;
+    default: {
+      // Exhaustiveness guard: a new mode member breaks the build until authored.
+      const never: never = mode;
+      throw new Error(`unhandled prompt mode: ${String(never)}`);
+    }
+  }
+}
