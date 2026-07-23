@@ -8,7 +8,7 @@ import {
 import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
-import type { LlmRouter } from "../llm/index.js";
+import { withMeter, type LlmRouter, type Meter } from "../llm/index.js";
 
 import { notesConfigSchema, type NotesConfig } from "./config.js";
 import { formatTranscript } from "./format.js";
@@ -43,18 +43,26 @@ import { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
  * counts on the `done` event but not the committed provider (Task 4/5 handoff).
  */
 
-/** Construction dependencies (the locked Task 3 signature). */
+/** Construction dependencies (the locked Task 3 signature + the Phase 6 meter seam). */
 export interface NotesPipelineDeps {
   readonly router: LlmRouter;
   readonly config?: Partial<NotesConfig>;
   readonly logger: NotesLogger;
   /** Injected clock — deadline anchoring falls back to this when `startedAt` is null. */
   readonly now?: () => Date;
+  /**
+   * Per-job metering factory (Phase 6, adr-0007 §2 — `metering.meterFor`). The
+   * pipeline is constructed ONCE but runs per job, so attribution is a factory,
+   * not a single meter: each `generate` builds ONE meter for (meta.userId,
+   * meta.id) and threads it into EVERY router call of that job (classify,
+   * generate, map, reduce, repair). Optional — absent, calls carry no meter.
+   */
+  readonly meterFor?: (userId: string, meetingId?: string) => Meter;
 }
 
 /** Build the single-pass notes pipeline over explicit deps (pure of env/DB). */
 export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
-  const { router, logger } = deps;
+  const { logger } = deps;
   const config = notesConfigSchema.parse(deps.config ?? {});
   const now = deps.now ?? ((): Date => new Date());
 
@@ -62,6 +70,11 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
     meta: NotesMeetingMeta,
     turns: TranscriptTurn[],
   ): Promise<{ notes: MeetingNotes; usage: JobUsage[]; rawText?: string }> {
+    // The job-scoped router: when metering is wired, every call below reports
+    // through the meter stamped with THIS job's user + meeting.
+    const router = deps.meterFor
+      ? withMeter(deps.router, deps.meterFor(meta.userId, meta.id))
+      : deps.router;
     const usage: JobUsage[] = [];
     const transcriptText = joinTranscriptText(turns);
 
@@ -75,7 +88,7 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
       return { notes: buildFallbackNotes(meta.title), usage };
     }
 
-    const type = await classify(turns, usage);
+    const type = await classify(router, turns, usage);
     const { callDate, weekday } = resolveCallDate(meta.startedAt, now);
 
     // Threshold gate (adr §5): a transcript over `maxSinglePassTokens` degrades
@@ -156,6 +169,7 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
    * neutral shape (adr §8). Usage is captured on success.
    */
   async function classify(
+    router: LlmRouter,
     turns: TranscriptTurn[],
     usage: JobUsage[],
   ): Promise<ConversationType> {

@@ -3,25 +3,25 @@
 > **Living document.** Updated in the same PR as any change to structure, data model,
 > or data flow (RULES.md §8). Describes the present; the "why" lives in `DECISIONS/`.
 >
-> **Status: Phase 5 post-call notes built on `dev-claude-notes` (branched off `development`,
-> which carries Phases 0-4 via PRs #1-#5). Phase 5 adds `modules/notes` — the MVP hero: a durable
-> `jobs`-table queue (FOR UPDATE SKIP LOCKED claim, lease + reaper crash recovery, sweep
-> backstop), the classify → generate (single-pass | map-reduce) → structured-output-ladder →
-> quote-verify pipeline over the EXISTING llm failover router, the follow-up draft generator
-> (cites notes by construction), the authed notes REST surface (read / regenerate / follow-up),
-> the stale-call reaper (closes the Phase 4 crash-orphan opener), and per-user usage logging on
-> every completion (the Phase 6 metering seam). What runs GREEN: the full mock/DB suites incl.
-> the kill-worker recovery + concurrent-claim race bars, the full-loop integration test
-> (markEnded → enqueue → worker → valid notes on the meeting row), the route integration suite
-> (real Postgres + real JWTs), AND the live LLM accuracy gates (2026-07-22, Task 6 round 1:
-> sales/interview/casual fixture fact-checks incl. the proposal-by-Friday owner+deadline bar,
-> three distinct type shapes, and the long-call map-reduce first+last-10-min planted-facts bar
-> — key-gated so keyless CI self-skips).** The Phase 4 RAG live gates (Voyage smoke + top-3
-> retrieval) also RAN GREEN 2026-07-22 once `VOYAGE_API_KEY` landed. On the live-call spine,
-> this tree carries the shared WebSocket wire protocol, the authenticated `GET /live` socket +
-> per-call session, the `modules/stt` gateway (live accuracy bars GREEN), and the `llm` failover
-> router + four real provider adapters (the notes pipeline is its first wired consumer). The
-> metering module remains design-only — see "Built so far" for what exists.
+> **Status: Phase 6 metering/quotas/billing built on `dev-claude-metering` (branched off
+> `development@9407425`, which carries Phases 0-5 via PRs #1-#6). Phase 6 adds the REAL
+> `modules/metering`: the append-only `usage_events` ledger (migration `20260722130000`,
+> select_own RLS, service-role-only writes) priced at write time from a zod price book; per-call
+> llm meters (`stream(req, {meter})` + `meterFor(userId, meetingId)`) so every notes/follow-up
+> token lands attributed; live STT billed by relayed bytes (spans flushed on vendor switch /
+> disposal / quota tick); plan quotas (`profiles.plan` free|pro) enforced at session start,
+> mid-stream, notes claim, and follow-up; REST rate limiting (@fastify/rate-limit, live WS
+> excluded); a one-live-session-per-user registry; the $50/day global spend kill-switch
+> (refuse-new / finish-in-flight, one alert per UTC day); the llm `invalid` error class
+> (400/404/422 — the anthropic credit-outage fix); and the token-gated RevenueCat webhook
+> mapping fixture purchases onto `profiles.plan`. What runs GREEN (2026-07-22, stack up):
+> 617 passed / 19 skipped / 0 failed incl. the ±5% STT accuracy bar, EXACT llm-token
+> passthrough, the seeded-ledger kill-switch E2E (the external-TestFlight gate), the RLS
+> posture suites, and the static no-unmetered-vendor-path audit. Anthropic is DISABLED by
+> decision (2026-07-22, cost): code kept + priced, key commented out — its live smoke
+> self-skips.** Phases 0-5 remain as merged: auth + RLS isolation, the llm failover router,
+> the live STT gateway, per-user RAG memory, and the post-call notes pipeline (all live gates
+> ran green 2026-07-22; see the per-phase blocks below).
 
 ## What Nova is
 
@@ -61,6 +61,11 @@ bot, stores transcripts only (never audio).
 Key invariants:
 1. **The phone is thin.** Mic capture + UI only. No vendor keys, no business logic.
 2. **All vendor spend flows through `metering`.** No unmetered path to a paid API.
+   **HELD as of Phase 6, with evidence:** the static wiring audit
+   (`modules/metering/metering.audit.test.ts`) asserts every llm-router construction
+   site threads `meterFor`, every RAG construction site passes the usage sink, the
+   live transport wires the STT usage seam, and `noopMeter` appears nowhere in the
+   production wiring; the E2E accuracy suite proves the rows actually land.
 3. **Per-user isolation is enforced by Postgres RLS**, not app code, and proven by
    A/B tests in CI.
 4. **Streaming commit-point rule:** once a provider yields its first token to a user,
@@ -129,13 +134,14 @@ modules/<name>/
 # tests are co-located as *.test.ts beside the code; fixtures live in apps/server/fixtures/
 ```
 
-### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory + Phase 5 post-call notes)
+### Built so far (Phase 0 scaffold + Phase 1 auth + Phase 2 LLM router + Phase 3 STT gateway + Phase 4 RAG memory + Phase 5 post-call notes + Phase 6 metering)
 
 The tree above is the target. What exists today is the skeleton, the `/health` vertical
 slice, the **Phase 1 auth domain**, the **Phase 2 LLM provider router**, the **Phase 3
-live-call STT gateway**, the **Phase 4 RAG memory**, and the **Phase 5 post-call notes
-pipeline** — all below. The remaining product module (`metering`) and the mobile
-`features/` are not built yet.
+live-call STT gateway**, the **Phase 4 RAG memory**, the **Phase 5 post-call notes
+pipeline**, and the **Phase 6 metering/quotas/billing layer** — all below. Every server
+product module now exists; the mobile `features/` (paywall states, product screens) are
+not built yet (Phase 8).
 
 Two structural deviations from the drawing, both intentional:
 
@@ -163,16 +169,17 @@ not auto-expose new tables to the Data API.
 - `deletion_requests` — the account-deletion purge queue. RLS enabled with **zero policies**
   (server/`service_role` only); `processed_at` is a lifecycle column, not a soft-delete
   tombstone. The purge-worker FK-ordering contract (deepest child first, every FK
-  `NO ACTION`) is: **embeddings → chunks → transcripts → jobs → meetings → context_docs →
-  deletion_requests → auth.users** — the Phase 4 RAG tables (`chunks` → meetings /
-  context_docs / profiles; `embeddings` → chunks / profiles) must be purged BEFORE the
-  meetings/context_docs they hang off, and the Phase 5 `jobs` table (→ meetings / profiles,
-  both `NO ACTION`) BEFORE the meetings its rows reference — otherwise the meetings delete
-  fails on the jobs FK. NOTE: the `deletion_requests` migration header predates the RAG and
-  jobs tables and still lists the shorter `transcripts → meetings → context_docs →
-  deletion_requests → auth.users` order; an applied migration is law and is not edited
-  (RULES §4) — this doc carries the current contract (the `jobs` migration header,
-  `20260722120000_create_jobs_and_notes_columns.sql`, carries the same full order).
+  `NO ACTION`) — the CANONICAL order as of Phase 6 is: **usage_events → embeddings →
+  chunks → transcripts → jobs → meetings → context_docs → deletion_requests →
+  auth.users** — the Phase 6 `usage_events` ledger (→ profiles / meetings, both
+  `NO ACTION`) purges FIRST, the Phase 4 RAG tables (`chunks` → meetings / context_docs /
+  profiles; `embeddings` → chunks / profiles) BEFORE the meetings/context_docs they hang
+  off, and the Phase 5 `jobs` table (→ meetings / profiles) BEFORE the meetings its rows
+  reference — otherwise the parent deletes fail on child FKs. NOTE: applied migration
+  headers are law and are not edited (RULES §4), so older headers carry older phrasings —
+  `create_deletion_requests` predates RAG/jobs/usage_events and lists the short order,
+  and the `usage_events` header (`20260722130000_create_usage_events_and_plan.sql`) lumps
+  "chunks/embeddings" in one breath — THIS DOC carries the canonical current contract.
   **Resolved (Phase 3, migration `20260720150000_enforce_transcript_parentage.sql`):** the
   original transcript write policies checked only `user_id = auth.uid()`, not that the referenced
   `meeting_id` belonged to the writer — so an authenticated user could insert a transcript they
@@ -256,10 +263,11 @@ yet** — no HTTP/WS transport is wired to the router this phase, it is a consum
   vendor usage → the `done` event via `usage.ts`. `factory.ts` (`createProvidersFromEnv`) builds
   only the providers whose API key is present, in default order, so the server boots with any
   subset (or none).
-- **Metering is a stub this phase.** The `Meter` port exists and the router records at every
-  success, but the wired default is `noopMeter`; the real `metering` module lands in a later
-  phase (invariant 2 preserved by construction — there is no unmetered code path, only a no-op
-  sink today).
+- **Metering was a stub this phase — landed in Phase 6.** The `Meter` port exists and the
+  router records at every success; since Phase 6 the production wiring threads a REAL
+  per-call meter (`metering.meterFor`) through every consumer and the wired default
+  `noopMeter` survives only as the router-internal fallback that the static audit proves
+  unreachable in production wiring (see the Phase 6 block).
 - **Env keys are optional.** `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GOOGLE_API_KEY` /
   `GROQ_API_KEY` were added to `env.ts` and `.env.example`, all `.optional()`; an absent key
   just means one fewer routable provider — the server still boots and serves `/health`.
@@ -404,15 +412,80 @@ hero — design spec `DESIGN/notes-pipeline.md`, decisions `DECISIONS/adr-0006-n
   conversation-type shapes, and the long-call map-reduce bar (first- AND last-10-min planted
   facts survive a forced map-reduce over the ~90-min fixture).
 
+**Phase 6 — `modules/metering/` (usage metering, quotas, billing hooks, built on
+`dev-claude-metering`):** design spec `DESIGN/metering.md`, decisions
+`DECISIONS/adr-0007-metering.md` (+ its Phase 6 build amendments). GATES external
+TestFlight — the kill-switch E2E is green.
+- **Ledger** (`db/usage-events.ts`, migration `20260722130000`) — append-only
+  `usage_events` (NO `deleted_at`: adr-0007 §1's explicit RULES §3 exception; the purge
+  worker deletes its rows first), one row per metered vendor call
+  (`llm_tokens | stt_seconds | embedding_tokens | rerank_requests`), amounts as facts +
+  `cost_estimate_usd` stamped at write time from the zod price book (`pricing.ts`;
+  unknown model/vendor → $0 + one warn, never blocks; anthropic stays priced though
+  disabled). Users read their own bar tab (`usage_events_select_own`); writes are
+  service-role-only. Sums are SQL aggregates over a direct `pg` Pool.
+- **Service + per-call meters** (`service.ts`, `ports.ts`) — `record()` prices + inserts
+  and NEVER throws (error-log + continue: a metering failure never fails the metered op —
+  safe because the static audit guarantees the sink is real); `meterFor(userId,
+  meetingId?)` builds the llm `Meter` closure; `usedInPeriod` (rolling 30d) and
+  `spendTodayUsd` (UTC day) feed enforcement. The llm surface gained
+  `stream(req, {meter})` — a per-call override so attribution travels WITH the call while
+  breaker/bench state stays process-global (adr-0007 §2); the notes pipeline + follow-up
+  thread it via a `meterFor` factory, the Voyage `logUsage` sink maps embedding/rerank
+  lines onto the ledger (rerank bills amount=1/request), and the live session bills
+  relayed-audio bytes (16kHz PCM16 → bytes/32000 = seconds) with spans flushed on vendor
+  switch / disposal / each quota tick (`modules/live/stt-usage.ts`; a crash loses ≤ one
+  tick; pre-first-failover attribution = the configured lineup head).
+- **Enforcement** — plan quotas on AMOUNTS (`quota.ts` + `db/plans.ts`:
+  `profiles.plan` free|pro → config limits; `>=` binds): live session start + mid-stream
+  recheck every 15s of METERED audio → typed `quota_exceeded` + policy close; notes
+  claim-time → dead-letter with `quota_exceeded` (never silent fallback notes — the
+  paywall stays visible); follow-up → 429. **Gate ORDER in `session.start`
+  (cheap/global → per-user):** concurrency (sync registry, slot released exactly-once via
+  the disposer) → daily cap → meeting ownership → stt quota — ownership fails CLOSED,
+  quota/cap fail OPEN (ratified posture; see the adr-0007 amendments). REST rate limiting
+  (`plugins/rate-limit.ts`, @fastify/rate-limit, 100/min default, key =
+  sha256(bearer) | IP pre-auth, typed 429; `/live` excluded — it has the
+  one-session-per-user cap instead). Kill-switch (`kill-switch.ts`):
+  `spendTodayUsd() >= $50` refuses NEW sessions (`daily_cap_reached`) and gates the
+  worker's CLAIM itself (jobs stay queued, attempts unburned, in-flight finishes);
+  exactly ONE `metering.daily_cap_tripped` error log per UTC day. **Honest posture:** the
+  rate-limit store and session registry are in-memory single-instance (the deployment
+  law; multi-instance = the logged opener family).
+- **llm `invalid` class** — 400/404/422 now classify `invalid` (was `transient`):
+  immediate failover, no same-provider retry, DOES count toward the breaker — the
+  2026-07-22 anthropic credit-400 outage (which burned a failover sweep per call) is the
+  live evidence. Auth 401/403 bench semantics unchanged.
+- **RevenueCat webhook** (`revenuecat.ts`) — `POST /webhooks/revenuecat`, registered ONLY
+  when `REVENUECAT_WEBHOOK_TOKEN` (+ the DB) is set; constant-time bearer check;
+  defensively zod-parsed envelope; INITIAL_PURCHASE/RENEWAL/UNCANCELLATION → the mapped
+  product's plan, EXPIRATION → free (CANCELLATION alone is a known no-op — access runs to
+  period end); unknown types/products/anonymous ids → 200 `{applied:false}` + warn, never
+  a 500. Idempotent absolute SET on `profiles.plan` via `db/plans.ts`. Fixture-proven;
+  live RevenueCat account/products/SDK `app_user_id` are Phase 8+ (Gustavo).
+- **Exit bars.** STT accuracy: the 58.4s fixture WAV relayed frame-by-frame bills within
+  ±5% of ground truth (exact on relayed bytes) with failover splitting attribution
+  (`session.metering.test.ts`). LLM accuracy: EXACT vendor-reported passthrough — known
+  mock usage lands as exact `usage_events` rows + `usedInPeriod` sum
+  (`metering.e2e.integration.test.ts`). Kill-switch: seeded ledger past $50 → new claims
+  refused (queued survives, attempts 0), in-flight finishes, exactly one alert. Quota:
+  tiny-quota session refused at start BEFORE any vendor connect; mid-stream cut typed +
+  wire-valid. Wiring: the static audit (`metering.audit.test.ts`) — no vendor path
+  without a real sink. RLS posture: `usage-events-rls.integration.test.ts` (A sees own
+  rows only, authenticated INSERT denied, service-role full).
+
 ## Data model
 
 The auth-domain tables (`profiles`, `meetings`, `transcripts`, `context_docs`,
 `deletion_requests`) are **built** as of Phase 1, the RAG tables (`chunks`, `embeddings`)
-plus the Phase 4 column expansions are **built** as of Phase 4, and the `jobs` table plus the
-meetings notes columns are **built** as of Phase 5 — see "Built so far" for their live shape
-and RLS posture. The `usage_events` sketch below becomes real in Phase 6.
+plus the Phase 4 column expansions are **built** as of Phase 4, the `jobs` table plus the
+meetings notes columns are **built** as of Phase 5, and the `usage_events` ledger plus
+`profiles.plan` are **built** as of Phase 6 — see "Built so far" for their live shape
+and RLS posture.
 
-- `profiles` — user profile + plan (1:1 with auth.users)
+- `profiles` — user profile (1:1 with auth.users); **built (Phase 6):** **`plan`**
+  (`text not null default 'free' check in ('free','pro')` — the quota tier, written by
+  the RevenueCat webhook, read by the quota checker)
 - `meetings` — id, user_id, title, started_at, **`ended_at`** (call completion), **`indexed_at`**
   (RAG sweeper marker: finished + null → unindexed backlog), deleted_at; **built (Phase 5):**
   **`notes`** jsonb (ONLY ever a zod-valid `meetingNotesSchema` object — the ladder guarantees
@@ -435,8 +508,17 @@ and RLS posture. The `usage_events` sketch below becomes real in Phase 6.
 - `embeddings` — **built (Phase 4):** a chunk's vector under a named embedding-space `model`,
   `dims`, `embedding halfvec(1024)`, unique `(chunk_id, model)`; **HNSW** index (cosine) for ANN;
   denormalized `user_id` so the RLS/where predicate stays a flat owner check
-- `usage_events` *(Phase 6)* — user_id, vendor, kind (stt_seconds|llm_tokens), amount, cost_estimate
-- All user tables: RLS ON at creation, `deleted_at` soft delete (RULES §3, §4.9)
+- `usage_events` — **built (Phase 6):** the append-only usage/billing ledger — user_id,
+  meeting_id (nullable), vendor, `kind` (`llm_tokens|stt_seconds|embedding_tokens|
+  rerank_requests`, CHECK-enforced), `amount` numeric (tokens/seconds/requests — facts,
+  quotas run on these), `input_amount`/`output_amount` (llm split), `model`,
+  `cost_estimate_usd` (advisory, priced at write; the kill-switch runs on its sum),
+  created_at. **NO `deleted_at`** — adr-0007 §1's explicit RULES §3 exception (a billing
+  ledger is history, not user-managed data; the purge worker hard-deletes its rows FIRST).
+  RLS: `usage_events_select_own` for authenticated, ZERO write policies (service-role
+  writes only). Indexes `(user_id, created_at)` + `(created_at)` for the two sums.
+- All user tables: RLS ON at creation, `deleted_at` soft delete (RULES §3, §4.9 —
+  `usage_events` is the one documented exception above)
 
 ## Environments
 
@@ -472,3 +554,12 @@ Details in `GIT_WORKFLOW.md`.
   single-pass primary with a 32k-token map-reduce gate, quote-grounding (flag-don't-drop),
   the portable structured-output ladder (salvage → zod → one repair → constant fallback),
   follow-up drafts citing notes by construction. Design: `DESIGN/notes-pipeline.md`.
+- **ADR-0007** — Metering, quotas, and the spend kill-switch: one append-only
+  `usage_events` ledger config-priced at write time (amounts are facts, dollars are
+  advisory); per-call meter injection (`stream(req, {meter})`) over per-user routers;
+  STT billed by relayed frames; plan quotas on amounts at start AND mid-stream; the
+  refuse-new/finish-in-flight daily kill-switch on estimated dollars;
+  @fastify/rate-limit + an in-memory one-session-per-user registry; RevenueCat as a
+  fixture-tested seam. Build amendments (in the ADR): quota/cap FAIL-OPEN vs ownership
+  FAIL-CLOSED, lineup-head STT attribution, rerank amount=1/request, RC static-bearer
+  auth. Design: `DESIGN/metering.md`.

@@ -125,6 +125,43 @@ export const jobRowSchema = z.object({
 
 export type JobRow = z.infer<typeof jobRowSchema>;
 
+/**
+ * The metered-unit family of a `usage_events` row. The DB CHECK constraint is the
+ * source of truth for this closed set; `modules/metering/ports.ts` re-declares the
+ * same values as its own `usageKindSchema` (the DB layer does not import module
+ * code — RULES §2). A new kind is a deliberate migration on both sides.
+ */
+export const usageKindDbSchema = z.enum([
+  "llm_tokens",
+  "stt_seconds",
+  "embedding_tokens",
+  "rerank_requests",
+]);
+
+/**
+ * Runtime shape of a `usage_events` row — the append-only usage/billing ledger
+ * (adr-0007 §1; NO `deleted_at`). `amount`/`input_amount`/`output_amount`/
+ * `cost_estimate_usd` are Postgres `numeric`: PostgREST/supabase-js return them as
+ * JSON numbers, so they parse as `z.number()` here (the pg-Pool adapter in
+ * `usage-events.ts` coerces its own string-typed numerics separately). Writes are
+ * service-role-only; users get `select_own`.
+ */
+export const usageEventRowSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  meeting_id: z.string().uuid().nullable(),
+  vendor: z.string(),
+  kind: usageKindDbSchema,
+  amount: z.number(),
+  input_amount: z.number().nullable(),
+  output_amount: z.number().nullable(),
+  model: z.string().nullable(),
+  cost_estimate_usd: z.number(),
+  created_at: z.string(),
+});
+
+export type UsageEventRow = z.infer<typeof usageEventRowSchema>;
+
 export interface Database {
   public: {
     Tables: {
@@ -141,23 +178,27 @@ export interface Database {
       };
       profiles: {
         // Only the columns the server adapter touches are modelled here (the
-        // account-deletion tombstone). A real project regenerates this with
-        // `supabase gen types`; this is the hand-written minimum.
+        // account-deletion tombstone + the Phase 6 subscription `plan`). A real
+        // project regenerates this with `supabase gen types`; this is the
+        // hand-written minimum.
         Row: {
           id: string;
           display_name: string | null;
+          plan: string;
           created_at: string;
           deleted_at: string | null;
         };
         Insert: {
           id: string;
           display_name?: string | null;
+          plan?: string;
           created_at?: string;
           deleted_at?: string | null;
         };
         Update: {
           id?: string;
           display_name?: string | null;
+          plan?: string;
           created_at?: string;
           deleted_at?: string | null;
         };
@@ -228,6 +269,26 @@ export interface Database {
           deleted_at?: string | null;
         };
         Update: Partial<TranscriptRow>;
+        Relationships: [];
+      };
+      usage_events: {
+        // The append-only metering ledger (adr-0007 §1). Service-role writes; users
+        // get `select_own`. No `deleted_at` (append-only exception).
+        Row: UsageEventRow;
+        Insert: {
+          user_id: string;
+          vendor: string;
+          kind: z.infer<typeof usageKindDbSchema>;
+          amount: number;
+          id?: string;
+          meeting_id?: string | null;
+          input_amount?: number | null;
+          output_amount?: number | null;
+          model?: string | null;
+          cost_estimate_usd?: number;
+          created_at?: string;
+        };
+        Update: Partial<UsageEventRow>;
         Relationships: [];
       };
     };

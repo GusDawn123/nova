@@ -53,5 +53,10 @@ consumes it. This ADR records the routing/latency decisions made during and afte
 ## Known gaps (logged Phase 3+ openers)
 - Post-commit failures don't feed the circuit breaker (one-token-then-die vendor
   wins every race). Top priority before real traffic.
-- 400/404 classified transient (burns a failover sweep); needs an "invalid" class.
+- ~~400/404 classified transient (burns a failover sweep); needs an "invalid" class.~~
+  **CLOSED (Phase 6):** `classifyHttpStatus` is now three-way — 401/403 `auth`
+  (bench, unchanged), **400/404/422 `invalid`** (immediate failover, no
+  same-provider retry, DOES count toward the breaker so repeated invalids trip it
+  open), rest `transient`. Live evidence: the 2026-07-22 anthropic credit outage
+  returned 400s the router classed transient, burning a failover sweep per call.
 - All-benched exhaustion yields an empty failures summary (observability).

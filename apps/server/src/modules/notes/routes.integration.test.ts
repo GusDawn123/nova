@@ -45,7 +45,8 @@ const COMPLETED_NOTES: MeetingNotes = {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Agreed to renew on the Growth plan next quarter.",
-  overview: "The rep and customer reviewed terms and aligned on the renewal path.",
+  overview:
+    "The rep and customer reviewed terms and aligned on the renewal path.",
   decisions: [{ text: "Renew on the Growth plan.", quote: null }],
   actionItems: [
     {
@@ -134,7 +135,10 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     const anon = createClient(url, anonKey, noPersist);
     const signIn = await anon.auth.signInWithPassword({ email, password });
     if (signIn.error) throw new Error(`signIn: ${signIn.error.message}`);
-    return { id: created.data.user.id, token: signIn.data.session.access_token };
+    return {
+      id: created.data.user.id,
+      token: signIn.data.session.access_token,
+    };
   }
 
   async function newMeeting(ownerId: string): Promise<string> {
@@ -157,7 +161,12 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     );
   }
 
-  function buildApp(followUpRouter: LlmRouter, log: NotesLogger): FastifyInstance {
+  function buildApp(
+    followUpRouter: LlmRouter,
+    log: NotesLogger,
+    isOverLlmQuota?: (userId: string) => Promise<boolean>,
+    isDailyCapReached?: () => Promise<boolean>,
+  ): FastifyInstance {
     const app = Fastify({ logger: false });
     void app.register(
       createNotesRoutes({
@@ -167,6 +176,8 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
         followUp: generateFollowUp({ router: followUpRouter, logger: log }),
         logger: log,
         now: () => new Date("2026-07-22T18:00:00Z"),
+        ...(isOverLlmQuota ? { isOverLlmQuota } : {}),
+        ...(isDailyCapReached ? { isDailyCapReached } : {}),
       }),
     );
     return app;
@@ -378,6 +389,43 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     });
     expect(res.statusCode).toBe(503);
     expect(res.json()).toEqual({ error: "provider_unavailable" });
+  });
+
+  it("follow-up over the llm quota is a typed 429 quota_exceeded (paywall; no call made)", async () => {
+    const meetingId = await newMeeting(userAId);
+    await completeNotes(meetingId);
+
+    // A router that would blow up if the quota gate let the call through.
+    const quotaApp = buildApp(throwingRouter(), okLog.logger, (userId) => {
+      expect(userId).toBe(userAId);
+      return Promise.resolve(true);
+    });
+    const res = await quotaApp.inject({
+      method: "POST",
+      url: `/meetings/${meetingId}/follow-up`,
+      headers: auth(tokenA),
+      payload: { tone: "warm" },
+    });
+    expect(res.statusCode).toBe(429);
+    expect(res.json()).toEqual({ error: "quota_exceeded" });
+  });
+
+  it("follow-up under a tripped daily cap is a typed 503 daily_cap_reached (no call made)", async () => {
+    const meetingId = await newMeeting(userAId);
+    await completeNotes(meetingId);
+
+    // A router that would blow up if the cap gate let the call through.
+    const capApp = buildApp(throwingRouter(), okLog.logger, undefined, () =>
+      Promise.resolve(true),
+    );
+    const res = await capApp.inject({
+      method: "POST",
+      url: `/meetings/${meetingId}/follow-up`,
+      headers: auth(tokenA),
+      payload: { tone: "warm" },
+    });
+    expect(res.statusCode).toBe(503);
+    expect(res.json()).toEqual({ error: "daily_cap_reached" });
   });
 
   it("follow-up on a foreign meeting is a uniform 404", async () => {

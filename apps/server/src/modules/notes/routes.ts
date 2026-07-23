@@ -5,11 +5,7 @@ import {
   regenerateResponseSchema,
   type NotesReadResponse,
 } from "@nova/shared";
-import type {
-  FastifyInstance,
-  FastifyReply,
-  FastifyRequest,
-} from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { NotesJobStore } from "../../db/jobs.js";
@@ -44,6 +40,19 @@ export interface NotesRoutesDeps {
   readonly logger: NotesLogger;
   /** Injected clock for the stored `generated_at` (deterministic in tests). */
   readonly now?: () => Date;
+  /**
+   * Request-time llm-token quota gate for the synchronous follow-up call (Phase
+   * 6, adr-0007 §4): over → typed 429 `quota_exceeded` (the paywall state)
+   * BEFORE any provider call. Optional (keyless posture); fail-open on an
+   * internal failure.
+   */
+  readonly isOverLlmQuota?: (userId: string) => Promise<boolean>;
+  /**
+   * The global daily-spend kill-switch (Phase 6, adr-0007 §5): tripped → typed
+   * 503 `daily_cap_reached` BEFORE any provider call (a service-side stop, not
+   * the caller's fault — hence 503, not 429). Optional; fail-open.
+   */
+  readonly isDailyCapReached?: () => Promise<boolean>;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -158,16 +167,64 @@ export function createNotesRoutes(
           return reply.code(409).send({ error: "notes_not_ready" });
         }
 
+        // Kill-switch gate (Phase 6, adr-0007 §5) — global/cheap before the
+        // per-user quota below. Fail-open (the kill-switch logs loudly itself).
+        if (deps.isDailyCapReached) {
+          let capReached = false;
+          try {
+            capReached = await deps.isDailyCapReached();
+          } catch (err) {
+            logger.error(
+              { user_id: userId, meeting_id: meetingId, err },
+              "notes.follow_up.daily_cap_check_failed",
+            );
+          }
+          if (capReached) {
+            logger.info(
+              { user_id: userId, meeting_id: meetingId },
+              "notes.follow_up.daily_cap_reached",
+            );
+            return reply.code(503).send({ error: "daily_cap_reached" });
+          }
+        }
+
+        // Quota gate (Phase 6, adr-0007 §4) — BEFORE the paid call. Fail-open on
+        // an internal failure (logged): quota protects spend, not availability.
+        if (deps.isOverLlmQuota) {
+          let overQuota = false;
+          try {
+            overQuota = await deps.isOverLlmQuota(userId);
+          } catch (err) {
+            logger.error(
+              { user_id: userId, meeting_id: meetingId, err },
+              "notes.follow_up.quota_check_failed",
+            );
+          }
+          if (overQuota) {
+            logger.info(
+              { user_id: userId, meeting_id: meetingId },
+              "notes.follow_up.quota_exceeded",
+            );
+            return reply.code(429).send({ error: "quota_exceeded" });
+          }
+        }
+
         let result: FollowUpResult;
         try {
           result = await followUp({
             notes: model.notes,
             tone,
             meetingTitle: model.notes.title,
+            // Metering attribution (Phase 6) — ids only, never content.
+            userId,
+            meetingId,
           });
         } catch (err) {
           // Transport/all-providers failures → typed 503 (never a 500 stack leak).
-          if (err instanceof LlmError || err instanceof AllProvidersFailedError) {
+          if (
+            err instanceof LlmError ||
+            err instanceof AllProvidersFailedError
+          ) {
             logger.error(
               { user_id: userId, meeting_id: meetingId },
               "notes.follow_up.provider_unavailable",

@@ -86,6 +86,69 @@ export interface LiveLogger {
   error(fields: Record<string, unknown>, msg: string): void;
 }
 
+/** One flushed span of relayed audio attributed to the CURRENT stt vendor. */
+export interface LiveSttUsage {
+  readonly userId: string;
+  readonly meetingId: string;
+  readonly vendor: string;
+  readonly seconds: number;
+}
+
+/**
+ * Metering + quota seam the live session enforces spend through (Phase 6,
+ * adr-0007 §3/§4). Kept live-local (not the metering module's own interface) so
+ * this module stays an island; `metering-wiring.ts` adapts the real
+ * MeteringService + QuotaChecker onto it. OPTIONAL everywhere it is consumed —
+ * a keyless/DB-less dev boot skips enforcement exactly as it skips persistence
+ * (the persister-optional posture): the session still streams to the phone,
+ * just unmetered and unquota'd, because there is no ledger to meter into.
+ *
+ * `recordSttSeconds` follows the never-fail-the-metered-op law (the metering
+ * service swallows persistence failures); the session still `.catch`es it so a
+ * misbehaving seam cannot produce an unhandled rejection on the audio path.
+ * `isOverSttQuota` resolves true when the caller is AT/OVER their plan's
+ * stt-seconds budget for the rolling period.
+ */
+export interface LiveMetering {
+  recordSttSeconds(usage: LiveSttUsage): Promise<void>;
+  isOverSttQuota(userId: string): Promise<boolean>;
+  /** true = the GLOBAL daily spend kill-switch is tripped (adr-0007 §5). */
+  isOverDailyCap(): Promise<boolean>;
+}
+
+/**
+ * ONE live session per user (Phase 6, adr-0007 §6) — the concurrency cap the
+ * live WS gets instead of REST rate limiting. `acquire` is SYNCHRONOUS so two
+ * simultaneous starts resolve deterministically (no async race window); the
+ * session releases its slot exactly-once via its disposer. OPTIONAL in session
+ * deps (the keyless posture).
+ *
+ * OPENER (logged, adr-0007 §6): this port's in-memory implementation is
+ * single-instance by design — the deployment law today. A multi-instance
+ * deploy needs a shared claim (alongside the RAG sweeper's same opener).
+ */
+export interface LiveSessionRegistry {
+  /** Claim the user's single live-session slot; false = already held. */
+  acquire(userId: string): boolean;
+  /** Free the slot. Harmless no-op when not held. */
+  release(userId: string): void;
+}
+
+/** The in-memory single-instance implementation (see the port's opener note). */
+export function createInMemorySessionRegistry(): LiveSessionRegistry {
+  const active = new Set<string>();
+  return {
+    acquire(userId: string): boolean {
+      if (active.has(userId)) return false;
+      active.add(userId);
+      return true;
+    },
+    release(userId: string): void {
+      active.delete(userId);
+    },
+  };
+}
+
 /** Build a fresh {@link Disposer}. */
 export function createDisposer(): Disposer {
   const cleanups: (() => void)[] = [];

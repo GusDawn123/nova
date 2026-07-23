@@ -164,6 +164,17 @@ export const liveErrorCodeSchema = z.enum([
   // session (Phase 4 review C1). "Forbidden" is deliberately undifferentiated
   // from "not found" so the code leaks nothing about another user's meeting ids.
   "meeting_forbidden",
+  // Phase 6 enforcement codes (adr-0007; additive, no v bump — the app renders
+  // these as paywall / blocked states):
+  //   quota_exceeded    — the caller's plan quota is spent (session-start check
+  //                       or mid-stream recheck); policy close follows.
+  //   daily_cap_reached — the GLOBAL daily spend kill-switch tripped; new
+  //                       sessions/work refused, in-flight finishes (Task 4).
+  //   concurrent_session — one live session per user; a second start is refused
+  //                       (Task 4).
+  "quota_exceeded",
+  "daily_cap_reached",
+  "concurrent_session",
   "internal",
 ]);
 

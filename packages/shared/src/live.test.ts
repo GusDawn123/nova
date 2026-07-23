@@ -83,6 +83,11 @@ describe("serverLiveEventSchema", () => {
       reason: "reconcile_miss",
     },
     { v: 1, type: "error", code: "invalid_json", message: "bad" },
+    // Phase 6 enforcement codes (additive, no v bump): the app renders these as
+    // paywall / blocked states.
+    { v: 1, type: "error", code: "quota_exceeded", message: "over quota" },
+    { v: 1, type: "error", code: "daily_cap_reached", message: "cap" },
+    { v: 1, type: "error", code: "concurrent_session", message: "busy" },
     { v: 1, type: "pong" },
     { v: 1, type: "audio.echo", bytes: 640 },
   ];

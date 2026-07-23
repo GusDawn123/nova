@@ -12,8 +12,13 @@ import type { ProviderId } from "./ports.js";
  * vitest fake clock in tests) so all timing is deterministic and testable.
  */
 
-/** The kinds of pre-commit failure the health tracker distinguishes. */
-export type FailureKind = "auth" | "transient";
+/**
+ * The kinds of pre-commit failure the health tracker distinguishes. `invalid`
+ * (Phase 6) feeds the breaker exactly like `transient` — repeated invalids (e.g.
+ * credit-exhausted 400s) trip the breaker open, ending the per-call sweep burn —
+ * while `auth` alone takes the long bench.
+ */
+export type FailureKind = "auth" | "invalid" | "transient";
 
 interface ProviderState {
   /** Consecutive transient pre-commit failures since the last success. */
@@ -69,6 +74,8 @@ export function createProviderHealth(config: LlmConfig): ProviderHealth {
         state.benchedUntil = now + config.authCooldownMs;
         return;
       }
+      // `transient` AND `invalid` both count toward the breaker (Phase 6): a
+      // provider throwing invalids per call is as unhealthy as one 500ing.
       state.consecutiveFailures += 1;
       if (state.consecutiveFailures >= config.breakerThreshold) {
         state.openUntil = now + config.breakerCooldownMs;

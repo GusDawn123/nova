@@ -13,23 +13,34 @@ Silent text copilot: no TTS, no bots joining calls, transcript-only storage.
 `apps/mobile` (React Native + Expo), `packages/shared` (zod schemas/types),
 `supabase/` (Postgres + RLS + pgvector migrations).
 
-**Status: Phase 5 post-call notes built on `dev-claude-notes` (branched off `development`, which
-carries Phases 0-4 via PRs #1-#5). `modules/notes` ships the MVP hero: a durable `jobs`-table
-queue (`db/jobs.ts`, atomic `FOR UPDATE SKIP LOCKED` claim, lease+reaper crash recovery, sweep
-backstop, migration `20260722120000`), the worker + handler, the classify → single-pass|map-reduce
-→ structured-output-ladder (salvage → zod → one repair → deterministic fallback) → quote-verify
-pipeline over the EXISTING llm failover router (its first wired consumer), the follow-up draft
-generator (cites notes BY CONSTRUCTION — its input type admits no transcript), the authed REST
-surface (`GET /meetings/:id/notes`, `POST .../regenerate` 202|409, `POST .../follow-up`
-200|409|503, uniform 404 — no existence leak), the stale-call reaper (closes the Phase 4
-crash-orphan hole), and per-user usage logging + `jobs.usage` jsonb (the Phase 6 metering seam).
-GREEN: full mock/DB suites incl. kill-worker recovery + concurrent-claim race, the full loop
-(markEnded → enqueue → worker → valid notes), route integration (real Postgres + real JWTs), AND
-the live LLM accuracy gates (2026-07-22, one prompt round: sales/interview/casual fact-checks
-incl. proposal-by-Friday owner+deadline, three distinct type shapes, long-call map-reduce
-planted-facts — key-gated so keyless CI self-skips). New env: `NOTES_WORKER_ENABLED=true` opts
-the background worker in (off by default; needs `SUPABASE_DB_URL` + ≥1 LLM key); the notes REST
-surface needs only the Supabase + DB env.**
+**Status: Phase 6 metering/quotas/billing built on `dev-claude-metering` (branched off
+`development@9407425`, which carries Phases 0-5 via PRs #1-#6). `modules/metering` is now REAL:
+the append-only `usage_events` ledger (migration `20260722130000`, select_own RLS, service-role
+writes, priced at write time from a zod price book), per-call llm meters (`stream(req, {meter})`
++ `meterFor(userId, meetingId)` threaded through the notes pipeline, follow-up, and the Voyage
+sinks — the static audit `modules/metering/metering.audit.test.ts` proves no vendor path runs
+unmetered), live STT billed by relayed bytes (spans flush on vendor switch/disposal/quota tick,
+±5% fixture bar), plan quotas over `profiles.plan` free|pro (session start + mid-stream →
+typed `quota_exceeded` close; notes claim → dead-letter; follow-up → 429), REST rate limiting
+(@fastify/rate-limit 100/min, `/live` excluded), ONE live session per user (typed
+`concurrent_session`), the $50/day global kill-switch (refuse-new/finish-in-flight, one alert
+per UTC day — the external-TestFlight gate, E2E-proven against a seeded ledger), the llm
+`invalid` error class (400/404/422 → failover once + breaker counts; the anthropic credit-400
+fix), and the token-gated RevenueCat webhook (fixture-proven free→pro/downgrade/idempotent;
+live RC account = Phase 8/Gustavo). Session-start gate order: concurrency → daily cap →
+ownership (fail-CLOSED) → quota (fail-OPEN — ratified posture, adr-0007 amendments). GREEN
+2026-07-22 stack-up: 617 passed / 19 skipped / 0 failed. New env: `REVENUECAT_WEBHOOK_TOKEN`
+(optional — unset means the webhook route does not exist).
+ANTHROPIC IS DISABLED (2026-07-22 cost decision): the adapter/config/smoke code is KEPT and the
+price book still prices claude-haiku-4-5, but the key is commented out in `apps/server/.env` —
+the factory builds no anthropic provider and its live smoke self-skips. Re-enable = uncomment
+the key. Working LLM set: OpenAI + Google (groq unkeyed).**
+Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
+lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
+structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by
+construction), the authed notes REST surface (uniform 404, 202|409, 200|409|503), the
+stale-call reaper. Live LLM accuracy gates green 2026-07-22. `NOTES_WORKER_ENABLED=true` opts
+the background worker in (off by default; needs `SUPABASE_DB_URL` + ≥1 LLM key).
 Phase 4 RAG memory is merged: `modules/rag` (chunker, four ports, Voyage + pgvector-hybrid-RRF
 adapters, `RagService`, marker-and-sweep indexer over `chunks`/`embeddings`, halfvec 1024 HNSW).
 GREEN incl. the freshness bar (~0.7s vs <60s), the store latency bar (`npm run bench:rag` p95
@@ -71,9 +82,12 @@ deferred), iOS-simulator verification deferred (Expo web + Playwright instead). 
   Personal-use license; legally off-limits for this commercial product (RULES §9).
   If you need to know "how X works," derive from public patterns and docs/ specs here.
 - No secrets in the repo. No vendor keys in the mobile app, ever.
-- No unmetered paths to paid vendor APIs is the target; today metering is partial —
-  LLM has an optional meter port, RAG's Voyage adapter has an ad-hoc usage sink, STT is
-  unmetered. A unified `modules/metering` is tracked for Phase 6 and must land before real traffic.
+- No unmetered paths to paid vendor APIs — **DONE and audit-enforced as of Phase 6**: the
+  unified `modules/metering` is live (llm per-call meters, STT relayed-byte spans, Voyage
+  embedding/rerank sinks all land in `usage_events`), and the static wiring audit
+  (`modules/metering/metering.audit.test.ts`) fails the build if any vendor construction
+  site loses its sink or `noopMeter` reappears in production wiring. Keep it that way:
+  new vendor paths MUST thread the metering seam and extend the audit.
 - Never claim "done" without the phase's mechanical verification passing.
 
 ## Commands

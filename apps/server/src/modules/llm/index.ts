@@ -33,6 +33,7 @@ export { llmConfigSchema, type LlmConfig } from "./config.js";
 
 export {
   createLlmRouter,
+  withMeter,
   type LlmRouter,
   type LlmRouterDeps,
 } from "./router.js";

@@ -42,8 +42,8 @@ export interface MockCallScript {
   firstTokenDelayMs?: number;
   /** Delay between successive events — the stall control. */
   interTokenDelayMs?: number;
-  /** Fail before any token, classified as `auth` or `transient`. */
-  failBeforeFirstToken?: { kind: "auth" | "transient" };
+  /** Fail before any token, classified as `auth`, `invalid`, or `transient`. */
+  failBeforeFirstToken?: { kind: "auth" | "invalid" | "transient" };
   /** Emit this many tokens, then throw — mid-stream death. */
   failAfterTokens?: number;
   /** Kind thrown by `failAfterTokens` (default `transient`). */
@@ -162,9 +162,14 @@ async function* runScript(
     }
 
     if (script.failBeforeFirstToken) {
-      throw script.failBeforeFirstToken.kind === "auth"
-        ? LlmError.auth("mock auth failure")
-        : LlmError.transient("mock transient failure");
+      const kind = script.failBeforeFirstToken.kind;
+      if (kind === "auth") {
+        throw LlmError.auth("mock auth failure");
+      }
+      if (kind === "invalid") {
+        throw LlmError.invalid("mock invalid failure");
+      }
+      throw LlmError.transient("mock transient failure");
     }
 
     if (script.neverYield) {

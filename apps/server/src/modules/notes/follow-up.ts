@@ -7,7 +7,7 @@ import {
 import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
-import type { LlmRouter } from "../llm/index.js";
+import { withMeter, type LlmRouter, type Meter } from "../llm/index.js";
 
 import { runLadder } from "./ladder.js";
 import type { NotesLogger } from "./ports.js";
@@ -33,11 +33,17 @@ import {
  * so the REST layer maps it to a typed 503 (never a 500 stack leak).
  */
 
-/** The ONLY inputs a follow-up draft is built from — no transcript by construction. */
+/**
+ * The ONLY inputs a follow-up draft is built from — no transcript by construction.
+ * `userId`/`meetingId` (Phase 6) are metering ATTRIBUTION only — ids, not content,
+ * so cites-notes-only still holds; they never reach a prompt builder.
+ */
 export interface FollowUpInput {
   readonly notes: MeetingNotes;
   readonly tone: FollowUpTone;
   readonly meetingTitle: string;
+  readonly userId?: string;
+  readonly meetingId?: string;
 }
 
 /** A generated draft + its per-call usage + whether the deterministic fallback fired. */
@@ -53,6 +59,12 @@ export interface FollowUpResult {
 export interface FollowUpDeps {
   readonly router: LlmRouter;
   readonly logger: NotesLogger;
+  /**
+   * Per-request metering factory (Phase 6, adr-0007 §2 — `metering.meterFor`).
+   * Applied only when the input carries a `userId`; the follow-up runs in a
+   * request, so attribution comes with each call, not construction.
+   */
+  readonly meterFor?: (userId: string, meetingId?: string) => Meter;
 }
 
 /** The draft body schema the model must return — tone is stamped by the pipeline. */
@@ -66,11 +78,18 @@ const draftRequestSchema = followUpDraftSchema.omit({ tone: true });
 export function generateFollowUp(
   deps: FollowUpDeps,
 ): (input: FollowUpInput) => Promise<FollowUpResult> {
-  const { router, logger } = deps;
+  const { logger } = deps;
 
   return async function run(input: FollowUpInput): Promise<FollowUpResult> {
     const { notes, tone, meetingTitle } = input;
     const messages = buildFollowUpMessages({ notes, tone, meetingTitle });
+
+    // Request-scoped metering (Phase 6): stamp the caller's attribution onto
+    // every router call of this draft (generate + the one repair, if spent).
+    const router =
+      deps.meterFor && input.userId !== undefined
+        ? withMeter(deps.router, deps.meterFor(input.userId, input.meetingId))
+        : deps.router;
 
     const ladder = await runLadder({
       schema: draftRequestSchema,
