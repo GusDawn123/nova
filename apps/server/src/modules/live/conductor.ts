@@ -34,6 +34,24 @@ export interface LiveConductor {
   dispose(): void;
 }
 
+/** Per-session args the transport supplies to build a conductor at `session.start`. */
+export interface ConductorFactoryArgs {
+  readonly send: (event: ServerLiveEvent) => void;
+  readonly userId: string;
+  readonly meetingId: string;
+}
+
+/**
+ * Builds a {@link LiveConductor} once a session is authenticated and its
+ * owner/meeting are known. Wired by the transport (metering-wiring.ts) closing
+ * over the live router, RAG service, and the per-call meter factory; the session
+ * supplies `send` + identity. Omitted on keyless boots (no LLM → no suggestions,
+ * transcription still runs).
+ */
+export type LiveConductorFactory = (
+  args: ConductorFactoryArgs,
+) => LiveConductor;
+
 export interface LiveConductorDeps {
   /** Emit a typed event down the socket (the session's own `send`). */
   send: (event: ServerLiveEvent) => void;

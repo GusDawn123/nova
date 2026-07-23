@@ -464,6 +464,83 @@ describe("LiveSession meeting-ownership guard (C1)", () => {
   });
 });
 
+describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
+  interface FakeConductor {
+    partials: string[];
+    finals: string[];
+    disposed: number;
+  }
+
+  function makeFakeConductor(): {
+    factory: NonNullable<LiveSessionDeps["createConductor"]>;
+    calls: { userId: string; meetingId: string }[];
+    conductor: FakeConductor;
+  } {
+    const conductor: FakeConductor = { partials: [], finals: [], disposed: 0 };
+    const calls: { userId: string; meetingId: string }[] = [];
+    const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
+      calls.push({ userId: args.userId, meetingId: args.meetingId });
+      return {
+        onPartial: (text) => conductor.partials.push(text),
+        onFinal: (text) => conductor.finals.push(text),
+        dispose: () => {
+          conductor.disposed += 1;
+        },
+      };
+    };
+    return { factory, calls, conductor };
+  }
+
+  it("builds the conductor with the owner + meeting and forwards transcript events", () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    fake.emit(partialEvent("what is your pricing"));
+    fake.emit(finalEvent("what is your pricing model?"));
+
+    expect(c.calls).toEqual([{ userId: USER_ID, meetingId: MEETING_ID }]);
+    expect(c.conductor.partials).toEqual(["what is your pricing"]);
+    expect(c.conductor.finals).toEqual(["what is your pricing model?"]);
+  });
+
+  it("disposes the conductor on teardown (aborts any in-flight generation)", () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    session.close();
+    session.close(); // idempotent
+
+    expect(c.conductor.disposed).toBe(1);
+  });
+
+  it("does not build a conductor in echo mode (pre-vendor diagnostic)", () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      allowEcho: true,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame(true));
+
+    expect(c.calls).toHaveLength(0);
+  });
+});
+
 describe("LiveSession teardown (exactly-once)", () => {
   it("runs registered cleanup exactly once across end + close + close", () => {
     const { session } = makeSession();

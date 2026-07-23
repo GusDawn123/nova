@@ -7,7 +7,10 @@ import { isSupabaseConfigured } from "../../db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "../../db/jobs.js";
 import { createTranscriptPersister } from "../../db/transcripts.js";
 import { isNotesWorkerEnabled } from "../../env.js";
-import { maybeCreateLiveMetering } from "../../metering-wiring.js";
+import {
+  maybeCreateLiveConductorFactory,
+  maybeCreateLiveMetering,
+} from "../../metering-wiring.js";
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
 import { meteringConfig } from "../metering/index.js";
 import { defaultSttConfig } from "../stt/config.js";
@@ -95,6 +98,11 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // gate: concurrency needs only the authenticated identity, so it holds even on
   // keyless/DB-less boots. Single-instance by design (the logged opener).
   const registry = createInMemorySessionRegistry();
+
+  // Live copilot conductor factory (Phase 7). Built ONCE (shared live router +
+  // RAG service), threading the metering seam; undefined when no LLM key is
+  // present (transcription still runs, just no suggestions).
+  const createConductor = maybeCreateLiveConductorFactory(app);
 
   // Durable transcript memory. Wired only when the DB is configured; otherwise the
   // session still streams to the phone, just without persistence (same keyless
@@ -217,6 +225,8 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
             : {}),
           // One-session-per-user cap (typed concurrent_session on a second start).
           registry,
+          // Live copilot: stream suggestions down this socket (Phase 7).
+          ...(createConductor !== undefined ? { createConductor } : {}),
           ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
           logger: app.log,
         });

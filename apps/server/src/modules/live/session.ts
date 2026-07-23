@@ -10,6 +10,7 @@ import {
 
 import type { SttEngine, SttSessionHandle } from "../stt/ports.js";
 
+import type { LiveConductor, LiveConductorFactory } from "./conductor.js";
 import {
   createDisposer,
   noopAudioFrameHandler,
@@ -87,6 +88,14 @@ export interface LiveSessionDeps {
    * the other enforcement seams; effective only with a {@link userId}.
    */
   registry?: LiveSessionRegistry;
+  /**
+   * The live copilot conductor factory (Phase 7). When wired (an LLM key is
+   * present) and an owner is known, a per-call conductor is built at
+   * `session.start`: it watches the same transcript stream the relay forwards,
+   * gates spend, and streams `suggestion.*` down THIS socket. Omitted on a
+   * keyless boot — the session still transcribes, just without suggestions.
+   */
+  createConductor?: LiveConductorFactory;
 }
 
 export class LiveSession {
@@ -104,8 +113,11 @@ export class LiveSession {
 
   private readonly metering: LiveMetering | null;
   private readonly registry: LiveSessionRegistry | null;
+  private readonly createConductor: LiveConductorFactory | null;
   private readonly initialSttVendor: string;
   private readonly quotaRecheckSeconds: number;
+  /** The live copilot conductor for this call; null until start (or unwired). */
+  private conductor: LiveConductor | null = null;
 
   private started = false;
   private sessionId: string | null = null;
@@ -133,6 +145,7 @@ export class LiveSession {
     this.logger = deps.logger ?? null;
     this.metering = deps.metering ?? null;
     this.registry = deps.registry ?? null;
+    this.createConductor = deps.createConductor ?? null;
     // "unknown" only ever bills on a misconfigured wiring (the transport always
     // passes the lineup head when vendors exist); kept explicit, never invented.
     this.initialSttVendor = deps.initialSttVendor ?? "unknown";
@@ -387,6 +400,24 @@ export class LiveSession {
       });
     }
 
+    // Live copilot conductor (Phase 7). Built AFTER the gates, BEFORE STT starts
+    // so it is ready when the first transcript flows. It streams suggestions down
+    // THIS socket and its teardown (abort any in-flight generation) rides the
+    // disperser BEFORE the STT stop is registered — LIFO stops STT first (no new
+    // finals), then the conductor aborts. Only when a factory + owner are wired
+    // and not in echo mode (echo is the pre-vendor transit diagnostic).
+    if (this.createConductor !== null && this.userId !== null && !this.echo) {
+      const conductor = this.createConductor({
+        send: this.send,
+        userId: this.userId,
+        meetingId,
+      });
+      this.conductor = conductor;
+      this.disposer.add(() => {
+        conductor.dispose();
+      });
+    }
+
     // Start the STT relay for this call. Echo mode is the pre-vendor transit
     // diagnostic, so it deliberately bypasses the engine; otherwise a per-call
     // engine session streams transcript/provider_switched/error events straight
@@ -412,7 +443,13 @@ export class LiveSession {
    */
   private readonly onServerEvent = (event: ServerLiveEvent): void => {
     this.send(event);
+    // Feed the copilot conductor the SAME transcript stream (off the relay's hot
+    // path — the conductor's own work is async/aborted, never blocking send).
+    if (event.type === "transcript.partial") {
+      this.conductor?.onPartial(event.text, event.speaker);
+    }
     if (event.type === "transcript.final") {
+      this.conductor?.onFinal(event.text, event.speaker);
       this.persistFinal(event.text, event.speaker, event.ts_ms);
     }
     if (event.type === "provider_switched") {

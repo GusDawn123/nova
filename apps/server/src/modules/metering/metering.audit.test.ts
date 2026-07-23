@@ -142,6 +142,29 @@ describe("modules/metering wiring audit", () => {
     }
   });
 
+  it("[metering-wired] the live copilot router threads the metering seam", () => {
+    // Phase 7: the live-suggestion LLM path is built in metering-wiring.ts
+    // (maybeCreateLiveConductorFactory). The function that constructs its router
+    // must also thread `meterFor` so every streamed suggestion token is metered —
+    // an unmetered live LLM path would silently spend on every trigger.
+    const src = readFileSync(WIRING_TS, "utf8");
+    const blocks = functionBlocks(src);
+    const routerBlocks = [...blocks.entries()].filter(([, body]) =>
+      body.includes("createLlmRouter("),
+    );
+    expect(routerBlocks.length).toBeGreaterThan(0);
+    for (const [name, body] of routerBlocks) {
+      expect(
+        body,
+        `metering-wiring function ${name} builds a router without meterFor`,
+      ).toMatch(/meterFor/);
+    }
+    // The live transport actually consumes the factory.
+    const routes = readFileSync(LIVE_ROUTES_TS, "utf8");
+    expect(routes).toMatch(/maybeCreateLiveConductorFactory/);
+    expect(routes).toMatch(/createConductor/);
+  });
+
   it("[metering-wired] the live STT transport wires the usage + quota seam", () => {
     // Task-3 tightening: the WS transport must hand the session the metering
     // seam (recordSttSeconds/isOverSttQuota) built from the REAL service — an
