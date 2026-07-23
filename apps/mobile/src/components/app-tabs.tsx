@@ -27,6 +27,16 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+
+      {/* Live copilot (Phase 7). Icon reuses explore.png as a placeholder — a
+          dedicated icon is a Phase 8 (mobile UI polish) item. */}
+      <NativeTabs.Trigger name="live">
+        <NativeTabs.Trigger.Label>Live</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/explore.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }
