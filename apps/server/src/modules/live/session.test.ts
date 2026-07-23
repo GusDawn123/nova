@@ -464,33 +464,33 @@ describe("LiveSession meeting-ownership guard (C1)", () => {
   });
 });
 
-describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
-  interface FakeConductor {
-    partials: string[];
-    finals: string[];
-    disposed: number;
-  }
+interface FakeConductor {
+  partials: string[];
+  finals: string[];
+  disposed: number;
+}
 
-  function makeFakeConductor(): {
-    factory: NonNullable<LiveSessionDeps["createConductor"]>;
-    calls: { userId: string; meetingId: string }[];
-    conductor: FakeConductor;
-  } {
-    const conductor: FakeConductor = { partials: [], finals: [], disposed: 0 };
-    const calls: { userId: string; meetingId: string }[] = [];
-    const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
-      calls.push({ userId: args.userId, meetingId: args.meetingId });
-      return {
-        onPartial: (text) => conductor.partials.push(text),
-        onFinal: (text) => conductor.finals.push(text),
-        dispose: () => {
-          conductor.disposed += 1;
-        },
-      };
+function makeFakeConductor(): {
+  factory: NonNullable<LiveSessionDeps["createConductor"]>;
+  calls: { userId: string; meetingId: string }[];
+  conductor: FakeConductor;
+} {
+  const conductor: FakeConductor = { partials: [], finals: [], disposed: 0 };
+  const calls: { userId: string; meetingId: string }[] = [];
+  const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
+    calls.push({ userId: args.userId, meetingId: args.meetingId });
+    return {
+      onPartial: (text) => conductor.partials.push(text),
+      onFinal: (text) => conductor.finals.push(text),
+      dispose: () => {
+        conductor.disposed += 1;
+      },
     };
-    return { factory, calls, conductor };
-  }
+  };
+  return { factory, calls, conductor };
+}
 
+describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
   it("builds the conductor with the owner + meeting and forwards transcript events", () => {
     const fake = makeFakeEngine();
     const c = makeFakeConductor();
@@ -538,6 +538,80 @@ describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
     session.handleTextMessage(startFrame(true));
 
     expect(c.calls).toHaveLength(0);
+  });
+});
+
+describe("LiveSession typed input (transcript.input, Phase 7)", () => {
+  const inputFrame = (text: string): string =>
+    JSON.stringify({ v: 1, type: "transcript.input", text });
+
+  it("refuses typed input before session.start with input_before_start", () => {
+    const { session, sent } = makeSession();
+    session.handleTextMessage(inputFrame("what is your pricing?"));
+    expect(sent[0]).toMatchObject({
+      type: "error",
+      code: "input_before_start",
+    });
+  });
+
+  it("echoes a transcript.final (speaker them) and feeds the conductor", async () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush(); // session.ready lands (no persister → no ownership wait)
+    session.handleTextMessage(inputFrame("what did we quote Acme last time?"));
+
+    const echoed = sent.find((e) => e.type === "transcript.final");
+    expect(echoed).toMatchObject({
+      type: "transcript.final",
+      text: "what did we quote Acme last time?",
+      speaker: "them",
+      is_final: true,
+    });
+    expect(c.conductor.finals).toEqual(["what did we quote Acme last time?"]);
+  });
+
+  it("persists a typed input like any final transcript utterance", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush(); // ownership guard resolves, session.ready lands
+    session.handleTextMessage(inputFrame("typed note about the deal"));
+    await flush();
+
+    expect(persister.saveCalls).toHaveLength(1);
+    expect(persister.saveCalls[0]).toMatchObject({
+      meetingId: MEETING_ID,
+      userId: USER_ID,
+      content: "typed note about the deal",
+      speaker: "them",
+    });
+  });
+
+  it("refuses typed input after teardown (disposed session)", async () => {
+    const fake = makeFakeEngine();
+    const { session, sent } = makeSession({ sttEngine: fake.engine });
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.close();
+    const before = sent.length;
+    session.handleTextMessage(inputFrame("late message"));
+    expect(sent[before]).toMatchObject({
+      type: "error",
+      code: "input_before_start",
+    });
   });
 });
 

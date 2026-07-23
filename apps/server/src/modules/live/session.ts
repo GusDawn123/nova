@@ -122,6 +122,8 @@ export class LiveSession {
   private started = false;
   private sessionId: string | null = null;
   private echo = false;
+  /** Wall-clock ms at `session.ready` — anchors ts_ms for typed-input finals. */
+  private startedAtMs: number | null = null;
   /** The meeting this socket is tied to (from `session.start`); null until start. */
   private meetingId: string | null = null;
   /** The live STT relay handle for this call; null until start (or in echo mode). */
@@ -229,7 +231,41 @@ export class LiveSession {
         // The JSON marker is documentation-only; real audio is binary.
         this.sendError("invalid_event", "audio must be sent as binary frames");
         return;
+      case "transcript.input":
+        this.onTranscriptInput(event.text);
+        return;
     }
+  }
+
+  /**
+   * Typed-input channel (Phase 7, decision 2026-07-22): the user typed what the
+   * other party said (or a question to the copilot). Treated EXACTLY like a
+   * final transcript utterance from "them": routed through the same sink the STT
+   * engine feeds ({@link onServerEvent}), so it is echoed down as a
+   * `transcript.final`, enters the conductor's rolling transcript + trigger
+   * gate, and is persisted — one path, no divergence. Valid only once the
+   * session is fully LIVE (`session.ready` emitted — the start gates passed);
+   * before that it is refused with a typed error. No new vendor call site: any
+   * resulting suggestion rides the conductor's already-metered router path.
+   */
+  private onTranscriptInput(text: string): void {
+    if (this.sessionId === null || this.disposer.disposed) {
+      this.sendError(
+        "input_before_start",
+        "typed input requires an active session (send session.start first)",
+      );
+      return;
+    }
+    const tsMs =
+      this.startedAtMs !== null ? Date.now() - this.startedAtMs : Date.now();
+    this.onServerEvent({
+      v: LIVE_PROTOCOL_VERSION,
+      type: "transcript.final",
+      text,
+      speaker: "them",
+      ts_ms: tsMs,
+      is_final: true,
+    });
   }
 
   private async onSessionStart(
@@ -357,6 +393,7 @@ export class LiveSession {
     }
 
     this.sessionId = this.generateSessionId();
+    this.startedAtMs = Date.now();
     this.send({
       v: LIVE_PROTOCOL_VERSION,
       type: "session.ready",

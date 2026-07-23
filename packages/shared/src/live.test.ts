@@ -42,6 +42,28 @@ describe("clientLiveEventSchema", () => {
     }
   });
 
+  it("accepts transcript.input with non-empty text (Phase 7 typed input)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "transcript.input",
+      text: "what did we quote them last time?",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects transcript.input with empty or oversized text", () => {
+    expect(
+      parseClientEvent({ v: 1, type: "transcript.input", text: "" }).success,
+    ).toBe(false);
+    expect(
+      parseClientEvent({
+        v: 1,
+        type: "transcript.input",
+        text: "x".repeat(2001),
+      }).success,
+    ).toBe(false);
+  });
+
   it("rejects an unknown event type", () => {
     expect(parseClientEvent({ v: 1, type: "nope" }).success).toBe(false);
   });
@@ -88,6 +110,8 @@ describe("serverLiveEventSchema", () => {
     { v: 1, type: "error", code: "quota_exceeded", message: "over quota" },
     { v: 1, type: "error", code: "daily_cap_reached", message: "cap" },
     { v: 1, type: "error", code: "concurrent_session", message: "busy" },
+    // Phase 7 (additive): typed input before session.start.
+    { v: 1, type: "error", code: "input_before_start", message: "no session" },
     { v: 1, type: "pong" },
     { v: 1, type: "audio.echo", bytes: 640 },
   ];

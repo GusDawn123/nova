@@ -20,6 +20,7 @@ export {
   suggestionDoneSchema,
   suggestionStartSchema,
   transcriptFinalSchema,
+  transcriptInputSchema,
   transcriptPartialSchema,
   type ClientLiveEvent,
   type LiveErrorCode,
