@@ -522,12 +522,29 @@ pane (not cards).
   `modules/live/routes.ts` consumes the factory. The static metering audit
   (`metering.audit.test.ts`) gained a case proving the live-router site threads `meterFor` — no
   unmetered live LLM path. Undefined on a keyless boot (transcription still runs, no suggestions).
-- **Mobile** (`apps/mobile`) — `hooks/use-live-session.ts` OWNS the socket (screens dumb): maps
-  wire events onto a FIXED streaming pane + a SEPARATE scrolling transcript; deltas append via a
-  ref buffer flushed once per animation frame; `suggestion.start` replaces in place,
-  `suggestion.discard` clears instantly. `features/live-call/` (CopilotPane, TranscriptList, a
-  mic-less replay fixture) + the `(app)/live` screen + a Live tab. Real mic capture + UI polish
-  are Phase 8/9.
+- **Typed input** (`transcript.input`, decision 2026-07-22 — Gustavo's follow-up after sim
+  testing) — a first-class up-event on the live wire (additive, no v bump): the user types what
+  the other party said, or a question to the copilot. `LiveSession` routes it through the SAME
+  sink the STT engine feeds, so it is echoed down as a `transcript.final` (speaker "them",
+  ts_ms relative to `session.ready`), enters the conductor's rolling transcript + trigger gate
+  (can stream a real suggestion) and persists. Valid only once the session is fully live
+  (`input_before_start` error otherwise); bounded 2000 chars. NO new vendor call site — a
+  resulting suggestion rides the conductor's already-metered router path (covered by the
+  existing live-router audit case). Proven end to end by the key+DB-gated
+  `live.input.e2e.test.ts` (real app + real JWT + real socket + real LLM).
+- **Mobile** (`apps/mobile`) — `hooks/use-live-session.ts` OWNS the socket, the meeting, and all
+  state (screens dumb). PRIMARY path: `start()` creates a meeting via the supabase seam (RLS
+  `meetings_insert_own`) and connects the real authed socket; `sendInput()` drives
+  `transcript.input` and the answer streams back as a real LLM suggestion. The copilot surface
+  is a **scrollable HISTORY** (2026-07-22 evolution of the single replace-in-place pane —
+  DESIGN/live-pipeline.md §Mobile): `suggestion.start` APPENDS an entry, deltas stream into it
+  via a ref buffer flushed once per animation frame, `discard` removes ONLY that entry;
+  auto-scroll pins to bottom unless the user scrolled up. Layout: a COMPACT transcript strip on
+  top, the copilot history owning the majority, the ask-a-question input below.
+  `features/live-call/` (CopilotHistory, TranscriptList, a mic-less replay fixture behind a
+  clearly-labeled secondary button) + the `(app)/live` screen + a Live tab. Real mic capture +
+  UI polish are Phase 8/9; durable copilot-history context + self-profile RAG feeding from this
+  screen are a Phase 8+ design conversation (logged in the design doc).
 - **Exit bars.** LATENCY (`conductor.latency.test.ts`, fake timers + REAL router + mock-LLM
   realistic TTFT): question-moment → first token **p50=800ms / p95=1450ms** (bars <2000 /
   <4000), final→visible **p50=800ms** (<1500), speculation-hit→visible **p50=0ms** (<500). QUIET +
@@ -535,8 +552,11 @@ pane (not cards).
   moments fire the right kind, zero suggestion events on small-talk finals. RELEVANCE + GROUNDING
   are key-gated (RAN 2026-07-22): `live.relevance.test.ts` **9/10** (bar ≥7, OpenAI+Google);
   `live.grounding.test.ts` — the suggestion contained the ingested **$47,500** Acme fact
-  (Voyage+pgvector+DB). Behavior (coalesce/supersede/deadline/meter/dispose) + the session
-  conductor-wiring seam are unit-tested.
+  (Voyage+pgvector+DB). TYPED INPUT E2E (key+DB-gated, RAN 2026-07-22):
+  `live.input.e2e.test.ts` — a typed question over the real authed socket streamed a real
+  answer (deltas=6, answer_len=883, echoed as "them", transcript row persisted, ~1.9s).
+  Behavior (coalesce/supersede/deadline/meter/dispose) + the session conductor-wiring +
+  typed-input seams are unit-tested.
 
 ## Data model
 

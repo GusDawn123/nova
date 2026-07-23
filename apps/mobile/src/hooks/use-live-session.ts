@@ -6,25 +6,31 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { liveSocketUrl } from '@/constants/live';
+import { useAuth } from '@/hooks/use-auth';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Smart hook that OWNS the live-call socket (guardrails: screens dumb, hooks
- * smart). It maps the server wire events 1:1 onto two view surfaces — a fixed
- * single streaming copilot pane and a separate scrolling transcript — and never
- * exposes the socket itself. Screens render the returned state; they never touch
- * `WebSocket` or `@nova/shared` schemas.
+ * smart). It maps the server wire events onto two view surfaces — a compact
+ * scrolling transcript and the COPILOT HISTORY (decision 2026-07-22, Gustavo's
+ * direction after sim testing): a chat-log of suggestions rather than a single
+ * replace-in-place pane, so earlier answers stay readable by scrolling.
  *
- * Streaming-pane contract (design: live-pipeline.md §Mobile):
- *   - suggestion.start   → replace the pane content in place (new focal answer)
- *   - suggestion.delta   → append tokens as they arrive (visible immediately);
- *                          batched to ONE state update per animation frame via a
- *                          ref buffer so a fast token stream can't thrash React
- *   - suggestion.done    → the final, format-upgraded body
- *   - suggestion.discard → clear the pane INSTANTLY (never a zombie card)
+ * History contract (design: live-pipeline.md §Mobile):
+ *   - suggestion.start   → APPEND a new entry (previous entries untouched)
+ *   - suggestion.delta   → stream into the entry with that id (tokens visible
+ *                          immediately; batched to ONE state update per
+ *                          animation frame via a ref buffer)
+ *   - suggestion.done    → finalize that entry's text
+ *   - suggestion.discard → remove ONLY that entry (in-flight speculation miss);
+ *                          previous answers keep
  *
- * Audio capture (mic → binary frames) is Phase 8/9; this minimal build connects
- * for real when given a token+meeting, and supports a `replay` fixture so the
- * pane can be demoed in the simulator without a mic (the same reducer feeds both).
+ * PRIMARY path: `start()` creates a meeting through the existing supabase seam
+ * (RLS `meetings_insert_own`) and connects the REAL authed socket; `sendInput`
+ * then drives `transcript.input` — the typed-question product surface — and the
+ * streamed answer is a real LLM suggestion. `startReplay()` is the clearly
+ * secondary mic-less scripted demo (same reducer, no network, no LLM). Real mic
+ * capture is Phase 8/9.
  */
 
 export type LiveStatus = 'idle' | 'connecting' | 'live' | 'closed' | 'error';
@@ -42,40 +48,52 @@ export interface LiveTranscriptTurn {
   readonly text: string;
 }
 
-export interface LiveSessionState {
-  readonly status: LiveStatus;
-  readonly transcript: readonly LiveTranscriptTurn[];
-  /** The single focal-pane suggestion, or null when the pane is clear. */
-  readonly suggestion: LiveSuggestion | null;
-}
-
-/** One scripted event for the mic-less simulator demo (replayed over time). */
+/** One scripted event for the mic-less demo (replayed over time). */
 export interface LiveReplayStep {
   readonly delayMs: number;
   readonly event: ServerLiveEvent;
 }
 
-export interface UseLiveSessionOptions {
-  /** Supabase access token (real socket). Omit to stay idle or use `replay`. */
-  readonly accessToken?: string;
-  /** The meeting this session is tied to (real socket). */
-  readonly meetingId?: string;
-  /** Dev/demo: replay these events locally instead of opening a socket. */
-  readonly replay?: readonly LiveReplayStep[];
+export interface LiveSessionState {
+  readonly status: LiveStatus;
+  /** Human-readable reason when something went wrong (typed server errors too). */
+  readonly errorMessage: string | null;
+  readonly transcript: readonly LiveTranscriptTurn[];
+  /** The copilot HISTORY, oldest first; the newest entry may be streaming. */
+  readonly suggestions: readonly LiveSuggestion[];
+  /** True when the real socket is live and typed input can be sent. */
+  readonly canSend: boolean;
 }
 
-export function useLiveSession(opts: UseLiveSessionOptions): LiveSessionState {
-  const { accessToken, meetingId, replay } = opts;
+export interface UseLiveSession extends LiveSessionState {
+  /** PRIMARY: create a meeting + connect the real authed socket. */
+  start: () => Promise<void>;
+  /** Send a typed utterance/question (`transcript.input`) up the live socket. */
+  sendInput: (text: string) => void;
+  /** SECONDARY: replay a scripted fixture locally (no network, no LLM). */
+  startReplay: (steps: readonly LiveReplayStep[]) => void;
+  /** End the session (closes the socket / cancels a replay). */
+  stop: () => void;
+}
+
+export function useLiveSession(): UseLiveSession {
+  const auth = useAuth();
 
   const [status, setStatus] = useState<LiveStatus>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<readonly LiveTranscriptTurn[]>([]);
-  const [suggestion, setSuggestion] = useState<LiveSuggestion | null>(null);
+  const [suggestions, setSuggestions] = useState<readonly LiveSuggestion[]>([]);
 
-  // Streaming buffer + one-flush-per-frame scheduler (refs, not state, so token
-  // appends never trigger a render — the rAF flush does, at most once per frame).
+  const socketRef = useRef<WebSocket | null>(null);
+  const replayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const turnSeq = useRef(0);
+
+  // Streaming buffer for the CURRENT in-flight entry + one-flush-per-frame
+  // scheduler (refs, not state, so token appends never trigger a render — the
+  // rAF flush does, at most once per frame).
+  const streamIdRef = useRef<string | null>(null);
   const bufferRef = useRef('');
   const frameRef = useRef<number | null>(null);
-  const turnSeq = useRef(0);
 
   const cancelFrame = useCallback((): void => {
     if (frameRef.current !== null) {
@@ -88,8 +106,12 @@ export function useLiveSession(opts: UseLiveSessionOptions): LiveSessionState {
     if (frameRef.current !== null) return;
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null;
+      const id = streamIdRef.current;
       const text = bufferRef.current;
-      setSuggestion((prev) => (prev ? { ...prev, text } : prev));
+      if (id === null) return;
+      setSuggestions((prev) =>
+        prev.map((s) => (s.id === id && s.streaming ? { ...s, text } : s)),
+      );
     });
   }, []);
 
@@ -111,37 +133,57 @@ export function useLiveSession(opts: UseLiveSessionOptions): LiveSessionState {
           ]);
           return;
         case 'suggestion.start':
+          // APPEND a new history entry — never erase the previous answers.
           cancelFrame();
+          streamIdRef.current = event.suggestion_id;
           bufferRef.current = '';
-          setSuggestion({
-            id: event.suggestion_id,
-            kind: event.kind,
-            text: '',
-            streaming: true,
-          });
+          setSuggestions((prev) => [
+            ...prev,
+            {
+              id: event.suggestion_id,
+              kind: event.kind,
+              text: '',
+              streaming: true,
+            },
+          ]);
           return;
         case 'suggestion.delta':
-          bufferRef.current += event.text;
-          scheduleFlush();
+          if (streamIdRef.current === event.suggestion_id) {
+            bufferRef.current += event.text;
+            scheduleFlush();
+          }
           return;
         case 'suggestion.done':
           cancelFrame();
-          bufferRef.current = event.text;
-          setSuggestion((prev) =>
-            prev && prev.id === event.suggestion_id
-              ? { ...prev, text: event.text, streaming: false }
-              : prev,
+          if (streamIdRef.current === event.suggestion_id) {
+            streamIdRef.current = null;
+            bufferRef.current = '';
+          }
+          setSuggestions((prev) =>
+            prev.map((s) =>
+              s.id === event.suggestion_id
+                ? { ...s, text: event.text, streaming: false }
+                : s,
+            ),
           );
           return;
         case 'suggestion.discard':
+          // Remove ONLY the discarded entry; previous answers stay readable.
           cancelFrame();
-          bufferRef.current = '';
-          setSuggestion((prev) =>
-            prev && prev.id === event.suggestion_id ? null : prev,
+          if (streamIdRef.current === event.suggestion_id) {
+            streamIdRef.current = null;
+            bufferRef.current = '';
+          }
+          setSuggestions((prev) =>
+            prev.filter((s) => s.id !== event.suggestion_id),
           );
           return;
-        // transcript.partial / provider_switched / error / pong / audio.echo:
-        // not surfaced by the minimal pane (Phase 8 adds interim + status chips).
+        case 'error':
+          // Surface typed server errors (quota/paywall SCREENS ride Phase 8).
+          setErrorMessage(`${event.code}: ${event.message}`);
+          return;
+        // transcript.partial / provider_switched / pong / audio.echo: not
+        // surfaced by this minimal build (Phase 8 adds interims + status chips).
         default:
           return;
       }
@@ -149,39 +191,63 @@ export function useLiveSession(opts: UseLiveSessionOptions): LiveSessionState {
     [cancelFrame, scheduleFlush],
   );
 
-  // Reset the view surfaces when a new session begins. Deferred to a macrotask so
-  // it is not a synchronous setState in the effect body (React 19 cascade rule);
-  // the tiny defer is invisible next to network/replay timing.
-  const resetSurfaces = useCallback((): ReturnType<typeof setTimeout> => {
-    return setTimeout(() => {
-      setStatus('connecting');
-      setTranscript([]);
-      setSuggestion(null);
-    }, 0);
-  }, []);
+  const reset = useCallback((): void => {
+    cancelFrame();
+    streamIdRef.current = null;
+    bufferRef.current = '';
+    setErrorMessage(null);
+    setTranscript([]);
+    setSuggestions([]);
+  }, [cancelFrame]);
 
-  // Replay mode: schedule the fixture events, no socket. Used for the sim demo.
-  useEffect(() => {
-    if (!replay) return;
-    const timers: ReturnType<typeof setTimeout>[] = [resetSurfaces()];
-    let elapsed = 0;
-    for (const step of replay) {
-      elapsed += step.delayMs;
-      timers.push(setTimeout(() => applyEvent(step.event), elapsed));
+  const stop = useCallback((): void => {
+    for (const t of replayTimersRef.current) clearTimeout(t);
+    replayTimersRef.current = [];
+    const socket = socketRef.current;
+    socketRef.current = null;
+    if (socket) {
+      try {
+        socket.send(
+          JSON.stringify({ v: LIVE_PROTOCOL_VERSION, type: 'session.end' }),
+        );
+      } catch {
+        // already closed — the server disposer runs on socket close either way
+      }
+      socket.close();
     }
-    timers.push(setTimeout(() => setStatus('closed'), elapsed + 50));
-    return () => {
-      cancelFrame();
-      for (const t of timers) clearTimeout(t);
-    };
-  }, [replay, applyEvent, cancelFrame, resetSurfaces]);
+    cancelFrame();
+    setStatus('closed');
+  }, [cancelFrame]);
 
-  // Real socket mode.
-  useEffect(() => {
-    if (replay || accessToken === undefined || meetingId === undefined) return;
-    const initTimer = resetSurfaces();
-    const socket = new WebSocket(liveSocketUrl(accessToken));
+  /** PRIMARY: create a meeting via the supabase seam, connect the real socket. */
+  const start = useCallback(async (): Promise<void> => {
+    if (auth.status !== 'signed-in' || supabase === null) {
+      setStatus('error');
+      setErrorMessage('sign in required for a live session');
+      return;
+    }
+    stop();
+    reset();
+    setStatus('connecting');
 
+    // A meeting row to tie the session to (RLS `meetings_insert_own` — the
+    // authenticated user inserts their own row through the existing seam; the
+    // server's ownership guard then accepts the session.start).
+    const title = `Live session ${new Date().toLocaleString()}`;
+    const inserted = await supabase
+      .from('meetings')
+      .insert({ user_id: auth.session.user.id, title })
+      .select('id')
+      .single<{ id: string }>();
+    if (inserted.error) {
+      setStatus('error');
+      setErrorMessage(`could not create a meeting: ${inserted.error.message}`);
+      return;
+    }
+    const meetingId = inserted.data.id;
+
+    const socket = new WebSocket(liveSocketUrl(auth.session.access_token));
+    socketRef.current = socket;
     socket.onopen = (): void => {
       socket.send(
         JSON.stringify({
@@ -196,20 +262,84 @@ export function useLiveSession(opts: UseLiveSessionOptions): LiveSessionState {
       try {
         json = JSON.parse(String(message.data));
       } catch {
-        return; // non-JSON (binary echo etc.) — ignore in the minimal client
+        return; // non-JSON — ignore in the minimal client
       }
       const parsed = serverLiveEventSchema.safeParse(json);
       if (parsed.success) applyEvent(parsed.data);
     };
-    socket.onerror = (): void => setStatus('error');
-    socket.onclose = (): void => setStatus('closed');
-
-    return () => {
-      clearTimeout(initTimer);
-      cancelFrame();
-      socket.close();
+    socket.onerror = (): void => {
+      if (socketRef.current === socket) {
+        setStatus('error');
+        setErrorMessage('connection error — is the server running?');
+      }
     };
-  }, [accessToken, meetingId, replay, applyEvent, cancelFrame, resetSurfaces]);
+    socket.onclose = (): void => {
+      if (socketRef.current === socket) {
+        socketRef.current = null;
+        setStatus('closed');
+      }
+    };
+  }, [auth, stop, reset, applyEvent]);
 
-  return { status, transcript, suggestion };
+  const sendInput = useCallback((text: string): void => {
+    const trimmed = text.trim();
+    const socket = socketRef.current;
+    if (
+      trimmed === '' ||
+      socket === null ||
+      socket.readyState !== WebSocket.OPEN
+    ) {
+      return;
+    }
+    socket.send(
+      JSON.stringify({
+        v: LIVE_PROTOCOL_VERSION,
+        type: 'transcript.input',
+        text: trimmed.slice(0, 2000),
+      }),
+    );
+  }, []);
+
+  /** SECONDARY: the mic-less scripted demo — same reducer, no network. */
+  const startReplay = useCallback(
+    (steps: readonly LiveReplayStep[]): void => {
+      stop();
+      reset();
+      setStatus('connecting');
+      let elapsed = 0;
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      for (const step of steps) {
+        elapsed += step.delayMs;
+        timers.push(setTimeout(() => applyEvent(step.event), elapsed));
+      }
+      timers.push(setTimeout(() => setStatus('closed'), elapsed + 50));
+      replayTimersRef.current = timers;
+    },
+    [stop, reset, applyEvent],
+  );
+
+  // Teardown on unmount: close the socket / cancel timers exactly once.
+  useEffect(() => {
+    return () => {
+      for (const t of replayTimersRef.current) clearTimeout(t);
+      cancelFrame();
+      socketRef.current?.close();
+      socketRef.current = null;
+    };
+  }, [cancelFrame]);
+
+  return {
+    status,
+    errorMessage,
+    transcript,
+    suggestions,
+    // 'live' is only ever set by session.ready on the REAL socket (the replay
+    // fixture's session.ready flips it too, but sendInput no-ops without an
+    // OPEN socket), so status alone is the render-safe signal.
+    canSend: status === 'live',
+    start,
+    sendInput,
+    startReplay,
+    stop,
+  };
 }

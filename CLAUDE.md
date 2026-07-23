@@ -49,13 +49,22 @@ adopt-or-discard reconcile (never a zombie), streaming suggestion.start/delta/do
 ~50ms/batch, deadline-ladder active abort, RAG grounding raced against a deadline (shrink, never
 delay), threading `metering.meterFor`. Wired into `LiveSession` (a `createConductor` factory built
 by `metering-wiring.ts::maybeCreateLiveConductorFactory`, consumed in `modules/live/routes.ts`);
-the static metering audit gained a live-router case (no unmetered live LLM path). Mobile: minimal
-`use-live-session` hook (owns the socket, ref-buffer flush once/frame, fixed pane + separate
-scrolling transcript) + `features/live-call/` + a Live tab; real mic capture is Phase 8/9 (this
-build has a mic-less replay demo). GATES (2026-07-22): latency question→first-token p50=800ms
-p95=1450ms (<2000/<4000), speculation-hit p50=0ms (<500), final→visible p50=800ms (<1500);
-relevance 9/10 (bar ≥7, OpenAI+Google); grounding contains the stored `$47,500` fact (Voyage+DB);
-quiet 11/11 small-talk silent. Live gates are key-gated (skipIf) — keyless CI self-skips.**
+the static metering audit gained a live-router case (no unmetered live LLM path). NEW (Gustavo's
+2026-07-22 follow-up): the `transcript.input` typed-utterance wire event (additive) — the server
+treats typed text exactly like a final "them" STT utterance (echo down + conductor + persistence;
+`input_before_start` before ready; no new vendor site — rides the metered conductor path). Mobile:
+`use-live-session` owns socket+meeting+state — PRIMARY path `start()` creates a meeting via the
+supabase seam and connects the REAL authed socket, `sendInput()` asks typed questions and gets
+REAL streamed answers; the copilot surface is a scrollable HISTORY (start APPENDS an entry,
+deltas stream into it once/frame, discard removes only that entry, auto-scroll pinned unless the
+user scrolled up), compact transcript strip on top, scripted replay demoted to a labeled
+secondary button. Real mic capture is Phase 8/9; durable copilot-history context = Phase 8+
+design item (see DESIGN/live-pipeline.md §Mobile). GATES (2026-07-22): latency
+question→first-token p50=800ms p95=1450ms (<2000/<4000), speculation-hit p50=0ms (<500),
+final→visible p50=800ms (<1500); relevance 9/10 (bar ≥7, OpenAI+Google); grounding contains the
+stored `$47,500` fact (Voyage+DB); quiet 11/11 small-talk silent; typed-input E2E over the real
+socket+LLM: deltas=6, answer_len=883, echoed as "them", persisted (~1.9s). Live gates are
+key-gated (skipIf) — keyless CI self-skips.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

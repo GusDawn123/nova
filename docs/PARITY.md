@@ -28,7 +28,7 @@
 | 9 | Stays quiet during small talk (no spam) | 7 | quiet test (zero cards in no-op windows) | ✅ |
 | 10 | Rolling live transcript view in-app | 7 + 8 | live-call screen loop checklist | 🔨 † |
 | 11 | LLM provider fallback racing (slow/dead vendor invisible) | 2 | race/commit/breaker/classify test suite | ✅ ‡ |
-| 12 | Ask-AI free-form question mid-session | 7 (opt) | manual E2E step | ⬜ |
+| 12 | Ask-AI free-form question mid-session | 7 (opt) | typed-input E2E (`live.input.e2e.test.ts`) | ✅ |
 
 > **Row 11 — Phase 2 (branch `dev-claude-llm`, commits `c172b74..645e32f`, merged via PR #3):**
 > Failover router shipped under `apps/server/src/modules/llm/`. `router.ts` (`createLlmRouter`)
@@ -77,11 +77,18 @@
 >   utterances stay silent** while **8 labeled trigger moments fire the right kind**;
 >   `conductor.test.ts` `[conductor] stays silent on small-talk finals` proves ZERO suggestion
 >   events end-to-end.
-> - **10 (rolling transcript view)** — 🔨 the mobile hook renders a separate scrolling transcript
->   beside the fixed pane; **† the on-device screen loop is Phase 8** (this build is a mic-less
->   replay demo — real mic capture rides Phase 8/9).
-> - **12 (Ask-AI free-form)** — ⬜ not built (optional; the conductor answers detected questions,
->   a free-form ask box is a later affordance).
+> - **10 (rolling transcript view)** — 🔨 the mobile hook renders a compact scrolling transcript
+>   strip above the copilot history (layout per Gustavo's 2026-07-22 direction); **† the
+>   on-device screen loop is Phase 8** (real mic capture rides Phase 8/9 — today the transcript
+>   fills from typed input + the scripted replay).
+> - **12 (Ask-AI free-form mid-session)** — ✅ the `transcript.input` typed-utterance channel
+>   (decision 2026-07-22): the live screen's "ask a question" box sends a first-class wire event
+>   the server treats as a final "them" utterance — trigger gate → conductor → REAL streamed
+>   suggestion, persisted like any transcript row, riding the already-metered live router path.
+>   Proven END TO END (not just manually) by the key+DB-gated `live.input.e2e.test.ts`: real app,
+>   real Supabase JWT, real socket, real LLM — typed Kubernetes question → deltas=6,
+>   answer_len=883, echoed as speaker "them", transcript row persisted (~1.9s). Caveat: input
+>   rides the trigger gate, so a non-question statement may correctly stay quiet.
 
 ## Post-call notes (the hero)
 
