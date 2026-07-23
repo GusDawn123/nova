@@ -25,12 +25,12 @@ import { supabase } from '@/lib/supabase';
  *   - suggestion.discard → remove ONLY that entry (in-flight speculation miss);
  *                          previous answers keep
  *
- * PRIMARY path: `start()` creates a meeting through the existing supabase seam
- * (RLS `meetings_insert_own`) and connects the REAL authed socket; `sendInput`
+ * `start()` creates a meeting through the existing supabase seam (RLS
+ * `meetings_insert_own`) and connects the REAL authed socket; `sendInput`
  * then drives `transcript.input` — the typed-question product surface — and the
- * streamed answer is a real LLM suggestion. `startReplay()` is the clearly
- * secondary mic-less scripted demo (same reducer, no network, no LLM). Real mic
- * capture is Phase 8/9.
+ * streamed answer is a real LLM suggestion. There is NO canned/replay path
+ * (removed 2026-07-23 at Gustavo's direction — every suggestion on this screen
+ * is a real one). Real mic capture is Phase 8/9.
  */
 
 export type LiveStatus = 'idle' | 'connecting' | 'live' | 'closed' | 'error';
@@ -48,12 +48,6 @@ export interface LiveTranscriptTurn {
   readonly text: string;
 }
 
-/** One scripted event for the mic-less demo (replayed over time). */
-export interface LiveReplayStep {
-  readonly delayMs: number;
-  readonly event: ServerLiveEvent;
-}
-
 export interface LiveSessionState {
   readonly status: LiveStatus;
   /** Human-readable reason when something went wrong (typed server errors too). */
@@ -66,13 +60,11 @@ export interface LiveSessionState {
 }
 
 export interface UseLiveSession extends LiveSessionState {
-  /** PRIMARY: create a meeting + connect the real authed socket. */
+  /** Create a meeting + connect the real authed socket. */
   start: () => Promise<void>;
   /** Send a typed utterance/question (`transcript.input`) up the live socket. */
   sendInput: (text: string) => void;
-  /** SECONDARY: replay a scripted fixture locally (no network, no LLM). */
-  startReplay: (steps: readonly LiveReplayStep[]) => void;
-  /** End the session (closes the socket / cancels a replay). */
+  /** End the session (closes the socket). */
   stop: () => void;
 }
 
@@ -85,7 +77,6 @@ export function useLiveSession(): UseLiveSession {
   const [suggestions, setSuggestions] = useState<readonly LiveSuggestion[]>([]);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const replayTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const turnSeq = useRef(0);
 
   // Streaming buffer for the CURRENT in-flight entry + one-flush-per-frame
@@ -201,8 +192,6 @@ export function useLiveSession(): UseLiveSession {
   }, [cancelFrame]);
 
   const stop = useCallback((): void => {
-    for (const t of replayTimersRef.current) clearTimeout(t);
-    replayTimersRef.current = [];
     const socket = socketRef.current;
     socketRef.current = null;
     if (socket) {
@@ -219,7 +208,7 @@ export function useLiveSession(): UseLiveSession {
     setStatus('closed');
   }, [cancelFrame]);
 
-  /** PRIMARY: create a meeting via the supabase seam, connect the real socket. */
+  /** Create a meeting via the supabase seam, connect the real socket. */
   const start = useCallback(async (): Promise<void> => {
     if (auth.status !== 'signed-in' || supabase === null) {
       setStatus('error');
@@ -300,28 +289,9 @@ export function useLiveSession(): UseLiveSession {
     );
   }, []);
 
-  /** SECONDARY: the mic-less scripted demo — same reducer, no network. */
-  const startReplay = useCallback(
-    (steps: readonly LiveReplayStep[]): void => {
-      stop();
-      reset();
-      setStatus('connecting');
-      let elapsed = 0;
-      const timers: ReturnType<typeof setTimeout>[] = [];
-      for (const step of steps) {
-        elapsed += step.delayMs;
-        timers.push(setTimeout(() => applyEvent(step.event), elapsed));
-      }
-      timers.push(setTimeout(() => setStatus('closed'), elapsed + 50));
-      replayTimersRef.current = timers;
-    },
-    [stop, reset, applyEvent],
-  );
-
-  // Teardown on unmount: close the socket / cancel timers exactly once.
+  // Teardown on unmount: close the socket / cancel the frame exactly once.
   useEffect(() => {
     return () => {
-      for (const t of replayTimersRef.current) clearTimeout(t);
       cancelFrame();
       socketRef.current?.close();
       socketRef.current = null;
@@ -333,13 +303,10 @@ export function useLiveSession(): UseLiveSession {
     errorMessage,
     transcript,
     suggestions,
-    // 'live' is only ever set by session.ready on the REAL socket (the replay
-    // fixture's session.ready flips it too, but sendInput no-ops without an
-    // OPEN socket), so status alone is the render-safe signal.
+    // 'live' is only ever set by session.ready on the real socket.
     canSend: status === 'live',
     start,
     sendInput,
-    startReplay,
     stop,
   };
 }

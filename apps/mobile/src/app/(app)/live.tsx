@@ -14,7 +14,6 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
-import { LIVE_DEMO_FIXTURE } from '@/features/live-call/demo-fixture';
 import { TranscriptList } from '@/features/live-call/transcript-list';
 import { useLiveSession } from '@/hooks/use-live-session';
 
@@ -24,11 +23,10 @@ import { useLiveSession } from '@/hooks/use-live-session';
  * majority below, and a typed-question input at the bottom. Dumb: the
  * `useLiveSession` hook owns the socket, the meeting, and all state.
  *
- * PRIMARY path: "Start session" creates a meeting + connects the real authed
- * socket; typing a question sends `transcript.input` and the answer streams
- * back as a REAL LLM suggestion. The scripted replay survives only as a
- * clearly-labeled secondary affordance so the pane mechanics stay testable
- * offline. Real mic capture is Phase 8/9.
+ * "Start session" creates a meeting + connects the real authed socket; typing
+ * a question sends `transcript.input` and the answer streams back as a REAL
+ * LLM suggestion. Every suggestion on this screen is real — the canned replay
+ * was removed 2026-07-23 at Gustavo's direction. Real mic capture is Phase 8/9.
  */
 export default function LiveScreen() {
   const scheme = useColorScheme();
@@ -126,15 +124,6 @@ export default function LiveScreen() {
                 </ThemedView>
               </Pressable>
             )}
-            <Pressable
-              testID="live-demo-button"
-              accessibilityRole="button"
-              onPress={() => live.startReplay(LIVE_DEMO_FIXTURE)}
-              style={({ pressed }) => pressed && styles.pressed}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Replay scripted demo (offline, canned)
-              </ThemedText>
-            </Pressable>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
