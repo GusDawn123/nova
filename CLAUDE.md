@@ -35,6 +35,27 @@ ANTHROPIC IS DISABLED (2026-07-22 cost decision): the adapter/config/smoke code 
 price book still prices claude-haiku-4-5, but the key is commented out in `apps/server/.env` —
 the factory builds no anthropic provider and its live smoke self-skips. Re-enable = uncomment
 the key. Working LLM set: OpenAI + Google (groq unkeyed).**
+**Phase 7 live copilot loop is built on `dev-claude-live-copilot` (branched off `development`
+after Phase 6). NEW: the llm `latencyTier: "live"` cheapest-first cascade (`liveOrder`
+google→groq→openai→anthropic + `liveLlmConfig()` tight TTFT/stall — reasoning stays OFF at the
+adapter layer); `modules/prompt` — one pure `assemble(mode, context) → { stablePrefix,
+dynamicSuffix }` over Gustavo's VERBATIM system prompt (extracted byte-for-byte from
+`docs/prompts/nova-prompts-source.md` by `scripts/gen-live-prompt.mjs` into
+`content/system-prompt.ts`; byte-stable prefix snapshot-pinned; dynamicSuffix = hard-guarded user
+context + RAG snippets under a token budget + windowed transcript LAST); `modules/live` conductor
+(`conductor.ts` + pure `trigger.ts`/`speculation.ts`) — rolling transcript, tiered trigger gate
+OFF the LLM hot path (quiet in small talk), speculation on confident partials with jaccard
+adopt-or-discard reconcile (never a zombie), streaming suggestion.start/delta/done coalesced
+~50ms/batch, deadline-ladder active abort, RAG grounding raced against a deadline (shrink, never
+delay), threading `metering.meterFor`. Wired into `LiveSession` (a `createConductor` factory built
+by `metering-wiring.ts::maybeCreateLiveConductorFactory`, consumed in `modules/live/routes.ts`);
+the static metering audit gained a live-router case (no unmetered live LLM path). Mobile: minimal
+`use-live-session` hook (owns the socket, ref-buffer flush once/frame, fixed pane + separate
+scrolling transcript) + `features/live-call/` + a Live tab; real mic capture is Phase 8/9 (this
+build has a mic-less replay demo). GATES (2026-07-22): latency question→first-token p50=800ms
+p95=1450ms (<2000/<4000), speculation-hit p50=0ms (<500), final→visible p50=800ms (<1500);
+relevance 9/10 (bar ≥7, OpenAI+Google); grounding contains the stored `$47,500` fact (Voyage+DB);
+quiet 11/11 small-talk silent. Live gates are key-gated (skipIf) — keyless CI self-skips.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

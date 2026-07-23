@@ -50,6 +50,27 @@ consumes it. This ADR records the routing/latency decisions made during and afte
 8. **`req.model` is a metering label**, not forwarded to vendors — each adapter owns
    its model ID. Prevents cross-vendor model-name confusion. (Phase 2 ruling.)
 
+## Implementation status (Phase 7, `dev-claude-live-copilot`)
+
+- **Live tier — SHIPPED.** `chatRequest.latencyTier: "live" | "deliberate"` (ports.ts);
+  the router selects the cheapest-first `liveOrder`
+  (google→groq→openai→anthropic) for a live request unless `providerOrder` overrides
+  (config.ts, router.ts). `liveLlmConfig()` carries the tight TTFT (1500ms) / stall
+  (8000ms) budgets. Decision 4's "reasoning OFF" is satisfied at the ADAPTER layer
+  (Gemini `thinkingBudget:0`; the OpenAI mini / Groq 8b models have none), so there is
+  no per-call reasoning toggle — a deliberate simplification (revisit only if a live
+  cascade model gains default reasoning). Order selection pinned by `router.tier.test.ts`.
+- **Monolithic cached prefix (decision 6) — SHIPPED** as `modules/prompt`: the byte-stable
+  `stablePrefix` (sha256-pinned by `assemble.snapshot.test.ts`) + the small uncached
+  `dynamicSuffix` (windowed transcript + hard-budgeted RAG snippets + hard-guarded user
+  context). Answer-type selection is NOT split out (decision 6 keeps it in the cached
+  prefix until measured spend says otherwise).
+- **Deterministic post-passes (decision 7) — DEFERRED on the live path.** The conductor
+  streams tokens raw; cosmetic format rules ride on the prompt directives (the prompt's
+  "NO headers" etc.), accepting occasional misses over live buffering/flicker — exactly
+  decision 7's posture. Incremental-safe header-strip / `$`-escape passes remain a future
+  add if live output quality demands them.
+
 ## Known gaps (logged Phase 3+ openers)
 - Post-commit failures don't feed the circuit breaker (one-token-then-die vendor
   wins every race). Top priority before real traffic.

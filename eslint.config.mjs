@@ -1,5 +1,6 @@
 import js from "@eslint/js";
 import prettier from "eslint-config-prettier";
+import globals from "globals";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
@@ -26,11 +27,15 @@ export default tseslint.config(
       },
     },
   },
-  // Plain-JS config files (e.g. eslint.config.mjs) aren't part of any typecheck
-  // project — drop the type-aware rules for them.
+  // Plain-JS config files (e.g. eslint.config.mjs) and Node scripts (e.g.
+  // scripts/gen-live-prompt.mjs) aren't part of any typecheck project — drop the
+  // type-aware rules and give them the Node runtime globals (console, Buffer, …).
   {
     files: ["**/*.{js,cjs,mjs}"],
     extends: [tseslint.configs.disableTypeChecked],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
   prettier,
 );
