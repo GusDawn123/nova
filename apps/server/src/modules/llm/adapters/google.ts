@@ -16,9 +16,12 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  */
 
 /** A cheap/fast current model — see docs before changing (do not guess IDs).
- * gemini-2.0-flash was retired (404 "no longer available", mid-2026); gemini-2.5-flash
- * is its GA flash-class successor per the @google/genai model list. */
-const DEFAULT_MODEL = "gemini-2.5-flash";
+ * Lineage: gemini-2.0-flash (retired mid-2026, 404 "no longer available") →
+ * gemini-2.5-flash (its GA flash successor) → gemini-3.5-flash-lite (2026-07-23
+ * refresh; $0.30/$2.50 per 1M verified — the price book moves in lockstep,
+ * adr-0004 addendum). The lite model REJECTS thinkingConfig (probed: 400), so
+ * the knob is OMITTED below — lite is non-thinking by default. */
+const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 
 export interface GoogleProviderOptions {
@@ -60,9 +63,7 @@ export function toGoogleContents(
   return result;
 }
 
-export function createGoogleProvider(
-  opts: GoogleProviderOptions,
-): LlmProvider {
+export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
   const client = new GoogleGenAI({ apiKey: opts.apiKey });
   const model = opts.model ?? DEFAULT_MODEL;
   const maxTokens = opts.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
@@ -79,11 +80,15 @@ export function createGoogleProvider(
       try {
         const config: GenerateContentConfig = {
           maxOutputTokens: maxTokens,
-          // Disable Gemini 2.5's default dynamic "thinking": a live call copilot
-          // wants low latency, and thinking tokens count against maxOutputTokens
-          // (a small cap can be consumed entirely by thinking, yielding zero text
-          // — the router then sees no first token and fails the provider).
-          thinkingConfig: { thinkingBudget: 0 },
+          // Reasoning/thinking OFF (adr-0004 §4). PROBED 2026-07-23:
+          // gemini-3.5-flash-lite REJECTS a thinkingConfig (400
+          // INVALID_ARGUMENT for both thinkingBudget: 0 and thinkingLevel) —
+          // the LITE lineage is non-thinking BY DEFAULT (thinking is opt-in),
+          // so OMITTING the knob IS the off state. The 2.5-flash era needed
+          // `thinkingConfig: { thinkingBudget: 0 }` here; restore it (or make
+          // it model-conditional) if the default model ever moves back to a
+          // thinking-by-default variant.
+          //
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,

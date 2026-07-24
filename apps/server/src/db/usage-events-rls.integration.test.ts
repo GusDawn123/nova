@@ -185,7 +185,10 @@ describe.skipIf(!hasStack)("usage_events RLS posture (local stack)", () => {
     const meeting = unwrap(
       await userA.client
         .from("meetings")
-        .insert({ user_id: userA.id, title: "A meeting for usage posture test" })
+        .insert({
+          user_id: userA.id,
+          title: "A meeting for usage posture test",
+        })
         .select()
         .single(),
       "A insert meeting",
@@ -204,7 +207,7 @@ describe.skipIf(!hasStack)("usage_events RLS posture (local stack)", () => {
           amount: 1500,
           input_amount: 1000,
           output_amount: 500,
-          model: "gpt-4o-mini",
+          model: "gpt-5.4-mini",
           cost_estimate_usd: 0.00045,
         })
         .select()

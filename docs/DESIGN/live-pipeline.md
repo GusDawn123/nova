@@ -71,7 +71,13 @@ mic (16kHz PCM, 40–80ms frames)
 
 ## Wire protocol (packages/shared, Phase 3 starts it)
 Zod discriminated union, versioned:
-- up: `audio.frame` (16kHz PCM, 40–80ms), `session.start/end`, `ping`
+- up: `audio.frame` (16kHz PCM, 40–80ms), `session.start/end`, `ping`, and
+  `transcript.input` `{ text }` (Phase 7, decision 2026-07-22) — a TYPED
+  utterance/question, first-class product surface: the server treats it exactly
+  like a final STT utterance from "them" (echoed down as `transcript.final`,
+  enters the rolling transcript + trigger gate + persistence; can stream a real
+  suggestion). Valid only after `session.start` (typed `input_before_start`
+  error otherwise); bounded 2000 chars.
 - down: `transcript.partial`, `transcript.final`, `suggestion.start/delta/done/discard`,
   `provider_switched`, `error`, `pong`
 - Server **coalesces tokens ~50ms/batch** (radio wakeups cost battery; per-token
@@ -81,9 +87,33 @@ Zod discriminated union, versioned:
 
 ## Mobile (Phase 7/8)
 - `use-live-session` hook owns the socket; screens stay dumb (RULES §10).
+- **Scrollable copilot HISTORY in a fixed focal region** (decision 2026-07-22,
+  Gustavo's direction after sim testing — evolves the earlier single
+  replace-in-place pane, which wiped an answer before it could be read): the
+  copilot is still ONE fixed region — the overlay mental model, one place to
+  glance under stress — but inside it suggestions accumulate as a chat-log
+  history. Behavior maps onto wire events:
+  - `suggestion.start` → APPEND a new entry (previous answers stay readable)
+  - `suggestion.delta` → stream into that entry as tokens arrive (first tokens
+    visible immediately; never buffer until `done`)
+  - `suggestion.done` → finalize the entry's text
+  - `suggestion.discard` → remove ONLY the discarded (in-flight) entry —
+    no zombie text, and earlier answers keep
+  - auto-scroll pins to the bottom while streaming UNLESS the user has scrolled
+    up to read an earlier answer (never yank them back down)
+  - the transcript is a COMPACT scrolling strip above the copilot region — the
+    copilot history owns the majority of the screen
+- **Typed input** (`transcript.input`): an "ask a question" box on the live
+  screen drives the same conductor path as speech — typed questions get real
+  streamed suggestions mid-call.
 - **Frame-cadence rendering**: deltas append to a ref buffer; one throttled flush
   per frame; plain text while streaming; single format upgrade on `done`.
-- One `SuggestionCard` component, variants by `kind`.
+- Cards survive only as an optional secondary affordance for discrete suggested
+  replies (Phase 8+, by `kind`); they are not the default copilot surface.
+- **Phase 8+ (out of scope here, logged 2026-07-22):** persisting the copilot
+  history as durable per-call context, and feeding self-profile info into RAG
+  from this screen (the conductor already injects RAG server-side) — the durable
+  context-window feature is a separate design conversation.
 
 ## Latency is a tested contract
 Budgets live in config and are enforced by fake-timer tests like the Phase 2 router
@@ -91,4 +121,12 @@ suite, plus stage-timing benchmarks that print p50/p95:
 - final utterance → suggestion visible: **p50 < 1.5s**
 - speculation hit → visible: **p50 < 500ms**
 - playbook Phase 7 gate: question moment → first token p50 < 2s, p95 < 4s.
+- client render budget (Phase 8): `suggestion.delta` received → pixels updated
+  within **one frame (~16ms)** — the ref-buffer flush, made a tested number so
+  rendering can't silently eat the server-side budgets.
+
+"Visible" always means **first token**, not full response. Sub-second feel on the
+happy path comes from the speculation manager (fires on a confident partial, before
+the utterance ends); the 1.5s budget is the no-speculation fallback. The metric to
+maximize is therefore **speculation hit rate**, tracked alongside the latency bars.
 Speed is provable, not promised.

@@ -23,12 +23,12 @@
 
 | # | Capability | Nova phase | Verified by | Status |
 |---|---|---|---|---|
-| 7 | Real-time suggestion cards (what to say / answer) | 7 | latency p50<2s + relevance ≥7/10 | ⬜ |
-| 8 | Suggestions grounded in user's own context (RAG) | 7 | grounding test | ⬜ |
-| 9 | Stays quiet during small talk (no spam) | 7 | quiet test (zero cards in no-op windows) | ⬜ |
-| 10 | Rolling live transcript view in-app | 7 + 8 | live-call screen loop checklist | ⬜ |
+| 7 | Real-time suggestion cards (what to say / answer) | 7 | latency p50<2s + relevance ≥7/10 | ✅ |
+| 8 | Suggestions grounded in user's own context (RAG) | 7 | grounding test | ✅ |
+| 9 | Stays quiet during small talk (no spam) | 7 | quiet test (zero cards in no-op windows) | ✅ |
+| 10 | Rolling live transcript view in-app | 7 + 8 | live-call screen loop checklist | 🔨 † |
 | 11 | LLM provider fallback racing (slow/dead vendor invisible) | 2 | race/commit/breaker/classify test suite | ✅ ‡ |
-| 12 | Ask-AI free-form question mid-session | 7 (opt) | manual E2E step | ⬜ |
+| 12 | Ask-AI free-form question mid-session | 7 (opt) | typed-input E2E (`live.input.e2e.test.ts`) | ✅ |
 
 > **Row 11 — Phase 2 (branch `dev-claude-llm`, commits `c172b74..645e32f`, merged via PR #3):**
 > Failover router shipped under `apps/server/src/modules/llm/`. `router.ts` (`createLlmRouter`)
@@ -51,7 +51,49 @@
 > through the router but self-skips without a vendor key (CI has none, so all 4 cases skip); the
 > phase's live-smoke-on-≥2-providers gate is a Gustavo action item (default models
 > `claude-haiku-4-5` / `gpt-4o-mini` / `gemini-2.5-flash` / `llama-3.1-8b-instant` unverified
-> until then).
+> until then). **Model refresh 2026-07-23 (adr-0004 addendum):** current defaults are
+> **`gpt-5.4-mini`** ($0.75/$4.50 per 1M, reasoning pinned OFF via `reasoning_effort: "none"`)
+> and **`gemini-3.5-flash-lite`** ($0.30/$2.50 per 1M, non-thinking by default — the
+> thinkingConfig knob removed; the lite model rejects it); groq/anthropic unchanged. Live
+> smokes re-ran GREEN on the new ids through the real router; the price book moved in
+> lockstep.
+
+> **Rows 7–10 — Phase 7 live copilot loop (branch `dev-claude-live-copilot`):** the live
+> loop ships — the llm `latencyTier: "live"` cheapest-first cascade (`modules/llm`), the pure
+> verbatim-prompt assembler (`modules/prompt`), and the conductor
+> (`modules/live/{conductor,trigger,speculation,conductor-config}.ts`) wired into the
+> `LiveSession` + transport (`metering-wiring.ts::maybeCreateLiveConductorFactory`), plus the
+> minimal mobile streaming pane (`apps/mobile/src/hooks/use-live-session.ts` +
+> `features/live-call/`).
+> - **7 (real-time suggestions)** — ✅ the single streaming focal pane (design: NOT cards).
+>   LATENCY (`modules/live/conductor.latency.test.ts`, fake timers + REAL router + mock-LLM
+>   realistic TTFT): question-moment → first token **p50=800ms / p95=1450ms** (bars p50<2000 /
+>   p95<4000), final→visible **p50=800ms** (<1500), speculation-hit→visible **p50=0ms** (<500).
+>   RELEVANCE (`live.relevance.test.ts`, key-gated, RAN on OpenAI+Google): **9/10** labeled
+>   moments referenced the expected topic by keyword rubric (bar ≥7; one passive-mode miss).
+>   Behavior (start/delta/done coalesced ~50ms, supersede, deadline-ladder abort, meter) in
+>   `conductor.test.ts`.
+> - **8 (RAG grounding)** — ✅ `live.grounding.test.ts` (key+DB-gated, RAN): a distinctive fact
+>   (`$47,500` Acme Enterprise quote) ingested via REAL Voyage + pgvector, then a question about
+>   the user's own history driven through the conductor → the streamed suggestion contained
+>   "**$47,500 for Enterprise tier**". Grounding is raced against a deadline (shrink, not delay).
+> - **9 (quiet in small talk)** — ✅ the pure tiered trigger gate (`trigger.ts`), OFF the LLM hot
+>   path, vetoes small-talk windows: `trigger.test.ts` proves **11 hand-labeled small-talk
+>   utterances stay silent** while **8 labeled trigger moments fire the right kind**;
+>   `conductor.test.ts` `[conductor] stays silent on small-talk finals` proves ZERO suggestion
+>   events end-to-end.
+> - **10 (rolling transcript view)** — 🔨 the mobile hook renders a compact scrolling transcript
+>   strip above the copilot history (layout per Gustavo's 2026-07-22 direction); **† the
+>   on-device screen loop is Phase 8** (real mic capture rides Phase 8/9 — today the transcript
+>   fills from typed input + the scripted replay).
+> - **12 (Ask-AI free-form mid-session)** — ✅ the `transcript.input` typed-utterance channel
+>   (decision 2026-07-22): the live screen's "ask a question" box sends a first-class wire event
+>   the server treats as a final "them" utterance — trigger gate → conductor → REAL streamed
+>   suggestion, persisted like any transcript row, riding the already-metered live router path.
+>   Proven END TO END (not just manually) by the key+DB-gated `live.input.e2e.test.ts`: real app,
+>   real Supabase JWT, real socket, real LLM — typed Kubernetes question → deltas=6,
+>   answer_len=883, echoed as speaker "them", transcript row persisted (~1.9s). Caveat: input
+>   rides the trigger gate, so a non-question statement may correctly stay quiet.
 
 ## Post-call notes (the hero)
 

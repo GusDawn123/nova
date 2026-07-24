@@ -33,6 +33,13 @@ export const chatRequestSchema = z.object({
   messages: z.array(chatMessageSchema).min(1),
   model: z.string().min(1).optional(),
   providerOrder: z.array(providerIdSchema).min(1).optional(),
+  /**
+   * Latency tier (adr-0004 §4). `"live"` selects the router's cheapest-first
+   * `liveOrder` cascade (the live copilot) unless `providerOrder` overrides it;
+   * anything else (or absent) uses the quality-first `defaultOrder` (notes /
+   * follow-up). Order selection only — budgets are the router config's job.
+   */
+  latencyTier: z.enum(["live", "deliberate"]).optional(),
 });
 export type ChatRequest = z.infer<typeof chatRequestSchema>;
 

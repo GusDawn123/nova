@@ -10,6 +10,7 @@ import {
 
 import type { SttEngine, SttSessionHandle } from "../stt/ports.js";
 
+import type { LiveConductor, LiveConductorFactory } from "./conductor.js";
 import {
   createDisposer,
   noopAudioFrameHandler,
@@ -87,6 +88,14 @@ export interface LiveSessionDeps {
    * the other enforcement seams; effective only with a {@link userId}.
    */
   registry?: LiveSessionRegistry;
+  /**
+   * The live copilot conductor factory (Phase 7). When wired (an LLM key is
+   * present) and an owner is known, a per-call conductor is built at
+   * `session.start`: it watches the same transcript stream the relay forwards,
+   * gates spend, and streams `suggestion.*` down THIS socket. Omitted on a
+   * keyless boot — the session still transcribes, just without suggestions.
+   */
+  createConductor?: LiveConductorFactory;
 }
 
 export class LiveSession {
@@ -104,12 +113,17 @@ export class LiveSession {
 
   private readonly metering: LiveMetering | null;
   private readonly registry: LiveSessionRegistry | null;
+  private readonly createConductor: LiveConductorFactory | null;
   private readonly initialSttVendor: string;
   private readonly quotaRecheckSeconds: number;
+  /** The live copilot conductor for this call; null until start (or unwired). */
+  private conductor: LiveConductor | null = null;
 
   private started = false;
   private sessionId: string | null = null;
   private echo = false;
+  /** Wall-clock ms at `session.ready` — anchors ts_ms for typed-input finals. */
+  private startedAtMs: number | null = null;
   /** The meeting this socket is tied to (from `session.start`); null until start. */
   private meetingId: string | null = null;
   /** The live STT relay handle for this call; null until start (or in echo mode). */
@@ -133,6 +147,7 @@ export class LiveSession {
     this.logger = deps.logger ?? null;
     this.metering = deps.metering ?? null;
     this.registry = deps.registry ?? null;
+    this.createConductor = deps.createConductor ?? null;
     // "unknown" only ever bills on a misconfigured wiring (the transport always
     // passes the lineup head when vendors exist); kept explicit, never invented.
     this.initialSttVendor = deps.initialSttVendor ?? "unknown";
@@ -216,7 +231,41 @@ export class LiveSession {
         // The JSON marker is documentation-only; real audio is binary.
         this.sendError("invalid_event", "audio must be sent as binary frames");
         return;
+      case "transcript.input":
+        this.onTranscriptInput(event.text);
+        return;
     }
+  }
+
+  /**
+   * Typed-input channel (Phase 7, decision 2026-07-22): the user typed what the
+   * other party said (or a question to the copilot). Treated EXACTLY like a
+   * final transcript utterance from "them": routed through the same sink the STT
+   * engine feeds ({@link onServerEvent}), so it is echoed down as a
+   * `transcript.final`, enters the conductor's rolling transcript + trigger
+   * gate, and is persisted — one path, no divergence. Valid only once the
+   * session is fully LIVE (`session.ready` emitted — the start gates passed);
+   * before that it is refused with a typed error. No new vendor call site: any
+   * resulting suggestion rides the conductor's already-metered router path.
+   */
+  private onTranscriptInput(text: string): void {
+    if (this.sessionId === null || this.disposer.disposed) {
+      this.sendError(
+        "input_before_start",
+        "typed input requires an active session (send session.start first)",
+      );
+      return;
+    }
+    const tsMs =
+      this.startedAtMs !== null ? Date.now() - this.startedAtMs : Date.now();
+    this.onServerEvent({
+      v: LIVE_PROTOCOL_VERSION,
+      type: "transcript.final",
+      text,
+      speaker: "them",
+      ts_ms: tsMs,
+      is_final: true,
+    });
   }
 
   private async onSessionStart(
@@ -344,6 +393,7 @@ export class LiveSession {
     }
 
     this.sessionId = this.generateSessionId();
+    this.startedAtMs = Date.now();
     this.send({
       v: LIVE_PROTOCOL_VERSION,
       type: "session.ready",
@@ -387,6 +437,24 @@ export class LiveSession {
       });
     }
 
+    // Live copilot conductor (Phase 7). Built AFTER the gates, BEFORE STT starts
+    // so it is ready when the first transcript flows. It streams suggestions down
+    // THIS socket and its teardown (abort any in-flight generation) rides the
+    // disperser BEFORE the STT stop is registered — LIFO stops STT first (no new
+    // finals), then the conductor aborts. Only when a factory + owner are wired
+    // and not in echo mode (echo is the pre-vendor transit diagnostic).
+    if (this.createConductor !== null && this.userId !== null && !this.echo) {
+      const conductor = this.createConductor({
+        send: this.send,
+        userId: this.userId,
+        meetingId,
+      });
+      this.conductor = conductor;
+      this.disposer.add(() => {
+        conductor.dispose();
+      });
+    }
+
     // Start the STT relay for this call. Echo mode is the pre-vendor transit
     // diagnostic, so it deliberately bypasses the engine; otherwise a per-call
     // engine session streams transcript/provider_switched/error events straight
@@ -412,7 +480,13 @@ export class LiveSession {
    */
   private readonly onServerEvent = (event: ServerLiveEvent): void => {
     this.send(event);
+    // Feed the copilot conductor the SAME transcript stream (off the relay's hot
+    // path — the conductor's own work is async/aborted, never blocking send).
+    if (event.type === "transcript.partial") {
+      this.conductor?.onPartial(event.text, event.speaker);
+    }
     if (event.type === "transcript.final") {
+      this.conductor?.onFinal(event.text, event.speaker);
       this.persistFinal(event.text, event.speaker, event.ts_ms);
     }
     if (event.type === "provider_switched") {

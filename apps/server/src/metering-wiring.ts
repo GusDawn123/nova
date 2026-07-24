@@ -5,7 +5,17 @@ import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
 } from "./db/usage-events.js";
+import {
+  createLiveConductor,
+  type LiveConductorFactory,
+} from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
+import {
+  createLlmRouter,
+  createProvidersFromEnv,
+  liveLlmConfig,
+  type LlmProviderEnv,
+} from "./modules/llm/index.js";
 import {
   createKillSwitch,
   createMeteringService,
@@ -15,7 +25,7 @@ import {
   type MeteringService,
   type QuotaChecker,
 } from "./modules/metering/index.js";
-import type { VoyageUsageLog } from "./modules/rag/index.js";
+import { createRagFromEnv, type VoyageUsageLog } from "./modules/rag/index.js";
 
 /**
  * Metering boot wiring (Phase 6, adr-0007) — split out of `app.ts` (RULES §2 file
@@ -132,6 +142,55 @@ export function maybeCreateLiveMetering(
     isOverSttQuota: (userId) => quota.isOverQuota(userId, "stt_seconds"),
     isOverDailyCap: () => killSwitch.isTripped(),
   };
+}
+
+/** Only the LLM provider keys that are set (exactOptionalPropertyTypes-safe). */
+function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
+  const out: LlmProviderEnv = {};
+  if (env.ANTHROPIC_API_KEY) out.ANTHROPIC_API_KEY = env.ANTHROPIC_API_KEY;
+  if (env.OPENAI_API_KEY) out.OPENAI_API_KEY = env.OPENAI_API_KEY;
+  if (env.GOOGLE_API_KEY) out.GOOGLE_API_KEY = env.GOOGLE_API_KEY;
+  if (env.GROQ_API_KEY) out.GROQ_API_KEY = env.GROQ_API_KEY;
+  return out;
+}
+
+/**
+ * Build the live copilot conductor factory (Phase 7) — the LLM-suggestion path
+ * of the live session, wired THROUGH the metering seam (adr-0007: no unmetered
+ * vendor call). Constructs ONE live-tuned failover router (cheapest-first
+ * cascade, tight TTFT/stall budgets) shared across sessions, the per-user RAG
+ * service for grounding (its Voyage usage lands on the ledger via the same sink
+ * as the notes/indexer paths), and threads `metering.meterFor(userId, meetingId)`
+ * into every suggestion call so each streamed token is attributed.
+ *
+ * Undefined when NO LLM provider key is present — the session still transcribes,
+ * it just streams no suggestions (the keyless posture, like RAG/STT).
+ */
+export function maybeCreateLiveConductorFactory(
+  app: FastifyInstance,
+): LiveConductorFactory | undefined {
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
+  if (providers.length === 0) return undefined;
+
+  const router = createLlmRouter({ providers, config: liveLlmConfig() });
+  const metering = maybeCreateMetering(app);
+  const rag = createRagFromEnv(process.env, {
+    logger: app.log,
+    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+  });
+
+  return ({ send, userId, meetingId }) =>
+    createLiveConductor({
+      send,
+      router,
+      rag,
+      userId,
+      meetingId,
+      logger: app.log,
+      // The per-call meter (adr-0007 §2): attribution travels with the call while
+      // the router's breaker/bench state stays process-global.
+      ...(metering ? { meter: metering.meterFor(userId, meetingId) } : {}),
+    });
 }
 
 /**

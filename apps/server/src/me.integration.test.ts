@@ -82,5 +82,25 @@ describe.skipIf(!hasStack)(
         await app.close();
       }
     });
+
+    it("exposes the default role 'customer' for a fresh user (adr-0008)", async () => {
+      // SUPABASE_DB_URL gates the role reader; without it the field is simply
+      // absent — assert only when this run has the full stack.
+      if (!process.env.SUPABASE_DB_URL) return;
+      const app = buildApp({ logger: false });
+      try {
+        const response = await app.inject({
+          method: "GET",
+          url: "/me",
+          headers: { authorization: `Bearer ${accessToken}` },
+        });
+
+        expect(response.statusCode).toBe(200);
+        const body = response.json<{ user_id: string; role?: string }>();
+        expect(body.role).toBe("customer");
+      } finally {
+        await app.close();
+      }
+    });
   },
 );

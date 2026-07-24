@@ -287,8 +287,10 @@ STOP WHEN: All green. This phase GATES external TestFlight — no outside tester
 
 ```
 GOAL: During a live session, the server watches the rolling transcript and pushes
-      suggestion cards (answer this / say this next / relevant context from RAG) fast
-      enough to matter mid-conversation.
+      streaming suggestions (answer this / say this next / relevant context from RAG)
+      fast enough to matter mid-conversation — first tokens on the wire immediately,
+      never buffered until complete (rendered client-side as the single streaming
+      pane, live-pipeline.md Mobile).
 VERIFY BY:
   - Latency: from a fixture "question moment" to first suggestion token on the client
     socket: p50 < 2s, p95 < 4s (benchmark prints numbers; mock LLM with realistic
@@ -297,15 +299,16 @@ VERIFY BY:
     expected topic ≥ 7/10 (keyword rubric, not vibes)
   - Grounding: fixture question about the user's own history ("what did we quote them
     last time?") → suggestion contains the Phase-4 stored fact
-  - Quiet: labeled small-talk windows → ZERO suggestion cards (spam is the #1 uninstall
+  - Quiet: labeled small-talk windows → ZERO suggestions (spam is the #1 uninstall
     driver)
 PLAN:
   1. Rolling transcript state + trigger detection → verify: fires on labeled moments,
      silent in no-op windows
   2. Suggestion generation through the Phase-2 router, streaming → verify: latency
   3. RAG injection → verify: grounding test
-  4. Push over live socket + card UI → verify: card renders in simulator during a
-     replayed fixture call (screenshot)
+  4. Push over live socket + minimal streaming-pane render (deltas append as they
+     arrive; replace on start, clear on discard) → verify: streamed suggestion visibly
+     builds up in simulator during a replayed fixture call (full pane polish = Phase 8)
   5. PARITY rows 7-10 (+12 if built) → ✅; docs updated
 STOP WHEN: Latency + quiet pass and relevance ≥ 7/10; below that after 4 prompt/trigger
            iterations → stop and present the failing transcripts for human judgment.

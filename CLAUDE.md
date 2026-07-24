@@ -35,6 +35,66 @@ ANTHROPIC IS DISABLED (2026-07-22 cost decision): the adapter/config/smoke code 
 price book still prices claude-haiku-4-5, but the key is commented out in `apps/server/.env` —
 the factory builds no anthropic provider and its live smoke self-skips. Re-enable = uncomment
 the key. Working LLM set: OpenAI + Google (groq unkeyed).**
+**Phase 7 live copilot loop is built on `dev-claude-live-copilot` (branched off `development`
+after Phase 6). NEW: the llm `latencyTier: "live"` cheapest-first cascade (`liveOrder`
+google→groq→openai→anthropic + `liveLlmConfig()` tight TTFT/stall — reasoning stays OFF at the
+adapter layer); `modules/prompt` — one pure `assemble(mode, context) → { stablePrefix,
+dynamicSuffix }` over Gustavo's VERBATIM system prompt (extracted byte-for-byte from
+`docs/prompts/nova-prompts-source.md` by `scripts/gen-live-prompt.mjs` into
+`content/system-prompt.ts`; byte-stable prefix snapshot-pinned; dynamicSuffix = hard-guarded user
+context + RAG snippets under a token budget + windowed transcript LAST); `modules/live` conductor
+(`conductor.ts` + pure `trigger.ts`/`speculation.ts`) — rolling transcript, tiered trigger gate
+OFF the LLM hot path (quiet in small talk), speculation on confident partials with jaccard
+adopt-or-discard reconcile (never a zombie), streaming suggestion.start/delta/done coalesced
+~50ms/batch, deadline-ladder active abort, RAG grounding raced against a deadline (shrink, never
+delay), threading `metering.meterFor`. Wired into `LiveSession` (a `createConductor` factory built
+by `metering-wiring.ts::maybeCreateLiveConductorFactory`, consumed in `modules/live/routes.ts`);
+the static metering audit gained a live-router case (no unmetered live LLM path). NEW (Gustavo's
+2026-07-22 follow-up): the `transcript.input` typed-utterance wire event (additive) — the server
+treats typed text exactly like a final "them" STT utterance (echo down + conductor + persistence;
+`input_before_start` before ready; no new vendor site — rides the metered conductor path). Mobile:
+`use-live-session` owns socket+meeting+state — PRIMARY path `start()` creates a meeting via the
+supabase seam and connects the REAL authed socket, `sendInput()` asks typed questions and gets
+REAL streamed answers; the copilot surface is a scrollable HISTORY (start APPENDS an entry,
+deltas stream into it once/frame, discard removes only that entry, auto-scroll pinned unless the
+user scrolled up), compact transcript strip on top, scripted replay demoted to a labeled
+secondary button. Real mic capture is Phase 8/9; durable copilot-history context = Phase 8+
+design item (see DESIGN/live-pipeline.md §Mobile). GATES (2026-07-22): latency
+question→first-token p50=800ms p95=1450ms (<2000/<4000), speculation-hit p50=0ms (<500),
+final→visible p50=800ms (<1500); relevance 9/10 (bar ≥7, OpenAI+Google); grounding contains the
+stored `$47,500` fact (Voyage+DB); quiet 11/11 small-talk silent; typed-input E2E over the real
+socket+LLM: deltas=6, answer_len=883, echoed as "them", persisted (~1.9s). Live gates are
+key-gated (skipIf) — keyless CI self-skips.
+ROLES (2026-07-23, adr-0008): `profiles.role` developer|admin|customer (migration
+`20260723100000` — which ALSO fixes a live privilege hole: profiles UPDATE re-granted
+column-scoped `display_name, deleted_at` only, so a user JWT can no longer self-set
+plan='pro'/role='admin'; proven in `db/profiles-grants.integration.test.ts`). Seams:
+`db/roles.ts` RoleReader (missing/deleted → 'customer'; DB error rejects), `/me` gains
+optional `role` (display, best-effort), `plugins/role.ts` `createRequireRole` (403 fail
+CLOSED, 503 unwired, no consumers yet), `scripts/set_user_role.ts <email|uuid> <role>`
+(service-role assignment; auto-loads apps/server/.env). Mobile: `use-role` (resolves
+'customer' until proven — no flash) hides the "Test Live" tab (renamed from "Live",
+label-only — route file stays `live.tsx`) for customers via the SDK 57 native-tabs
+`hidden` prop.
+MODEL REFRESH (2026-07-23, adr-0004 addendum): default models are now `gpt-5.4-mini`
+($0.75/$4.50 per 1M, VERIFIED on OpenAI's pricing page; reasoning pinned OFF via
+`reasoning_effort: "none"` — the model REJECTS 'minimal') and `gemini-3.5-flash-lite`
+($0.30/$2.50 per 1M; the lite model REJECTS thinkingConfig — non-thinking by default, the
+knob removed from the adapter). Price book swapped in lockstep (old ids dropped —
+historical usage_events keep their stamped costs). Live smokes green on the new ids.
+PROMPT FREEDOM (2026-07-23, Gustavo-ratified — see the source-doc AMENDMENT banner):
+"the AI always answers; context shapes answers, never limits them" — passive mode now
+never triggers on a question of any kind (hypothetical/sales/role-play/design included),
+"Not sure what you need help with right now" is scoped to genuinely-empty moments, and
+content constraints bind fabrication to the user's OWN data while general knowledge is
+always fair game. Regen via scripts/gen-live-prompt.mjs + snapshot repin (the sanctioned
+path). Trigger fix: a substantial question (ends "?" + ≥6 words) is re-tested behind its
+filler prefix — "Okay, so how would you price this?" fires; "Hey, how are you doing
+today?" stays quiet. GATES on the new models + prompt (2026-07-23): relevance **10/10**
+(the 9/10 passive-mode miss is gone), grounding still cites the stored $47,500 (no
+fabrication regression), typed-input E2E deltas=6/787 chars ~1.9s, smokes openai 881ms /
+google 845ms, notes accuracy 5/5, latency p50=800ms p95=1450ms, quiet 11/11 + 3
+filler-prefix fixtures.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

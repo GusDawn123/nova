@@ -11,6 +11,7 @@ describe("llmConfigSchema", () => {
       breakerCooldownMs: 30000,
       authCooldownMs: 600000,
       defaultOrder: ["anthropic", "openai", "google", "groq"],
+      liveOrder: ["google", "groq", "openai", "anthropic"],
     });
   });
 

@@ -81,9 +81,19 @@ export function isNotesWorkerEnabled(
 /**
  * Pure parse of an env-shaped object. Returns a zod result so callers (and
  * tests) can inspect failures without side effects.
+ *
+ * Blank means absent: `.env` files routinely keep a key with no value
+ * (`GROQ_API_KEY=`) to mean "not configured", and `--env-file` loads that as
+ * the empty string — which would trip every `min(1).optional()` above and
+ * kill the boot over a key the deploy deliberately left unset.
  */
 export function parseEnv(source: NodeJS.ProcessEnv) {
-  return envSchema.safeParse(source);
+  const cleaned = Object.fromEntries(
+    Object.entries(source).filter(
+      ([, value]) => value !== undefined && value.trim() !== "",
+    ),
+  );
+  return envSchema.safeParse(cleaned);
 }
 
 /**

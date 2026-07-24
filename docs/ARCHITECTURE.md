@@ -21,7 +21,16 @@
 > decision (2026-07-22, cost): code kept + priced, key commented out — its live smoke
 > self-skips.** Phases 0-5 remain as merged: auth + RLS isolation, the llm failover router,
 > the live STT gateway, per-user RAG memory, and the post-call notes pipeline (all live gates
-> ran green 2026-07-22; see the per-phase blocks below).
+> ran green 2026-07-22; see the per-phase blocks below).**
+> **Phase 7 live copilot loop is built on `dev-claude-live-copilot`** (off `development` after
+> Phase 6): the llm `latencyTier: "live"` cheapest-first cascade, the pure verbatim-prompt
+> `modules/prompt`, the `modules/live` conductor (rolling transcript + tiered trigger gate off the
+> LLM hot path + speculation adopt-or-discard reconcile + ~50ms-coalesced streaming + deadline-
+> ladder active abort + RAG grounding raced against a deadline), and a minimal mobile streaming
+> pane. Every new vendor call threads `metering.meterFor` (the static audit gained a live-router
+> case). Gates green 2026-07-22: latency question→first-token p50=800ms / p95=1450ms,
+> speculation-hit p50=0ms, relevance 9/10, grounding contains the stored `$47,500` fact, quiet
+> 11/11 silent — see the Phase 7 block below.
 
 ## What Nova is
 
@@ -98,10 +107,12 @@ nova/
 │           ├── app.ts         # Fastify wiring, boot-time env parse
 │           ├── modules/
 │           │   ├── auth/      # JWT verify middleware, account deletion
-│           │   ├── sessions/  # live-call session lifecycle (WS)
+│           │   ├── live/      # WS transport + LiveSession + Phase-7 conductor
+│           │   │              #   (trigger gate, speculation, streaming suggestions)
 │           │   ├── stt/       # ports.ts, adapters/{assemblyai,deepgram}, gateway
 │           │   ├── llm/       # ports.ts, adapters/{anthropic,openai,google,groq},
-│           │   │              #   router (fallback race, breaker), prompts/
+│           │   │              #   router (fallback race, breaker, latencyTier)
+│           │   ├── prompt/    # pure assemble(mode,context); verbatim system prompt
 │           │   ├── rag/       # ports.ts (Chunker/Embedder/VectorStore/Reranker),
 │           │   │              #   adapters/pgvector, service
 │           │   ├── notes/     # post-call pipeline, schemas, job queue, recovery
@@ -474,6 +485,79 @@ TestFlight — the kill-switch E2E is green.
   without a real sink. RLS posture: `usage-events-rls.integration.test.ts` (A sees own
   rows only, authenticated INSERT denied, service-role full).
 
+**Phase 7 — the live copilot loop (built on `dev-claude-live-copilot`):** design spec
+`DESIGN/live-pipeline.md`, decisions `DECISIONS/adr-0004-llm-routing-latency.md`. Streaming
+suggestions during a live call — first tokens on the wire immediately, rendered as ONE fixed
+pane (not cards).
+- **llm live tier** (`modules/llm/config.ts`, `ports.ts`, `router.ts`) — `chatRequest.latencyTier`
+  `"live"|"deliberate"`; live selects the cheapest-first `liveOrder`
+  (google→groq→openai→anthropic) unless `providerOrder` overrides. `liveLlmConfig()` bundles the
+  tight TTFT (1500ms) / stall (8000ms) budgets. Reasoning stays OFF at the ADAPTER layer (flash
+  `thinkingBudget:0`; mini/8b have none), so no per-call reasoning toggle. Additive — the 27
+  pinned router tests are untouched; `router.tier.test.ts` covers order selection.
+- **`modules/prompt`** — one PURE `assemble(mode, context) → { stablePrefix, dynamicSuffix }`.
+  `content/system-prompt.ts` is Gustavo's authored co-pilot prompt extracted VERBATIM
+  (byte-for-byte) from `docs/prompts/nova-prompts-source.md` by `scripts/gen-live-prompt.mjs`
+  (code assembles, never writes prose — RULES §9). The `stablePrefix` is byte-stable (sha256
+  pinned by `assemble.snapshot.test.ts` — the vendor prompt cache can't silently churn, adr-0004
+  §6); the `dynamicSuffix` is the only uncached part: hard-guarded user context (delimited DATA
+  after the prefix that owns identity/security) + RAG snippets under a hard token budget +
+  windowed transcript LAST (the current moment ends the prompt). Budgets SHRINK the suffix, never
+  delay first token. (The mobile screen/screenshot-block exclusion in the source-doc note is a
+  token optimization DEFERRED — the full prose is kept verbatim rather than edit Gustavo's text.)
+- **`modules/live` conductor** (`conductor.ts`, `conductor-config.ts`, pure `trigger.ts` +
+  `speculation.ts`) — transport-agnostic. Maintains a rolling transcript window; the tiered
+  trigger gate (triviality → small-talk veto → question → term → advancement) runs OFF the LLM hot
+  path and stays QUIET in no-op windows. Speculates on confident partials, then jaccard-reconciles
+  against the final (adopt the finished/in-flight answer, or emit `suggestion.discard` + refire —
+  never a zombie card). Streams `suggestion.start/delta/done` coalesced ~50ms/batch, ONE focal
+  pane (a new trigger supersedes the old). Deadline ladder actively aborts through the router if no
+  first token in time; RAG grounding is raced against `ragDeadlineMs` and dropped if slow (shrink,
+  never delay). Every suggestion call threads `metering.meterFor(userId, meetingId)`.
+- **Wiring** — `metering-wiring.ts::maybeCreateLiveConductorFactory` builds ONE shared live-tuned
+  router + RAG service (its Voyage usage lands on the ledger via the same sink as
+  notes/indexer) and threads the per-call meter; `LiveSession` takes a `createConductor` factory,
+  builds the conductor at `session.start` (after the quota/ownership gates, before STT, never in
+  echo), feeds it the SAME transcript stream the relay forwards, and disposes it on teardown;
+  `modules/live/routes.ts` consumes the factory. The static metering audit
+  (`metering.audit.test.ts`) gained a case proving the live-router site threads `meterFor` — no
+  unmetered live LLM path. Undefined on a keyless boot (transcription still runs, no suggestions).
+- **Typed input** (`transcript.input`, decision 2026-07-22 — Gustavo's follow-up after sim
+  testing) — a first-class up-event on the live wire (additive, no v bump): the user types what
+  the other party said, or a question to the copilot. `LiveSession` routes it through the SAME
+  sink the STT engine feeds, so it is echoed down as a `transcript.final` (speaker "them",
+  ts_ms relative to `session.ready`), enters the conductor's rolling transcript + trigger gate
+  (can stream a real suggestion) and persists. Valid only once the session is fully live
+  (`input_before_start` error otherwise); bounded 2000 chars. NO new vendor call site — a
+  resulting suggestion rides the conductor's already-metered router path (covered by the
+  existing live-router audit case). Proven end to end by the key+DB-gated
+  `live.input.e2e.test.ts` (real app + real JWT + real socket + real LLM).
+- **Mobile** (`apps/mobile`) — `hooks/use-live-session.ts` OWNS the socket, the meeting, and all
+  state (screens dumb). PRIMARY path: `start()` creates a meeting via the supabase seam (RLS
+  `meetings_insert_own`) and connects the real authed socket; `sendInput()` drives
+  `transcript.input` and the answer streams back as a real LLM suggestion. The copilot surface
+  is a **scrollable HISTORY** (2026-07-22 evolution of the single replace-in-place pane —
+  DESIGN/live-pipeline.md §Mobile): `suggestion.start` APPENDS an entry, deltas stream into it
+  via a ref buffer flushed once per animation frame, `discard` removes ONLY that entry;
+  auto-scroll pins to bottom unless the user scrolled up. Layout: a COMPACT transcript strip on
+  top, the copilot history owning the majority, the ask-a-question input below.
+  `features/live-call/` (CopilotHistory, TranscriptList, a mic-less replay fixture behind a
+  clearly-labeled secondary button) + the `(app)/live` screen + a Live tab. Real mic capture +
+  UI polish are Phase 8/9; durable copilot-history context + self-profile RAG feeding from this
+  screen are a Phase 8+ design conversation (logged in the design doc).
+- **Exit bars.** LATENCY (`conductor.latency.test.ts`, fake timers + REAL router + mock-LLM
+  realistic TTFT): question-moment → first token **p50=800ms / p95=1450ms** (bars <2000 /
+  <4000), final→visible **p50=800ms** (<1500), speculation-hit→visible **p50=0ms** (<500). QUIET +
+  TRIGGER (`trigger.test.ts`, `conductor.test.ts`): 11 small-talk fixtures silent, 8 labeled
+  moments fire the right kind, zero suggestion events on small-talk finals. RELEVANCE + GROUNDING
+  are key-gated (RAN 2026-07-22): `live.relevance.test.ts` **9/10** (bar ≥7, OpenAI+Google);
+  `live.grounding.test.ts` — the suggestion contained the ingested **$47,500** Acme fact
+  (Voyage+pgvector+DB). TYPED INPUT E2E (key+DB-gated, RAN 2026-07-22):
+  `live.input.e2e.test.ts` — a typed question over the real authed socket streamed a real
+  answer (deltas=6, answer_len=883, echoed as "them", transcript row persisted, ~1.9s).
+  Behavior (coalesce/supersede/deadline/meter/dispose) + the session conductor-wiring +
+  typed-input seams are unit-tested.
+
 ## Data model
 
 The auth-domain tables (`profiles`, `meetings`, `transcripts`, `context_docs`,
@@ -485,7 +569,15 @@ and RLS posture.
 
 - `profiles` — user profile (1:1 with auth.users); **built (Phase 6):** **`plan`**
   (`text not null default 'free' check in ('free','pro')` — the quota tier, written by
-  the RevenueCat webhook, read by the quota checker)
+  the RevenueCat webhook, read by the quota checker); **built (2026-07-23, adr-0008):**
+  **`role`** (`text not null default 'customer' check in ('developer','admin','customer')`
+  — the PERMISSION axis, orthogonal to `plan`; written only via service_role
+  (`scripts/set_user_role.ts`), read by `db/roles.ts` → `/me.role` + the `requireRole`
+  preHandler seam). The same migration (`20260723100000`) FIXES a live privilege hole:
+  the blanket `authenticated` UPDATE grant on profiles is revoked and re-granted
+  column-scoped to `display_name, deleted_at` — a user JWT can no longer
+  `set plan='pro'` (or `role='admin'`) on its own row (RLS checks rows, not columns);
+  proven by `db/profiles-grants.integration.test.ts`.
 - `meetings` — id, user_id, title, started_at, **`ended_at`** (call completion), **`indexed_at`**
   (RAG sweeper marker: finished + null → unindexed backlog), deleted_at; **built (Phase 5):**
   **`notes`** jsonb (ONLY ever a zod-valid `meetingNotesSchema` object — the ladder guarantees
@@ -563,3 +655,9 @@ Details in `GIT_WORKFLOW.md`.
   fixture-tested seam. Build amendments (in the ADR): quota/cap FAIL-OPEN vs ownership
   FAIL-CLOSED, lineup-head STT attribution, rerank amount=1/request, RC static-bearer
   auth. Design: `DESIGN/metering.md`.
+- **ADR-0008** — Permission roles developer/admin/customer on `profiles.role`
+  (column-over-JWT-claim: PlanReader-twin seam, next-request revocation, service-role
+  assignment), the `requireRole` fail-CLOSED preHandler seam, `/me.role` as best-effort
+  display data, mobile `use-role` conservative gating (Test Live tab hidden until proven
+  dev/admin) — plus the shipped-together security fix: profiles UPDATE re-granted
+  column-scoped (`display_name, deleted_at` only), closing the free→pro self-upgrade.

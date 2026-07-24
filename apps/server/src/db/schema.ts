@@ -178,13 +178,14 @@ export interface Database {
       };
       profiles: {
         // Only the columns the server adapter touches are modelled here (the
-        // account-deletion tombstone + the Phase 6 subscription `plan`). A real
-        // project regenerates this with `supabase gen types`; this is the
-        // hand-written minimum.
+        // account-deletion tombstone, the Phase 6 subscription `plan`, and the
+        // 2026-07-23 permission `role`). A real project regenerates this with
+        // `supabase gen types`; this is the hand-written minimum.
         Row: {
           id: string;
           display_name: string | null;
           plan: string;
+          role: string;
           created_at: string;
           deleted_at: string | null;
         };
@@ -192,6 +193,7 @@ export interface Database {
           id: string;
           display_name?: string | null;
           plan?: string;
+          role?: string;
           created_at?: string;
           deleted_at?: string | null;
         };
@@ -199,6 +201,7 @@ export interface Database {
           id?: string;
           display_name?: string | null;
           plan?: string;
+          role?: string;
           created_at?: string;
           deleted_at?: string | null;
         };

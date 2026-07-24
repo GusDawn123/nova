@@ -56,6 +56,23 @@ export const audioFrameMarkerSchema = z.object({
   type: z.literal("audio.frame"),
 });
 
+/**
+ * A TYPED utterance from the conversation (Phase 7, decision 2026-07-22): the
+ * user types what was said — or a question to the copilot — instead of (or
+ * alongside) the mic. The server treats it exactly like a FINAL transcript
+ * utterance from the OTHER party: it is echoed back as a `transcript.final`
+ * (speaker "them"), enters the rolling transcript + persistence, runs the
+ * trigger gate, and can stream a real suggestion. A first-class product surface
+ * (typed input to your copilot mid-call), not a dev affordance. Only valid
+ * AFTER `session.start` (else a typed `input_before_start` error). Bounded at
+ * 2000 chars so one message can't balloon the prompt window.
+ */
+export const transcriptInputSchema = z.object({
+  v: version,
+  type: z.literal("transcript.input"),
+  text: z.string().min(1).max(2000),
+});
+
 /** Gracefully end the session; triggers server-side teardown. */
 export const sessionEndSchema = z.object({
   v: version,
@@ -72,6 +89,7 @@ export const pingSchema = z.object({
 export const clientLiveEventSchema = z.discriminatedUnion("type", [
   sessionStartSchema,
   audioFrameMarkerSchema,
+  transcriptInputSchema,
   sessionEndSchema,
   pingSchema,
 ]);
@@ -175,6 +193,9 @@ export const liveErrorCodeSchema = z.enum([
   "quota_exceeded",
   "daily_cap_reached",
   "concurrent_session",
+  // Phase 7 (additive, no v bump): a `transcript.input` arrived before
+  // `session.start` — mirrors `audio_before_start` for the typed-input channel.
+  "input_before_start",
   "internal",
 ]);
 

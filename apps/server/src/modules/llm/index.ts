@@ -29,7 +29,7 @@ export {
   type ProviderFailure,
 } from "./errors.js";
 
-export { llmConfigSchema, type LlmConfig } from "./config.js";
+export { llmConfigSchema, liveLlmConfig, type LlmConfig } from "./config.js";
 
 export {
   createLlmRouter,

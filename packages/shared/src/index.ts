@@ -20,12 +20,18 @@ export {
   suggestionDoneSchema,
   suggestionStartSchema,
   transcriptFinalSchema,
+  transcriptInputSchema,
   transcriptPartialSchema,
   type ClientLiveEvent,
   type LiveErrorCode,
   type ServerLiveEvent,
 } from "./live.js";
-export { meResponseSchema, type MeResponse } from "./me.js";
+export {
+  meResponseSchema,
+  roleSchema,
+  type MeResponse,
+  type Role,
+} from "./me.js";
 export {
   FALLBACK_TLDR,
   buildFallbackNotes,
