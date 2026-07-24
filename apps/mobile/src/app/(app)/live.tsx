@@ -18,10 +18,13 @@ import { TranscriptList } from '@/features/live-call/transcript-list';
 import { useLiveSession } from '@/hooks/use-live-session';
 
 /**
- * Live copilot screen (Phase 7, layout per Gustavo's 2026-07-22 direction):
- * a COMPACT transcript strip on top, the scrollable COPILOT HISTORY taking the
- * majority below, and a typed-question input at the bottom. Dumb: the
- * `useLiveSession` hook owns the socket, the meeting, and all state.
+ * "Test Live" — the typed-question testing playground for the Phase 7 copilot
+ * (renamed from "Live" 2026-07-23 so the real mic-driven Live screen of Phase
+ * 8/9 can own that name; it will replace this playground at this same route).
+ * Layout per Gustavo's 2026-07-22 direction: a COMPACT transcript strip on top,
+ * the scrollable COPILOT HISTORY taking the majority below, and a
+ * typed-question input at the bottom. Dumb: the `useLiveSession` hook owns the
+ * socket, the meeting, and all state.
  *
  * "Start session" creates a meeting + connects the real authed socket; typing
  * a question sends `transcript.input` and the answer streams back as a REAL
@@ -47,7 +50,7 @@ export default function LiveScreen() {
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <View style={styles.header}>
-            <ThemedText type="title">Live</ThemedText>
+            <ThemedText type="title">Test Live</ThemedText>
             <ThemedText type="small" themeColor="textSecondary">
               {live.status}
             </ThemedText>
