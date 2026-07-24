@@ -81,7 +81,20 @@ MODEL REFRESH (2026-07-23, adr-0004 addendum): default models are now `gpt-5.4-m
 `reasoning_effort: "none"` — the model REJECTS 'minimal') and `gemini-3.5-flash-lite`
 ($0.30/$2.50 per 1M; the lite model REJECTS thinkingConfig — non-thinking by default, the
 knob removed from the adapter). Price book swapped in lockstep (old ids dropped —
-historical usage_events keep their stamped costs). Live smokes green on the new ids.**
+historical usage_events keep their stamped costs). Live smokes green on the new ids.
+PROMPT FREEDOM (2026-07-23, Gustavo-ratified — see the source-doc AMENDMENT banner):
+"the AI always answers; context shapes answers, never limits them" — passive mode now
+never triggers on a question of any kind (hypothetical/sales/role-play/design included),
+"Not sure what you need help with right now" is scoped to genuinely-empty moments, and
+content constraints bind fabrication to the user's OWN data while general knowledge is
+always fair game. Regen via scripts/gen-live-prompt.mjs + snapshot repin (the sanctioned
+path). Trigger fix: a substantial question (ends "?" + ≥6 words) is re-tested behind its
+filler prefix — "Okay, so how would you price this?" fires; "Hey, how are you doing
+today?" stays quiet. GATES on the new models + prompt (2026-07-23): relevance **10/10**
+(the 9/10 passive-mode miss is gone), grounding still cites the stored $47,500 (no
+fabrication regression), typed-input E2E deltas=6/787 chars ~1.9s, smokes openai 881ms /
+google 845ms, notes accuracy 5/5, latency p50=800ms p95=1450ms, quiet 11/11 + 3
+filler-prefix fixtures.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

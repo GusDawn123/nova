@@ -24,20 +24,28 @@ const SMALL_TALK: readonly string[] = [
 ];
 
 /** Hand-labeled trigger moments — the gate MUST fire, with the labeled kind. */
-const TRIGGERS: readonly { text: string; kind: "answer" | "define" | "advance" }[] =
-  [
-    { text: "What's your approach to handling data consistency?", kind: "answer" },
-    { text: "So how did you scale the ingestion pipeline exactly", kind: "answer" },
-    { text: "Can you walk me through the architecture", kind: "answer" },
-    { text: "I'm curious about your pricing model", kind: "answer" },
-    { text: "Tell me about a time you led a difficult project", kind: "answer" },
-    { text: "we're building on top of Databricks right now", kind: "define" },
-    { text: "mostly did Foundry work at Palantir last summer", kind: "define" },
-    {
-      text: "last summer i built a real-time trade reconciliation dashboard and wired it into the data warehouse for the automated nightly pulls",
-      kind: "advance",
-    },
-  ];
+const TRIGGERS: readonly {
+  text: string;
+  kind: "answer" | "define" | "advance";
+}[] = [
+  {
+    text: "What's your approach to handling data consistency?",
+    kind: "answer",
+  },
+  {
+    text: "So how did you scale the ingestion pipeline exactly",
+    kind: "answer",
+  },
+  { text: "Can you walk me through the architecture", kind: "answer" },
+  { text: "I'm curious about your pricing model", kind: "answer" },
+  { text: "Tell me about a time you led a difficult project", kind: "answer" },
+  { text: "we're building on top of Databricks right now", kind: "define" },
+  { text: "mostly did Foundry work at Palantir last summer", kind: "define" },
+  {
+    text: "last summer i built a real-time trade reconciliation dashboard and wired it into the data warehouse for the automated nightly pulls",
+    kind: "advance",
+  },
+];
 
 describe("modules/live [trigger] quiet in no-op windows", () => {
   for (const text of SMALL_TALK) {
@@ -61,13 +69,38 @@ describe("modules/live [trigger] fires on labeled moments", () => {
   it("[trigger] a user's own small talk never advances", () => {
     // A long-but-trivial user utterance is not an advancement cue.
     expect(
-      evaluateTrigger("yeah yeah totally okay cool sounds good to me for sure", true)
-        .fire,
+      evaluateTrigger(
+        "yeah yeah totally okay cool sounds good to me for sure",
+        true,
+      ).fire,
     ).toBe(false);
   });
 
   it("[trigger] short fragments never fire", () => {
     expect(evaluateTrigger("uh", false).fire).toBe(false);
     expect(evaluateTrigger("right", false).fire).toBe(false);
+  });
+});
+
+describe("modules/live [trigger] filler-prefixed real questions (2026-07-23 fix)", () => {
+  // A substantial question (ends in "?" AND ≥6 words) must never be vetoed by
+  // its small-talk opener; short pleasantry questions still stay quiet.
+  const REAL_QUESTIONS: readonly string[] = [
+    "Okay, so how would you price this?",
+    "Cool, but how would you sell me a pencil?",
+    "Yeah so what's your approach to onboarding here?",
+  ];
+
+  for (const text of REAL_QUESTIONS) {
+    it(`[trigger] fires despite the filler prefix: "${text}"`, () => {
+      const decision = evaluateTrigger(text, false);
+      expect(decision.fire).toBe(true);
+      if (decision.fire) expect(decision.kind).toBe("answer");
+    });
+  }
+
+  it("[trigger] short pleasantry questions still stay quiet", () => {
+    expect(evaluateTrigger("How are you?", false).fire).toBe(false);
+    expect(evaluateTrigger("What's up?", false).fire).toBe(false);
   });
 });

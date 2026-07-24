@@ -18,11 +18,16 @@ import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
 describe("modules/prompt [prompt-snapshot] byte-stable stablePrefix", () => {
   it("[prompt-snapshot] the stablePrefix hash is pinned", () => {
     const { stablePrefix } = assemble("general", { transcript: [] });
-    const hash = createHash("sha256").update(stablePrefix, "utf8").digest("hex");
+    const hash = createHash("sha256")
+      .update(stablePrefix, "utf8")
+      .digest("hex");
     // Regenerating the prompt from the source doc (scripts/gen-live-prompt.mjs)
     // is the ONLY sanctioned way to change this hash — never a hand edit.
+    // Repinned 2026-07-23: the prompt-freedom prose edits (source-doc AMENDMENT
+    // banner) regenerated the content module via scripts/gen-live-prompt.mjs —
+    // the sanctioned regen-then-repin path.
     expect(hash).toBe(
-      "77bb8f980c5ac57921c94e8d13222f58a1ececf9de3f60cd719004b852d7b400",
+      "1407b3bc157c2669f093d94fcc6d5c8b4547a69ef39503b79c4cc888fd4148b6",
     );
   });
 

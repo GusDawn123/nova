@@ -113,6 +113,19 @@ function isSmallTalk(normalized: string): boolean {
   return SMALL_TALK_PATTERNS.some((re) => re.test(normalized));
 }
 
+/**
+ * Leading backchannel/filler tokens that can precede a real question ("okay, so
+ * how would you…"). Stripped so the small-talk veto re-tests the substance
+ * behind them (the 2026-07-23 filler-prefix fix).
+ */
+const FILLER_PREFIX =
+  /^(?:(?:ok|okay|cool|nice|great|awesome|right|sure|yeah|yep|yup|yes|no|nope|well|alright|so|um|uh|hey|hi|hello|but|and|anyway|honestly|actually)[,.!\s]+)+/;
+
+/** Drop leading filler/backchannel tokens from a normalized utterance. */
+function stripFillerPrefix(normalized: string): string {
+  return normalized.replace(FILLER_PREFIX, "");
+}
+
 /** Does the utterance read as a question (mark OR interrogative form)? */
 function looksLikeQuestion(raw: string, normalized: string): boolean {
   if (raw.trimEnd().endsWith("?")) return true;
@@ -120,13 +133,17 @@ function looksLikeQuestion(raw: string, normalized: string): boolean {
   const head = words.slice(0, 3);
   // Strong interrogatives anywhere in the first three words.
   if (
-    head.some((word) => STRONG_OPENERS.some((opener) => word.startsWith(opener)))
+    head.some((word) =>
+      STRONG_OPENERS.some((opener) => word.startsWith(opener)),
+    )
   ) {
     return true;
   }
   // Weak interrogatives only at the very start.
   const first = words[0] ?? "";
-  if (WEAK_OPENERS.some((opener) => first === opener || first === `${opener}'t`)) {
+  if (
+    WEAK_OPENERS.some((opener) => first === opener || first === `${opener}'t`)
+  ) {
     return true;
   }
   // Request phrases in the leading clause.
@@ -229,8 +246,20 @@ export function evaluateTrigger(
   // Small-talk veto FIRST — pleasantries/backchannels are a no-op window even
   // when question-shaped ("how are you?"). Staying quiet outranks a marginal
   // define on a stray capitalized word inside a greeting (spam is the bigger risk).
+  //
+  // EXCEPT (2026-07-23 fix, Gustavo-approved): a SUBSTANTIAL question must never
+  // be vetoed by its filler prefix — "Okay, so how would you price this?" opens
+  // with a backchannel ("okay") but IS a real question. For an utterance that
+  // ends in "?" AND carries ≥6 words, the veto is re-tested on the text BEHIND
+  // the filler prefix: if the remainder is no longer small talk, it fires. A
+  // wholly-pleasantry question ("Hey, how are you doing today?") stays quiet —
+  // its remainder is still small talk.
+  const substantialQuestion =
+    raw.trimEnd().endsWith("?") && raw.trim().split(/\s+/).length >= 6;
   if (isSmallTalk(normalized)) {
-    return { fire: false, reason: "small_talk" };
+    if (!substantialQuestion || isSmallTalk(stripFillerPrefix(normalized))) {
+      return { fire: false, reason: "small_talk" };
+    }
   }
 
   const question = looksLikeQuestion(raw, normalized);
