@@ -16,6 +16,11 @@ import Fastify, {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
+import { createRoleReader } from "./db/roles.js";
+import {
+  isUsageEventsConfigured,
+  usageEventsDbFromEnv,
+} from "./db/usage-events.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
 import { createStaleCallReaper } from "./db/stale-call-reaper.js";
@@ -130,6 +135,14 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   const quota = maybeCreateQuotaChecker(app, metering);
   const killSwitch = maybeCreateKillSwitch(app, metering);
 
+  // Role reader (adr-0008): profiles.role over the same memoised pool + the
+  // same SUPABASE_DB_URL gate as metering. Undefined on a DB-less boot — /me
+  // then omits the role field (clients treat absent as 'customer') and any
+  // future requireRole-gated route answers 503.
+  const roleReader = isUsageEventsConfigured(process.env)
+    ? createRoleReader(usageEventsDbFromEnv(process.env).pool)
+    : undefined;
+
   // Auto-index sweeper: closes the memory loop (call ends → chunks queryable
   // < 60s). Started only when RAG is configured AND not under test — unit/DB
   // suites drive the sweeper explicitly, never the boot-wired background one.
@@ -166,18 +179,34 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
     // or short-circuits with 401/503, so by the time this handler runs the user is
     // present. We narrow defensively rather than assert, then parse the outgoing
     // body through the shared schema (house pattern — validate every boundary).
-    app.get("/me", { preHandler: requireAuth }, (request): MeResponse => {
-      const user = request.user;
-      if (user === undefined) {
-        // Unreachable: requireAuth either populated user or already replied.
-        throw new Error("requireAuth did not populate request.user");
-      }
-      const body =
-        user.email !== undefined
-          ? { user_id: user.id, email: user.email }
-          : { user_id: user.id };
-      return meResponseSchema.parse(body);
-    });
+    // `role` (adr-0008) is best-effort DISPLAY data here: a DB-less boot or a
+    // read failure just omits the field (clients default to 'customer') — the
+    // fail-CLOSED posture lives in requireRole, the actual privilege gate.
+    app.get(
+      "/me",
+      { preHandler: requireAuth },
+      async (request): Promise<MeResponse> => {
+        const user = request.user;
+        if (user === undefined) {
+          // Unreachable: requireAuth either populated user or already replied.
+          throw new Error("requireAuth did not populate request.user");
+        }
+        let role: MeResponse["role"];
+        if (roleReader !== undefined) {
+          try {
+            role = await roleReader.getRole(user.id);
+          } catch (err: unknown) {
+            request.log.error({ user_id: user.id, err }, "me.role_read_failed");
+          }
+        }
+        const body = {
+          user_id: user.id,
+          ...(user.email !== undefined ? { email: user.email } : {}),
+          ...(role !== undefined ? { role } : {}),
+        };
+        return meResponseSchema.parse(body);
+      },
+    );
 
     // Protected: queue the caller's account for deletion (App Store mandate) and
     // tombstone their profile, then 202 with the queued request id. requireAuth

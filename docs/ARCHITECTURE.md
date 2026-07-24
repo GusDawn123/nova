@@ -569,7 +569,15 @@ and RLS posture.
 
 - `profiles` — user profile (1:1 with auth.users); **built (Phase 6):** **`plan`**
   (`text not null default 'free' check in ('free','pro')` — the quota tier, written by
-  the RevenueCat webhook, read by the quota checker)
+  the RevenueCat webhook, read by the quota checker); **built (2026-07-23, adr-0008):**
+  **`role`** (`text not null default 'customer' check in ('developer','admin','customer')`
+  — the PERMISSION axis, orthogonal to `plan`; written only via service_role
+  (`scripts/set_user_role.ts`), read by `db/roles.ts` → `/me.role` + the `requireRole`
+  preHandler seam). The same migration (`20260723100000`) FIXES a live privilege hole:
+  the blanket `authenticated` UPDATE grant on profiles is revoked and re-granted
+  column-scoped to `display_name, deleted_at` — a user JWT can no longer
+  `set plan='pro'` (or `role='admin'`) on its own row (RLS checks rows, not columns);
+  proven by `db/profiles-grants.integration.test.ts`.
 - `meetings` — id, user_id, title, started_at, **`ended_at`** (call completion), **`indexed_at`**
   (RAG sweeper marker: finished + null → unindexed backlog), deleted_at; **built (Phase 5):**
   **`notes`** jsonb (ONLY ever a zod-valid `meetingNotesSchema` object — the ladder guarantees
@@ -647,3 +655,9 @@ Details in `GIT_WORKFLOW.md`.
   fixture-tested seam. Build amendments (in the ADR): quota/cap FAIL-OPEN vs ownership
   FAIL-CLOSED, lineup-head STT attribution, rerank amount=1/request, RC static-bearer
   auth. Design: `DESIGN/metering.md`.
+- **ADR-0008** — Permission roles developer/admin/customer on `profiles.role`
+  (column-over-JWT-claim: PlanReader-twin seam, next-request revocation, service-role
+  assignment), the `requireRole` fail-CLOSED preHandler seam, `/me.role` as best-effort
+  display data, mobile `use-role` conservative gating (Test Live tab hidden until proven
+  dev/admin) — plus the shipped-together security fix: profiles UPDATE re-granted
+  column-scoped (`display_name, deleted_at` only), closing the free→pro self-upgrade.

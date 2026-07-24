@@ -64,7 +64,18 @@ question→first-token p50=800ms p95=1450ms (<2000/<4000), speculation-hit p50=0
 final→visible p50=800ms (<1500); relevance 9/10 (bar ≥7, OpenAI+Google); grounding contains the
 stored `$47,500` fact (Voyage+DB); quiet 11/11 small-talk silent; typed-input E2E over the real
 socket+LLM: deltas=6, answer_len=883, echoed as "them", persisted (~1.9s). Live gates are
-key-gated (skipIf) — keyless CI self-skips.**
+key-gated (skipIf) — keyless CI self-skips.
+ROLES (2026-07-23, adr-0008): `profiles.role` developer|admin|customer (migration
+`20260723100000` — which ALSO fixes a live privilege hole: profiles UPDATE re-granted
+column-scoped `display_name, deleted_at` only, so a user JWT can no longer self-set
+plan='pro'/role='admin'; proven in `db/profiles-grants.integration.test.ts`). Seams:
+`db/roles.ts` RoleReader (missing/deleted → 'customer'; DB error rejects), `/me` gains
+optional `role` (display, best-effort), `plugins/role.ts` `createRequireRole` (403 fail
+CLOSED, 503 unwired, no consumers yet), `scripts/set_user_role.ts <email|uuid> <role>`
+(service-role assignment; auto-loads apps/server/.env). Mobile: `use-role` (resolves
+'customer' until proven — no flash) hides the "Test Live" tab (renamed from "Live",
+label-only — route file stays `live.tsx`) for customers via the SDK 57 native-tabs
+`hidden` prop.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by
