@@ -75,7 +75,13 @@ CLOSED, 503 unwired, no consumers yet), `scripts/set_user_role.ts <email|uuid> <
 (service-role assignment; auto-loads apps/server/.env). Mobile: `use-role` (resolves
 'customer' until proven — no flash) hides the "Test Live" tab (renamed from "Live",
 label-only — route file stays `live.tsx`) for customers via the SDK 57 native-tabs
-`hidden` prop.**
+`hidden` prop.
+MODEL REFRESH (2026-07-23, adr-0004 addendum): default models are now `gpt-5.4-mini`
+($0.75/$4.50 per 1M, VERIFIED on OpenAI's pricing page; reasoning pinned OFF via
+`reasoning_effort: "none"` — the model REJECTS 'minimal') and `gemini-3.5-flash-lite`
+($0.30/$2.50 per 1M; the lite model REJECTS thinkingConfig — non-thinking by default, the
+knob removed from the adapter). Price book swapped in lockstep (old ids dropped —
+historical usage_events keep their stamped costs). Live smokes green on the new ids.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

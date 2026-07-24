@@ -28,6 +28,14 @@ export interface OpenAiCompatibleOptions {
   /** Override the API host (Groq points this at its OpenAI-compatible URL). */
   baseURL?: string;
   maxOutputTokens?: number;
+  /**
+   * Reasoning-effort floor for reasoning-capable models (gpt-5.x family).
+   * adr-0004 §4: reasoning OFF at the adapter layer is the single biggest TTFT
+   * lever, and reasoning tokens count against `max_completion_tokens` (a small
+   * cap could be consumed entirely by reasoning — the Gemini thinking trap).
+   * Omit for endpoints/models without the param (Groq passes nothing).
+   */
+  reasoningEffort?: "none" | "minimal";
 }
 
 /**
@@ -48,8 +56,11 @@ export function createOpenAiCompatibleProvider(
 ): LlmProvider {
   // maxRetries: 0 — retries are the ROUTER's job (failover + breaker); SDK
   // retries must not stack under it (would burn the TTFT window / re-hammer 429s).
-  const clientOptions: { apiKey: string; maxRetries: number; baseURL?: string } =
-    { apiKey: opts.apiKey, maxRetries: 0 };
+  const clientOptions: {
+    apiKey: string;
+    maxRetries: number;
+    baseURL?: string;
+  } = { apiKey: opts.apiKey, maxRetries: 0 };
   if (opts.baseURL !== undefined) {
     clientOptions.baseURL = opts.baseURL;
   }
@@ -74,6 +85,9 @@ export function createOpenAiCompatibleProvider(
             // Usage arrives in a final chunk (after `[DONE]`-adjacent deltas);
             // without this it is omitted from streamed responses.
             stream_options: { include_usage: true },
+            ...(opts.reasoningEffort !== undefined
+              ? { reasoning_effort: opts.reasoningEffort }
+              : {}),
           },
           { signal },
         );

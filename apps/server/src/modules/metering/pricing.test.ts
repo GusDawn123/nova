@@ -30,13 +30,13 @@ describe("createPricer — known models price per the book", () => {
     const input: UsageEventInput = {
       ...base,
       kind: "llm_tokens",
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       amount: 1500,
       inputAmount: 1000,
       outputAmount: 500,
     };
-    // 1000/1e6 * 0.15 + 500/1e6 * 0.60 = 0.00015 + 0.00030 = 0.00045
-    expect(pricer.price(input, logger)).toBeCloseTo(0.00045, 10);
+    // 1000/1e6 * 0.75 + 500/1e6 * 4.50 = 0.00075 + 0.00225 = 0.00300
+    expect(pricer.price(input, logger)).toBeCloseTo(0.003, 10);
     expect(logger.warn).not.toHaveBeenCalled();
   });
 
@@ -162,9 +162,13 @@ describe("createPricer — unknown price → 0 + exactly one warn", () => {
 describe("priceBook is zod-defaulted + override-able", () => {
   it("parses an empty object into the full default book", () => {
     const book = priceBookSchema.parse({});
-    expect(book.llm["gpt-4o-mini"]).toEqual({
-      inputPer1MUsd: 0.15,
-      outputPer1MUsd: 0.6,
+    expect(book.llm["gpt-5.4-mini"]).toEqual({
+      inputPer1MUsd: 0.75,
+      outputPer1MUsd: 4.5,
+    });
+    expect(book.llm["gemini-3.5-flash-lite"]).toEqual({
+      inputPer1MUsd: 0.3,
+      outputPer1MUsd: 2.5,
     });
     expect(book.sttPerHourUsd.deepgram).toBe(0.26);
     expect(book.rerankPer1kRequestsUsd).toBe(0.05);

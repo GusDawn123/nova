@@ -71,6 +71,30 @@ consumes it. This ADR records the routing/latency decisions made during and afte
   decision 7's posture. Incremental-safe header-strip / `$`-escape passes remain a future
   add if live output quality demands them.
 
+## Addendum — 2026-07-23 model refresh (decision 5 in action)
+
+Default model swaps (config/adapter-level only — the router is untouched, exactly as
+decision 5 intends):
+- **openai: `gpt-4o-mini` → `gpt-5.4-mini`** ($0.75/$4.50 per 1M, verified on OpenAI's
+  pricing page at swap time; the price book moved in lockstep). gpt-5.x minis are
+  reasoning-capable, so the shared OpenAI-compatible engine gained an optional
+  `reasoningEffort` knob and the openai adapter pins **`reasoning_effort: "none"`** —
+  probed live: the model REJECTS `'minimal'` (400; accepts none/low/medium/high/xhigh)
+  and `"none"` yields `reasoning_tokens: 0`. Groq passes no knob (its llama endpoint has
+  no such param).
+- **google: `gemini-2.5-flash` → `gemini-3.5-flash-lite`** ($0.30/$2.50 per 1M). Probed
+  live: the LITE model **rejects any `thinkingConfig`** (400 INVALID_ARGUMENT for both
+  `thinkingBudget: 0` and `thinkingLevel`) — the lite lineage is non-thinking BY
+  DEFAULT, so the adapter now OMITS the knob; omission IS the off state. If the default
+  ever returns to a thinking-by-default variant, the knob must come back
+  (model-conditional).
+- Groq (`llama-3.1-8b-instant`) and Anthropic (disabled; `claude-haiku-4-5`) unchanged;
+  `liveOrder`/`defaultOrder` unchanged.
+- These defaults also serve the DELIBERATE tier (notes pipeline) — the key-gated
+  `notes.accuracy.test.ts` re-runs on the new models (see the Phase 7 gate runs).
+- Old price-book ids are DROPPED: costs stamp at write time, so historical
+  `usage_events` rows keep the rate they were written with.
+
 ## Known gaps (logged Phase 3+ openers)
 - Post-commit failures don't feed the circuit breaker (one-token-then-die vendor
   wins every race). Top priority before real traffic.

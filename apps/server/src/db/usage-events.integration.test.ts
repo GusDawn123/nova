@@ -96,7 +96,7 @@ describe.skipIf(!hasStack)("UsageEventsDb (local stack)", () => {
       amount: 1500,
       inputAmount: 1000,
       outputAmount: 500,
-      model: "gpt-4o-mini",
+      model: "gpt-5.4-mini",
       costEstimateUsd: 0.00045,
     });
 
@@ -113,7 +113,7 @@ describe.skipIf(!hasStack)("UsageEventsDb (local stack)", () => {
     expect(Number(r.amount)).toBe(1500);
     expect(Number(r.input_amount)).toBe(1000);
     expect(Number(r.output_amount)).toBe(500);
-    expect(r.model).toBe("gpt-4o-mini");
+    expect(r.model).toBe("gpt-5.4-mini");
     expect(Number(r.cost_estimate_usd)).toBeCloseTo(0.00045, 8);
   });
 

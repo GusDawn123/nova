@@ -51,7 +51,12 @@
 > through the router but self-skips without a vendor key (CI has none, so all 4 cases skip); the
 > phase's live-smoke-on-≥2-providers gate is a Gustavo action item (default models
 > `claude-haiku-4-5` / `gpt-4o-mini` / `gemini-2.5-flash` / `llama-3.1-8b-instant` unverified
-> until then).
+> until then). **Model refresh 2026-07-23 (adr-0004 addendum):** current defaults are
+> **`gpt-5.4-mini`** ($0.75/$4.50 per 1M, reasoning pinned OFF via `reasoning_effort: "none"`)
+> and **`gemini-3.5-flash-lite`** ($0.30/$2.50 per 1M, non-thinking by default — the
+> thinkingConfig knob removed; the lite model rejects it); groq/anthropic unchanged. Live
+> smokes re-ran GREEN on the new ids through the real router; the price book moved in
+> lockstep.
 
 > **Rows 7–10 — Phase 7 live copilot loop (branch `dev-claude-live-copilot`):** the live
 > loop ships — the llm `latencyTier: "live"` cheapest-first cascade (`modules/llm`), the pure
