@@ -451,7 +451,11 @@ conductor · changing any post-call prompt · seeding the post-call reduce from 
 
 ## 13. Adjacent findings (out of scope, raised for the record)
 
-**F1 — `public.meetings` still carries a table-wide `grant update ... to authenticated`.**
+**F1 — `public.meetings` carried a table-wide `grant update ... to authenticated`. FIXED
+2026-07-25** (`20260725120000_tighten_meetings_grants.sql` + `db/meetings-grants.integration.test.ts`,
+which proved the hole open before the migration and closed after: a real user JWT could
+write `indexed_at`, `ended_at`, `notes_status`, `notes`, and smuggle server columns on
+INSERT). Original writeup follows.
 `create_meetings` (20260719215139) grants blanket UPDATE, and no later migration tightens it
 — `20260723100000` fixed exactly this class of hole on `profiles` (blanket UPDATE → column-
 scoped `display_name, deleted_at`) but did not touch `meetings`. Combined with
