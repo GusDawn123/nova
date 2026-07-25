@@ -128,7 +128,7 @@ describe("follow-up [meter] — meterFor threading", () => {
 
     const result = await followUp({
       notes: NOTES,
-      tone: "friendly",
+      tone: "warm",
       meetingTitle: "Renewal call",
       userId: "user-42",
       meetingId: "meeting-7",
@@ -153,7 +153,7 @@ describe("follow-up [meter] — meterFor threading", () => {
 
     await followUp({
       notes: NOTES,
-      tone: "friendly",
+      tone: "warm",
       meetingTitle: "Renewal call",
     });
 

@@ -43,10 +43,10 @@ function capturingRouter(reply: string | (() => never)): {
     async *stream(req: ChatRequest): AsyncGenerator<LlmStreamEvent> {
       calls.push(req.messages);
       await Promise.resolve(); // async generator: yields on the microtask queue
-      if (typeof reply === "function") {
-        reply(); // throws (transport-failure simulation)
-      }
-      yield { type: "token", text: reply };
+      // `reply()` returns `never` (it throws — the transport-failure
+      // simulation), so this also narrows `reply` to string for the yield.
+      const text = typeof reply === "function" ? reply() : reply;
+      yield { type: "token", text };
       yield { type: "done", usage: { inputTokens: 12, outputTokens: 7 } };
     },
   };

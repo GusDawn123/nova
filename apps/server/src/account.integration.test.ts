@@ -92,7 +92,14 @@ describe.skipIf(!hasStack)(
           .from("deletion_requests")
           .select("id, user_id, processed_at")
           .eq("user_id", userId)
-          .is("processed_at", null);
+          .is("processed_at", null)
+          // The admin client is built without a `Database` generic, so rows
+          // infer as `never`; name the columns we selected (RULES §1 house
+          // style: explicit columns, shape stated at the boundary).
+          .overrideTypes<
+            { id: string; user_id: string; processed_at: string | null }[],
+            { merge: false }
+          >();
         expect(pending.error).toBeNull();
         expect(pending.data).toHaveLength(1);
         expect(pending.data?.[0]?.id).toBe(firstBody.request_id);
@@ -103,7 +110,11 @@ describe.skipIf(!hasStack)(
           .from("profiles")
           .select("id, deleted_at")
           .eq("id", userId)
-          .single();
+          .single()
+          .overrideTypes<
+            { id: string; deleted_at: string | null },
+            { merge: false }
+          >();
         expect(profile.error).toBeNull();
         expect(profile.data?.deleted_at).not.toBeNull();
 

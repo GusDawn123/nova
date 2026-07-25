@@ -13,7 +13,8 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc -b && npm run typecheck --workspace apps/mobile",
+    "typecheck": "tsc -b && npm run typecheck:tests && npm run typecheck --workspace apps/mobile",
+    "typecheck:tests": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit",
     "lint": "eslint . && npm run lint --workspace apps/mobile",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",

@@ -7,7 +7,6 @@ import { LlmError } from "../llm/index.js";
 import { createNotesJobHandler } from "./handler.js";
 import type {
   NotesLogger,
-  NotesMeetingMeta,
   NotesPipeline,
   NotesSource,
   NotesSourceMeeting,
@@ -64,7 +63,9 @@ describe("createNotesJobHandler", () => {
   it("loads → generates → writes → completed with usage", async () => {
     const writeNotes = vi.fn(() => Promise.resolve());
     const writer: NotesWriter = { writeNotes };
-    const generate = vi.fn(() => Promise.resolve({ notes: NOTES, usage: USAGE }));
+    const generate = vi.fn<NotesPipeline["generate"]>(() =>
+      Promise.resolve({ notes: NOTES, usage: USAGE }),
+    );
     const now = (): Date => new Date("2026-07-22T16:00:00Z");
     const handler = createNotesJobHandler({
       pipeline: fakePipeline(generate),
@@ -78,8 +79,7 @@ describe("createNotesJobHandler", () => {
 
     expect(outcome).toEqual({ outcome: "completed", usage: USAGE });
     // The pipeline saw the loaded meta + turns.
-    const meta = generate.mock.calls[0]?.[0] as NotesMeetingMeta;
-    expect(meta.id).toBe("meeting-1");
+    expect(generate.mock.calls[0]?.[0].id).toBe("meeting-1");
     // The writer persisted notes with the injected generatedAt (user-scoped write).
     expect(writeNotes).toHaveBeenCalledWith(
       "meeting-1",
