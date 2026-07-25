@@ -467,6 +467,7 @@ describe("LiveSession meeting-ownership guard (C1)", () => {
 interface FakeConductor {
   partials: string[];
   finals: string[];
+  directQuestions: string[];
   disposed: number;
 }
 
@@ -475,13 +476,19 @@ function makeFakeConductor(): {
   calls: { userId: string; meetingId: string }[];
   conductor: FakeConductor;
 } {
-  const conductor: FakeConductor = { partials: [], finals: [], disposed: 0 };
+  const conductor: FakeConductor = {
+    partials: [],
+    finals: [],
+    directQuestions: [],
+    disposed: 0,
+  };
   const calls: { userId: string; meetingId: string }[] = [];
   const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
     calls.push({ userId: args.userId, meetingId: args.meetingId });
     return {
       onPartial: (text) => conductor.partials.push(text),
       onFinal: (text) => conductor.finals.push(text),
+      onDirectQuestion: (text) => conductor.directQuestions.push(text),
       dispose: () => {
         conductor.disposed += 1;
       },
@@ -542,8 +549,13 @@ describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
 });
 
 describe("LiveSession typed input (transcript.input, Phase 7)", () => {
-  const inputFrame = (text: string): string =>
-    JSON.stringify({ v: 1, type: "transcript.input", text });
+  const inputFrame = (text: string, origin?: string): string =>
+    JSON.stringify({
+      v: 1,
+      type: "transcript.input",
+      text,
+      ...(origin !== undefined ? { origin } : {}),
+    });
 
   it("refuses typed input before session.start with input_before_start", () => {
     const { session, sent } = makeSession();
@@ -598,6 +610,118 @@ describe("LiveSession typed input (transcript.input, Phase 7)", () => {
       content: "typed note about the deal",
       speaker: "them",
     });
+  });
+
+
+  it("[origin] a copilot_question is echoed as SPEAKER ME, never as 'them'", async () => {
+    const fake = makeFakeEngine();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("how should I price this?", "copilot_question"),
+    );
+
+    const echoed = sent.find((e) => e.type === "transcript.final");
+    expect(echoed).toMatchObject({
+      text: "how should I price this?",
+      speaker: "me",
+    });
+    // Scenario 1: nothing may claim the OTHER party said this.
+    expect(
+      sent.filter((e) => e.type === "transcript.final" && e.speaker === "them"),
+    ).toHaveLength(0);
+  });
+
+  it("[origin] a copilot_question is NEVER persisted (no notes/RAG contamination)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("should I offer the annual discount?", "copilot_question"),
+    );
+    await flush();
+
+    // Scenarios 1 + 2: no transcripts row => never read by the notes pipeline,
+    // never chunked/embedded into RAG memory.
+    expect(persister.saveCalls).toHaveLength(0);
+  });
+
+  it("[origin] a copilot_question reaches the conductor as a DIRECT question", async () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("what did we quote Acme?", "copilot_question"),
+    );
+
+    // Still answered (that is the whole point of typing to your copilot) —
+    // but through the direct channel, not as an utterance by the other party.
+    expect(c.conductor.directQuestions).toEqual(["what did we quote Acme?"]);
+    expect(c.conductor.finals).toEqual([]);
+  });
+
+  it("[origin] an explicit utterance still behaves exactly as before", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const c = makeFakeConductor();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("we need this by Friday", "utterance"),
+    );
+    await flush();
+
+    expect(sent.find((e) => e.type === "transcript.final")).toMatchObject({
+      speaker: "them",
+    });
+    expect(persister.saveCalls).toHaveLength(1);
+    expect(c.conductor.finals).toEqual(["we need this by Friday"]);
+  });
+
+  it("[origin] an OMITTED origin stays an utterance (backward compatible)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(inputFrame("they said yes to the pilot"));
+    await flush();
+
+    expect(sent.find((e) => e.type === "transcript.final")).toMatchObject({
+      speaker: "them",
+    });
+    expect(persister.saveCalls).toHaveLength(1);
   });
 
   it("refuses typed input after teardown (disposed session)", async () => {

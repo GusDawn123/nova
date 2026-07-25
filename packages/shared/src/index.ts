@@ -20,11 +20,13 @@ export {
   suggestionDoneSchema,
   suggestionStartSchema,
   transcriptFinalSchema,
+  transcriptInputOriginSchema,
   transcriptInputSchema,
   transcriptPartialSchema,
   type ClientLiveEvent,
   type LiveErrorCode,
   type ServerLiveEvent,
+  type TranscriptInputOrigin,
 } from "./live.js";
 export {
   meResponseSchema,

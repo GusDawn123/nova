@@ -30,6 +30,15 @@ import { isConfidentPartial, reconcile } from "./speculation.js";
 export interface LiveConductor {
   onPartial(text: string, speaker: string | null): void;
   onFinal(text: string, speaker: string | null): void;
+  /**
+   * A question typed straight AT the copilot (`transcript.input` with
+   * `origin: "copilot_question"`). Bypasses the trigger gate — the gate exists to
+   * decide whether an overheard utterance is worth spending on, and a question
+   * the user deliberately typed to their assistant already answered that. Matches
+   * the 2026-07-23 prompt-freedom decision ("the AI always answers"). The turn is
+   * recorded as the USER's own, never as the other party's.
+   */
+  onDirectQuestion(text: string): void;
   /** Abort any in-flight generation (teardown). No discard — the socket closes. */
   dispose(): void;
 }
@@ -349,6 +358,24 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       // newest question owns the focal pane (startGeneration discards the old one).
       const trigger = evaluateTrigger(finalText, isUserSpeaker(speaker));
       if (trigger.fire) startGeneration(trigger, finalText, false);
+    },
+
+    onDirectQuestion(text) {
+      if (disposed) return;
+      const asked = text.trim();
+      if (asked === "") return;
+      // The user's OWN turn — never "them" (that mislabel is the whole bug this
+      // channel exists to fix), and it stays in the ephemeral prompt window only.
+      pushTurn(asked, "me");
+      // A direct question supersedes the pane outright, so drop any outstanding
+      // speculation first: its generation is about to be discarded, and leaving
+      // it set would make the next final reconcile against a dead id.
+      speculation = null;
+      startGeneration(
+        { fire: true, kind: "answer", reason: "direct_question" },
+        asked,
+        false,
+      );
     },
 
     dispose() {

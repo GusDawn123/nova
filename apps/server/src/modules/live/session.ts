@@ -6,6 +6,7 @@ import {
   type ClientLiveEvent,
   type LiveErrorCode,
   type ServerLiveEvent,
+  type TranscriptInputOrigin,
 } from "@nova/shared";
 
 import type { SttEngine, SttSessionHandle } from "../stt/ports.js";
@@ -232,7 +233,7 @@ export class LiveSession {
         this.sendError("invalid_event", "audio must be sent as binary frames");
         return;
       case "transcript.input":
-        this.onTranscriptInput(event.text);
+        this.onTranscriptInput(event.text, event.origin);
         return;
     }
   }
@@ -248,7 +249,10 @@ export class LiveSession {
    * before that it is refused with a typed error. No new vendor call site: any
    * resulting suggestion rides the conductor's already-metered router path.
    */
-  private onTranscriptInput(text: string): void {
+  private onTranscriptInput(
+    text: string,
+    origin: TranscriptInputOrigin = "utterance",
+  ): void {
     if (this.sessionId === null || this.disposer.disposed) {
       this.sendError(
         "input_before_start",
@@ -258,6 +262,27 @@ export class LiveSession {
     }
     const tsMs =
       this.startedAtMs !== null ? Date.now() - this.startedAtMs : Date.now();
+
+    if (origin === "copilot_question") {
+      // NOT part of the conversation — the user asked their assistant something.
+      // Echoed back as their OWN turn so the UI can show it, routed to the
+      // conductor's direct channel so it is always answered, and deliberately
+      // NOT run through `onServerEvent`: that is the path that persists, and a
+      // question to the copilot must never become a `transcripts` row (from
+      // there it would reach post-call notes and RAG memory as something the
+      // other party said — see docs/DESIGN/live-notes.md §13 F2).
+      this.send({
+        v: LIVE_PROTOCOL_VERSION,
+        type: "transcript.final",
+        text,
+        speaker: "me",
+        ts_ms: tsMs,
+        is_final: true,
+      });
+      this.conductor?.onDirectQuestion(text);
+      return;
+    }
+
     this.onServerEvent({
       v: LIVE_PROTOCOL_VERSION,
       type: "transcript.final",

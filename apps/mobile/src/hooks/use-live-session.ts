@@ -284,6 +284,13 @@ export function useLiveSession(): UseLiveSession {
     };
   }, [auth, stop, reset, applyEvent]);
 
+  /**
+   * Send what the user typed. The bottom input on the Live screen is labelled
+   * "Ask a question…" — it is a message to the COPILOT, not a line of the call —
+   * so it goes up as `origin: "copilot_question"`. The server then answers it but
+   * never writes it to `transcripts`, which is what used to leak typed questions
+   * into post-call notes and RAG memory as something the other party said.
+   */
   const sendInput = useCallback((text: string): void => {
     const trimmed = text.trim();
     const socket = socketRef.current;
@@ -299,6 +306,7 @@ export function useLiveSession(): UseLiveSession {
         v: LIVE_PROTOCOL_VERSION,
         type: 'transcript.input',
         text: trimmed.slice(0, 2000),
+        origin: 'copilot_question',
       }),
     );
   }, []);

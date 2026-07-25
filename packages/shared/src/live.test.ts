@@ -51,6 +51,40 @@ describe("clientLiveEventSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts transcript.input with an explicit origin (Phase 8 fix)", () => {
+    for (const origin of ["utterance", "copilot_question"]) {
+      const result = parseClientEvent({
+        v: 1,
+        type: "transcript.input",
+        text: "how should I price this?",
+        origin,
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("treats an OMITTED origin as absent (backward compatible)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "transcript.input",
+      text: "they said yes",
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === "transcript.input") {
+      expect(result.data.origin).toBeUndefined();
+    }
+  });
+
+  it("rejects an unknown transcript.input origin (closed set)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "transcript.input",
+      text: "hello there",
+      origin: "whatever",
+    });
+    expect(result.success).toBe(false);
+  });
+
   it("rejects transcript.input with empty or oversized text", () => {
     expect(
       parseClientEvent({ v: 1, type: "transcript.input", text: "" }).success,

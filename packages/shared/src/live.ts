@@ -57,6 +57,30 @@ export const audioFrameMarkerSchema = z.object({
 });
 
 /**
+ * WHICH of the two things a `transcript.input` means. The channel was built to
+ * carry both (Phase 7) and the server could not tell them apart — so every
+ * question typed AT the copilot was recorded as a line the OTHER party spoke,
+ * and flowed on into post-call notes and RAG memory as a fact about the call.
+ *
+ *   utterance         The user is typing what was SAID (mic off / noisy room).
+ *                     Attributed to "them", echoed, persisted, indexed — the
+ *                     original Phase 7 behavior, and correct for this meaning.
+ *   copilot_question  The user is asking their COPILOT something. Answered (that
+ *                     is the point), echoed back as the user's OWN turn, and
+ *                     deliberately NOT persisted: it is not part of the call, so
+ *                     it must never reach the transcript, the notes, or memory.
+ *
+ * OPTIONAL, and an omitted value means `utterance` — the field is additive, so a
+ * client older than this schema keeps its exact prior behavior rather than
+ * silently changing what gets stored.
+ */
+export const transcriptInputOriginSchema = z.enum([
+  "utterance",
+  "copilot_question",
+]);
+export type TranscriptInputOrigin = z.infer<typeof transcriptInputOriginSchema>;
+
+/**
  * A TYPED utterance from the conversation (Phase 7, decision 2026-07-22): the
  * user types what was said — or a question to the copilot — instead of (or
  * alongside) the mic. The server treats it exactly like a FINAL transcript
@@ -71,6 +95,7 @@ export const transcriptInputSchema = z.object({
   v: version,
   type: z.literal("transcript.input"),
   text: z.string().min(1).max(2000),
+  origin: transcriptInputOriginSchema.optional(),
 });
 
 /** Gracefully end the session; triggers server-side teardown. */
