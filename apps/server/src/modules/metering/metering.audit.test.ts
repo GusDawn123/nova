@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -78,7 +78,71 @@ function callArgs(src: string, callee: string): string[] {
   return args;
 }
 
+
+/**
+ * Every non-test `.ts` under `apps/server/src`, EXCLUDING any `testing/` directory —
+ * those are deliberate in-repo test harnesses (e.g. `modules/llm/testing/router-harness.ts`
+ * builds a bare router on purpose) and are never reachable from a production boot.
+ */
+function sourceFiles(dir: string = SRC_ROOT): string[] {
+  const out: string[] = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      if (entry.name === "testing" || entry.name === "node_modules") continue;
+      out.push(...sourceFiles(full));
+      continue;
+    }
+    if (entry.name.endsWith(".test.ts")) continue;
+    if (entry.name.endsWith(".ts")) out.push(full);
+  }
+  return out;
+}
+
+/**
+ * A paid-vendor construction site and the seam token that proves it was wired.
+ * `defines` marks the module that DECLARES the factory (the definition is not a
+ * call site, so it is exempt from needing the seam itself).
+ */
+const VENDOR_SITES = [
+  {
+    call: "createLlmRouter(",
+    seam: /meterFor|withMeter/,
+    defines: "export function createLlmRouter",
+    what: "an llm router",
+  },
+  {
+    call: "createRagFromEnv(",
+    seam: /logUsage/,
+    defines: "export function createRagFromEnv",
+    what: "a RAG service",
+  },
+] as const;
+
 describe("modules/metering wiring audit", () => {
+
+  /**
+   * The TREE-WIDE backstop. The per-file checks below prove the three KNOWN
+   * wiring files are correct; this one proves no FOURTH file quietly appears.
+   * Without it the audit's advertised guarantee ("no vendor path runs unmetered")
+   * was only ever "these three files are wired" — a new `createLlmRouter(` in any
+   * other module passed clean (verified: it did).
+   */
+  it("[metering-wired] NO module anywhere constructs a vendor path without the seam", () => {
+    const offenders: string[] = [];
+    for (const file of sourceFiles()) {
+      const src = readFileSync(file, "utf8");
+      for (const site of VENDOR_SITES) {
+        if (!src.includes(site.call)) continue;
+        if (src.includes(site.defines)) continue; // the declaring module
+        if (!site.seam.test(src)) {
+          offenders.push(`${file.slice(SRC_ROOT.length + 1)} builds ${site.what} without ${String(site.seam)}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it("[metering-buildable] the real metering sink is a non-noop Meter", () => {
     // A minimal stub DB — the audit only needs the service to construct + hand back a
     // meter, not to persist.
