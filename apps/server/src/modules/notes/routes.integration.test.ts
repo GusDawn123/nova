@@ -5,6 +5,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import {
   followUpDraftSchema,
+  identifyNotes,
   notesReadResponseSchema,
   type MeetingNotes,
 } from "@nova/shared";
@@ -40,8 +41,8 @@ const noPersist = {
 } as const;
 
 /** A valid notes object stored to force `notes_status='completed'` for follow-up. */
-const COMPLETED_NOTES: MeetingNotes = {
-  version: 1,
+const COMPLETED_NOTES: MeetingNotes = identifyNotes(
+  {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Agreed to renew on the Growth plan next quarter.",
@@ -59,9 +60,10 @@ const COMPLETED_NOTES: MeetingNotes = {
   ],
   openQuestions: [],
   risks: [],
-  typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
-  source: "generated",
-};
+    typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
+  },
+  "generated",
+);
 
 /** A mock router that streams a fixed body for the follow-up generate call. */
 function replyRouter(bodyJson: string): LlmRouter {

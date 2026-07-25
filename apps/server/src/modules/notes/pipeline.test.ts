@@ -95,7 +95,7 @@ describe("createNotesPipeline — single pass", () => {
     // Persist-shaped: passes the strict shared schema, stamped generated/v1.
     expect(() => meetingNotesSchema.parse(notes)).not.toThrow();
     expect(notes.source).toBe("generated");
-    expect(notes.version).toBe(1);
+    expect(notes.version).toBe(2);
     expect(notes.conversationType).toBe("sales");
     expect(notes.typeInsights.kind).toBe("sales");
     // The grounded quote verifies (no unverified flag); the dated commitment survives.

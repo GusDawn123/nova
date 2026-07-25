@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackNotes, type MeetingNotes } from "@nova/shared";
+import {
+  FALLBACK_TLDR,
+  identifyNotes,
+  type MeetingNotes,
+  type NotesContent,
+} from "@nova/shared";
 
 import { joinTranscriptText, normalizeForMatch, verifyNotes } from "./verify-quotes.js";
 
@@ -12,15 +17,29 @@ import { joinTranscriptText, normalizeForMatch, verifyNotes } from "./verify-quo
 const TRANSCRIPT =
   "Alice: Let's ship the beta on Monday.\nBob: I'll send the proposal by Friday.";
 
-/** A generated-shaped notes object with the given decisions/actionItems spliced in. */
+/**
+ * A generated-shaped notes object with the given decisions/actionItems spliced in.
+ * Takes id-LESS content and mints ids via `identifyNotes` (v2) so each case reads as
+ * the facts under test, not as id bookkeeping.
+ */
 function notesWith(
-  overrides: Partial<Pick<MeetingNotes, "decisions" | "actionItems">>,
+  overrides: Partial<Pick<NotesContent, "decisions" | "actionItems">>,
 ): MeetingNotes {
-  return {
-    ...buildFallbackNotes("Test call"),
-    source: "generated",
-    ...overrides,
-  };
+  return identifyNotes(
+    {
+      conversationType: "casual",
+      title: "Test call",
+      tldr: FALLBACK_TLDR,
+      overview: FALLBACK_TLDR,
+      decisions: [],
+      actionItems: [],
+      openQuestions: [],
+      risks: [],
+      typeInsights: { kind: "casual" },
+      ...overrides,
+    },
+    "generated",
+  );
 }
 
 describe("verifyNotes — quote grounding", () => {

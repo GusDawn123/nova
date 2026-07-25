@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   followUpDraftSchema,
+  identifyNotes,
   type FollowUpTone,
   type MeetingNotes,
 } from "@nova/shared";
@@ -61,8 +62,8 @@ function promptText(messages: ChatMessage[]): string {
 const DECISION_TEXT = "Recommend the Enterprise plan for SSO and the audit log.";
 const ACTION_TEXT = "Send a proposal with the forty-seat Enterprise pricing.";
 
-const SALES_NOTES: MeetingNotes = {
-  version: 1,
+const SALES_NOTES: MeetingNotes = identifyNotes(
+  {
   conversationType: "sales",
   title: "Acme pricing call",
   tldr: "Reviewed pricing tiers and aligned on the Enterprise plan for security needs.",
@@ -80,9 +81,10 @@ const SALES_NOTES: MeetingNotes = {
   ],
   openQuestions: ["Confirm the SOC 2 report scope."],
   risks: ["A full SOC 2 report can take several days via compliance."],
-  typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
-  source: "generated",
-};
+    typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
+  },
+  "generated",
+);
 
 const VALID_REPLY = JSON.stringify({
   subject: "Acme pricing — Enterprise proposal to follow",

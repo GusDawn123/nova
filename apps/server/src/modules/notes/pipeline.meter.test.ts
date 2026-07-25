@@ -1,4 +1,8 @@
-import { meetingNotesSchema } from "@nova/shared";
+import {
+  identifyNotes,
+  meetingNotesSchema,
+  type NotesContent,
+} from "@nova/shared";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Meter } from "../llm/index.js";
@@ -31,7 +35,7 @@ const TURNS: TranscriptTurn[] = [
 ];
 
 /** A schema-valid single-pass sales notes object the mock generate call returns. */
-const SALES_NOTES = {
+const SALES_NOTES: NotesContent = {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Discussed the renewal and agreed on next steps.",
@@ -105,11 +109,7 @@ describe("notes pipeline [meter] — meterFor threading", () => {
 
 describe("follow-up [meter] — meterFor threading", () => {
   // Parsed through the shared schema so the fixture is provably wire-valid (no cast).
-  const NOTES = meetingNotesSchema.parse({
-    version: 1,
-    source: "generated",
-    ...SALES_NOTES,
-  });
+  const NOTES = meetingNotesSchema.parse(identifyNotes(SALES_NOTES, "generated"));
 
   const DRAFT_BODY = {
     subject: "Follow-up: Renewal call",

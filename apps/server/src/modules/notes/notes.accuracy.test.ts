@@ -112,13 +112,19 @@ function notesTextBlob(notes: MeetingNotes): string {
     notes.overview,
     ...notes.decisions.map((d) => d.text),
     ...notes.actionItems.map((a) => a.text),
-    ...notes.openQuestions,
-    ...notes.risks,
+    ...notes.openQuestions.map((q) => q.text),
+    ...notes.risks.map((r) => r.text),
   ];
   if (notes.typeInsights.kind === "sales") {
-    parts.push(...notes.typeInsights.objections, ...notes.typeInsights.buyingSignals);
+    parts.push(
+      ...notes.typeInsights.objections.map((o) => o.text),
+      ...notes.typeInsights.buyingSignals.map((b) => b.text),
+    );
   } else if (notes.typeInsights.kind === "interview") {
-    parts.push(...notes.typeInsights.questionsAsked, ...notes.typeInsights.answersToRevisit);
+    parts.push(
+      ...notes.typeInsights.questionsAsked.map((q) => q.text),
+      ...notes.typeInsights.answersToRevisit.map((a) => a.text),
+    );
   }
   return parts.join(" ").toLowerCase();
 }
