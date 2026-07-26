@@ -50,6 +50,25 @@ export interface LiveNotesConductor {
   dispose(): void;
 }
 
+/** Per-session args the transport supplies at `session.start`. */
+export interface NotesConductorFactoryArgs {
+  readonly send: (event: ServerLiveEvent) => void;
+  readonly userId: string;
+  readonly meetingId: string;
+}
+
+/**
+ * Builds a {@link LiveNotesConductor} once a session is authenticated and its
+ * owner/meeting are known — the notes twin of {@link
+ * import("./conductor.js").LiveConductorFactory}. Wired by `metering-wiring.ts`
+ * closing over the live router, the store, the plan reader and the meter;
+ * undefined on a boot without an LLM key or without the DB, which is what makes
+ * the fail-closed posture literal: no factory, no conductor, no spend.
+ */
+export type LiveNotesConductorFactory = (
+  args: NotesConductorFactoryArgs,
+) => LiveNotesConductor;
+
 export interface LiveNotesConductorDeps {
   /** Emit a typed event down the socket (the session's own `send`). */
   send: (event: ServerLiveEvent) => void;
@@ -59,10 +78,27 @@ export interface LiveNotesConductorDeps {
   store: LiveNotesStore;
   readonly userId: string;
   readonly meetingId: string;
-  /** Seeds the notes title until the first narrative fold replaces it. */
-  readonly meetingTitle: string;
+  /**
+   * Seeds the notes title until the first narrative fold replaces it. Optional
+   * because the session does NOT know it: the ownership guard reads one column,
+   * and adding a title fetch would put a query on the session-start path the
+   * design explicitly keeps clear (§8). Nothing is observable before the first
+   * fold anyway — no row exists, so the REST read model answers null and the
+   * socket has emitted nothing — and that fold's narrative window is open.
+   */
+  readonly meetingTitle?: string;
   /** ISO start time, for relative-deadline resolution. Null → the injected clock. */
   readonly startedAt?: string | null;
+  /**
+   * Entitlement (Phase 8, §8). Resolved LAZILY on the first tick — never at
+   * session start, which already chains concurrency → daily cap → ownership →
+   * quota and must not grow — then LATCHED for the session, so a RevenueCat
+   * downgrade mid-call does not kill a call in progress.
+   *
+   * Fail-CLOSED: unresolvable entitlement stops the loop. This gates a paid
+   * capability, not a budget; the quota check above is the fail-open one.
+   */
+  isEntitled?: () => Promise<boolean>;
   /** Per-call meter (`metering.meterFor`); threaded into every model call. */
   meter?: Meter;
   logger?: LiveLogger;
@@ -109,7 +145,7 @@ export function createLiveNotesConductor(
   /** Accrued since the last fold that LANDED. Retained on every failure path. */
   let delta: TranscriptTurn[] = [];
 
-  let notes: MeetingNotes = emptyLiveNotes(deps.meetingTitle);
+  let notes: MeetingNotes = emptyLiveNotes(deps.meetingTitle ?? "");
   let state: FoldState = initialFoldState(null);
   let rev = 0;
   let foldsSpent = 0;
@@ -123,6 +159,8 @@ export function createLiveNotesConductor(
    */
   let classifiedType: ConversationType | null = null;
   let classified = false;
+  /** Entitlement is resolved once, on the first tick, then latched. */
+  let entitlementResolved = false;
 
   let inFlight: AbortController | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -222,7 +260,27 @@ export function createLiveNotesConductor(
       return;
     }
 
-    // 2. Budget and quota are terminal, not skips.
+    // 2a. Entitlement, once, lazily, latched — and BEFORE the budget/quota checks
+    //     so an unentitled session never touches the metering DB either.
+    if (!entitlementResolved && deps.isEntitled !== undefined) {
+      entitlementResolved = true;
+      let entitled = false;
+      try {
+        entitled = await deps.isEntitled();
+      } catch (err: unknown) {
+        // Fail CLOSED (§8): a capability gate that cannot answer denies. Contrast
+        // the quota check below, which fails open because it protects spend.
+        log({ err }, "live.notes_conductor.entitlement_check_failed");
+      }
+      if (!entitled) {
+        stopped = true;
+        log({}, "live.notes_conductor.not_entitled");
+        return;
+      }
+      if (isDisposed()) return;
+    }
+
+    // 2b. Budget and quota are terminal, not skips.
     if (foldsSpent >= config.maxFoldsPerSession) {
       stopped = true;
       log({ folds_spent: foldsSpent }, "live.notes_conductor.budget_exhausted");
@@ -273,8 +331,13 @@ export function createLiveNotesConductor(
           ? classifiedType
           : undefined;
 
-      // The narrative window: every Nth fold, or once enough items have moved.
+      // The narrative window: open on the FIRST fold (there is no narrative yet,
+      // so there is nothing to churn and the placeholder title/tldr should not
+      // survive a single fold), then every Nth fold, or once enough items move.
+      // Until one has landed it is REQUIRED, not offered — see FoldMessageParams.
+      const narrativeRequired = !state.titleLatched;
       const narrativeOpen =
+        narrativeRequired ||
         foldsSinceNarrative >= config.narrativeEveryNFolds ||
         Math.abs(itemCount(notes) - itemsAtLastNarrative) >=
           config.narrativeItemDelta;
@@ -286,6 +349,7 @@ export function createLiveNotesConductor(
         delta,
         state,
         narrativeOpen,
+        narrativeRequired,
         transcriptSoFar: joinTranscriptText(transcript),
         canLatchType: transcript.length >= config.classifyMinTurns,
         callDate,

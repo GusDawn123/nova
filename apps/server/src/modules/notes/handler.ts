@@ -1,6 +1,10 @@
+import type { MeetingNotes } from "@nova/shared";
+
 import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
+import type { LiveNotesStore } from "../../db/live-notes.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
 
+import { reconcileIds } from "./reconcile-ids.js";
 import type {
   NotesJobHandler,
   NotesLogger,
@@ -53,6 +57,18 @@ export interface NotesJobHandlerDeps {
    * posture) and fail-open on an internal failure.
    */
   readonly isOverLlmQuota?: (userId: string) => Promise<boolean>;
+  /**
+   * The live running-notes preview for this meeting (Phase 8, §3). Read just
+   * before the write so retained items can keep the ids the tab has been
+   * animating all call — without it, the authoritative notes replace the preview
+   * under brand-new ids and the client's diff shows "everything changed" at the
+   * exact moment the user is most likely watching.
+   *
+   * Optional (the keyless/DB-less posture) and BEST-EFFORT: a failed read means
+   * fresh ids, never a failed job. The final notes are authoritative; the
+   * animation is not worth risking them for.
+   */
+  readonly liveNotes?: LiveNotesStore;
 }
 
 /** Best-effort message from an unknown thrown value (never leaks a stack to logs). */
@@ -74,6 +90,29 @@ export function createNotesJobHandler(
 ): NotesJobHandler {
   const { pipeline, source, writer, logger } = deps;
   const now = deps.now ?? ((): Date => new Date());
+
+  /**
+   * The live preview, or null. Swallows every failure by design: reconciliation
+   * is a cosmetic win and the notes write behind it is not — a live-notes outage
+   * must never turn a successful generation into a retry.
+   */
+  async function readLivePreview(
+    meetingId: string,
+    userId: string,
+    base: Record<string, unknown>,
+  ): Promise<MeetingNotes | null> {
+    if (deps.liveNotes === undefined) return null;
+    try {
+      const row = await deps.liveNotes.readLiveNotes(meetingId, userId);
+      return row?.notes ?? null;
+    } catch (err) {
+      logger.error(
+        { ...base, error: errorMessage(err) },
+        "notes.handler.live_notes_read_failed",
+      );
+      return null;
+    }
+  }
 
   async function handle(
     job: ClaimedJob,
@@ -129,7 +168,14 @@ export function createNotesJobHandler(
       };
 
       const { notes, usage } = await pipeline.generate(meta, turns);
-      await writer.writeNotes(job.meetingId, job.userId, notes, now());
+
+      // Carry the live preview's ids onto the matching final items (§3). Pure,
+      // id-only, and it touches no LLM path — the content written below is the
+      // authoritative pipeline output either way.
+      const live = await readLivePreview(job.meetingId, job.userId, base);
+      const reconciled = reconcileIds(live, notes);
+
+      await writer.writeNotes(job.meetingId, job.userId, reconciled, now());
 
       // The per-user cost line (playbook "token usage per summary logged per user";
       // the Phase 6 metering seam). Ids + counts ONLY — never transcript content

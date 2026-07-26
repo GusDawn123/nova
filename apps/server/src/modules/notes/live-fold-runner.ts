@@ -43,6 +43,8 @@ export interface FoldRequest {
   readonly delta: readonly TranscriptTurn[];
   readonly state: FoldState;
   readonly narrativeOpen: boolean;
+  /** No narrative has ever landed — the model must produce one, not offer to. */
+  readonly narrativeRequired?: boolean;
   /** Transcript so far, for the quote check — the whole call, not just the delta. */
   readonly transcriptSoFar: string;
   readonly canLatchType: boolean;
@@ -107,6 +109,9 @@ export function createLiveFoldRunner(
         delta: formatTranscript([...request.delta]),
         callDate: request.callDate,
         narrativeOpen: request.narrativeOpen,
+        ...(request.narrativeRequired !== undefined
+          ? { narrativeRequired: request.narrativeRequired }
+          : {}),
       });
 
       const ladder = await runLadder({

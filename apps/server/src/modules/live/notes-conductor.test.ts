@@ -341,6 +341,82 @@ describe("[notes-conductor] the stops", () => {
   });
 });
 
+describe("[notes-conductor] entitlement", () => {
+  it("stops the loop for an unentitled plan, before any model call", async () => {
+    const store = fakeStore();
+    const conductor = makeConductor({
+      router: scriptedRouter([ADD_ONE]),
+      store,
+      isEntitled: () => Promise.resolve(false),
+    });
+
+    conductor.onFinal(...turn(1));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(prompts).toHaveLength(0);
+    expect(store.writes).toHaveLength(0);
+    expect(notesUpdates()).toHaveLength(0);
+    conductor.dispose();
+  });
+
+  it("fails CLOSED when the entitlement check throws", async () => {
+    // Contrast the quota check, which fails OPEN: quota protects spend, this
+    // gates a paid capability, and a gate that cannot answer denies (§8).
+    const store = fakeStore();
+    const errors: string[] = [];
+    const conductor = makeConductor({
+      router: scriptedRouter([ADD_ONE]),
+      store,
+      isEntitled: () => Promise.reject(new Error("plans table down")),
+      logger: { error: (_f, msg) => errors.push(msg) },
+    });
+
+    conductor.onFinal(...turn(1));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    expect(prompts).toHaveLength(0);
+    expect(errors).toContain("live.notes_conductor.entitlement_check_failed");
+    conductor.dispose();
+  });
+
+  it("resolves entitlement ONCE and latches it for the session", async () => {
+    // A mid-call downgrade must not kill a call already in progress.
+    let calls = 0;
+    const conductor = makeConductor({
+      router: scriptedRouter([ADD_ONE, ADD_TWO]),
+      isEntitled: () => {
+        calls += 1;
+        return Promise.resolve(calls === 1);
+      },
+    });
+
+    conductor.onFinal(...turn(1));
+    await vi.advanceTimersByTimeAsync(1000);
+    conductor.onFinal(...turn(2));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(calls).toBe(1);
+    expect(notesUpdates().map((u) => u.rev)).toEqual([1, 2]);
+    conductor.dispose();
+  });
+
+  it("is never resolved at construction — only on the first tick", async () => {
+    // Session start already chains concurrency → daily cap → ownership → quota;
+    // live notes must not add a DB round trip to it.
+    let calls = 0;
+    const conductor = makeConductor({
+      isEntitled: () => {
+        calls += 1;
+        return Promise.resolve(true);
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(calls).toBe(0); // constructed + hydrated, still not asked
+    conductor.dispose();
+  });
+});
+
 describe("[notes-conductor] the gate", () => {
   it("skips a pure small-talk delta without spending a call", async () => {
     const conductor = makeConductor({ router: scriptedRouter([ADD_ONE]) });

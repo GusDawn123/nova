@@ -30,16 +30,22 @@ the local stack up):
 | `8546466` | **pg Pool had no `error` handler** at any of 3 sites — one dropped idle connection killed the whole process (observed live). New `db/pg-pool.ts` factory + a static audit + a real-Postgres termination test. |
 | `c5e98de` | **Slice 2 — wire event + persistence.** §6 `notes.update` (additive, protocol stays `v: 1`); §7 `public.live_notes` (migration `20260726120000`, denormalized `user_id`, select-own RLS, NO `authenticated` write grant) + `db/live-notes.ts` (`LiveNotesStore`: user-scoped read, `rev`-guarded atomic upsert, parsed BOTH directions) riding the memoised jobs pool; §7 read model (`notesReadResponseSchema` gains `live_notes`/`live_notes_rev`, composed at the notes route behind the existing 404 gate). **Plus the slice-1 leftover:** `storedNotesSchema` was built but never wired — `db/notes.ts` and `db/schema.ts` still parsed `meetings.notes` with `meetingNotesSchema` (`z.literal(2)`), so a stored v1 row 500'd the read model. Both boundaries swapped, with a route-level regression test. No behavior change: nothing writes `live_notes` and nothing emits `notes.update` until slice 3. |
 | `859f6e6` | **Slice 3 — the fold, the loop, the gate.** §3 `live-fold.ts` (`applyFold`, all ten clamps, never throws; split across `live-fold-ops.ts` / `live-fold-state.ts` for the ~400-line cap) + `live-fold-runner.ts` (prompt → ladder → reducer, so `modules/live` reaches the notes domain through ONE interface) + `prompts/live-fold.ts` (ops against an id+text digest — no quotes back, so the model structurally cannot rewrite one) + `reconcile-ids.ts`. §4 `notes-conductor.ts` + `notes-conductor-config.ts`: hydrate-and-emit at start, debounced tick, single in-flight latch, per-session fold budget + quota stop, narrative window, dispose-without-write. §5 `notes-trigger.ts` over a shared `small-talk.ts` extracted verbatim from `trigger.ts`. **Still inert** — nothing constructs the conductor until §8. New: 76 tests, incl. the adversarial non-teleport suite and the fake-timer delta-lifecycle suite. |
+| *(pending)* | **Slice 4 — the wiring; the feature is ON.** §8: `LiveTranscriptConsumer[]` fan-out in `session.ts` (copilot #1, notes #2, per-consumer disposal, and a throw in one no longer starves the next or escapes into the relay); `maybeCreateLiveNotesConductorFactory` as its OWN top-level function in `metering-wiring.ts`, consumed by `modules/live/routes.ts`; `canUseLiveNotes(plan)` resolved LAZILY on the first tick (never on the session-start path) then latched, fail-CLOSED; `reconcileIds` in the post-call handler, best-effort so a live-notes outage can never fail a generation. **Audit fix:** `functionBlocks` never matched `export function`, so `metering-wiring.ts` collapsed into ONE block and every per-function metering assertion was vacuous — exactly the hole §8 warned about. **Prompt fix caught by the e2e:** the narrative was offered on the first fold, so the model declined and the placeholder tldr survived; it is now REQUIRED until one lands. |
 
-**Next up: slice 4 — the wiring, which is what finally turns the feature ON.** §8: the
-`LiveTranscriptConsumer[]` fan-out in `session.ts` (replacing the hardcoded
-`this.conductor?.on*`), `maybeCreateLiveNotesConductorFactory` as its OWN top-level function
-in `metering-wiring.ts` (the metering audit greps per-function — building it inside
-`maybeCreateLiveConductorFactory` would pass vacuously), the `canUseLiveNotes(plan)`
-entitlement resolved lazily on the first tick and latched at session start, wiring the
-factory in `modules/live/routes.ts`, extending `metering.audit.test.ts` with the two new
-LLM sites, and calling `reconcileIds` in the post-call handler before the notes are written.
-Until that lands, NOTHING constructs the conductor — slices 2 and 3 are both inert by design.
+**THE BACKEND FEATURE IS LIVE** as of slice 4 — proven end to end over a real socket
+against a real model (`live.notes.e2e.test.ts`): a `pro` call streams `notes.update`,
+persists its `live_notes` row at the announced rev, and a `free` call on the identical
+path gets zero events and zero rows.
+
+**Next up: what is left.**
+1. **§12.2 needs Gustavo:** `canUseLiveNotes` currently reads `plan === "pro"`. Pro-only,
+   or its own tier? It is one line in `modules/metering/config.ts`.
+2. **§12.3/§12.4 cost:** the fold interval is still the 25s guess. It is a near-linear
+   cost lever (~$0.10–0.15/hour-call at 25s) and now measurable against a real call.
+3. **Mobile (Gustavo):** render `notes.update` — the client rule is drop any update whose
+   `rev` <= the last seen. All animation is his.
+4. **Docs before the PR:** `adr-0009-live-notes`, ARCHITECTURE, CLAUDE (RULES §8).
+5. Real mic capture (Phase 9) is what makes this reachable outside the Test Live tab.
 
 **Local dev:** `npm run db:migrate` to pick up migrations (NOT `db:reset` — that drops
 everything; it exists to prove replay-from-zero). Seeded dev account:

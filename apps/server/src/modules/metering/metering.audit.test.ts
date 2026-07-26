@@ -33,10 +33,18 @@ const LIVE_ROUTES_TS = join(SRC_ROOT, "modules", "live", "routes.ts");
 /**
  * Split the source into top-level `function` blocks (name → body text). Good
  * enough for the audit: app.ts wires everything inside named top-level functions.
+ *
+ * `export ` IS part of the pattern, and that is load-bearing. Without it the
+ * regex missed every exported function, so `metering-wiring.ts` — where all but
+ * one function is exported — collapsed into a SINGLE block starting at its lone
+ * unexported helper and running to end-of-file. Every per-function assertion
+ * below then reduced to "somewhere in this file the word meterFor appears",
+ * which is exactly the vacuous pass the notes-factory case exists to prevent
+ * (design-doc §8). Found 2026-07-26 while adding that case.
  */
 function functionBlocks(src: string): Map<string, string> {
   const blocks = new Map<string, string>();
-  const re = /^(?:async )?function (\w+)/gm;
+  const re = /^(?:export )?(?:async )?function (\w+)/gm;
   const marks: { name: string; start: number }[] = [];
   for (let m = re.exec(src); m !== null; m = re.exec(src)) {
     marks.push({ name: m[1] ?? "", start: m.index });
@@ -227,6 +235,35 @@ describe("modules/metering wiring audit", () => {
     const routes = readFileSync(LIVE_ROUTES_TS, "utf8");
     expect(routes).toMatch(/maybeCreateLiveConductorFactory/);
     expect(routes).toMatch(/createConductor/);
+  });
+
+  it("[metering-wired] the live NOTES conductor is its own metered wiring site", () => {
+    // Phase 8: the running-notes fold is the SECOND live LLM path, and it runs on
+    // a per-tick cadence — an unmetered one would spend ~150 times per call.
+    //
+    // Asserting on the function BY NAME is the point. The per-function check
+    // above only proves that whichever functions build a router also mention
+    // `meterFor`; if the notes factory were nested inside
+    // `maybeCreateLiveConductorFactory` it would inherit that function's
+    // `meterFor` and pass vacuously. This pins it as a top-level block of its own.
+    const src = readFileSync(WIRING_TS, "utf8");
+    const blocks = functionBlocks(src);
+    const notesFactory = blocks.get("maybeCreateLiveNotesConductorFactory");
+    expect(
+      notesFactory,
+      "maybeCreateLiveNotesConductorFactory must be its OWN top-level function",
+    ).toBeDefined();
+    expect(notesFactory).toMatch(/createLlmRouter\(/);
+    expect(notesFactory).toMatch(/meterFor/);
+    // Its enforcement, not just its accounting: a per-user spend stop and the
+    // paid-feature gate both have to be threaded, or the fold has no ceiling.
+    expect(notesFactory).toMatch(/isOverQuota/);
+    expect(notesFactory).toMatch(/canUseLiveNotes/);
+
+    // The live transport actually consumes it.
+    const routes = readFileSync(LIVE_ROUTES_TS, "utf8");
+    expect(routes).toMatch(/maybeCreateLiveNotesConductorFactory/);
+    expect(routes).toMatch(/createNotesConductor/);
   });
 
   it("[metering-wired] the live STT transport wires the usage + quota seam", () => {

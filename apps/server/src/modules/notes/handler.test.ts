@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { buildFallbackNotes, type MeetingNotes } from "@nova/shared";
+import {
+  buildFallbackNotes,
+  identifyNotes,
+  type MeetingNotes,
+} from "@nova/shared";
 
 import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
+import type { LiveNotesStore } from "../../db/live-notes.js";
 import { LlmError } from "../llm/index.js";
 
 import { createNotesJobHandler } from "./handler.js";
@@ -58,6 +63,121 @@ function fakePipeline(
 ): NotesPipeline {
   return { generate };
 }
+
+/** A live-notes store that answers with `notes`, or throws when given an Error. */
+function fakeLiveNotes(seed: MeetingNotes | Error | null): LiveNotesStore {
+  return {
+    readLiveNotes: () =>
+      seed instanceof Error
+        ? Promise.reject(seed)
+        : Promise.resolve(
+            seed === null
+              ? null
+              : { notes: seed, rev: 3, updatedAt: "2026-07-22T15:30:00Z" },
+          ),
+    upsertLiveNotes: () => Promise.resolve({ status: "written", rev: 1 }),
+  };
+}
+
+/** Notes carrying one risk, so id carry-over is observable. */
+function notesWithRisk(text: string, source: "generated" | "live"): MeetingNotes {
+  return identifyNotes(
+    {
+      conversationType: "casual",
+      title: "Acme call",
+      tldr: "A call happened.",
+      overview: "Things were said on the call.",
+      decisions: [],
+      actionItems: [],
+      openQuestions: [],
+      risks: [text],
+      typeInsights: { kind: "casual" },
+    },
+    source,
+  );
+}
+
+describe("createNotesJobHandler — live-notes reconciliation (Phase 8 §3)", () => {
+  it("carries live ids onto the matching final items before the write", async () => {
+    const writeNotes = vi.fn<NotesWriter["writeNotes"]>(() => Promise.resolve());
+    // The live preview minted r1 for this risk during the call…
+    const live = notesWithRisk("Budget freeze", "live");
+    // …and the post-call pass re-derived it, freshly id'd as r1 too — but only
+    // because it is the sole item. Seed a SECOND live item so the carried id is
+    // r2, which a naive fresh mint would never produce.
+    const liveTwo: MeetingNotes = {
+      ...live,
+      risks: [
+        { id: "r1", text: "Something dropped from the final notes" },
+        { id: "r2", text: "Budget freeze" },
+      ],
+    };
+    const handler = createNotesJobHandler({
+      pipeline: fakePipeline(() =>
+        Promise.resolve({
+          notes: notesWithRisk("Budget freeze", "generated"),
+          usage: USAGE,
+        }),
+      ),
+      source: fakeSource(),
+      writer: { writeNotes },
+      logger: NOOP_LOGGER,
+      liveNotes: fakeLiveNotes(liveTwo),
+    });
+
+    await handler.handle(JOB);
+
+    const written = writeNotes.mock.calls[0]?.[2];
+    expect(written?.risks).toEqual([{ id: "r2", text: "Budget freeze" }]);
+    // The FINAL notes are still what gets written — reconcile only rewrites ids.
+    expect(written?.source).toBe("generated");
+  });
+
+  it("writes unreconciled notes when there is no live preview", async () => {
+    const writeNotes = vi.fn(() => Promise.resolve());
+    const handler = createNotesJobHandler({
+      pipeline: fakePipeline(),
+      source: fakeSource(),
+      writer: { writeNotes },
+      logger: NOOP_LOGGER,
+      liveNotes: fakeLiveNotes(null),
+    });
+
+    const outcome = await handler.handle(JOB);
+    expect(outcome).toEqual({ outcome: "completed", usage: USAGE });
+    expect(writeNotes).toHaveBeenCalledWith(
+      "meeting-1",
+      "user-1",
+      NOTES,
+      expect.any(Date),
+    );
+  });
+
+  it("[best-effort] a live-notes read failure still completes the job", async () => {
+    // The animation is cosmetic; the notes write behind it is not. A live-notes
+    // outage must never turn a successful generation into a retry.
+    const writeNotes = vi.fn(() => Promise.resolve());
+    const error = vi.fn();
+    const handler = createNotesJobHandler({
+      pipeline: fakePipeline(),
+      source: fakeSource(),
+      writer: { writeNotes },
+      logger: { info: () => {}, error },
+      liveNotes: fakeLiveNotes(new Error("live_notes unavailable")),
+    });
+
+    const outcome = await handler.handle(JOB);
+
+    expect(outcome).toEqual({ outcome: "completed", usage: USAGE });
+    expect(writeNotes).toHaveBeenCalledWith(
+      "meeting-1",
+      "user-1",
+      NOTES,
+      expect.any(Date),
+    );
+    expect(error.mock.calls[0]?.[1]).toBe("notes.handler.live_notes_read_failed");
+  });
+});
 
 describe("createNotesJobHandler", () => {
   it("loads → generates → writes → completed with usage", async () => {

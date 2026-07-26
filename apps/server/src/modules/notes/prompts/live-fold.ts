@@ -120,13 +120,21 @@ export const LIVE_FOLD_SYSTEM_PROMPT = [
 ].join("\n");
 
 /** The ops schema, in the compact TS style the notes prompts use throughout. */
-function opsSchemaText(type: ConversationType, narrativeOpen: boolean): string {
+function opsSchemaText(
+  type: ConversationType,
+  narrativeOpen: boolean,
+  narrativeRequired: boolean,
+): string {
   const lists = [...BASE_LISTS, ...ARM_LISTS[type]];
   const listUnion = lists.map((list) => `"${list}"`).join(" | ");
   const hints = lists.map((list) => `//   ${list} — ${LIST_HINT[list]}`);
   const narrative = narrativeOpen
     ? [
-        '  "narrative": {           // optional; only when the call has moved on enough to warrant it',
+        `  "narrative": {           // ${
+          narrativeRequired
+            ? "REQUIRED on this update — these notes have no summary yet"
+            : "optional; only when the call has moved on enough to warrant it"
+        }`,
         '    "title": string,       // <= 8 words naming the call',
         '    "tldr": string,        // one sentence',
         '    "overview": string     // 2-4 sentences',
@@ -162,11 +170,23 @@ export interface FoldMessageParams {
   readonly callDate: string;
   /** Closed → the narrative section is omitted AND the reducer ignores it (§4). */
   readonly narrativeOpen: boolean;
+  /**
+   * These notes still carry the placeholder title/tldr, so the narrative is not
+   * an option on this fold — it is the job.
+   *
+   * Offering it ("only when the call has moved on enough to warrant it") is the
+   * right framing for every LATER fold and exactly the wrong one for the first:
+   * a reasonable model declines on a call that has barely started, and the tab
+   * then shows "Notes are still forming." next to a populated list until the
+   * cadence opens the window again. Caught by the e2e, 2026-07-26.
+   */
+  readonly narrativeRequired?: boolean;
 }
 
 /** Build the fold messages: notes digest, then the new transcript, then the schema. */
 export function buildFoldMessages(params: FoldMessageParams): ChatMessage[] {
   const { type, digest, delta, callDate, narrativeOpen } = params;
+  const narrativeRequired = params.narrativeRequired ?? false;
   const user = [
     "NOTES SO FAR:",
     digest,
@@ -182,11 +202,13 @@ export function buildFoldMessages(params: FoldMessageParams): ChatMessage[] {
     calendarTable(callDate),
     "",
     narrativeOpen
-      ? "You may also refresh the narrative (title/tldr/overview) on this update."
+      ? narrativeRequired
+        ? "These notes have NO summary yet, so you MUST return a narrative (title, tldr, overview) on this update, however early the call is. Write it from what you have."
+        : "You may also refresh the narrative (title/tldr/overview) on this update."
       : "Do NOT return a narrative on this update — only operations.",
     "",
     "Return a JSON object of exactly this shape:",
-    opsSchemaText(type, narrativeOpen),
+    opsSchemaText(type, narrativeOpen, narrativeRequired),
     "",
     "Return ONLY the JSON object.",
   ].join("\n");
@@ -208,7 +230,7 @@ export function buildFoldRepairMessages(
     "Your previous response did not match the required schema.",
     "",
     "Required shape:",
-    opsSchemaText(type, narrativeOpen),
+    opsSchemaText(type, narrativeOpen, false),
     "",
     "Your invalid output:",
     invalidText,

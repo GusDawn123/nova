@@ -363,6 +363,9 @@ function maybeStartNotesWorker(
     source: createNotesSource(),
     writer: createNotesWriter(),
     logger: app.log,
+    // Carry live-notes ids onto the final notes so the end-of-call swap animates
+    // a diff (Phase 8 §3). Same memoised pool as the job store above.
+    liveNotes: createLiveNotesStore(notesJobStoreFromEnv(process.env).pool),
     // Claim-time llm quota gate (adr-0007 §4): over-quota jobs dead-letter with
     // 'quota_exceeded' so the paywall stays visible. Present whenever metering is.
     ...(quota
