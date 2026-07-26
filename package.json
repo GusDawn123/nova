@@ -19,6 +19,7 @@
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:start": "supabase start",
+    "db:migrate": "supabase migration up",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "format": "prettier --write .",

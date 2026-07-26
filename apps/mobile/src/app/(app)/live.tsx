@@ -81,7 +81,7 @@ export default function LiveScreen() {
                     backgroundColor: colors.backgroundElement,
                   },
                 ]}
-                placeholder="Ask a question…"
+                placeholder="Type what they said…"
                 placeholderTextColor={colors.textSecondary}
                 value={draft}
                 onChangeText={setDraft}
