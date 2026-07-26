@@ -84,6 +84,13 @@ export interface TranscriptPersister {
  */
 export interface LiveLogger {
   error(fields: Record<string, unknown>, msg: string): void;
+  /**
+   * Optional info sink. The notes conductor reports fold telemetry through it
+   * (how many ops the reducer clamped, and why) — the signal that would tell you
+   * the model is fighting the churn ceiling. Optional so existing callers that
+   * only supply `error` keep type-checking; Fastify's `app.log` has both.
+   */
+  info?(fields: Record<string, unknown>, msg: string): void;
 }
 
 /** One flushed span of relayed audio attributed to the CURRENT stt vendor. */

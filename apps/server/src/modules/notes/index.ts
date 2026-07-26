@@ -43,3 +43,32 @@ export {
   computeBackoff,
   type NotesConfig,
 } from "./config.js";
+export { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
+export { reconcileIds, RECONCILE_THRESHOLD } from "./reconcile-ids.js";
+/**
+ * The live-notes fold (Phase 8). `modules/live`'s notes conductor owns the LOOP
+ * and reaches the notes domain only through these — the prompt, the ops schema,
+ * the reducer and the ladder all stay internal (RULES §2).
+ */
+export {
+  applyFold,
+  emptyLiveNotes,
+  initialFoldState,
+  deriveSeqCounters,
+  foldResultSchema,
+  MAX_OPS_PER_FOLD,
+  LIVE_FORMING_TLDR,
+  type FoldContext,
+  type FoldOutcome,
+  type FoldResult,
+  type FoldState,
+  type DroppedOp,
+  type LiveFoldConfig,
+  type SeqCounters,
+} from "./live-fold.js";
+export {
+  createLiveFoldRunner,
+  type FoldRequest,
+  type LiveFoldRunner,
+  type LiveFoldRunnerDeps,
+} from "./live-fold-runner.js";
