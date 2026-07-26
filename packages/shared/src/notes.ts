@@ -401,6 +401,20 @@ export const notesReadResponseSchema = z.object({
   notes: meetingNotesSchema.nullable(),
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
+  /**
+   * The live running-notes PREVIEW accrued during the call (Phase 8,
+   * `docs/DESIGN/live-notes.md` §7) — `source: "live"`, null until the notes
+   * conductor has folded at least once, and null forever for calls that predate
+   * the feature or run without the entitlement.
+   *
+   * The tab prefers `notes` when non-null and falls back to `live_notes`; the
+   * post-call pipeline stays authoritative. `notes_status` is UNCHANGED by this
+   * field — it still means what it always meant, and the retry affordance still
+   * keys off it.
+   */
+  live_notes: meetingNotesSchema.nullable(),
+  /** `live_notes`' monotonic revision; null exactly when `live_notes` is null. */
+  live_notes_rev: z.number().int().nonnegative().nullable(),
 });
 export type NotesReadResponse = z.infer<typeof notesReadResponseSchema>;
 

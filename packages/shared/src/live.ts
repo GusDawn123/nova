@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { meetingNotesSchema } from "./notes.js";
+
 /**
  * Live-call wire protocol (Phase 3) — the typed envelope exchanged over the one
  * authenticated WebSocket per call (`GET /live`). Audio frames travel UP as raw
@@ -255,6 +257,31 @@ export const audioEchoSchema = z.object({
   bytes: z.number().int().nonnegative(),
 });
 
+/**
+ * The running-notes preview, emitted after a fold that actually changed something
+ * (Phase 8, `docs/DESIGN/live-notes.md` §6). Carries the FULL v2 notes object, not
+ * a delta: the model returns ops, the server folds them into authoritative state,
+ * and only the folded result reaches the wire. The client diffs by item `id`
+ * (`noteIdSchema`) — ids are stable for the life of an item, which is what lets the
+ * tab animate a change instead of replacing the list.
+ *
+ * `rev` is a per-meeting monotonic counter, bumped once per fold that changed
+ * state. CLIENT RULE: drop any `notes.update` whose `rev` is <= the last one seen —
+ * a cheap guard against out-of-order delivery across a reconnect.
+ *
+ * Live notes are a PREVIEW: `notes.source === "live"` here, while the post-call
+ * pipeline stays authoritative and writes `generated`/`fallback`.
+ *
+ * No `meeting_id` field: the socket is already bound to one meeting by
+ * `session.start`, so carrying it would be a second source of truth.
+ */
+export const notesUpdateSchema = z.object({
+  v: version,
+  type: z.literal("notes.update"),
+  notes: meetingNotesSchema,
+  rev: z.number().int().nonnegative(),
+});
+
 /** Every JSON message the server may send down the socket. */
 export const serverLiveEventSchema = z.discriminatedUnion("type", [
   sessionReadySchema,
@@ -268,6 +295,7 @@ export const serverLiveEventSchema = z.discriminatedUnion("type", [
   liveErrorSchema,
   pongSchema,
   audioEchoSchema,
+  notesUpdateSchema,
 ]);
 
 export type ServerLiveEvent = z.infer<typeof serverLiveEventSchema>;

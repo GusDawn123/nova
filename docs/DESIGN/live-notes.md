@@ -28,10 +28,10 @@ the local stack up):
 | `557dcd2` | **F2 fixed:** `transcript.input` gains `origin`; `copilot_question` is answered but never persisted (was contaminating post-call notes AND RAG memory). New `LiveConductor.onDirectQuestion` bypasses the trigger gate. |
 | `74aef72` | `supabase/seed.sql` (dev account survives a reset), `npm run db:migrate` (forward-apply, the production model), Test Live input restored to `origin: "utterance"`. |
 | `8546466` | **pg Pool had no `error` handler** at any of 3 sites — one dropped idle connection killed the whole process (observed live). New `db/pg-pool.ts` factory + a static audit + a real-Postgres termination test. |
+| *(pending)* | **Slice 2 — wire event + persistence.** §6 `notes.update` (additive, protocol stays `v: 1`); §7 `public.live_notes` (migration `20260726120000`, denormalized `user_id`, select-own RLS, NO `authenticated` write grant) + `db/live-notes.ts` (`LiveNotesStore`: user-scoped read, `rev`-guarded atomic upsert, parsed BOTH directions) riding the memoised jobs pool; §7 read model (`notesReadResponseSchema` gains `live_notes`/`live_notes_rev`, composed at the notes route behind the existing 404 gate). **Plus the slice-1 leftover:** `storedNotesSchema` was built but never wired — `db/notes.ts` and `db/schema.ts` still parsed `meetings.notes` with `meetingNotesSchema` (`z.literal(2)`), so a stored v1 row 500'd the read model. Both boundaries swapped, with a route-level regression test. No behavior change: nothing writes `live_notes` and nothing emits `notes.update` until slice 3. |
 
-**Next up: slice 2** — §6 wire event (`notes.update`), §7 `live_notes` table + migration
-+ `db/live-notes.ts` over the pg Pool (via `createResilientPool`), then §3/§4 the pure
-fold + the loop, then §8 wiring + entitlement.
+**Next up: slice 3** — §3 the pure fold (`applyFold` + the churn ceiling) and §4 the loop
+(`notes-conductor.ts` + its config + `notes-trigger.ts`), then §8 wiring + entitlement.
 
 **Local dev:** `npm run db:migrate` to pick up migrations (NOT `db:reset` — that drops
 everything; it exists to prove replay-from-zero). Seeded dev account:

@@ -6,6 +6,7 @@ import {
   identifyNotes,
   meetingNotesSchema,
   notesContentSchema,
+  notesReadResponseSchema,
   storedNotesSchema,
   type MeetingNotes,
   type NotesContent,
@@ -298,6 +299,58 @@ describe("buildFallbackNotes", () => {
       const result = meetingNotesSchema.safeParse(buildFallbackNotes(title));
       expect(result.success).toBe(true);
     }
+  });
+});
+
+describe("notesReadResponseSchema (the GET read model)", () => {
+  /** The shape a meeting with no notes and no live preview answers with. */
+  const emptyModel = {
+    notes_status: "none",
+    notes: null,
+    follow_up: null,
+    notes_generated_at: null,
+    live_notes: null,
+    live_notes_rev: null,
+  };
+
+  it("accepts a model with no notes and no live preview", () => {
+    expect(notesReadResponseSchema.safeParse(emptyModel).success).toBe(true);
+  });
+
+  it("accepts a live preview with its rev (Phase 8 §7)", () => {
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      live_notes: { ...validNotes, source: "live" },
+      live_notes_rev: 7,
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("requires the live-notes fields to be present (null, not absent)", () => {
+    // They are part of the contract, not optional extras — an adapter that
+    // forgets to project them must fail loudly here, not ship `undefined`.
+    const { live_notes, live_notes_rev, ...withoutLive } = emptyModel;
+    void live_notes;
+    void live_notes_rev;
+    expect(notesReadResponseSchema.safeParse(withoutLive).success).toBe(false);
+  });
+
+  it.each([-1, 2.5])("rejects a live_notes_rev of %s", (rev) => {
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      live_notes: { ...validNotes, source: "live" },
+      live_notes_rev: rev,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects a v1 object in live_notes (the table is v2-only)", () => {
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      live_notes: { ...validNotes, version: 1 },
+      live_notes_rev: 1,
+    });
+    expect(result.success).toBe(false);
   });
 });
 

@@ -9,6 +9,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import type { NotesJobStore } from "../../db/jobs.js";
+import type { LiveNotesStore } from "../../db/live-notes.js";
 import { requireAuth } from "../../plugins/auth.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
 
@@ -53,6 +54,13 @@ export interface NotesRoutesDeps {
    * the caller's fault — hence 503, not 429). Optional; fail-open.
    */
   readonly isDailyCapReached?: () => Promise<boolean>;
+  /**
+   * Read seam for the live running-notes preview (Phase 8,
+   * `docs/DESIGN/live-notes.md` §7) — surfaced on GET so a tab opened before the
+   * post-call pipeline finishes has cold state to render. Optional (the DB-less
+   * boot posture): unwired means `live_notes: null`, never a throw.
+   */
+  readonly liveNotes?: LiveNotesStore;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -101,14 +109,23 @@ export function createNotesRoutes(
         const meetingId = await parseMeetingId(request, reply);
         if (meetingId === null) return reply;
 
-        const model = await reader.readNotes(meetingId, userIdOf(request));
+        const userId = userIdOf(request);
+        const model = await reader.readNotes(meetingId, userId);
         if (model === null) return reply.code(404).send(NOT_FOUND);
+
+        // AFTER the 404 gate: that gate already proved ownership and
+        // not-soft-deleted, and this way a 404 costs no second query.
+        const live = deps.liveNotes
+          ? await deps.liveNotes.readLiveNotes(meetingId, userId)
+          : null;
 
         const body: NotesReadResponse = notesReadResponseSchema.parse({
           notes_status: model.notesStatus,
           notes: model.notes,
           follow_up: model.followUp,
           notes_generated_at: model.notesGeneratedAt,
+          live_notes: live?.notes ?? null,
+          live_notes_rev: live?.rev ?? null,
         });
         return reply.code(200).send(body);
       },

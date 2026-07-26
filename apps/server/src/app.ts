@@ -22,6 +22,7 @@ import {
   usageEventsDbFromEnv,
 } from "./db/usage-events.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
+import { createLiveNotesStore } from "./db/live-notes.js";
 import { createRagIndexerDb } from "./db/rag-indexer.js";
 import { createStaleCallReaper } from "./db/stale-call-reaper.js";
 import { isNotesWorkerEnabled } from "./env.js";
@@ -429,10 +430,14 @@ function maybeRegisterNotesRoutes(
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 
-  const { store } = notesJobStoreFromEnv(process.env);
+  // The pool comes back with the store: this gate already required
+  // SUPABASE_DB_URL, so the live-notes store rides the same memoised pool rather
+  // than opening a fourth one (the db/plans.ts + db/roles.ts precedent).
+  const { store, pool } = notesJobStoreFromEnv(process.env);
   void app.register(
     createNotesRoutes({
       reader: createNotesReader(),
+      liveNotes: createLiveNotesStore(pool),
       followUpWriter: createFollowUpWriter(),
       store,
       followUp,

@@ -1,7 +1,7 @@
 import {
   followUpStoredSchema,
-  meetingNotesSchema,
   notesStatusSchema,
+  storedNotesSchema,
   type FollowUpDraft,
   type MeetingNotes,
 } from "@nova/shared";
@@ -60,10 +60,18 @@ export function createNotesWriter(): NotesWriter {
   };
 }
 
-/** The meeting's notes columns as read for the REST surface (parsed at the boundary). */
+/**
+ * The meeting's notes columns as read for the REST surface (parsed at the boundary).
+ *
+ * `notes` uses {@link storedNotesSchema}, the v1 ∪ v2 READ boundary — NOT
+ * `meetingNotesSchema`, which is `version: z.literal(2)` and would throw on every
+ * row written before the v2 split, turning this endpoint into a permanent 500 for
+ * those meetings. Rows upcast to v2 in code on the way out; writers only ever emit
+ * v2, so no backfill migration is needed (docs/DESIGN/live-notes.md §2).
+ */
 const notesReadRowSchema = z.object({
   notes_status: notesStatusSchema,
-  notes: meetingNotesSchema.nullable(),
+  notes: storedNotesSchema.nullable(),
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
 });
