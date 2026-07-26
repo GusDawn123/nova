@@ -27,7 +27,7 @@ the local stack up):
 | `ad9d19d` | The metering audit only scanned 3 hardcoded files, not the tree — a new unmetered `createLlmRouter(` anywhere else passed clean. Added a tree-wide backstop. |
 | `557dcd2` | **F2 fixed:** `transcript.input` gains `origin`; `copilot_question` is answered but never persisted (was contaminating post-call notes AND RAG memory). New `LiveConductor.onDirectQuestion` bypasses the trigger gate. |
 | `74aef72` | `supabase/seed.sql` (dev account survives a reset), `npm run db:migrate` (forward-apply, the production model), Test Live input restored to `origin: "utterance"`. |
-| `ea3f1c8` | **pg Pool had no `error` handler** at any of 3 sites — one dropped idle connection killed the whole process (observed live). New `db/pg-pool.ts` factory + a static audit + a real-Postgres termination test. |
+| `8546466` | **pg Pool had no `error` handler** at any of 3 sites — one dropped idle connection killed the whole process (observed live). New `db/pg-pool.ts` factory + a static audit + a real-Postgres termination test. |
 
 **Next up: slice 2** — §6 wire event (`notes.update`), §7 `live_notes` table + migration
 + `db/live-notes.ts` over the pg Pool (via `createResilientPool`), then §3/§4 the pure
