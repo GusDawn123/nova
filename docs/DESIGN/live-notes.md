@@ -10,6 +10,43 @@
 
 ---
 
+## BUILD STATUS (updated 2026-07-26) — read this first
+
+Branch: **`dev-claude-live-notes`**, stacked on `dev-claude-live-copilot` (Phase 7 is
+not in `development` yet, so this branch sits on top of it rather than off
+`development` — its PR will show only its own diff once Phase 7 merges).
+
+**Done and committed** (`npm run check` green throughout — 738 passed / 0 failed with
+the local stack up):
+
+| commit | what |
+|---|---|
+| `b109d51` | **Slice 1 — notes v2.** Content/identified schema split, `identifyNotes`, `upcastNotesV1`, `storedNotesSchema` (the v1 read boundary), consumers updated in `pipeline.ts` + `map-reduce.ts` + the follow-up prompt renderer. Post-call LLM contract UNCHANGED — no prompt moved, accuracy gates untouched. |
+| `47941f4` | `npm run typecheck` never typechecked a single test file (root tsconfig referenced only `*.build.json`, which exclude `**/*.test.ts`). Wired in + fixed the 15 latent errors it exposed. |
+| `60c2977` | **Security:** `public.meetings` carried a blanket `authenticated` write grant — same hole class as the profiles fix, plus a vendor-spend vector via `indexed_at`/`ended_at`. Proven open with a real JWT, then closed. |
+| `ad9d19d` | The metering audit only scanned 3 hardcoded files, not the tree — a new unmetered `createLlmRouter(` anywhere else passed clean. Added a tree-wide backstop. |
+| `557dcd2` | **F2 fixed:** `transcript.input` gains `origin`; `copilot_question` is answered but never persisted (was contaminating post-call notes AND RAG memory). New `LiveConductor.onDirectQuestion` bypasses the trigger gate. |
+| `74aef72` | `supabase/seed.sql` (dev account survives a reset), `npm run db:migrate` (forward-apply, the production model), Test Live input restored to `origin: "utterance"`. |
+| `ea3f1c8` | **pg Pool had no `error` handler** at any of 3 sites — one dropped idle connection killed the whole process (observed live). New `db/pg-pool.ts` factory + a static audit + a real-Postgres termination test. |
+
+**Next up: slice 2** — §6 wire event (`notes.update`), §7 `live_notes` table + migration
++ `db/live-notes.ts` over the pg Pool (via `createResilientPool`), then §3/§4 the pure
+fold + the loop, then §8 wiring + entitlement.
+
+**Local dev:** `npm run db:migrate` to pick up migrations (NOT `db:reset` — that drops
+everything; it exists to prove replay-from-zero). Seeded dev account:
+`dev@nova.test` / `nova-dev-1234`, role `developer` (a `customer` cannot see the Test
+Live tab). After any `db:reset` the Kong gateway needs
+`docker restart supabase_kong_nova supabase_rest_nova` before auth works again.
+
+**PRE-LAUNCH BLOCKER, unrelated to live notes but must not be lost:** `DELETE /account`
+returns 202 and deletes nothing — `deletion_requests` has no consumer and
+`scripts/purge/` does not exist (RULES §3 points at it). That is a legal obligation
+under GDPR/CCPA and an **App Store gate** (Guideline 5.1.1(v) requires in-app account
+deletion), so it blocks TestFlight → App Store. See §13 F3.
+
+---
+
 ## 0. What changed from the first draft, and why
 
 | # | First draft | Revised | Why |

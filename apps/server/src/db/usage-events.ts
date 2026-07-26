@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { z } from "zod";
 
 import type {
@@ -6,6 +6,12 @@ import type {
   UsageEventsDb,
   UsageKind,
 } from "../modules/metering/ports.js";
+
+import {
+  createResilientPool,
+  PG_IDLE_TIMEOUT_MS,
+  PG_POOL_MAX,
+} from "./pg-pool.js";
 
 /**
  * `UsageEventsDb` over a direct `pg` Pool — the append-only metering ledger's only
@@ -21,8 +27,6 @@ import type {
  * window is empty.
  */
 
-const PG_POOL_MAX = 10;
-const PG_IDLE_TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Boundary parsing (the DB is a boundary too; RULES §1).
@@ -116,11 +120,14 @@ export function createUsageEventsPool(
       "Usage-events store is not configured: set SUPABASE_DB_URL.",
     );
   }
-  return new Pool({
-    connectionString: parsed.data.SUPABASE_DB_URL,
-    max: PG_POOL_MAX,
-    idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
-  });
+  return createResilientPool(
+    {
+      connectionString: parsed.data.SUPABASE_DB_URL,
+      max: PG_POOL_MAX,
+      idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
+    },
+    "usage_events",
+  );
 }
 
 /** Presence check: is SUPABASE_DB_URL set + well-formed (so a feature can wire)? */

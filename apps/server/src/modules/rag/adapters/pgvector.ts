@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { z } from "zod";
 
 import { ragConfig, type RagConfig } from "../config.js";
@@ -9,6 +9,12 @@ import type {
   RagSource,
   VectorStore,
 } from "../ports.js";
+
+import {
+  createResilientPool,
+  PG_IDLE_TIMEOUT_MS,
+  PG_POOL_MAX,
+} from "../../../db/pg-pool.js";
 
 /**
  * pgvector {@link VectorStore} adapter (Phase 4) — the ONLY place the RAG hot
@@ -26,8 +32,6 @@ import type {
  * Design source: `docs/DECISIONS/adr-0005-rag-memory.md` §§2,3,4,5.
  */
 
-const PG_POOL_MAX = 10;
-const PG_IDLE_TIMEOUT_MS = 30_000;
 
 /** The config knobs the retrieval SQL reads (candidates/leg + the RRF constant). */
 export type PgVectorConfig = Pick<RagConfig, "candidatesPerLeg" | "rrfK">;
@@ -327,11 +331,14 @@ export function createPgPool(source: NodeJS.ProcessEnv = process.env): Pool {
       "pgvector store is not configured: set SUPABASE_DB_URL to use RAG storage.",
     );
   }
-  return new Pool({
-    connectionString: parsed.data.SUPABASE_DB_URL,
-    max: PG_POOL_MAX,
-    idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
-  });
+  return createResilientPool(
+    {
+      connectionString: parsed.data.SUPABASE_DB_URL,
+      max: PG_POOL_MAX,
+      idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
+    },
+    "pgvector",
+  );
 }
 
 let cachedPool: Pool | undefined;

@@ -1,5 +1,11 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { z } from "zod";
+
+import {
+  createResilientPool,
+  PG_IDLE_TIMEOUT_MS,
+  PG_POOL_MAX,
+} from "./pg-pool.js";
 
 /**
  * `NotesJobStore` — the durable notes-generation queue over a direct `pg` Pool
@@ -24,8 +30,6 @@ import { z } from "zod";
  */
 
 const JOB_KIND = "generate_notes";
-const PG_POOL_MAX = 10;
-const PG_IDLE_TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Public contract (LOCKED — Tasks 4–5 compile against these).
@@ -377,11 +381,14 @@ export function createJobsPool(source: NodeJS.ProcessEnv = process.env): Pool {
       "Notes job store is not configured: set SUPABASE_DB_URL.",
     );
   }
-  return new Pool({
-    connectionString: parsed.data.SUPABASE_DB_URL,
-    max: PG_POOL_MAX,
-    idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
-  });
+  return createResilientPool(
+    {
+      connectionString: parsed.data.SUPABASE_DB_URL,
+      max: PG_POOL_MAX,
+      idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
+    },
+    "jobs",
+  );
 }
 
 let cachedPool: Pool | undefined;
