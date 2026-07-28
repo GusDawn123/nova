@@ -4,25 +4,101 @@
     "startedAt": "2026-07-22T15:00:00Z"
   },
   "turns": [
-    { "speaker": "Marcus", "text": "Hi Elena, thanks for making the time. I know pricing was the big open item from last week, so I want to walk you through the plans and leave plenty of room for questions.", "tsMs": 0 },
-    { "speaker": "Elena", "text": "Perfect. My VP is going to ask me two things: what does it cost per seat, and what happens when we scale past fifty users.", "tsMs": 18000 },
-    { "speaker": "Marcus", "text": "Great questions. So we have three tiers. Team is nineteen dollars per seat per month, Growth is thirty-four, and Enterprise is custom. Growth is where most teams your size land.", "tsMs": 34000 },
-    { "speaker": "Elena", "text": "Thirty-four is honestly higher than what we're paying for our current tool. That's going to be the first objection internally.", "tsMs": 55000 },
-    { "speaker": "Marcus", "text": "I hear you. The way I'd frame it is the current tool doesn't do the automated call summaries, and that's the piece your team said was eating an hour a day.", "tsMs": 70000 },
-    { "speaker": "Elena", "text": "That's fair. The time savings is real. If we go past fifty seats, does the per-seat price drop?", "tsMs": 88000 },
-    { "speaker": "Marcus", "text": "Yes. At fifty seats we move you to volume pricing, which brings Growth down to twenty-eight a seat, and Enterprise unlocks SSO and the audit log.", "tsMs": 104000 },
-    { "speaker": "Elena", "text": "SSO is going to matter to our security team. They flagged it as a requirement for anything that touches customer calls.", "tsMs": 122000 },
-    { "speaker": "Marcus", "text": "Then Enterprise is probably the honest recommendation, even at your current headcount. I don't want to sell you Growth and have security block it in month two.", "tsMs": 139000 },
-    { "speaker": "Elena", "text": "I appreciate that. What's the Enterprise number look like for, say, forty seats?", "tsMs": 158000 },
-    { "speaker": "Marcus", "text": "For forty seats with SSO and the audit log, we'd be looking at roughly fifteen hundred a month, and I can hold that rate through the end of the quarter.", "tsMs": 173000 },
-    { "speaker": "Elena", "text": "Okay. That's a number I can actually take to my VP. Can you put all of this in a proposal I can forward?", "tsMs": 192000 },
-    { "speaker": "Marcus", "text": "Absolutely. I'll send the proposal over by Friday with the forty-seat Enterprise pricing, the SSO details, and the security overview attached.", "tsMs": 208000 },
-    { "speaker": "Elena", "text": "That works. My VP is out Thursday, so Friday actually lines up well for our Monday review.", "tsMs": 228000 },
-    { "speaker": "Marcus", "text": "Then let's target Friday. One thing I'd flag: if security wants a full SOC 2 report, that goes through our compliance team and can take a few days, so it's worth kicking off early.", "tsMs": 243000 },
-    { "speaker": "Elena", "text": "Good call. I'll ask our security lead whether they need the full report or just the summary, and I'll let you know by Wednesday.", "tsMs": 262000 },
-    { "speaker": "Marcus", "text": "Perfect. So to recap: I send the proposal Friday, you confirm the SOC 2 scope Wednesday, and we regroup after your Monday review.", "tsMs": 280000 },
-    { "speaker": "Elena", "text": "That's the plan. Honestly, if the proposal lands the way this call did, I think we're in good shape to move forward this quarter.", "tsMs": 297000 },
-    { "speaker": "Marcus", "text": "Love to hear it. I'll get that proposal to you by Friday and we'll take it from there. Thanks Elena.", "tsMs": 312000 },
+    {
+      "speaker": "Marcus",
+      "text": "Hi Elena, thanks for making the time. I know pricing was the big open item from last week, so I want to walk you through the plans and leave plenty of room for questions.",
+      "tsMs": 0
+    },
+    {
+      "speaker": "Elena",
+      "text": "Perfect. My VP is going to ask me two things: what does it cost per seat, and what happens when we scale past fifty users.",
+      "tsMs": 18000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Great questions. So we have three tiers. Team is nineteen dollars per seat per month, Growth is thirty-four, and Enterprise is custom. Growth is where most teams your size land.",
+      "tsMs": 34000
+    },
+    {
+      "speaker": "Elena",
+      "text": "Thirty-four is honestly higher than what we're paying for our current tool. That's going to be the first objection internally.",
+      "tsMs": 55000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "I hear you. The way I'd frame it is the current tool doesn't do the automated call summaries, and that's the piece your team said was eating an hour a day.",
+      "tsMs": 70000
+    },
+    {
+      "speaker": "Elena",
+      "text": "That's fair. The time savings is real. If we go past fifty seats, does the per-seat price drop?",
+      "tsMs": 88000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Yes. At fifty seats we move you to volume pricing, which brings Growth down to twenty-eight a seat, and Enterprise unlocks SSO and the audit log.",
+      "tsMs": 104000
+    },
+    {
+      "speaker": "Elena",
+      "text": "SSO is going to matter to our security team. They flagged it as a requirement for anything that touches customer calls.",
+      "tsMs": 122000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Then Enterprise is probably the honest recommendation, even at your current headcount. I don't want to sell you Growth and have security block it in month two.",
+      "tsMs": 139000
+    },
+    {
+      "speaker": "Elena",
+      "text": "I appreciate that. What's the Enterprise number look like for, say, forty seats?",
+      "tsMs": 158000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "For forty seats with SSO and the audit log, we'd be looking at roughly fifteen hundred a month, and I can hold that rate through the end of the quarter.",
+      "tsMs": 173000
+    },
+    {
+      "speaker": "Elena",
+      "text": "Okay. That's a number I can actually take to my VP. Can you put all of this in a proposal I can forward?",
+      "tsMs": 192000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Absolutely. I'll send the proposal over by Friday with the forty-seat Enterprise pricing, the SSO details, and the security overview attached.",
+      "tsMs": 208000
+    },
+    {
+      "speaker": "Elena",
+      "text": "That works. My VP is out Thursday, so Friday actually lines up well for our Monday review.",
+      "tsMs": 228000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Then let's target Friday. One thing I'd flag: if security wants a full SOC 2 report, that goes through our compliance team and can take a few days, so it's worth kicking off early.",
+      "tsMs": 243000
+    },
+    {
+      "speaker": "Elena",
+      "text": "Good call. I'll ask our security lead whether they need the full report or just the summary, and I'll let you know by Wednesday.",
+      "tsMs": 262000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Perfect. So to recap: I send the proposal Friday, you confirm the SOC 2 scope Wednesday, and we regroup after your Monday review.",
+      "tsMs": 280000
+    },
+    {
+      "speaker": "Elena",
+      "text": "That's the plan. Honestly, if the proposal lands the way this call did, I think we're in good shape to move forward this quarter.",
+      "tsMs": 297000
+    },
+    {
+      "speaker": "Marcus",
+      "text": "Love to hear it. I'll get that proposal to you by Friday and we'll take it from there. Thanks Elena.",
+      "tsMs": 312000
+    },
     { "speaker": "Elena", "text": "Thanks Marcus, talk soon.", "tsMs": 325000 }
   ]
 }

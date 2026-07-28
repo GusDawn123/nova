@@ -180,7 +180,9 @@ describe.skipIf(!hasStack)("live_notes RLS posture (local stack)", () => {
     expect(stamped.error).toBeNull();
 
     try {
-      const res = await userB.client.from("live_notes").select("meeting_id, rev");
+      const res = await userB.client
+        .from("live_notes")
+        .select("meeting_id, rev");
       expect(res.error).toBeNull();
       expect(res.data ?? []).toHaveLength(0);
     } finally {

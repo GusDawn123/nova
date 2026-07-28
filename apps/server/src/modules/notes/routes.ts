@@ -121,9 +121,8 @@ export function createNotesRoutes(
         // outage turned a perfectly good notes read into a 500 — the durable
         // payload is the contract here and the live preview is a cosmetic add-on.
         // Absent store and failing store must land in the same place: null.
-        let live: Awaited<
-          ReturnType<LiveNotesStore["readLiveNotes"]>
-        > | null = null;
+        let live: Awaited<ReturnType<LiveNotesStore["readLiveNotes"]>> | null =
+          null;
         if (deps.liveNotes) {
           try {
             live = await deps.liveNotes.readLiveNotes(meetingId, userId);

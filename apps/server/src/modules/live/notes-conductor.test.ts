@@ -286,7 +286,10 @@ describe("[notes-conductor] the delta lifecycle", () => {
       }),
     });
 
-    conductor.onFinal("First, we agreed to raise the cap to 500 seats.", "them");
+    conductor.onFinal(
+      "First, we agreed to raise the cap to 500 seats.",
+      "them",
+    );
     await vi.advanceTimersByTimeAsync(1000); // fold goes out consuming ONE turn
 
     // Four more land mid-fold: the delta grows past 3 and is trimmed twice.

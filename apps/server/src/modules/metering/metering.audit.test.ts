@@ -91,7 +91,7 @@ function enclosingBlocks(src: string): Map<string, string> {
  */
 function withoutConditionalSpreads(block: string): string {
   let out = "";
-  for (let i = 0; i < block.length; ) {
+  for (let i = 0; i < block.length;) {
     if (block.startsWith("...(", i)) {
       let depth = 0;
       let j = i + 3; // index of the '('
