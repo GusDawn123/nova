@@ -310,9 +310,13 @@ export function createLiveNotesConductor(
 
     const controller = new AbortController();
     inFlight = controller;
-    // Snapshot what this fold is consuming: `delta` keeps growing underneath us
-    // while the model call is out, and only the snapshot may be cleared on success.
-    const consumed = delta.length;
+    // Snapshot what this fold is consuming BY IDENTITY, not by index.
+    // why: `delta` does not only grow underneath us — the maxDeltaTurns cost
+    // backstop trims it from the FRONT. A count captured here would then point at
+    // the wrong entries, and clearing by index dropped turns this fold never
+    // consumed. Holding the turn objects themselves makes the clear exact under
+    // any concurrent growth OR trim.
+    const consumed = delta.slice();
 
     try {
       // 5. Classify once, past the threshold, while still casual. Latched after —
@@ -346,7 +350,9 @@ export function createLiveNotesConductor(
       foldsSpent += 1;
       const outcome = await runner.fold({
         prior: notes,
-        delta,
+        // The snapshot, not the live array: what the model reads must be exactly
+        // what step 8 clears, even if a trim reshapes `delta` mid-call.
+        delta: consumed,
         state,
         narrativeOpen,
         narrativeRequired,
@@ -389,9 +395,11 @@ export function createLiveNotesConductor(
       if (isDisposed()) return;
       emit();
 
-      // 8. THE ONLY PLACE THE DELTA CLEARS. Drop exactly what this fold consumed;
-      //    turns that arrived while the model call was out survive.
-      delta = delta.slice(consumed);
+      // 8. THE ONLY PLACE THE DELTA CLEARS. Drop exactly what this fold consumed,
+      //    matched by identity; turns that arrived — or survived a trim — while the
+      //    model call was out are kept.
+      const folded = new Set(consumed);
+      delta = delta.filter((turn) => !folded.has(turn));
     } catch (err: unknown) {
       // Transport failure (LlmError / AllProvidersFailedError) or a store throw.
       // The delta is retained by simply not clearing it.

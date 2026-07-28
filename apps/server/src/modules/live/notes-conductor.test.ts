@@ -259,6 +259,55 @@ describe("[notes-conductor] the delta lifecycle", () => {
     expect(last).not.toContain("raise the cap to 500 seats");
     conductor.dispose();
   });
+
+  it("survives a maxDeltaTurns trim mid-fold — unconsumed turns are not lost", async () => {
+    // The delta was cleared by INDEX (`delta.slice(consumed)`), but the cost
+    // backstop trims from the FRONT (`delta.slice(delta.length - max)`). A trim
+    // while a fold is out shifts every entry left, so the stale index then dropped
+    // turns the fold never consumed — silent data loss, not a bounded cost.
+    const gate = deferred();
+    const router: LlmRouter = {
+      async *stream(req): AsyncIterable<LlmStreamEvent> {
+        prompts.push(req.messages.map((m) => m.content).join("\n"));
+        await gate.promise;
+        yield { type: "token", text: ADD_ONE };
+        yield { type: "done", usage: null };
+      },
+    };
+    const conductor = makeConductor({
+      router,
+      // A tiny cap so the backstop actually fires while the fold is in flight.
+      config: notesConductorConfigSchema.parse({
+        foldIntervalMs: 1000,
+        minUtterancesPerFold: 1,
+        classifyMinTurns: 1000,
+        narrativeEveryNFolds: 1000,
+        maxDeltaTurns: 3,
+      }),
+    });
+
+    conductor.onFinal("First, we agreed to raise the cap to 500 seats.", "them");
+    await vi.advanceTimersByTimeAsync(1000); // fold goes out consuming ONE turn
+
+    // Four more land mid-fold: the delta grows past 3 and is trimmed twice.
+    conductor.onFinal("Second, Priya will own the migration.", "them");
+    conductor.onFinal("Third, legal review is booked for Thursday.", "them");
+    conductor.onFinal("Fourth, the budget freeze lifts in Q3.", "them");
+    conductor.onFinal("Fifth, we need a security questionnaire.", "them");
+
+    gate.resolve();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    // Dropping the OLDEST turns is the backstop working as designed. What must
+    // never happen is losing a turn the backstop KEPT and the fold never folded —
+    // "Third" is exactly that turn.
+    const last = prompts[prompts.length - 1] ?? "";
+    expect(last).toContain("Third, legal review is booked");
+    expect(last).toContain("Fourth, the budget freeze lifts");
+    expect(last).toContain("Fifth, we need a security questionnaire");
+    conductor.dispose();
+  });
 });
 
 describe("[notes-conductor] the single in-flight latch", () => {
