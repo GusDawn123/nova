@@ -34,13 +34,15 @@ beforeEach(() => {
   saved = {};
   for (const key of [...LLM_KEYS, ...DB_KEYS]) {
     saved[key] = process.env[key];
-    delete process.env[key];
+    // Reflect.deleteProperty, not `delete env[key]`: the dynamic-key form is a
+    // lint error, and assigning undefined would store the STRING "undefined".
+    Reflect.deleteProperty(process.env, key);
   }
 });
 
 afterEach(async () => {
   for (const [key, value] of Object.entries(saved)) {
-    if (value === undefined) delete process.env[key];
+    if (value === undefined) Reflect.deleteProperty(process.env, key);
     else process.env[key] = value;
   }
   await app.close();

@@ -106,7 +106,7 @@ function withoutConditionalSpreads(block: string): string {
       i = j + 1;
       continue;
     }
-    out += block[i];
+    out += block[i] ?? ""; // noUncheckedIndexedAccess: string | undefined
     i++;
   }
   return out;

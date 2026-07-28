@@ -247,6 +247,12 @@ export function useLiveSession(): UseLiveSession {
       );
     };
     socket.onmessage = (message: WebSocketMessageEvent): void => {
+      // why: onerror and onclose below already ignore a superseded socket; this
+      // handler did not. A frame still in flight from a previous socket (stop then
+      // start again, or a reconnect) applied its transcript lines and suggestion
+      // deltas into the CURRENT session's state — the exact bug class the ref
+      // guard exists to prevent.
+      if (socketRef.current !== socket) return;
       let json: unknown;
       try {
         json = JSON.parse(String(message.data));
