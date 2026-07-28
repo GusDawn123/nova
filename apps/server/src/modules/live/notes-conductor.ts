@@ -130,12 +130,25 @@ export function createLiveNotesConductor(
       churnFraction: config.churnFraction,
       maxItemsPerList: config.maxItemsPerList,
     },
+    // The runner's log lines carry only SHAPE (salvage/repair flags, drop counts
+    // and reasons — never transcript text, RULES §6), so correlation has to be
+    // injected here. This wrapper is the single construction site for the runner,
+    // which makes it the right place: threading ids through FoldRequest would
+    // duplicate a cross-cutting concern into every individual log call.
+    // why user_id: it was missing, so fold-runner lines could not be tied to a
+    // user during an incident — RULES §6 requires both ids on structured logs.
     logger: {
       info: (fields: Record<string, unknown>, msg: string): void => {
-        logger?.info?.({ ...fields, meeting_id: deps.meetingId }, msg);
+        logger?.info?.(
+          { ...fields, user_id: deps.userId, meeting_id: deps.meetingId },
+          msg,
+        );
       },
       error: (fields: Record<string, unknown>, msg: string): void => {
-        logger?.error({ ...fields, meeting_id: deps.meetingId }, msg);
+        logger?.error(
+          { ...fields, user_id: deps.userId, meeting_id: deps.meetingId },
+          msg,
+        );
       },
     },
   });

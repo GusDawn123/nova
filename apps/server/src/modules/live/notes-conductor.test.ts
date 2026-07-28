@@ -597,6 +597,32 @@ describe("[notes-conductor] hydration", () => {
     conductor.dispose();
   });
 
+  it("stamps BOTH correlation ids onto fold-runner log lines", async () => {
+    // The runner logs shape only (salvage/repair flags, drop reasons) and never
+    // transcript text, so user_id/meeting_id can only come from the conductor's
+    // wrapper. The wrapper injected meeting_id but not user_id, which left every
+    // notes.live_fold.* line untraceable to a user during an incident.
+    const lines: { fields: Record<string, unknown>; msg: string }[] = [];
+    const conductor = makeConductor({
+      // Unparseable twice: the ladder spends its repair round, gives up, and the
+      // runner emits notes.live_fold.schema_reject.
+      router: scriptedRouter(["not json at all", "still not json"]),
+      logger: {
+        info: (fields, msg) => lines.push({ fields, msg }),
+        error: (fields, msg) => lines.push({ fields, msg }),
+      },
+    });
+
+    conductor.onFinal(...turn(1));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const reject = lines.find((l) => l.msg === "notes.live_fold.schema_reject");
+    expect(reject).toBeDefined();
+    expect(reject?.fields.user_id).toBe("user-1");
+    expect(reject?.fields.meeting_id).toBe("meeting-1");
+    conductor.dispose();
+  });
+
   it("starts from empty notes when hydration fails, rather than not at all", async () => {
     const errors: string[] = [];
     const conductor = makeConductor({
