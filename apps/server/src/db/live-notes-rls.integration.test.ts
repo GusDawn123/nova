@@ -166,6 +166,32 @@ describe.skipIf(!hasStack)("live_notes RLS posture (local stack)", () => {
     expect(res.data ?? []).toHaveLength(0);
   });
 
+  it("[live-notes-isolation] A cannot read its OWN soft-deleted row", async () => {
+    // RULES §3: soft delete is the delete. The column comment on live_notes says
+    // reads filter `deleted_at is null`, but the SELECT policy only checked
+    // ownership — so stamping deleted_at removed the row from every application
+    // read while PostgREST still served it to the owner's JWT. "Deleted" has to
+    // mean deleted at the policy, which is the only layer a raw Data API call
+    // cannot route around.
+    const stamped = await admin
+      .from("live_notes")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("meeting_id", userB.meetingId);
+    expect(stamped.error).toBeNull();
+
+    try {
+      const res = await userB.client.from("live_notes").select("meeting_id, rev");
+      expect(res.error).toBeNull();
+      expect(res.data ?? []).toHaveLength(0);
+    } finally {
+      // Restore so later cases still see B's row (order independence).
+      await admin
+        .from("live_notes")
+        .update({ deleted_at: null })
+        .eq("meeting_id", userB.meetingId);
+    }
+  });
+
   it("[live-notes-posture] authenticated cannot INSERT, even for itself", async () => {
     const fresh = await userA.client
       .from("meetings")
