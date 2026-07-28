@@ -65,6 +65,7 @@ This is the load-bearing table; every row below is verified against the schema.
 | tl;dr card | `notes.tldr` | |
 | decisions + italic quote | `decisions[].text`, `.quote` | `quote` is nullable — hide the rule when null |
 | action items | `actionItems[].text`, `.owner`, `.deadlineRaw` | render `deadlineRaw` (the spoken phrase), not the ISO `deadline` |
+| action-item checkbox | `note_item_state.completed_at` | **new table — see §6.3** |
 | "open" card | `openQuestions[]` | |
 | "risk" card | `risks[]` | |
 | Professional / Warm / Brief | `followUpToneSchema` | **exactly** those three values |
@@ -107,9 +108,10 @@ Each is a ruling, not an open question, unless §11 says otherwise.
    (prompt work is explicitly deferred).
 4. **No participant name.** "Dana Whitfield" is not in the schema. **Ruling: cut** the
    subtitle. A `participant` column is a later migration if wanted.
-5. **Action-item checkboxes have no persistence.** **Ruling:** render them as
-   non-interactive state indicators. Interactive-but-unsaved is the one option to
-   refuse — it silently loses user input.
+5. **Action-item checkboxes have no persistence.** **Ruling (Gustavo, 2026-07-28 —
+   overrides the first draft's "display only"):** build the persistence. A checkbox
+   that unchecks itself on refresh is bad UX, and display-only checkboxes invite the
+   tap anyway. Full design in §6.3.
 6. **Search has no backend.** **Ruling: cut** the search field from this PR.
 7. **"18 this month".** Cheap on the server (`count` with a date predicate). **Ruling:**
    include it in the list response.
@@ -118,28 +120,58 @@ Each is a ruling, not an open question, unless §11 says otherwise.
 
 ## 5. The live-notes surface
 
-The mock shows **no live notes on the Live screen** — every notes surface is
-post-call. That is better than what `live-notes.md` assumed, and it needs no design
-change, because the server read model already prefers `notes` when non-null and falls
-back to `live_notes`.
+Live notes appear in **two** places.
 
-So the live-notes surface is: a meeting whose `notes_status` is `queued|processing`
-shows the shimmer "Writing notes" pill in the list; opening it renders the detail
-screen from `live_notes`, subscribed to `notes.update` for as long as that meeting is
-the active session.
+### 5.1 During the call — the capture card is tabbed
 
-**Client rule (from `live.ts:269`, non-negotiable):** drop any `notes.update` whose
-`rev` is ≤ the last seen rev. Out-of-order delivery across a reconnect is the failure
-this guards.
+**Ruling (Gustavo, 2026-07-28 — supersedes the first draft, which had no live-notes
+surface on the Live screen at all):** the capture card's content area splits into two
+tabs, **Transcript** and **Live notes**, switched the same way the Live/Meetings bar
+switches screens.
+
+Three constraints, all binding:
+
+- **The card does not change size.** It keeps the mock's `min-height: 120 /
+  max-height: 176`. Whichever tab is showing scrolls inside that fixed frame.
+- **Both tabs keep updating while hidden.** Neither is a mount-on-demand view.
+  Implementation: both panels stay mounted and are toggled with `display: 'none'`,
+  which preserves scroll position and internal state for free. State lives in the
+  hooks (`use-live-session`, `use-live-notes`) regardless, so even a remount loses
+  nothing — the `display` toggle is about scroll position, not correctness.
+- **They switch independently of the main tab bar.** Leaving the Live screen and
+  coming back does not reset which sub-tab was showing.
+
+Because a hidden tab still updates, the inactive tab shows an unread affordance — a
+small accent dot — when new content has landed since it was last visible. That is the
+whole reason to keep both live.
+
+**Live notes in 176px** cannot be the full detail layout. The in-call panel is a
+condensed view: the `tldr` paragraph, then decisions and action items as single-line
+compact rows, scrollable. Newly changed items animate in with `riseIn`. Everything
+else (quotes, owners, deadlines, open/risk, insights) is post-call only, in the detail
+screen — where there is room for it.
+
+### 5.2 After the call — the detail screen
+
+The read model already prefers `notes` when non-null and falls back to `live_notes`,
+so a meeting whose `notes_status` is `queued|processing` shows the shimmer "Writing
+notes" pill in the list, and opening it renders the detail screen from `live_notes`,
+subscribed to `notes.update` while that meeting is the active session.
+
+### 5.3 The rev rule
+
+**Non-negotiable, from `live.ts:269`:** drop any `notes.update` whose `rev` is ≤ the
+last seen rev. Out-of-order delivery across a reconnect is the failure this guards.
+One implementation (`applyNotesUpdate`) serves both surfaces; both read the same hook.
 
 ---
 
 ## 6. Server work
 
-Two new routes. Both live in a new `modules/meetings/` module following the standard
+Three new routes. They live in a new `modules/meetings/` module following the standard
 anatomy (`ports.ts` / `routes.ts`), reusing the `db/notes-source.ts` reader patterns.
 
-### `GET /meetings` — the list model
+### 6.1 `GET /meetings` — the list model
 
 Returns a **projection**, never the raw notes blob. Rationale, in order of weight:
 
@@ -176,7 +208,7 @@ export const meetingListResponseSchema = z.object({
 Ordering: `started_at desc nulls last, created_at desc`. Soft-deleted rows excluded.
 User-scoped. Capped at 100 items for now — **and the cap is logged**, not silent.
 
-### `GET /meetings/:id/transcript`
+### 6.2 `GET /meetings/:id/transcript`
 
 Separate from the notes route on purpose: notes is polled while a call is folding,
 transcripts are opened on demand and can be large. Lazy-loaded when the tab is tapped.
@@ -194,6 +226,70 @@ export const transcriptResponseSchema = z.object({
 
 Same uniform-404 posture as the notes routes: missing, foreign, or soft-deleted
 meetings are indistinguishable. Ordered by `ts_ms asc nulls last, created_at asc`.
+
+### 6.3 Action-item completion — `note_item_state` + the write route
+
+The hard part is not storing a boolean. It is **which item the boolean belongs to.**
+
+Note ids (`a1`, `a2`, …) are positional counters minted server-side, not durable
+identities. `POST /meetings/:id/notes/regenerate` re-runs the whole pipeline, so `a2`
+after a regenerate can be a different action item than `a2` before it. Keying
+completion on the id alone would silently move a user's checkmark onto a different
+task — worse than losing it.
+
+The codebase already solved this exact problem class. `reconcile-ids.ts` carries live
+ids onto post-call items by **jaccard similarity ≥ `RECONCILE_THRESHOLD` (0.6)** over
+`normalizeForMatch` word sets, so an hour of accrued items does not blink out and
+re-mint at hangup. Completion reuses that mechanism rather than inventing a hash.
+
+**The table** (new migration; RLS ships with it, RULES §4.9):
+
+```sql
+create table public.note_item_state (
+  meeting_id   uuid not null references public.meetings (id),
+  user_id      uuid not null references public.profiles (id),
+  item_id      text not null,          -- 'a1', 'a2' — positional, not durable
+  item_text    text not null,          -- the text as it was when checked
+  completed_at timestamptz,            -- null = explicitly uncompleted
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now(),
+  deleted_at   timestamptz,
+  primary key (meeting_id, item_id)
+);
+create index note_item_state_user_id_idx on public.note_item_state (user_id);
+```
+
+**Posture: server-authored writes, same as `live_notes`.** `authenticated` gets
+`select` only — no insert/update policy, no insert/update grant. This codebase has
+been bitten twice by blanket client write grants (`profiles` self-setting
+`plan`/`role`, `meetings` and its `indexed_at` vendor-spend vector). `note_item_state`
+carries no privilege-bearing column, so a client write grant would be *defensible*
+here — but going through the server also lets it reject `item_id`s that do not exist
+in the meeting's notes, which keeps the table free of junk rows. That validation is
+worth the ~40 lines.
+
+**Write:** `PUT /meetings/:id/notes/items/:itemId` with `{ completed: boolean }`.
+Behind `requireAuth`, uniform 404 for missing/foreign/soft-deleted meetings, 404 when
+`itemId` is not an action item in the current notes. The server reads the item's
+current text and stores it alongside — the client never supplies `item_text`, so it
+cannot desync the guard.
+
+**Read:** `GET /meetings/:id/notes` merges completion onto each action item, so the
+client renders a plain boolean and holds no matching logic:
+
+```ts
+// added to noteActionItemSchema's read model (response only, never stored in notes)
+completed: z.boolean(),
+```
+
+**The staleness rule**, applied at merge time: a stored row counts as completed only
+when its `item_text` still matches the current item at that `item_id` at jaccard ≥
+0.6. Below the threshold the item is treated as *different*, and it renders unchecked.
+Rewording survives; replacement does not. Self-healing, and honest either way — the
+alternative is a checkmark that quietly migrates to a task the user never finished.
+
+Rows are never hard-deleted here; `deleted_at` and the purge-list obligation apply
+exactly as for `live_notes` (§7 of live-notes.md).
 
 **Not in scope:** moving meeting *creation* off supabase-js in `use-live-session`. It
 is a trivial insert with no projection or versioning concern. Noted as a follow-up.
@@ -246,14 +342,21 @@ only) is preserved. See §11.1 for where Account lives.
   `filter-chips.tsx`, `section-grouping.ts` (pure)
 - `features/notes/` — `notes-panel.tsx`, `decision-item.tsx`, `action-item.tsx`,
   `insight-cards.tsx`, `follow-up-panel.tsx`, `transcript-panel.tsx`
-- `features/live-call/` — existing files restyled; the mic orb is new
+- `features/live-call/` — existing files restyled; new: `mic-orb.tsx`,
+  `capture-card.tsx` (the fixed-height tabbed frame from §5.1), `sub-tabs.tsx`
+  (the Transcript/Live-notes switcher with its unread dot), `live-notes-panel.tsx`
+  (the condensed in-call view)
 
 ### 7.5 Hooks
 
 - `use-meetings()` — list + `month_count`, refetch on focus
 - `use-meeting-notes(id)` — the notes read model; polls while `queued|processing`
-- `use-live-notes(meetingId)` — subscribes to `notes.update`, enforces the rev rule
+- `use-live-notes(meetingId)` — subscribes to `notes.update`, enforces the rev rule,
+  and exposes `hasUnseen` so a hidden tab can show its accent dot. Serves both §5.1
+  and §5.2 — one subscription, one rev guard, two renderers.
 - `use-follow-up(id)` — POST per tone, caches per tone, maps 409/429/503 to typed UI states
+- `use-item-completion(meetingId)` — optimistic toggle over
+  `PUT /meetings/:id/notes/items/:itemId`, reverting on failure
 
 Screens stay dumb; hooks own state (RULES §10).
 
@@ -301,12 +404,22 @@ Native Testing Library, wired into the root `npm run test`.
 - Notes panel with null quotes, empty arrays, both `typeInsights` kinds
 - Follow-up panel renders 409/429/503 states
 - List renders the empty state
+- Action item reflects `completed`, and an optimistic toggle reverts on a failed write
+- **Capture card (§5.1):** the hidden tab still receives updates; switching tabs does
+  not remount or reset scroll; the unread dot appears on the hidden tab and clears on
+  reveal; the card's height is unchanged by either tab's content volume
 
 **Server (vitest, existing harness):**
 - `GET /meetings` — projection shape, ordering, soft-delete exclusion, user scoping,
   `tldr` fallback to `live_notes`, `month_count`, the 100 cap
 - `GET /meetings/:id/transcript` — ordering, uniform 404 for missing/foreign/deleted
-- RLS integration tests for both, against real Postgres
+- `PUT /meetings/:id/notes/items/:itemId` — 404 for an `itemId` absent from the notes,
+  404 for foreign/deleted meetings, idempotent re-check, uncheck writes null
+- **The staleness rule (§6.3):** completion survives a reworded item at jaccard ≥ 0.6,
+  and is dropped when the item at that id is replaced by a dissimilar one — asserted
+  against a real regenerate, not a hand-built row
+- RLS integration tests for all three, incl. proof that `authenticated` cannot write
+  `note_item_state` directly (mirroring `live-notes-rls.integration.test.ts`)
 
 **Manual:** iOS simulator, both themes, a real session end to end.
 
@@ -314,13 +427,18 @@ Native Testing Library, wired into the root `npm run test`.
 
 ## 10. Out of scope
 
-Search backend · "grounded in" chips · participant names · interactive checkboxes ·
-prompt changes · real mic capture (Phase 9) · moving meeting creation off supabase-js ·
-the `DELETE /account` purge consumer (pre-launch blocker, tracked in live-notes.md §13 F3)
+Search backend · "grounded in" chips · participant names · prompt changes · real mic
+capture (Phase 9) · moving meeting creation off supabase-js · the `DELETE /account`
+purge consumer (pre-launch blocker, tracked in live-notes.md §13 F3)
+
+`note_item_state` must be added to the purge-job table list when that job is written.
 
 ---
 
 ## 11. Open questions for Gustavo
+
+**Settled 2026-07-28:** action-item completion is built, not cut (§6.3) · the in-call
+capture card is tabbed Transcript / Live notes (§5.1) · `explore.tsx` is deleted.
 
 1. **Where does Account live?** The mock shows two tabs (Live, Meetings) but the app
    has a real account screen (health, `/me`, sign-out, delete account). Options: a
@@ -329,10 +447,10 @@ the `DELETE /account` purge consumer (pre-launch blocker, tracked in live-notes.
 2. **Does the Live tab stay role-gated?** Without mic capture a customer cannot start
    a call, so Live is unusable for them until Phase 9. **Recommendation:** keep the
    gate; customers see Meetings + Account. Revisit in Phase 9.
-3. **`overview` and `typeInsights`** — §3 rules them into an extra card. Confirm, or
-   cut `typeInsights` too.
-4. **Delete `explore.tsx`?** It is unmodified Expo starter content. **Recommendation:**
-   delete.
+3. **`typeInsights` treatment.** The data is real and populated (sales:
+   objections/buying-signals; interview: questions-asked/answers-to-revisit). §3 rules
+   it into one extra card below open/risk. Confirm that, or say whether it should be
+   held back behind a "coming soon" placeholder instead.
 
 ---
 
@@ -343,15 +461,16 @@ Each slice is a commit; `npm run check` green at every one.
 | # | Slice |
 |---|---|
 | 1 | Server: `GET /meetings` + `GET /meetings/:id/transcript`, shared schemas, tests, RLS integration |
-| 2 | Mobile test harness (vitest + RNTL) wired into root `npm run test` |
-| 3 | Design system: tokens, glass primitives, motion, reduced-motion |
-| 4 | Tab bar: `Tabs` + custom floating glass bar, role gate preserved, `explore.tsx` removed |
-| 5 | Meetings list: hook, card, pills, filters, grouping, empty/error states |
-| 6 | Detail — Notes tab: tl;dr, decisions, action items, open/risk, insights |
-| 7 | Detail — Follow-up + Transcript tabs, incl. the typed error states |
-| 8 | Live screen restyle: mic orb, transcript bubbles, "What to say" card |
-| 9 | Live notes: `use-live-notes`, the rev rule, wired into detail |
-| 10 | Docs: `adr-0010-notes-ui`, ARCHITECTURE, CLAUDE, this file's build status |
+| 2 | Server: `note_item_state` migration + RLS, the jaccard staleness merge, `PUT .../items/:itemId`, `completed` on the read model |
+| 3 | Mobile test harness (vitest + RNTL) wired into root `npm run test` |
+| 4 | Design system: tokens, glass primitives, motion, reduced-motion |
+| 5 | Tab bar: `Tabs` + custom floating glass bar, role gate preserved, `explore.tsx` removed |
+| 6 | Meetings list: hook, card, pills, filters, grouping, empty/error states |
+| 7 | Detail — Notes tab: tl;dr, decisions, action items **with working checkboxes**, open/risk, insights |
+| 8 | Detail — Follow-up + Transcript tabs, incl. the typed error states |
+| 9 | Live screen restyle: mic orb, "What to say" card, and the **tabbed capture card** (§5.1) |
+| 10 | Live notes: `use-live-notes`, the rev rule, the unread dot, wired into both surfaces |
+| 11 | Docs: `adr-0010-notes-ui`, ARCHITECTURE, CLAUDE, this file's build status |
 
 The pre-existing CodeRabbit critical in `use-live-session.ts` (`start()` does not
 re-check for unmount after the async meeting insert resolves) is fixed in slice 8,
