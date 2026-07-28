@@ -178,11 +178,19 @@ export function maybeCreateLiveConductorFactory(
   const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
   if (providers.length === 0) return undefined;
 
-  const router = createLlmRouter({ providers, config: liveLlmConfig() });
+  // FAIL CLOSED, exactly as `maybeCreateLiveNotesConductorFactory` below does.
+  // why: this used to build the router first and treat metering as optional
+  // (`...(metering ? { meter } : {})`), so a deployment holding vendor keys but no
+  // `usage_events` DB streamed real suggestions — and their Voyage grounding —
+  // that never reached the ledger. That is the unmetered vendor path the hard
+  // prohibition forbids, so the conductor must not exist without its meter.
   const metering = maybeCreateMetering(app);
+  if (!metering) return undefined;
+
+  const router = createLlmRouter({ providers, config: liveLlmConfig() });
   const rag = createRagFromEnv(process.env, {
     logger: app.log,
-    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+    logUsage: voyageMeteringSink(metering, app),
   });
 
   return ({ send, userId, meetingId }) =>
@@ -195,7 +203,7 @@ export function maybeCreateLiveConductorFactory(
       logger: app.log,
       // The per-call meter (adr-0007 §2): attribution travels with the call while
       // the router's breaker/bench state stays process-global.
-      ...(metering ? { meter: metering.meterFor(userId, meetingId) } : {}),
+      meter: metering.meterFor(userId, meetingId),
     });
 }
 
