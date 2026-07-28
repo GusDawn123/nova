@@ -97,6 +97,34 @@ describe("modules/live [conductor] quiet + fire", () => {
     expect(done && "text" in done ? done.text : "").toBe("Answer here");
   });
 
+  it("[conductor] discards as no_response when a provider emits no token", async () => {
+    // Pins the contract that makes the conductor's empty-completion branch
+    // unreachable. A provider CAN complete having emitted nothing (a refusal, a
+    // safety stop), but the router classifies "stream ended without ever producing
+    // a token" as a transient failure (router.ts) and never surfaces it as a clean
+    // stream — so the conductor takes its catch path and clears the pane with
+    // `no_response` rather than sending `suggestion.done` with empty text.
+    //
+    // This is regression cover, not a bug fix: a CodeRabbit finding claimed the
+    // success path emitted an empty `suggestion.done`. It cannot, because of the
+    // router guarantee above. If that guarantee is ever relaxed, this test fails
+    // and the conductor genuinely will need its own empty-completion branch.
+    const c = makeConductor({
+      router: router({ firstTokenDelayMs: 20, tokens: [] }),
+    });
+    c.onFinal("What is your pricing model exactly?", "them");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const done = events.find((e) => e.type === "suggestion.done");
+    expect(done).toBeUndefined();
+
+    const discard = events.find((e) => e.type === "suggestion.discard");
+    expect(discard).toBeDefined();
+    expect(discard && "reason" in discard ? discard.reason : "").toBe(
+      "no_response",
+    );
+  });
+
   it("[conductor] coalesces many tokens into fewer deltas (~50ms batches)", async () => {
     const c = makeConductor({
       router: router({
