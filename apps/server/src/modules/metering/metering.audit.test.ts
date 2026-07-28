@@ -43,19 +43,49 @@ const LIVE_ROUTES_TS = join(SRC_ROOT, "modules", "live", "routes.ts");
  * (design-doc §8). Found 2026-07-26 while adding that case.
  */
 function functionBlocks(src: string): Map<string, string> {
-  const blocks = new Map<string, string>();
-  const re = /^(?:export )?(?:async )?function (\w+)/gm;
-  const marks: { name: string; start: number }[] = [];
+  return new Map(
+    functionSpans(src).map((span) => [
+      span.name,
+      src.slice(span.start, span.end),
+    ]),
+  );
+}
+
+/**
+ * Each top-level function's TRUE extent, brace-matched from its signature to its
+ * closing brace.
+ *
+ * why brace-matching rather than slicing to the next function's start: trailing
+ * top-level code was being absorbed into the preceding function's block, so a
+ * module-scope `createLlmRouter(...)` written AFTER any function that merely
+ * mentions `meterFor` inherited that mention and passed — the same vacuity this
+ * audit exists to stop, just relocated. Verified by probe (CodeRabbit round 2).
+ */
+function functionSpans(
+  src: string,
+): { name: string; start: number; end: number }[] {
+  const re = /^(?:export (?:default )?)?(?:async )?function (\w+)/gm;
+  const spans: { name: string; start: number; end: number }[] = [];
   for (let m = re.exec(src); m !== null; m = re.exec(src)) {
-    marks.push({ name: m[1] ?? "", start: m.index });
+    const open = src.indexOf("{", m.index);
+    if (open === -1) continue;
+    let depth = 0;
+    let i = open;
+    for (; i < src.length; i++) {
+      const ch = src[i];
+      if (ch === "{") depth++;
+      else if (ch === "}") {
+        depth--;
+        if (depth === 0) break;
+      }
+    }
+    spans.push({
+      name: m[1] ?? "",
+      start: m.index,
+      end: Math.min(i + 1, src.length),
+    });
   }
-  for (let i = 0; i < marks.length; i++) {
-    const mark = marks[i];
-    if (!mark) continue;
-    const end = marks[i + 1]?.start ?? src.length;
-    blocks.set(mark.name, src.slice(mark.start, end));
-  }
-  return blocks;
+  return spans;
 }
 
 /**
@@ -71,8 +101,19 @@ function functionBlocks(src: string): Map<string, string> {
  */
 function enclosingBlocks(src: string): Map<string, string> {
   const blocks = functionBlocks(src);
-  const firstFn = /^(?:export )?(?:async )?function \w+/m.exec(src);
-  const moduleScope = src.slice(0, firstFn?.index ?? src.length);
+  // Module scope = every byte NOT inside a top-level function body, joined —
+  // before, between, and AFTER the functions. The trailing region is the part
+  // that used to leak into the last function's block. Arrow-function and
+  // class-method bodies fall in here too: a coarser bucket, but it errs toward
+  // demanding the seam rather than toward a silent pass.
+  const spans = functionSpans(src).sort((a, b) => a.start - b.start);
+  let moduleScope = "";
+  let cursor = 0;
+  for (const span of spans) {
+    if (span.start > cursor) moduleScope += src.slice(cursor, span.start);
+    cursor = Math.max(cursor, span.end);
+  }
+  moduleScope += src.slice(cursor);
   if (moduleScope.trim() !== "") blocks.set("<module scope>", moduleScope);
   return blocks;
 }
@@ -293,9 +334,13 @@ describe("modules/metering wiring audit", () => {
     );
     expect(routerBlocks.length).toBeGreaterThan(0);
     for (const [name, body] of routerBlocks) {
+      // Stripped, matching the tree-wide backstop. why: raw text let a
+      // reintroduced `...(metering ? { meter: meterFor(...) } : {})` satisfy this
+      // per-file check — the tighter of the two — while only the tree-wide one
+      // caught it. Both now ask for an UNCONDITIONAL seam.
       expect(
-        body,
-        `metering-wiring function ${name} builds a router without meterFor`,
+        withoutConditionalSpreads(body),
+        `metering-wiring function ${name} builds a router without an unconditional meterFor`,
       ).toMatch(/meterFor/);
     }
     // The live transport actually consumes the factory.
