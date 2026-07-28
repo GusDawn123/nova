@@ -264,10 +264,14 @@ function maybeStartRagIndexer(
   const ragConfigured =
     Boolean(env.VOYAGE_API_KEY) && Boolean(env.SUPABASE_DB_URL);
   if (!ragConfigured || env.NODE_ENV === "test") return;
+  // why: SUPABASE_DB_URL above already implies metering, so this never fires in
+  // practice — it exists so the Voyage sink below can be unconditional. The
+  // indexer is a background embedder; without a ledger it must not run at all.
+  if (!metering) return;
 
   const ragService = createRagFromEnv(env, {
     logger: app.log,
-    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+    logUsage: voyageMeteringSink(metering, app),
   });
   const indexer = createRagIndexer({
     ragService,
@@ -340,23 +344,23 @@ function maybeStartNotesWorker(
     );
     return;
   }
+  // why: the gate above already requires SUPABASE_DB_URL, so metering resolves —
+  // this early return is a no-op in practice. It replaces a conditional spread that
+  // merely satisfied the optional type: a `...(metering ? { meterFor } : {})` reads
+  // as "metered when convenient", and that is exactly how the live copilot shipped
+  // unmetered. Fail closed instead, and let the seam below be unconditional.
+  if (!metering) return;
 
   const { store } = notesJobStoreFromEnv(process.env);
   const router = createLlmRouter({
     providers,
     config: llmConfigSchema.parse({}),
   });
-  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
-  // gate); the conditional spread only satisfies the type, never skips the sink.
   const pipeline = createNotesPipeline({
     router,
     logger: app.log,
-    ...(metering
-      ? {
-          meterFor: (userId: string, meetingId?: string) =>
-            metering.meterFor(userId, meetingId),
-        }
-      : {}),
+    meterFor: (userId: string, meetingId?: string) =>
+      metering.meterFor(userId, meetingId),
   });
   const handler = createNotesJobHandler({
     pipeline,
@@ -414,22 +418,22 @@ function maybeRegisterNotesRoutes(
   }
 
   const providers = createProvidersFromEnv(llmProviderEnv(process.env));
-  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
-  // gate); the conditional spread only satisfies the type, never skips the sink.
+  // why: metering joins the CONDITION rather than being spread in optionally, so the
+  // router is never constructed without its meter. The gate above already requires
+  // SUPABASE_DB_URL so metering resolves in practice; folding it in here means the
+  // unmetered branch is unrepresentable rather than merely unlikely. The notes REST
+  // surface still registers either way — only follow-up generation degrades, exactly
+  // as it already does with no provider key.
   const followUp: (input: FollowUpInput) => Promise<FollowUpResult> =
-    providers.length > 0
+    providers.length > 0 && metering
       ? generateFollowUp({
           router: createLlmRouter({
             providers,
             config: llmConfigSchema.parse({}),
           }),
           logger: app.log,
-          ...(metering
-            ? {
-                meterFor: (userId: string, meetingId?: string) =>
-                  metering.meterFor(userId, meetingId),
-              }
-            : {}),
+          meterFor: (userId: string, meetingId?: string) =>
+            metering.meterFor(userId, meetingId),
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 

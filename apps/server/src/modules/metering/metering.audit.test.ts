@@ -59,6 +59,60 @@ function functionBlocks(src: string): Map<string, string> {
 }
 
 /**
+ * Every scope a vendor call could sit in: each top-level function block, PLUS a
+ * synthetic `<module scope>` block holding whatever precedes the first function.
+ *
+ * The tree-wide backstop needs this rather than raw file text. Checking the seam
+ * against a whole file lets an unrelated function's `meterFor` vouch for a call
+ * site that threads nothing — the vacuous pass that let the live-copilot factory
+ * ship unmetered (CodeRabbit, 2026-07-28). Module scope is included so a top-level
+ * `const router = createLlmRouter({...})` cannot escape by sitting outside any
+ * function.
+ */
+function enclosingBlocks(src: string): Map<string, string> {
+  const blocks = functionBlocks(src);
+  const firstFn = /^(?:export )?(?:async )?function \w+/m.exec(src);
+  const moduleScope = src.slice(0, firstFn?.index ?? src.length);
+  if (moduleScope.trim() !== "") blocks.set("<module scope>", moduleScope);
+  return blocks;
+}
+
+/**
+ * The block with every CONDITIONAL SPREAD (`...( ... )`) removed, paren-matched.
+ *
+ * This is the load-bearing half of the tree-wide backstop. Presence of the seam
+ * token is not enough — the live-copilot factory shipped unmetered while literally
+ * containing `meterFor`, because it was threaded as
+ * `...(metering ? { meter: metering.meterFor(...) } : {})`. When metering was
+ * undefined the spread contributed nothing and the vendor call ran bare, yet every
+ * substring check passed. Stripping conditional spreads before testing the seam
+ * asks the question that actually matters: is this vendor path metered
+ * UNCONDITIONALLY? A conditional meter is not a meter.
+ */
+function withoutConditionalSpreads(block: string): string {
+  let out = "";
+  for (let i = 0; i < block.length; ) {
+    if (block.startsWith("...(", i)) {
+      let depth = 0;
+      let j = i + 3; // index of the '('
+      for (; j < block.length; j++) {
+        const ch = block[j];
+        if (ch === "(") depth++;
+        else if (ch === ")") {
+          depth--;
+          if (depth === 0) break;
+        }
+      }
+      i = j + 1;
+      continue;
+    }
+    out += block[i];
+    i++;
+  }
+  return out;
+}
+
+/**
  * The object-literal argument text of every `<callee>({ ... })` call in the
  * source — brace-matched so nested objects don't truncate the capture.
  */
@@ -140,11 +194,24 @@ describe("modules/metering wiring audit", () => {
       const src = readFileSync(file, "utf8");
       for (const site of VENDOR_SITES) {
         if (!src.includes(site.call)) continue;
-        if (src.includes(site.defines)) continue; // the declaring module
-        if (!site.seam.test(src)) {
-          offenders.push(
-            `${file.slice(SRC_ROOT.length + 1)} builds ${site.what} without ${String(site.seam)}`,
-          );
+        // Scope BOTH the exemption and the seam check to the enclosing block.
+        // why: this used to `continue` on the whole file when it contained
+        // `site.defines`, and test `site.seam` against the entire file text — the
+        // same whole-file vacuity documented on `functionBlocks` above. That is
+        // precisely how the unmetered live-copilot path passed: metering-wiring.ts
+        // mentions `meterFor` in a DIFFERENT function, so the file-wide regex hit
+        // while the copilot factory itself threaded no meter.
+        for (const [name, block] of enclosingBlocks(src)) {
+          if (block.includes(site.defines)) continue; // the declaring block only
+          if (!block.includes(site.call)) continue;
+          // Conditional spreads stripped FIRST: a seam that only appears inside
+          // `...(x ? { meter } : {})` vanishes when x is undefined, so it does not
+          // count as wired. See withoutConditionalSpreads above.
+          if (!site.seam.test(withoutConditionalSpreads(block))) {
+            offenders.push(
+              `${file.slice(SRC_ROOT.length + 1)} :: ${name} builds ${site.what} without an unconditional ${String(site.seam)}`,
+            );
+          }
         }
       }
     }
