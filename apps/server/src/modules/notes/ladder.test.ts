@@ -1,13 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { makeMockProvider, type ChatMessage } from "../llm/index.js";
 import { LlmError } from "../llm/errors.js";
-import {
-  doneWith,
-  makeRouter,
-  tok,
-} from "../llm/testing/router-harness.js";
+import { makeMockProvider, type ChatMessage } from "../llm/index.js";
+import { doneWith, makeRouter, tok } from "../llm/testing/router-harness.js";
 
 import { runLadder } from "./ladder.js";
 
@@ -18,9 +14,7 @@ import { runLadder } from "./ladder.js";
  * and no timer leaks as an unhandled rejection.
  */
 
-const schema = z
-  .object({ a: z.number(), b: z.string() })
-  .strict();
+const schema = z.object({ a: z.number(), b: z.string() }).strict();
 type Shape = z.infer<typeof schema>;
 
 /** Build a single-provider router that returns each given text on successive calls. */
@@ -48,7 +42,12 @@ const messages: ChatMessage[] = [{ role: "user", content: "make json" }];
 describe("runLadder — clean and salvage rungs", () => {
   it("parses clean JSON on the first call with no salvage or repair", async () => {
     const { router, provider } = routerReturning('{"a":1,"b":"ok"}');
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "ok", value: { a: 1, b: "ok" } });
     expect(out.telemetry).toEqual({
@@ -64,7 +63,12 @@ describe("runLadder — clean and salvage rungs", () => {
     const { router, provider } = routerReturning(
       'Here you go:\n```json\n{"a":2,"b":"fenced"}\n```\n',
     );
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "ok", value: { a: 2, b: "fenced" } });
     expect(out.telemetry.salvageApplied).toBe(true);
@@ -76,7 +80,12 @@ describe("runLadder — clean and salvage rungs", () => {
     const { router } = routerReturning(
       'Sure! {"a":3,"b":"prose"} — hope that helps.',
     );
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "ok", value: { a: 3, b: "prose" } });
     expect(out.telemetry.salvageApplied).toBe(true);
@@ -84,7 +93,12 @@ describe("runLadder — clean and salvage rungs", () => {
 
   it("repairs a trailing comma with jsonrepair (salvage, no repair call)", async () => {
     const { router, provider } = routerReturning('{"a":4,"b":"trail",}');
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "ok", value: { a: 4, b: "trail" } });
     expect(out.telemetry.salvageApplied).toBe(true);
@@ -94,7 +108,12 @@ describe("runLadder — clean and salvage rungs", () => {
 
   it("repairs single-quoted keys/values with jsonrepair", async () => {
     const { router } = routerReturning("{'a': 5, 'b': 'single'}");
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "ok", value: { a: 5, b: "single" } });
     expect(out.telemetry.salvageApplied).toBe(true);
@@ -108,9 +127,17 @@ describe("runLadder — repair round-trip", () => {
       '{"a":"nope","b":"x"}',
       '{"a":6,"b":"repaired"}',
     );
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
-    expect(out.result).toEqual({ status: "ok", value: { a: 6, b: "repaired" } });
+    expect(out.result).toEqual({
+      status: "ok",
+      value: { a: 6, b: "repaired" },
+    });
     expect(out.telemetry).toEqual({
       salvageApplied: false,
       repairUsed: true,
@@ -131,7 +158,12 @@ describe("runLadder — repair round-trip", () => {
       '{"a":"bad","b":"x"}',
       "still not json at all",
     );
-    const out = await runLadder<Shape>({ schema, messages, router, repair: repairBuilder });
+    const out = await runLadder<Shape>({
+      schema,
+      messages,
+      router,
+      repair: repairBuilder,
+    });
 
     expect(out.result).toEqual({ status: "failed" });
     expect(out.telemetry.repairUsed).toBe(true);

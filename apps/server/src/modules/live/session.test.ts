@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import type { SttEmit, SttEngine } from "../stt/ports.js";
 
@@ -635,15 +635,16 @@ describe("LiveSession transcript-consumer fan-out (Phase 8)", () => {
     // BOTH assertions: no notes final, and the throw escapes into the relay.
     const fake = makeFakeEngine();
     const n = makeFakeNotesConductor();
-    const explodingCopilot: NonNullable<LiveSessionDeps["createConductor"]> =
-      () => ({
-        onPartial: () => undefined,
-        onFinal: () => {
-          throw new Error("copilot conductor bug");
-        },
-        onDirectQuestion: () => undefined,
-        dispose: () => undefined,
-      });
+    const explodingCopilot: NonNullable<
+      LiveSessionDeps["createConductor"]
+    > = () => ({
+      onPartial: () => undefined,
+      onFinal: () => {
+        throw new Error("copilot conductor bug");
+      },
+      onDirectQuestion: () => undefined,
+      dispose: () => undefined,
+    });
     const { session, sent } = makeSession({
       sttEngine: fake.engine,
       userId: USER_ID,
@@ -724,7 +725,6 @@ describe("LiveSession typed input (transcript.input, Phase 7)", () => {
       speaker: "them",
     });
   });
-
 
   it("[origin] a copilot_question is echoed as SPEAKER ME, never as 'them'", async () => {
     const fake = makeFakeEngine();

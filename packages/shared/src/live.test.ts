@@ -140,9 +140,24 @@ describe("serverLiveEventSchema", () => {
       is_final: true,
     },
     { v: 1, type: "provider_switched", from: "assemblyai", to: "deepgram" },
-    { v: 1, type: "suggestion.start", suggestion_id: SUGGESTION_ID, kind: "answer" },
-    { v: 1, type: "suggestion.delta", suggestion_id: SUGGESTION_ID, text: "par" },
-    { v: 1, type: "suggestion.done", suggestion_id: SUGGESTION_ID, text: "full" },
+    {
+      v: 1,
+      type: "suggestion.start",
+      suggestion_id: SUGGESTION_ID,
+      kind: "answer",
+    },
+    {
+      v: 1,
+      type: "suggestion.delta",
+      suggestion_id: SUGGESTION_ID,
+      text: "par",
+    },
+    {
+      v: 1,
+      type: "suggestion.done",
+      suggestion_id: SUGGESTION_ID,
+      text: "full",
+    },
     {
       v: 1,
       type: "suggestion.discard",

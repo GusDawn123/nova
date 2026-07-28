@@ -200,7 +200,10 @@ export class MockVendor implements SttVendor {
 }
 
 /** Resolve when `promise` settles OR `signal` aborts; `true` if the signal won. */
-function raceAbort(promise: Promise<void>, signal: AbortSignal): Promise<boolean> {
+function raceAbort(
+  promise: Promise<void>,
+  signal: AbortSignal,
+): Promise<boolean> {
   const abortedFirst = Symbol("aborted");
   return new Promise<typeof abortedFirst | null>((resolve) => {
     const onAbort = (): void => {

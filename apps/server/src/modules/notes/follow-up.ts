@@ -1,10 +1,10 @@
+import { z } from "zod";
 import {
   followUpDraftSchema,
   type FollowUpDraft,
   type FollowUpTone,
   type MeetingNotes,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
 import { withMeter, type LlmRouter, type Meter } from "../llm/index.js";

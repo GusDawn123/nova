@@ -23,7 +23,9 @@ describe("adapters/google — translation", () => {
   it("omits systemInstruction when there are no system turns", () => {
     const result = toGoogleContents([{ role: "user", content: "hi" }]);
     expect(result.systemInstruction).toBeUndefined();
-    expect(result.contents).toEqual([{ role: "user", parts: [{ text: "hi" }] }]);
+    expect(result.contents).toEqual([
+      { role: "user", parts: [{ text: "hi" }] },
+    ]);
   });
 
   it("builds a provider with the google id", () => {

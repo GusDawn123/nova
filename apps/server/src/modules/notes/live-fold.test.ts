@@ -1,5 +1,5 @@
-import type { MeetingNotes } from "@nova/shared";
 import { describe, expect, it } from "vitest";
+import type { MeetingNotes } from "@nova/shared";
 
 import {
   applyFold,
@@ -27,7 +27,10 @@ const CONFIG = {
   maxItemsPerList: 40,
 } as const;
 
-function ctxWith(state: FoldState, over: Partial<FoldContext> = {}): FoldContext {
+function ctxWith(
+  state: FoldState,
+  over: Partial<FoldContext> = {},
+): FoldContext {
   return {
     config: CONFIG,
     state,
@@ -152,10 +155,12 @@ describe("applyFold — adds and ids", () => {
 
 describe("applyFold — [non-teleport] the churn ceiling", () => {
   /** A 12-item list: budget is max(3, ceil(12 * 0.25)) = 3. */
-  const twelve = foldAll(
-    emptyLiveNotes("Acme call"),
-    [adds("risks", Array.from({ length: 12 }, (_, i) => `risk ${String(i + 1)}`))],
-  );
+  const twelve = foldAll(emptyLiveNotes("Acme call"), [
+    adds(
+      "risks",
+      Array.from({ length: 12 }, (_, i) => `risk ${String(i + 1)}`),
+    ),
+  ]);
 
   it("clamps a WHOLESALE rewrite to the per-list budget", () => {
     // The model returns an update for every single item — the teleport scenario.
@@ -173,9 +178,9 @@ describe("applyFold — [non-teleport] the churn ceiling", () => {
       r.text.startsWith("REWRITTEN"),
     );
     expect(rewritten).toHaveLength(3);
-    expect(out.dropped.filter((d) => d.reason === "churn_ceiling")).toHaveLength(
-      9,
-    );
+    expect(
+      out.dropped.filter((d) => d.reason === "churn_ceiling"),
+    ).toHaveLength(9);
     // The other nine survive untouched — retained, not dropped from the list.
     expect(out.notes.risks).toHaveLength(12);
   });
@@ -196,7 +201,10 @@ describe("applyFold — [non-teleport] the churn ceiling", () => {
   it("scales the budget to 25% on a long list", () => {
     // 40 items → budget is ceil(40 * 0.25) = 10, not the floor of 3.
     const big = foldAll(emptyLiveNotes("Acme call"), [
-      adds("risks", Array.from({ length: 40 }, (_, i) => `r${String(i + 1)}`)),
+      adds(
+        "risks",
+        Array.from({ length: 40 }, (_, i) => `r${String(i + 1)}`),
+      ),
     ]);
     const rewrite = foldResultSchema.parse({
       ops: big.notes.risks.map((r) => ({
@@ -207,9 +215,9 @@ describe("applyFold — [non-teleport] the churn ceiling", () => {
       })),
     });
     const out = applyFold(big.notes, rewrite, ctxWith(big.state));
-    expect(
-      out.notes.risks.filter((r) => r.text.startsWith("X ")),
-    ).toHaveLength(10);
+    expect(out.notes.risks.filter((r) => r.text.startsWith("X "))).toHaveLength(
+      10,
+    );
   });
 
   it("budgets each list separately, computed from PRIOR lengths", () => {
@@ -237,7 +245,9 @@ describe("applyFold — [non-teleport] the churn ceiling", () => {
       }),
       ctxWith(seeded.state),
     );
-    expect(out.notes.risks.filter((r) => r.text.startsWith("R "))).toHaveLength(3);
+    expect(out.notes.risks.filter((r) => r.text.startsWith("R "))).toHaveLength(
+      3,
+    );
     expect(
       out.notes.openQuestions.filter((q) => q.text.startsWith("Q ")),
     ).toHaveLength(3);
@@ -289,7 +299,9 @@ describe("applyFold — adversarial model output", () => {
       ctxWith(seeded.state),
     );
     expect(out.notes.risks.find((r) => r.id === "r1")?.text).toBe("first");
-    expect(out.dropped.filter((d) => d.reason === "duplicate_id")).toHaveLength(2);
+    expect(out.dropped.filter((d) => d.reason === "duplicate_id")).toHaveLength(
+      2,
+    );
   });
 
   it("[server-owned order] a reshuffled response cannot reorder the list", () => {
@@ -300,7 +312,9 @@ describe("applyFold — adversarial model output", () => {
       many.notes,
       foldResultSchema.parse({
         // The model echoes them back in reverse; only r3 is actually changed.
-        ops: [{ op: "update", list: "risks", id: "r3", item: { text: "THREE" } }],
+        ops: [
+          { op: "update", list: "risks", id: "r3", item: { text: "THREE" } },
+        ],
       }),
       ctxWith(many.state),
     );
@@ -332,7 +346,10 @@ describe("applyFold — adversarial model output", () => {
 
   it("drops adds once the list hits its cap", () => {
     const full = foldAll(emptyLiveNotes("Acme call"), [
-      adds("risks", Array.from({ length: 40 }, (_, i) => `r${String(i + 1)}`)),
+      adds(
+        "risks",
+        Array.from({ length: 40 }, (_, i) => `r${String(i + 1)}`),
+      ),
     ]);
     const out = applyFold(
       full.notes,
@@ -375,7 +392,9 @@ describe("applyFold — id stability across a scripted sequence", () => {
     // An untouched item keeps its id; an updated one keeps its id with new text.
     step(
       foldResultSchema.parse({
-        ops: [{ op: "update", list: "risks", id: "r2", item: { text: "BETA" } }],
+        ops: [
+          { op: "update", list: "risks", id: "r2", item: { text: "BETA" } },
+        ],
       }),
     );
     expect(notes.risks.map((r) => `${r.id}:${r.text}`)).toEqual([

@@ -125,7 +125,10 @@ export function makeMockProvider(
   return {
     id,
     calls,
-    stream(req: ChatRequest, signal: AbortSignal): AsyncIterable<LlmStreamEvent> {
+    stream(
+      req: ChatRequest,
+      signal: AbortSignal,
+    ): AsyncIterable<LlmStreamEvent> {
       const current =
         scripts[Math.min(callIndex, scripts.length - 1)] ?? scripts[0];
       callIndex += 1;

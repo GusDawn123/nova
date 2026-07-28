@@ -1,6 +1,11 @@
 import type { ChunkConfig } from "./config.js";
 import { RagError } from "./ports.js";
-import type { Chunker, ChunkDraft, SourceMeta, TranscriptTurn } from "./ports.js";
+import type {
+  Chunker,
+  ChunkDraft,
+  SourceMeta,
+  TranscriptTurn,
+} from "./ports.js";
 
 /**
  * The pure, deterministic chunker (Phase 4). Zero I/O, zero clock — identical
@@ -82,7 +87,9 @@ function packSentenceWindows(text: string, cfg: ChunkConfig): string[][] {
  * — the doc/oversized overlap unit. Preserves source order.
  */
 function overlapSentences(sentences: string[], cfg: ChunkConfig): string[] {
-  const need = Math.ceil(approxTokens(sentences.join(" ")) * cfg.docOverlapRatio);
+  const need = Math.ceil(
+    approxTokens(sentences.join(" ")) * cfg.docOverlapRatio,
+  );
   if (need <= 0) return [];
   const picked: string[] = [];
   let acc = 0;
@@ -105,7 +112,9 @@ function splitOversizedTurn(turn: TranscriptTurn, cfg: ChunkConfig): string[] {
   let prev: string[] | null = null;
   for (const window of windows) {
     const overlap = prev ? overlapSentences(prev, cfg) : [];
-    const body = (overlap.length > 0 ? overlap.concat(window) : window).join(" ");
+    const body = (overlap.length > 0 ? overlap.concat(window) : window).join(
+      " ",
+    );
     out.push(`${speaker}: ${body}`);
     prev = window;
   }
@@ -118,7 +127,10 @@ type TurnGroup =
   | { readonly kind: "oversized"; readonly turn: TranscriptTurn };
 
 /** Partition turns into contiguous, non-overlapping groups honoring the cap. */
-function partitionTurns(turns: TranscriptTurn[], cfg: ChunkConfig): TurnGroup[] {
+function partitionTurns(
+  turns: TranscriptTurn[],
+  cfg: ChunkConfig,
+): TurnGroup[] {
   const groups: TurnGroup[] = [];
   let cur: string[] = [];
   let curTokens = 0;
@@ -239,7 +251,9 @@ function chunkDoc(
   let prevSentences: string[] | null = null;
   for (const body of bodies) {
     const overlap = prevSentences ? overlapSentences(prevSentences, cfg) : [];
-    contents.push(overlap.length > 0 ? `${overlap.join(" ")}\n\n${body}` : body);
+    contents.push(
+      overlap.length > 0 ? `${overlap.join(" ")}\n\n${body}` : body,
+    );
     prevSentences = splitSentences(body);
   }
   return finalize(header, contents, cfg);

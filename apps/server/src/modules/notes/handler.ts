@@ -4,7 +4,6 @@ import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
 import type { LiveNotesStore } from "../../db/live-notes.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
 
-import { reconcileIds } from "./reconcile-ids.js";
 import type {
   NotesJobHandler,
   NotesLogger,
@@ -13,6 +12,7 @@ import type {
   NotesSource,
   NotesWriter,
 } from "./ports.js";
+import { reconcileIds } from "./reconcile-ids.js";
 
 /**
  * The REAL notes job handler (Task 4) the worker delegates each claimed job to. It

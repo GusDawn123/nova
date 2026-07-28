@@ -58,9 +58,9 @@ describe("ragSourceSchema", () => {
   });
 
   it("rejects an unknown kind", () => {
-    expect(
-      ragSourceSchema.safeParse({ kind: "email", id: "x" }).success,
-    ).toBe(false);
+    expect(ragSourceSchema.safeParse({ kind: "email", id: "x" }).success).toBe(
+      false,
+    );
   });
 
   it("rejects a source missing its parent id", () => {

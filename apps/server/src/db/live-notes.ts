@@ -1,6 +1,6 @@
-import { meetingNotesSchema, type MeetingNotes } from "@nova/shared";
 import type { Pool } from "pg";
 import { z } from "zod";
+import { meetingNotesSchema, type MeetingNotes } from "@nova/shared";
 
 /**
  * `public.live_notes` over a direct `pg` Pool — the only read/write seam for the
@@ -95,7 +95,10 @@ export interface LiveNotesStore {
    * `deleted_at`-aware in SQL, so a foreign or tombstoned row is indistinguishable
    * from a missing one (no existence leak, matching `db/notes.ts`).
    */
-  readLiveNotes(meetingId: string, userId: string): Promise<LiveNotesRow | null>;
+  readLiveNotes(
+    meetingId: string,
+    userId: string,
+  ): Promise<LiveNotesRow | null>;
 
   /**
    * Write the preview, guarded by `rev`. Returns `stale` — having written nothing —

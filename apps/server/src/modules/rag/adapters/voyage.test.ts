@@ -2,13 +2,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RagError } from "../ports.js";
 import type { RagHit } from "../ports.js";
-import { MAX_RETRY_ATTEMPTS, type VoyageBackoffLog } from "./voyage.retry.js";
 import {
   createVoyageAdapter,
   voyageAdapterFromEnv,
   type VoyageConfig,
   type VoyageUsageLog,
 } from "./voyage.js";
+import { MAX_RETRY_ATTEMPTS, type VoyageBackoffLog } from "./voyage.retry.js";
 
 /**
  * Voyage adapter unit tests — the vendor HTTP is `vi.stubGlobal("fetch", …)`, so
@@ -38,7 +38,12 @@ function embeddingsBody(
   model = "voyage-4-lite",
   tokens = 7,
 ): unknown {
-  return { object: "list", data: items, model, usage: { total_tokens: tokens } };
+  return {
+    object: "list",
+    data: items,
+    model,
+    usage: { total_tokens: tokens },
+  };
 }
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -75,7 +80,9 @@ describe("voyage embedder — request shape", () => {
   it("embeds a query with the lite model, input_type=query, 1024 dims", async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
-      .mockResolvedValue(jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.1) }])));
+      .mockResolvedValue(
+        jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.1) }])),
+      );
     vi.stubGlobal("fetch", fetchMock);
 
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
@@ -104,7 +111,9 @@ describe("voyage embedder — request shape", () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValue(
-        jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4")),
+        jsonResponse(
+          embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4"),
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -137,12 +146,16 @@ describe("voyage embedder — batching", () => {
         ),
       )
       .mockResolvedValueOnce(
-        jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.3) }], "voyage-4", 3)),
+        jsonResponse(
+          embeddingsBody([{ index: 0, embedding: vec(0.3) }], "voyage-4", 3),
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
 
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    const res = await embedder.embed(["one", "two", "three"], { kind: "document" });
+    const res = await embedder.embed(["one", "two", "three"], {
+      kind: "document",
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(bodyOf(fetchMock.mock.calls[0] ?? []).input).toEqual(["one", "two"]);
@@ -175,10 +188,14 @@ describe("voyage embedder — error mapping", () => {
   it("maps a 429 to EMBEDDER_FAILED (status only, no body echoed)", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ error: "rate" }, 429)),
+      vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(jsonResponse({ error: "rate" }, 429)),
     );
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    await expect(embedder.embed(["x"], { kind: "query" })).rejects.toMatchObject({
+    await expect(
+      embedder.embed(["x"], { kind: "query" }),
+    ).rejects.toMatchObject({
       code: "EMBEDDER_FAILED",
     });
   });
@@ -189,7 +206,9 @@ describe("voyage embedder — error mapping", () => {
       vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({}, 500)),
     );
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    await expect(embedder.embed(["x"], { kind: "query" })).rejects.toMatchObject({
+    await expect(
+      embedder.embed(["x"], { kind: "query" }),
+    ).rejects.toMatchObject({
       code: "EMBEDDER_FAILED",
     });
   });
@@ -200,11 +219,17 @@ describe("voyage embedder — error mapping", () => {
       vi
         .fn<typeof fetch>()
         .mockResolvedValue(
-          jsonResponse(embeddingsBody([{ index: 0, embedding: Array<number>(512).fill(0.1) }])),
+          jsonResponse(
+            embeddingsBody([
+              { index: 0, embedding: Array<number>(512).fill(0.1) },
+            ]),
+          ),
         ),
     );
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    const err = await embedder.embed(["x"], { kind: "query" }).catch((e: unknown) => e);
+    const err = await embedder
+      .embed(["x"], { kind: "query" })
+      .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(RagError);
     expect((err as RagError).code).toBe("EMBEDDER_FAILED");
     expect((err as RagError).message).toContain("512");
@@ -225,7 +250,9 @@ describe("voyage embedder — error mapping", () => {
       ),
     );
     const { embedder } = createVoyageAdapter({ apiKey: "k", config });
-    const settled = embedder.embed(["x"], { kind: "query" }).catch((e: unknown) => e);
+    const settled = embedder
+      .embed(["x"], { kind: "query" })
+      .catch((e: unknown) => e);
     await vi.advanceTimersByTimeAsync(config.queryEmbedTimeoutMs + 1);
     const err = await settled;
     expect(err).toBeInstanceOf(RagError);
@@ -242,7 +269,13 @@ describe("voyage embedder — usage log", () => {
       vi
         .fn<typeof fetch>()
         .mockResolvedValue(
-          jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.1) }], "voyage-4-lite", 11)),
+          jsonResponse(
+            embeddingsBody(
+              [{ index: 0, embedding: vec(0.1) }],
+              "voyage-4-lite",
+              11,
+            ),
+          ),
         ),
     );
     const logUsage = vi.fn<(entry: VoyageUsageLog) => void>();
@@ -267,7 +300,9 @@ describe("voyage embedder — usage log", () => {
       "fetch",
       vi
         .fn<typeof fetch>()
-        .mockResolvedValue(jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.1) }]))),
+        .mockResolvedValue(
+          jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.1) }])),
+        ),
     );
     const logUsage = vi.fn<(entry: VoyageUsageLog) => void>();
     const { embedder } = createVoyageAdapter({ apiKey: "k", config, logUsage });
@@ -279,8 +314,22 @@ describe("voyage embedder — usage log", () => {
 
 describe("voyage reranker", () => {
   const hits: RagHit[] = [
-    { chunkId: "a", content: "derivatives pricing", header: "", score: 0.1, contextDocId: "d", meetingId: null },
-    { chunkId: "b", content: "a small kitten", header: "", score: 0.2, contextDocId: "d", meetingId: null },
+    {
+      chunkId: "a",
+      content: "derivatives pricing",
+      header: "",
+      score: 0.1,
+      contextDocId: "d",
+      meetingId: null,
+    },
+    {
+      chunkId: "b",
+      content: "a small kitten",
+      header: "",
+      score: 0.2,
+      contextDocId: "d",
+      meetingId: null,
+    },
   ];
 
   it("reorders hits by the vendor relevance and rewrites score", async () => {
@@ -339,11 +388,17 @@ describe("voyage — rate-limit retry (429)", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(jsonResponse({ error: "rate" }, 429))
       .mockResolvedValueOnce(
-        jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4")),
+        jsonResponse(
+          embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4"),
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
     const logBackoff = vi.fn<(entry: VoyageBackoffLog) => void>();
-    const { embedder } = createVoyageAdapter({ apiKey: "k", config, logBackoff });
+    const { embedder } = createVoyageAdapter({
+      apiKey: "k",
+      config,
+      logBackoff,
+    });
 
     const settled = embedder.embed(["a document"], { kind: "document" });
     // First 429 waits (equal-jitter, ≤2s for attempt 1); drive past it.
@@ -370,11 +425,17 @@ describe("voyage — rate-limit retry (429)", () => {
       .fn<typeof fetch>()
       .mockResolvedValueOnce(rateLimited)
       .mockResolvedValueOnce(
-        jsonResponse(embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4")),
+        jsonResponse(
+          embeddingsBody([{ index: 0, embedding: vec(0.2) }], "voyage-4"),
+        ),
       );
     vi.stubGlobal("fetch", fetchMock);
     const logBackoff = vi.fn<(entry: VoyageBackoffLog) => void>();
-    const { embedder } = createVoyageAdapter({ apiKey: "k", config, logBackoff });
+    const { embedder } = createVoyageAdapter({
+      apiKey: "k",
+      config,
+      logBackoff,
+    });
 
     const settled = embedder.embed(["a document"], { kind: "document" });
     // Not yet resolved just before the 3s Retry-After elapses...
@@ -395,9 +456,15 @@ describe("voyage — rate-limit retry (429)", () => {
       .mockResolvedValue(jsonResponse({ error: "rate" }, 429));
     vi.stubGlobal("fetch", fetchMock);
     const logBackoff = vi.fn<(entry: VoyageBackoffLog) => void>();
-    const { embedder } = createVoyageAdapter({ apiKey: "k", config, logBackoff });
+    const { embedder } = createVoyageAdapter({
+      apiKey: "k",
+      config,
+      logBackoff,
+    });
 
-    const settled = embedder.embed(["a document"], { kind: "document" }).catch((e: unknown) => e);
+    const settled = embedder
+      .embed(["a document"], { kind: "document" })
+      .catch((e: unknown) => e);
     // Each wait is ≤30s; MAX_RETRY_ATTEMPTS-1 of them drive the loop to exhaustion.
     for (let i = 0; i < MAX_RETRY_ATTEMPTS; i += 1) {
       await vi.advanceTimersByTimeAsync(30_000);
@@ -417,9 +484,15 @@ describe("voyage — rate-limit retry (429)", () => {
       .mockResolvedValue(jsonResponse({ error: "rate" }, 429));
     vi.stubGlobal("fetch", fetchMock);
     const logBackoff = vi.fn<(entry: VoyageBackoffLog) => void>();
-    const { embedder } = createVoyageAdapter({ apiKey: "k", config, logBackoff });
+    const { embedder } = createVoyageAdapter({
+      apiKey: "k",
+      config,
+      logBackoff,
+    });
 
-    await expect(embedder.embed(["x"], { kind: "query" })).rejects.toMatchObject({
+    await expect(
+      embedder.embed(["x"], { kind: "query" }),
+    ).rejects.toMatchObject({
       code: "EMBEDDER_FAILED",
     });
     // Hot-path law: no wait, no retry, no backoff line (adr-0005 §8).
@@ -435,7 +508,11 @@ describe("voyage — rate-limit retry (429)", () => {
       .mockResolvedValueOnce(jsonResponse(rerankBody(0, 0.5)));
     vi.stubGlobal("fetch", fetchMock);
     const logBackoff = vi.fn<(entry: VoyageBackoffLog) => void>();
-    const { reranker } = createVoyageAdapter({ apiKey: "k", config, logBackoff });
+    const { reranker } = createVoyageAdapter({
+      apiKey: "k",
+      config,
+      logBackoff,
+    });
 
     const settled = reranker.rerank("q", [hit], 1);
     await vi.advanceTimersByTimeAsync(3_000);

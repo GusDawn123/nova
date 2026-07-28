@@ -31,7 +31,10 @@ export interface NotesChunk {
 }
 
 /** The chunking knobs the map step reads from {@link NotesConfig}. */
-export type ChunkOptions = Pick<NotesConfig, "mapChunkTokens" | "mapOverlapRatio">;
+export type ChunkOptions = Pick<
+  NotesConfig,
+  "mapChunkTokens" | "mapOverlapRatio"
+>;
 
 /** Estimate one turn's token cost (text only — the heuristic; adr-0006 §5). */
 function turnTokens(turn: TranscriptTurn): number {
@@ -44,7 +47,10 @@ function turnTokens(turn: TranscriptTurn): number {
  * chunk. A `budget` of 0 (or a chunk whose last turn already exceeds it) yields
  * an empty seed.
  */
-function overlapTail(turns: TranscriptTurn[], budget: number): TranscriptTurn[] {
+function overlapTail(
+  turns: TranscriptTurn[],
+  budget: number,
+): TranscriptTurn[] {
   if (budget <= 0) return [];
   const seed: TranscriptTurn[] = [];
   let total = 0;
@@ -109,5 +115,8 @@ export function chunkTurns(
   }
   flush();
 
-  return chunks.map((chunkTurnsList, index) => ({ index, turns: chunkTurnsList }));
+  return chunks.map((chunkTurnsList, index) => ({
+    index,
+    turns: chunkTurnsList,
+  }));
 }

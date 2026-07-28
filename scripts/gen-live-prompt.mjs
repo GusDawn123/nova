@@ -3,8 +3,8 @@
 // The prompt text is Gustavo's authored work (docs/prompts/nova-prompts-source.md);
 // this script extracts it byte-for-byte — it never rewrites prose (RULES §9).
 import { readFileSync, writeFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const srcPath = join(root, "docs/prompts/nova-prompts-source.md");
@@ -17,7 +17,10 @@ const src = readFileSync(srcPath, "utf8");
 const endComment = src.indexOf("-->");
 if (endComment === -1) throw new Error("source banner comment not found");
 const body =
-  src.slice(endComment + 3).replace(/^\n+/, "").replace(/\s+$/, "") + "\n";
+  src
+    .slice(endComment + 3)
+    .replace(/^\n+/, "")
+    .replace(/\s+$/, "") + "\n";
 
 const header = `/**
  * GENERATED — DO NOT EDIT BY HAND. Gustavo's authored Nova live-copilot system
@@ -36,4 +39,6 @@ const header = `/**
 export const LIVE_SYSTEM_PROMPT_GENERAL = ${JSON.stringify(body)};
 `;
 writeFileSync(outPath, header);
-console.log(`wrote ${outPath} (${Buffer.byteLength(body, "utf8")} prompt bytes)`);
+console.log(
+  `wrote ${outPath} (${Buffer.byteLength(body, "utf8")} prompt bytes)`,
+);

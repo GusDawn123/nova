@@ -1,5 +1,5 @@
-import { conversationTypeSchema } from "@nova/shared";
 import { z } from "zod";
+import { conversationTypeSchema } from "@nova/shared";
 
 import type { NoteListKey } from "@nova/shared";
 
@@ -76,7 +76,10 @@ export type FoldResult = z.infer<typeof foldResultSchema>;
  * lose real content. The identified form is minted here, never by the model.
  */
 const stringItemInSchema = z.union([
-  z.string().min(1).transform((text) => ({ text })),
+  z
+    .string()
+    .min(1)
+    .transform((text) => ({ text })),
   z.object({ text: z.string().min(1) }),
 ]);
 

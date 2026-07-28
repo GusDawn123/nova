@@ -178,7 +178,7 @@ export function createRevenueCatRoutes(
 ): (app: FastifyInstance) => Promise<void> {
   const apply = createRevenueCatHandler(deps);
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+  // eslint-disable-next-line @typescript-eslint/require-await -- why: Fastify's plugin signature is `(app) => Promise<void>`; registration awaits nothing.
   return async function revenueCatRoutes(app: FastifyInstance): Promise<void> {
     app.post("/webhooks/revenuecat", async (request, reply) => {
       if (!bearerMatches(request.headers.authorization, deps.token)) {

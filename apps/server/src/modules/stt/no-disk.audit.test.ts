@@ -58,8 +58,24 @@ describe("modules/stt leaves no disk footprint at runtime", () => {
       connections: [
         {
           events: [
-            { afterMs: 0, event: { type: "partial", text: "hello", speaker: null, ts_ms: 0 } },
-            { afterMs: 0, event: { type: "final", text: "hello there", speaker: "A", ts_ms: 0 } },
+            {
+              afterMs: 0,
+              event: {
+                type: "partial",
+                text: "hello",
+                speaker: null,
+                ts_ms: 0,
+              },
+            },
+            {
+              afterMs: 0,
+              event: {
+                type: "final",
+                text: "hello there",
+                speaker: "A",
+                ts_ms: 0,
+              },
+            },
           ],
           terminal: "close",
         },
@@ -98,7 +114,9 @@ describe("modules/stt leaves no disk footprint at runtime", () => {
 
     // … and touched no disk.
     expect(gitPorcelain()).toBe(treeBefore);
-    const newAudio = [...tmpAudioFiles()].filter((name) => !tmpBefore.has(name));
+    const newAudio = [...tmpAudioFiles()].filter(
+      (name) => !tmpBefore.has(name),
+    );
     expect(newAudio).toEqual([]);
   });
 });

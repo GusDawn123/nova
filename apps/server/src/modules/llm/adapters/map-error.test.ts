@@ -39,7 +39,10 @@ describe("adapters/map-error", () => {
   it("maps an aborted signal to an `aborted` error regardless of the thrown value", () => {
     const controller = new AbortController();
     controller.abort();
-    const mapped = toLlmError(new Error("Request was aborted"), controller.signal);
+    const mapped = toLlmError(
+      new Error("Request was aborted"),
+      controller.signal,
+    );
     expect(mapped.kind).toBe("aborted");
   });
 

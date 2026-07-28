@@ -1,5 +1,5 @@
-import { type MeetingNotes, storedNotesSchema } from "@nova/shared";
 import { z } from "zod";
+import { type MeetingNotes, storedNotesSchema } from "@nova/shared";
 
 /**
  * Shared `_smoke` contract for the db adapter: the runtime validator (zod) plus a

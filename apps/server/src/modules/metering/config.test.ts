@@ -39,8 +39,6 @@ describe("meteringConfig defaults (the plan's book)", () => {
   });
 
   it("rejects an unknown top-level key (.strict)", () => {
-    expect(() =>
-      meteringConfigSchema.parse({ bogus: true }),
-    ).toThrow();
+    expect(() => meteringConfigSchema.parse({ bogus: true })).toThrow();
   });
 });

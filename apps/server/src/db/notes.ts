@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   followUpStoredSchema,
   notesStatusSchema,
@@ -5,7 +6,6 @@ import {
   type FollowUpDraft,
   type MeetingNotes,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type {
   FollowUpWriter,

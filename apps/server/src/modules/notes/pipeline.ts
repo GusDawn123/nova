@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   buildFallbackNotes,
   conversationTypeSchema,
@@ -6,7 +7,6 @@ import {
   type ConversationType,
   type MeetingNotes,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
 import { withMeter, type LlmRouter, type Meter } from "../llm/index.js";
@@ -21,8 +21,11 @@ import type {
   NotesPipeline,
   TranscriptTurn,
 } from "./ports.js";
-import { buildClassifyMessages, buildGenerateMessages } from "./prompts/types.js";
 import { buildNotesRepairMessages } from "./prompts/repair.js";
+import {
+  buildClassifyMessages,
+  buildGenerateMessages,
+} from "./prompts/types.js";
 import { CHARS_PER_TOKEN, estimateTokens } from "./tokens.js";
 import { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
 

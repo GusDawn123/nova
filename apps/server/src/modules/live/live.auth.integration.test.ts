@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { ServerLiveEvent } from "@nova/shared";
 import type { FastifyInstance } from "fastify";
 import {
   afterAll,
@@ -15,6 +14,7 @@ import {
   vi,
 } from "vitest";
 import { WebSocket } from "ws";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { buildApp } from "../../app.js";
 

@@ -74,7 +74,9 @@ describe("llmStreamEventSchema", () => {
   });
 
   it("requires usage (nullable) on a done event", () => {
-    expect(llmStreamEventSchema.safeParse({ type: "done" }).success).toBe(false);
+    expect(llmStreamEventSchema.safeParse({ type: "done" }).success).toBe(
+      false,
+    );
   });
 });
 

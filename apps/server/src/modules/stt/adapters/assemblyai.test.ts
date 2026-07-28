@@ -25,7 +25,9 @@ describe("translateTurn", () => {
       end_of_turn: true,
       transcript: "how can I help?",
       speaker_label: "A",
-      words: [{ start: 2500, end: 2700, confidence: 0.95, text: "how", speaker: "A" }],
+      words: [
+        { start: 2500, end: 2700, confidence: 0.95, text: "how", speaker: "A" },
+      ],
     });
     expect(event).toEqual({
       type: "final",
@@ -58,7 +60,9 @@ describe("translateTurn", () => {
   });
 
   it("defaults ts_ms to 0 when a turn has no words", () => {
-    expect(translateTurn({ end_of_turn: true, transcript: "ok" })).toMatchObject({
+    expect(
+      translateTurn({ end_of_turn: true, transcript: "ok" }),
+    ).toMatchObject({
       ts_ms: 0,
       speaker: null,
     });
@@ -67,7 +71,9 @@ describe("translateTurn", () => {
 
 describe("mapAssemblyAiError", () => {
   it("maps auth failures to SttAuthError", () => {
-    expect(mapAssemblyAiError(new Error("Unauthorized"))).toBeInstanceOf(SttAuthError);
+    expect(mapAssemblyAiError(new Error("Unauthorized"))).toBeInstanceOf(
+      SttAuthError,
+    );
   });
 
   it("maps unknown failures to SttTransientError with a vendor prefix", () => {

@@ -1,3 +1,5 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 import {
   followUpDraftSchema,
   followUpToneSchema,
@@ -5,8 +7,6 @@ import {
   regenerateResponseSchema,
   type NotesReadResponse,
 } from "@nova/shared";
-import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { z } from "zod";
 
 import type { NotesJobStore } from "../../db/jobs.js";
 import type { LiveNotesStore } from "../../db/live-notes.js";
@@ -100,7 +100,7 @@ export function createNotesRoutes(
   const { reader, followUpWriter, store, followUp, logger } = deps;
   const now = deps.now ?? ((): Date => new Date());
 
-  // eslint-disable-next-line @typescript-eslint/require-await
+  // eslint-disable-next-line @typescript-eslint/require-await -- why: Fastify's plugin signature is `(app) => Promise<void>`; registration awaits nothing.
   return async function notesRoutes(app: FastifyInstance): Promise<void> {
     app.get(
       "/meetings/:id/notes",

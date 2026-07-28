@@ -189,10 +189,7 @@ describe.skipIf(!hasStack)("RLS tenant isolation (local stack)", () => {
   });
 
   it("[signup-profile] trigger provisions A's profile; A sees own, not B's", async () => {
-    const own = await userA.client
-      .from("profiles")
-      .select()
-      .eq("id", userA.id);
+    const own = await userA.client.from("profiles").select().eq("id", userA.id);
     expect(own.error).toBeNull();
     expect(own.data ?? []).toHaveLength(1);
     expect(own.data?.[0]?.id).toBe(userA.id);

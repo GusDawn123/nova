@@ -35,7 +35,10 @@ export interface StaleCallReaper {
 export interface StaleCallReaperDeps {
   readonly pool: Pool;
   readonly logger: NotesLogger;
-  readonly config?: Pick<NotesConfig, "staleCallMaxAgeMs" | "staleReaperIntervalMs">;
+  readonly config?: Pick<
+    NotesConfig,
+    "staleCallMaxAgeMs" | "staleReaperIntervalMs"
+  >;
   /** Per-pass batch cap; defaults to {@link DEFAULT_BATCH}. */
   readonly batchSize?: number;
 }
@@ -56,7 +59,9 @@ returning id, user_id
 const reapedRowSchema = z.object({ id: z.string(), user_id: z.string() });
 
 /** Build the {@link StaleCallReaper} over explicit deps (pure of env). */
-export function createStaleCallReaper(deps: StaleCallReaperDeps): StaleCallReaper {
+export function createStaleCallReaper(
+  deps: StaleCallReaperDeps,
+): StaleCallReaper {
   const { pool, logger } = deps;
   const config = deps.config ?? notesConfig;
   const batchSize = deps.batchSize ?? DEFAULT_BATCH;
@@ -67,7 +72,9 @@ export function createStaleCallReaper(deps: StaleCallReaperDeps): StaleCallReape
 
   async function reapOnce(): Promise<number> {
     // Cutoff in JS so tests can seed deterministic ages without a clock dependency.
-    const cutoff = new Date(Date.now() - config.staleCallMaxAgeMs).toISOString();
+    const cutoff = new Date(
+      Date.now() - config.staleCallMaxAgeMs,
+    ).toISOString();
     const res = await pool.query(REAP_SQL, [cutoff, batchSize]);
     const rows = z.array(reapedRowSchema).parse(res.rows);
     if (rows.length > 0) {

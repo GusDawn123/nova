@@ -251,7 +251,11 @@ export function createNotesJobStore(pool: Pool): NotesJobStore {
       );
     },
 
-    async fail(jobId: string, error: string, rawOutput?: string): Promise<void> {
+    async fail(
+      jobId: string,
+      error: string,
+      rawOutput?: string,
+    ): Promise<void> {
       const client = await pool.connect();
       try {
         await client.query("begin");
@@ -325,9 +329,9 @@ export function createNotesJobStore(pool: Pool): NotesJobStore {
       try {
         await client.query("begin");
         const res = await client.query(SWEEP_SQL, [limit]);
-        const rows = z.array(enqueuedRowSchema.omit({ id: true })).parse(
-          res.rows,
-        );
+        const rows = z
+          .array(enqueuedRowSchema.omit({ id: true }))
+          .parse(res.rows);
         for (const row of rows) {
           await client.query(
             "update meetings set notes_status = 'queued' where id = $1 and user_id = $2",
@@ -401,9 +405,10 @@ export function isJobStoreConfigured(
 }
 
 /** Lazily build + memoise the pool and wrap it as a {@link NotesJobStore}. */
-export function notesJobStoreFromEnv(
-  source: NodeJS.ProcessEnv = process.env,
-): { store: NotesJobStore; pool: Pool } {
+export function notesJobStoreFromEnv(source: NodeJS.ProcessEnv = process.env): {
+  store: NotesJobStore;
+  pool: Pool;
+} {
   cachedPool ??= createJobsPool(source);
   return { store: createNotesJobStore(cachedPool), pool: cachedPool };
 }

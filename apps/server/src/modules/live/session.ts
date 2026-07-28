@@ -499,7 +499,11 @@ export class LiveSession {
     // Running-notes conductor (Phase 8). Consumer #2 on the SAME stream, sharing
     // nothing with the copilot above: its own cadence, gate, model call and state.
     // Same gating — a factory, a known owner, and not echo mode.
-    if (this.createNotesConductor !== null && this.userId !== null && !this.echo) {
+    if (
+      this.createNotesConductor !== null &&
+      this.userId !== null &&
+      !this.echo
+    ) {
       this.registerConsumer(
         this.createNotesConductor({
           send: this.send,

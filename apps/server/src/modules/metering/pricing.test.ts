@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createPricer, priceBookSchema } from "./pricing.js";
 import type { MeteringLogger, UsageEventInput } from "./ports.js";
+import { createPricer, priceBookSchema } from "./pricing.js";
 
 /**
  * Pricing unit tests (adr-0007 §1): known models price per the plan's book; an

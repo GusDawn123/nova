@@ -5,8 +5,8 @@ import Fastify, { type FastifyInstance } from "fastify";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { createPlanWriter } from "../../db/plans.js";
 import { buildApp } from "../../app.js";
+import { createPlanWriter } from "../../db/plans.js";
 
 import type { MeteringLogger } from "./ports.js";
 import { createRevenueCatRoutes } from "./revenuecat.js";

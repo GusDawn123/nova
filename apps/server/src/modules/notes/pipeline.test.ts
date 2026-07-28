@@ -26,17 +26,32 @@ const META: NotesMeetingMeta = {
 };
 
 const TURNS: TranscriptTurn[] = [
-  { speaker: "Rep", text: "Thanks for hopping on. Let me walk you through pricing.", tsMs: 0 },
-  { speaker: "Buyer", text: "Sounds good. Can you send us a proposal by Friday?", tsMs: 5000 },
-  { speaker: "Rep", text: "Absolutely, I'll send the proposal by Friday.", tsMs: 9000 },
+  {
+    speaker: "Rep",
+    text: "Thanks for hopping on. Let me walk you through pricing.",
+    tsMs: 0,
+  },
+  {
+    speaker: "Buyer",
+    text: "Sounds good. Can you send us a proposal by Friday?",
+    tsMs: 5000,
+  },
+  {
+    speaker: "Rep",
+    text: "Absolutely, I'll send the proposal by Friday.",
+    tsMs: 9000,
+  },
 ];
 
 const SALES_NOTES = {
   conversationType: "sales",
   title: "Acme pricing call",
   tldr: "Discussed pricing; the buyer wants a proposal.",
-  overview: "The rep walked the buyer through pricing and agreed to send a written proposal.",
-  decisions: [{ text: "Send a proposal", quote: "Can you send us a proposal by Friday?" }],
+  overview:
+    "The rep walked the buyer through pricing and agreed to send a written proposal.",
+  decisions: [
+    { text: "Send a proposal", quote: "Can you send us a proposal by Friday?" },
+  ],
   actionItems: [
     {
       text: "Send the proposal",
@@ -48,7 +63,11 @@ const SALES_NOTES = {
   ],
   openQuestions: [],
   risks: [],
-  typeInsights: { kind: "sales", objections: [], buyingSignals: ["asked for a proposal"] },
+  typeInsights: {
+    kind: "sales",
+    objections: [],
+    buyingSignals: ["asked for a proposal"],
+  },
 };
 
 const INTERVIEW_NOTES = {
@@ -60,7 +79,11 @@ const INTERVIEW_NOTES = {
   actionItems: [],
   openQuestions: ["How deep is their queue experience?"],
   risks: [],
-  typeInsights: { kind: "interview", questionsAsked: ["design a queue"], answersToRevisit: [] },
+  typeInsights: {
+    kind: "interview",
+    questionsAsked: ["design a queue"],
+    answersToRevisit: [],
+  },
 };
 
 const CASUAL_NOTES = {
@@ -87,7 +110,10 @@ function pipelineRouter(...texts: string[]) {
 
 describe("createNotesPipeline — single pass", () => {
   it("classifies then generates schema-valid, persist-shaped sales notes", async () => {
-    const { router, provider } = pipelineRouter("sales", JSON.stringify(SALES_NOTES));
+    const { router, provider } = pipelineRouter(
+      "sales",
+      JSON.stringify(SALES_NOTES),
+    );
     const pipeline = createNotesPipeline({ router, logger: NOOP_LOGGER });
 
     const { notes, usage } = await pipeline.generate(META, TURNS);
@@ -108,7 +134,10 @@ describe("createNotesPipeline — single pass", () => {
   });
 
   it("puts the transcript at the top, the pinned schema + date + type section at the bottom", async () => {
-    const { provider, router } = pipelineRouter("sales", JSON.stringify(SALES_NOTES));
+    const { provider, router } = pipelineRouter(
+      "sales",
+      JSON.stringify(SALES_NOTES),
+    );
     const pipeline = createNotesPipeline({ router, logger: NOOP_LOGGER });
     await pipeline.generate(META, TURNS);
 
@@ -138,7 +167,10 @@ describe("createNotesPipeline — single pass", () => {
   });
 
   it("degrades an unrecognised classification to casual and still generates", async () => {
-    const { router, provider } = pipelineRouter("banana", JSON.stringify(CASUAL_NOTES));
+    const { router, provider } = pipelineRouter(
+      "banana",
+      JSON.stringify(CASUAL_NOTES),
+    );
     const pipeline = createNotesPipeline({ router, logger: NOOP_LOGGER });
 
     const { notes } = await pipeline.generate(META, TURNS);
@@ -199,7 +231,11 @@ describe("createNotesPipeline — single-pass ↔ map-reduce gate", () => {
     const pipeline = createNotesPipeline({
       router,
       logger: NOOP_LOGGER,
-      config: { maxSinglePassTokens: 10, mapChunkTokens: 100, mapOverlapRatio: 0.15 },
+      config: {
+        maxSinglePassTokens: 10,
+        mapChunkTokens: 100,
+        mapOverlapRatio: 0.15,
+      },
     });
 
     const { notes } = await pipeline.generate(META, TURNS);
@@ -229,7 +265,12 @@ describe("createNotesPipeline — error passthrough", () => {
   it("degrades to casual when classification itself hits a transport failure", async () => {
     const provider = makeMockProvider("anthropic", [
       { failBeforeFirstToken: { kind: "transient" } }, // classify dies
-      { events: [tok(JSON.stringify(CASUAL_NOTES)), doneWith({ inputTokens: 10, outputTokens: 5 })] },
+      {
+        events: [
+          tok(JSON.stringify(CASUAL_NOTES)),
+          doneWith({ inputTokens: 10, outputTokens: 5 }),
+        ],
+      },
     ]);
     const router = makeRouter([provider], { defaultOrder: ["anthropic"] });
     const pipeline = createNotesPipeline({ router, logger: NOOP_LOGGER });

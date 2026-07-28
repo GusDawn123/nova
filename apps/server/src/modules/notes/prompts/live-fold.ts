@@ -155,7 +155,7 @@ function opsSchemaText(
     "// which list to use:",
     ...hints,
     "",
-    "// <item> for decisions:   { \"text\": string, \"quote\": string | null }",
+    '// <item> for decisions:   { "text": string, "quote": string | null }',
     '// <item> for actionItems: { "text": string, "owner": string | null, "deadline": string | null, "deadlineRaw": string | null, "quote": string | null }',
     '// <item> for every other list: { "text": string }',
   ].join("\n");

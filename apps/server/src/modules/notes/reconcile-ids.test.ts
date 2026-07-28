@@ -1,5 +1,9 @@
-import { identifyNotes, type MeetingNotes, type NotesContent } from "@nova/shared";
 import { describe, expect, it } from "vitest";
+import {
+  identifyNotes,
+  type MeetingNotes,
+  type NotesContent,
+} from "@nova/shared";
 
 import { reconcileIds } from "./reconcile-ids.js";
 
@@ -9,7 +13,10 @@ import { reconcileIds } from "./reconcile-ids.js";
  * final notes is authoritative and must come through untouched.
  */
 
-function notesWith(over: Partial<NotesContent>, source: "generated" | "live"): MeetingNotes {
+function notesWith(
+  over: Partial<NotesContent>,
+  source: "generated" | "live",
+): MeetingNotes {
   return identifyNotes(
     {
       conversationType: "casual",
@@ -70,9 +77,14 @@ describe("reconcileIds", () => {
   });
 
   it("mints fresh for a genuinely new item, above every carried id", () => {
-    const live = notesWith({ risks: ["Budget freeze", "Legal review"] }, "live");
+    const live = notesWith(
+      { risks: ["Budget freeze", "Legal review"] },
+      "live",
+    );
     const final = notesWith(
-      { risks: ["Budget freeze", "Legal review", "Something nobody said live"] },
+      {
+        risks: ["Budget freeze", "Legal review", "Something nobody said live"],
+      },
       "generated",
     );
     const out = reconcileIds(live, final);

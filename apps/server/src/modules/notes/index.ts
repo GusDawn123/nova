@@ -6,10 +6,7 @@
 
 export { createNotesWorker, type NotesWorkerDeps } from "./worker.js";
 export { createNotesPipeline, type NotesPipelineDeps } from "./pipeline.js";
-export {
-  createNotesJobHandler,
-  type NotesJobHandlerDeps,
-} from "./handler.js";
+export { createNotesJobHandler, type NotesJobHandlerDeps } from "./handler.js";
 export {
   generateFollowUp,
   buildFallbackFollowUp,
@@ -17,10 +14,7 @@ export {
   type FollowUpInput,
   type FollowUpResult,
 } from "./follow-up.js";
-export {
-  createNotesRoutes,
-  type NotesRoutesDeps,
-} from "./routes.js";
+export { createNotesRoutes, type NotesRoutesDeps } from "./routes.js";
 export {
   type NotesJobHandler,
   type NotesLogger,

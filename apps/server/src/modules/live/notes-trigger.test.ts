@@ -64,7 +64,10 @@ describe("evaluateNotesTrigger — fires", () => {
 
   it("fires on a question in any turn of the delta", () => {
     const decision = evaluateNotesTrigger(
-      turns("Right, that makes sense to me.", "And what does onboarding look like?"),
+      turns(
+        "Right, that makes sense to me.",
+        "And what does onboarding look like?",
+      ),
     );
     expect(decision.fire).toBe(true);
   });

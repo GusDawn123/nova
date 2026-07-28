@@ -162,7 +162,12 @@ export function applyFold(
         continue;
       }
       if (!chargeChurn(list, budget, churnUsed)) {
-        dropped.push({ op: "update", list, id: op.id, reason: "churn_ceiling" });
+        dropped.push({
+          op: "update",
+          list,
+          id: op.id,
+          reason: "churn_ceiling",
+        });
         continue;
       }
       // The id is CARRIED, never re-minted — that is what makes this an update the
@@ -170,7 +175,12 @@ export function applyFold(
       items[index] = { ...item, id: op.id };
     } else {
       if (!chargeChurn(list, budget, churnUsed)) {
-        dropped.push({ op: "retract", list, id: op.id, reason: "churn_ceiling" });
+        dropped.push({
+          op: "retract",
+          list,
+          id: op.id,
+          reason: "churn_ceiling",
+        });
         continue;
       }
       // RULE 6 — retraction ONLY on an explicit retract op. An item the model

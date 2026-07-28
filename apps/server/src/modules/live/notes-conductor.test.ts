@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import type {
   LiveNotesStore,
@@ -45,7 +45,7 @@ let events: ServerLiveEvent[];
 /** One scripted response per call: a JSON string, or an Error to throw. */
 function scriptedRouter(script: (string | Error)[]): LlmRouter {
   return {
-    // eslint-disable-next-line @typescript-eslint/require-await
+    // eslint-disable-next-line @typescript-eslint/require-await -- why: must match the LlmRouter async-generator port; this scripted fake yields without awaiting.
     async *stream(req, opts): AsyncIterable<LlmStreamEvent> {
       prompts.push(req.messages.map((m) => m.content).join("\n"));
       const next = script.shift() ?? '{"ops":[]}';
@@ -61,7 +61,9 @@ interface FakeStore extends LiveNotesStore {
   readonly writes: { rev: number; titles: string }[];
 }
 
-function fakeStore(seed: Awaited<ReturnType<LiveNotesStore["readLiveNotes"]>> = null): FakeStore {
+function fakeStore(
+  seed: Awaited<ReturnType<LiveNotesStore["readLiveNotes"]>> = null,
+): FakeStore {
   const writes: { rev: number; titles: string }[] = [];
   return {
     writes,
@@ -140,7 +142,9 @@ describe("[notes-conductor] the happy path", () => {
     const updates = notesUpdates();
     expect(updates).toHaveLength(1);
     expect(updates[0]?.rev).toBe(1);
-    expect(updates[0]?.notes.risks.map((r) => r.text)).toEqual(["Budget freeze"]);
+    expect(updates[0]?.notes.risks.map((r) => r.text)).toEqual([
+      "Budget freeze",
+    ]);
     expect(updates[0]?.notes.source).toBe("live");
     expect(store.writes).toEqual([{ rev: 1, titles: "Acme call" }]);
     conductor.dispose();

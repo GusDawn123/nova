@@ -207,7 +207,11 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
           queue.close();
         } else {
           failOpen?.(
-            toSttError("deepgram", `socket closed (${String(event.code)})`, event.code),
+            toSttError(
+              "deepgram",
+              `socket closed (${String(event.code)})`,
+              event.code,
+            ),
           );
         }
       });

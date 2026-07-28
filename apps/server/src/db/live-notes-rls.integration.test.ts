@@ -1,8 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import { buildFallbackNotes } from "@nova/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildFallbackNotes } from "@nova/shared";
 
 /**
  * `public.live_notes` RLS + grant posture proof (Phase 8,
@@ -103,14 +103,16 @@ describe.skipIf(!hasStack)("live_notes RLS posture (local stack)", () => {
 
     const client = createClient<Database>(url ?? "", anonKey ?? "", noPersist);
     const signIn = await client.auth.signInWithPassword({ email, password });
-    if (signIn.error) throw new Error(`signIn(${label}): ${signIn.error.message}`);
+    if (signIn.error)
+      throw new Error(`signIn(${label}): ${signIn.error.message}`);
 
     const meeting = await client
       .from("meetings")
       .insert({ user_id: created.data.user.id, title: `live notes ${label}` })
       .select("id")
       .single();
-    if (meeting.error) throw new Error(`meeting(${label}): ${meeting.error.message}`);
+    if (meeting.error)
+      throw new Error(`meeting(${label}): ${meeting.error.message}`);
 
     return { id: created.data.user.id, client, meetingId: meeting.data.id };
   }
@@ -127,7 +129,8 @@ describe.skipIf(!hasStack)("live_notes RLS posture (local stack)", () => {
   }
 
   beforeAll(async () => {
-    if (!url || !serviceRoleKey || !anonKey) throw new Error("stack env missing");
+    if (!url || !serviceRoleKey || !anonKey)
+      throw new Error("stack env missing");
     admin = createClient<Database>(url, serviceRoleKey, noPersist);
 
     userA = await createTestUser("a");

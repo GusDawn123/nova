@@ -19,7 +19,10 @@ function turnOf(tokens: number, speaker = "spk_0", tsMs = 0): TranscriptTurn {
 /** Chunk options with an explicit budget + overlap (defaults filled by the schema). */
 function opts(mapChunkTokens: number, mapOverlapRatio: number) {
   const cfg = notesConfigSchema.parse({ mapChunkTokens, mapOverlapRatio });
-  return { mapChunkTokens: cfg.mapChunkTokens, mapOverlapRatio: cfg.mapOverlapRatio };
+  return {
+    mapChunkTokens: cfg.mapChunkTokens,
+    mapOverlapRatio: cfg.mapOverlapRatio,
+  };
 }
 
 describe("chunkTurns", () => {
@@ -40,7 +43,9 @@ describe("chunkTurns", () => {
     const chunks = chunkTurns([giant], opts(100, 0.15));
     expect(chunks).toHaveLength(1);
     expect(chunks[0]?.turns).toEqual([giant]);
-    expect(estimateTokens(chunks[0]?.turns[0]?.text ?? "")).toBeGreaterThan(100);
+    expect(estimateTokens(chunks[0]?.turns[0]?.text ?? "")).toBeGreaterThan(
+      100,
+    );
   });
 
   it("isolates a giant turn in the middle and flushes the open chunk first", () => {
@@ -66,7 +71,9 @@ describe("chunkTurns", () => {
     // the 4th overflows → new chunk. The overlap tail seeds the 3rd turn (30 > 15?)
     // — so with 30-token turns nothing fits the 15-token overlap budget; use
     // 10-token turns to prove real carryover.
-    const turns = Array.from({ length: 24 }, (_, i) => turnOf(10, `spk_${String(i % 2)}`, i * 1000));
+    const turns = Array.from({ length: 24 }, (_, i) =>
+      turnOf(10, `spk_${String(i % 2)}`, i * 1000),
+    );
     const chunks = chunkTurns(turns, opts(100, 0.2)); // overlap budget = 20 tokens = 2 turns
     expect(chunks.length).toBeGreaterThan(1);
 
@@ -80,7 +87,9 @@ describe("chunkTurns", () => {
   });
 
   it("never splits a turn: every input turn appears whole, in order, at least once", () => {
-    const turns = Array.from({ length: 40 }, (_, i) => turnOf(12, `spk_${String(i % 2)}`, i * 1000));
+    const turns = Array.from({ length: 40 }, (_, i) =>
+      turnOf(12, `spk_${String(i % 2)}`, i * 1000),
+    );
     const chunks = chunkTurns(turns, opts(100, 0.15));
 
     // Concatenate chunk turns dropping overlap repeats: the de-duplicated,
@@ -95,7 +104,9 @@ describe("chunkTurns", () => {
   });
 
   it("is deterministic for identical input", () => {
-    const turns = Array.from({ length: 30 }, (_, i) => turnOf(15, `spk_${String(i % 2)}`, i * 1000));
+    const turns = Array.from({ length: 30 }, (_, i) =>
+      turnOf(15, `spk_${String(i % 2)}`, i * 1000),
+    );
     const a = chunkTurns(turns, opts(100, 0.15));
     const b = chunkTurns(turns, opts(100, 0.15));
     expect(a).toEqual(b);

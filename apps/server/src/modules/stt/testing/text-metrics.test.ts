@@ -21,7 +21,9 @@ describe("normalizeTokens", () => {
 
 describe("normalizedTokenOverlap", () => {
   it("scores a perfect match as 1", () => {
-    expect(normalizedTokenOverlap("the quick brown fox", "the quick brown fox")).toBe(1);
+    expect(
+      normalizedTokenOverlap("the quick brown fox", "the quick brown fox"),
+    ).toBe(1);
   });
 
   it("is punctuation- and case-insensitive", () => {
@@ -30,14 +32,17 @@ describe("normalizedTokenOverlap", () => {
 
   it("scores partial recall as the fraction of reference tokens found", () => {
     // 3 of 4 reference tokens appear in the hypothesis.
-    expect(normalizedTokenOverlap("one two three four", "one two three")).toBeCloseTo(
-      0.75,
-    );
+    expect(
+      normalizedTokenOverlap("one two three four", "one two three"),
+    ).toBeCloseTo(0.75);
   });
 
   it("does not reward extra hypothesis tokens (recall, not precision)", () => {
     expect(
-      normalizedTokenOverlap("call me back", "please call me back tomorrow okay"),
+      normalizedTokenOverlap(
+        "call me back",
+        "please call me back tomorrow okay",
+      ),
     ).toBe(1);
   });
 

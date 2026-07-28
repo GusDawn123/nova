@@ -162,7 +162,9 @@ export function initialFoldState(notes: MeetingNotes | null): FoldState {
 }
 
 /** Every itemized list of a notes object, as `[key, items]` pairs. */
-export function listEntries(notes: MeetingNotes): [NoteListKey, Identified[]][] {
+export function listEntries(
+  notes: MeetingNotes,
+): [NoteListKey, Identified[]][] {
   const entries: [NoteListKey, Identified[]][] = [
     ["decisions", notes.decisions],
     ["actionItems", notes.actionItems],

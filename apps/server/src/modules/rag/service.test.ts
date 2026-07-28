@@ -6,7 +6,12 @@ import { ragConfig, type RagConfig } from "./config.js";
 import { isRagError } from "./ports.js";
 import type { RagHit } from "./ports.js";
 import { createRagService, type RagServiceDeps } from "./service.js";
-import { MockEmbedder, MockStore, SpyReranker, makeHit } from "./testing/mock-rag.js";
+import {
+  MockEmbedder,
+  MockStore,
+  SpyReranker,
+  makeHit,
+} from "./testing/mock-rag.js";
 
 /**
  * RagService behavior suite — pure, deterministic, mock-driven (no network, DB, or
@@ -20,22 +25,26 @@ import { MockEmbedder, MockStore, SpyReranker, makeHit } from "./testing/mock-ra
 const USER = "user-a";
 
 /** A service over fresh mock ports; returns the doubles so tests can inspect them. */
-function build(
-  over: Partial<RagServiceDeps> & { hits?: RagHit[] } = {},
-): {
+function build(over: Partial<RagServiceDeps> & { hits?: RagHit[] } = {}): {
   embedder: MockEmbedder;
   store: MockStore;
   reranker: SpyReranker;
   service: ReturnType<typeof createRagService>;
 } {
-  const embedder = over.embedder instanceof MockEmbedder ? over.embedder : new MockEmbedder();
-  const store = over.store instanceof MockStore ? over.store : new MockStore(over.hits ?? []);
+  const embedder =
+    over.embedder instanceof MockEmbedder ? over.embedder : new MockEmbedder();
+  const store =
+    over.store instanceof MockStore
+      ? over.store
+      : new MockStore(over.hits ?? []);
   const reranker = new SpyReranker();
   const service = createRagService({
     chunker,
     embedder,
     store,
-    ...(over.reranker !== undefined ? { reranker: over.reranker } : { reranker }),
+    ...(over.reranker !== undefined
+      ? { reranker: over.reranker }
+      : { reranker }),
     ...(over.config ? { config: over.config } : {}),
   });
   return { embedder, store, reranker, service };
@@ -83,7 +92,11 @@ describe("RagService.query", () => {
   it("deliberate tier skips cleanly when no reranker is configured", async () => {
     const hits = [makeHit({ chunkId: "c1" }), makeHit({ chunkId: "c2" })];
     const store = new MockStore(hits);
-    const service = createRagService({ chunker, embedder: new MockEmbedder(), store });
+    const service = createRagService({
+      chunker,
+      embedder: new MockEmbedder(),
+      store,
+    });
     const res = await service.query(USER, "q", { tier: "deliberate" });
     // No throw, original order preserved (identity fallthrough).
     expect(res.snippets.map((s) => s.chunkId)).toEqual(["c1", "c2"]);
@@ -105,7 +118,10 @@ describe("RagService.query", () => {
       tokenBudget: per * 2 + 1, // room for exactly two
     });
     expect(res.snippets.map((s) => s.chunkId)).toEqual(["c1", "c2"]);
-    const total = res.snippets.reduce((n, s) => n + approxTokens(`${s.header} ${s.content}`), 0);
+    const total = res.snippets.reduce(
+      (n, s) => n + approxTokens(`${s.header} ${s.content}`),
+      0,
+    );
     expect(total).toBeLessThanOrEqual(per * 2 + 1);
   });
 
@@ -132,13 +148,17 @@ describe("RagService.ingest", () => {
       kind: "context_doc",
       contextDocId: "doc-1",
       title: "Pricing",
-      content: "Acme pays 4200 per month.\n\nGrowth plan with 15% annual discount.",
+      content:
+        "Acme pays 4200 per month.\n\nGrowth plan with 15% annual discount.",
     });
     expect(res.chunks).toBeGreaterThan(0);
     expect(embedder.calls[0]?.kind).toBe("document");
     expect(store.replaceCalls).toHaveLength(1);
     const call = store.replaceCalls[0];
-    expect(call?.source).toEqual({ kind: "context_doc", contextDocId: "doc-1" });
+    expect(call?.source).toEqual({
+      kind: "context_doc",
+      contextDocId: "doc-1",
+    });
     expect(call?.chunks).toHaveLength(res.chunks);
     // Every persisted chunk carries the embed's model + dims (the versioning bar).
     for (const ch of call?.chunks ?? []) {
@@ -173,7 +193,9 @@ describe("RagService.ingest", () => {
     await service.ingest(USER, source);
     await service.ingest(USER, source);
     expect(store.replaceCalls).toHaveLength(2);
-    expect(store.replaceCalls[0]?.source).toEqual(store.replaceCalls[1]?.source);
+    expect(store.replaceCalls[0]?.source).toEqual(
+      store.replaceCalls[1]?.source,
+    );
   });
 
   it("ingests a meeting, deriving speakers into the header seam", async () => {
@@ -189,7 +211,10 @@ describe("RagService.ingest", () => {
       ],
     });
     expect(res.chunks).toBeGreaterThan(0);
-    expect(store.replaceCalls[0]?.source).toEqual({ kind: "meeting", meetingId: "m-1" });
+    expect(store.replaceCalls[0]?.source).toEqual({
+      kind: "meeting",
+      meetingId: "m-1",
+    });
     // Header carries title, date, and derived speakers (chunker builds it).
     expect(store.replaceCalls[0]?.chunks[0]?.header).toContain("Acme call");
     expect(store.replaceCalls[0]?.chunks[0]?.header).toContain("Rep");

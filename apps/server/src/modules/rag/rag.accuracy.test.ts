@@ -1,19 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-import { randomUUID } from "node:crypto";
 
 import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { createPgPool, createPgVectorStore } from "./adapters/pgvector.js";
+import { voyageAdapterFromEnv } from "./adapters/voyage.js";
 import { chunker } from "./chunker.js";
 import { ragConfig } from "./config.js";
 import { createRagService, type RagService } from "./index.js";
-import { createPgPool, createPgVectorStore } from "./adapters/pgvector.js";
-import { voyageAdapterFromEnv } from "./adapters/voyage.js";
 
 /**
  * KEY + DB-GATED RAG accuracy gate — the Phase 4 exit bar (playbook VERIFY). It
@@ -62,7 +61,9 @@ function loadFixtures(): FixtureDoc[] {
   return fixtureSchema.parse(raw);
 }
 
-const noPersist = { auth: { persistSession: false, autoRefreshToken: false } } as const;
+const noPersist = {
+  auth: { persistSession: false, autoRefreshToken: false },
+} as const;
 
 // ---------------------------------------------------------------------------
 // Fixture guard — ALWAYS ON. The accuracy suite below is key-gated (skips on CI),
@@ -79,7 +80,10 @@ describe("rag accuracy fixtures — existence guard", () => {
     expect(acme?.content).toContain("$4,200 per month for the Growth plan");
     // Distractors the gate depends on must be present.
     for (const id of ["globex-pricing", "initech-pricing", "acme-hiring"]) {
-      expect(docs.some((d) => d.id === id), `missing distractor: ${id}`).toBe(true);
+      expect(
+        docs.some((d) => d.id === id),
+        `missing distractor: ${id}`,
+      ).toBe(true);
     }
   });
 });
@@ -103,7 +107,13 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
     pool = createPgPool(process.env);
     const store = createPgVectorStore({ pool, config: ragConfig });
     const { embedder, reranker } = voyageAdapterFromEnv(process.env, ragConfig);
-    service = createRagService({ chunker, embedder, store, reranker, config: ragConfig });
+    service = createRagService({
+      chunker,
+      embedder,
+      store,
+      reranker,
+      config: ragConfig,
+    });
     admin = createClient(url, serviceRoleKey, noPersist);
 
     const mkUser = async (label: string): Promise<string> => {
@@ -112,7 +122,8 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
         password: `Pw-${randomUUID()}`,
         email_confirm: true,
       });
-      if (res.error) throw new Error(`createUser(${label}): ${res.error.message}`);
+      if (res.error)
+        throw new Error(`createUser(${label}): ${res.error.message}`);
       const id = res.data.user.id;
       userIds.push(id);
       return id;
@@ -157,7 +168,9 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
     const acmeDocId = docIdBySlug.get(ACME_DOC);
     expect(acmeDocId).toBeDefined();
 
-    const { snippets } = await service.query(userA, QUERY, { tier: "deliberate" });
+    const { snippets } = await service.query(userA, QUERY, {
+      tier: "deliberate",
+    });
     const top3 = snippets.slice(0, 3).map((s) => s.contextDocId);
     console.log(
       `[rag deliberate] returned=${String(snippets.length)} ` +
@@ -169,7 +182,9 @@ describe.skipIf(!canRun)("rag accuracy gate (voyage + local stack)", () => {
   }, 600_000);
 
   it("[isolation] the same query for user B returns zero snippets", async () => {
-    const { snippets } = await service.query(userB, QUERY, { tier: "deliberate" });
+    const { snippets } = await service.query(userB, QUERY, {
+      tier: "deliberate",
+    });
     console.log(`[rag isolation] userB_returned=${String(snippets.length)}`);
     expect(snippets).toHaveLength(0);
   }, 600_000);

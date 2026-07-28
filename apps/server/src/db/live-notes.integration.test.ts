@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { buildFallbackNotes, type MeetingNotes } from "@nova/shared";
 import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { buildFallbackNotes, type MeetingNotes } from "@nova/shared";
 
 import { createLiveNotesStore, type LiveNotesStore } from "./live-notes.js";
 
@@ -60,7 +60,8 @@ describe.skipIf(!hasStack)("LiveNotesStore (local stack)", () => {
         password: `Pw-${randomUUID()}`,
         email_confirm: true,
       });
-      if (created.error) throw new Error(`createUser: ${created.error.message}`);
+      if (created.error)
+        throw new Error(`createUser: ${created.error.message}`);
       if (label === "owner") userId = created.data.user.id;
       else otherUserId = created.data.user.id;
     }

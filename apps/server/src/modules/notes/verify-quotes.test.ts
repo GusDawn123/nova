@@ -6,7 +6,11 @@ import {
   type NotesContent,
 } from "@nova/shared";
 
-import { joinTranscriptText, normalizeForMatch, verifyNotes } from "./verify-quotes.js";
+import {
+  joinTranscriptText,
+  normalizeForMatch,
+  verifyNotes,
+} from "./verify-quotes.js";
 
 /**
  * Quote/deadline guards vs hand-picked edge cases. The transcript corpus is a
@@ -45,7 +49,9 @@ function notesWith(
 describe("verifyNotes — quote grounding", () => {
   it("keeps a decision whose quote is a verbatim transcript substring (no flag)", () => {
     const notes = notesWith({
-      decisions: [{ text: "Ship the beta Monday", quote: "ship the beta on Monday" }],
+      decisions: [
+        { text: "Ship the beta Monday", quote: "ship the beta on Monday" },
+      ],
     });
     const out = verifyNotes(notes, TRANSCRIPT);
     expect(out.decisions[0]?.unverified).toBeUndefined();
@@ -70,7 +76,12 @@ describe("verifyNotes — quote grounding", () => {
 
   it("flags (never drops) a decision whose quote is absent from the transcript", () => {
     const notes = notesWith({
-      decisions: [{ text: "Invented decision", quote: "we agreed to acquire the company" }],
+      decisions: [
+        {
+          text: "Invented decision",
+          quote: "we agreed to acquire the company",
+        },
+      ],
     });
     const out = verifyNotes(notes, TRANSCRIPT);
     expect(out.decisions).toHaveLength(1); // kept for recall
@@ -124,7 +135,9 @@ describe("verifyNotes — invented-date guard", () => {
 
 describe("normalization helpers", () => {
   it("joins turn texts into one corpus", () => {
-    expect(joinTranscriptText([{ text: "one" }, { text: "two" }])).toBe("one two");
+    expect(joinTranscriptText([{ text: "one" }, { text: "two" }])).toBe(
+      "one two",
+    );
   });
 
   it("collapses whitespace, folds case, and straightens curly quotes", () => {

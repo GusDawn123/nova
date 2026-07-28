@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   buildFallbackNotes,
   FALLBACK_TLDR,
@@ -10,7 +11,6 @@ import {
   type NotesContent,
   type TypeInsightsContent,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
 import type { LlmRouter } from "../llm/index.js";
@@ -170,9 +170,7 @@ function dedupStrings(values: string[]): string[] {
 }
 
 /** Merge + dedup decisions by normalized text; first occurrence (earliest chunk) wins. */
-function dedupDecisions(
-  items: ChunkFacts["decisions"],
-): NoteDecisionContent[] {
+function dedupDecisions(items: ChunkFacts["decisions"]): NoteDecisionContent[] {
   const seen = new Set<string>();
   const out: NoteDecisionContent[] = [];
   for (const item of items) {
@@ -283,7 +281,8 @@ export async function runMapReduce(
         weekday,
       }),
       router,
-      repair: (invalidText, issues) => buildMapRepairMessages(invalidText, issues),
+      repair: (invalidText, issues) =>
+        buildMapRepairMessages(invalidText, issues),
     });
     usage.push(...ladder.usage);
     if (ladder.result.status === "ok") {
@@ -304,7 +303,9 @@ export async function runMapReduce(
   );
 
   // REDUCE (merge in code) — dedup facts by normalized text, first (earliest) wins.
-  const mergedDecisions = dedupDecisions(chunkResults.flatMap((c) => c.decisions));
+  const mergedDecisions = dedupDecisions(
+    chunkResults.flatMap((c) => c.decisions),
+  );
   const mergedActionItems = dedupActionItems(
     chunkResults.flatMap((c) => c.actionItems),
   );
@@ -313,7 +314,9 @@ export async function runMapReduce(
   );
   const mergedRisks = dedupStrings(chunkResults.flatMap((c) => c.risks));
   const mergedInsights = {
-    objections: dedupStrings(chunkResults.flatMap((c) => c.insights.objections)),
+    objections: dedupStrings(
+      chunkResults.flatMap((c) => c.insights.objections),
+    ),
     buyingSignals: dedupStrings(
       chunkResults.flatMap((c) => c.insights.buyingSignals),
     ),
@@ -355,7 +358,10 @@ export async function runMapReduce(
 
   // Reduce exhausted AND nothing to salvage → the deterministic fallback constant.
   if (reduceLadder.result.status !== "ok" && !hasContent) {
-    logger.info({ meeting_id: meta.id }, "notes.mapreduce.reduce_fallback_empty");
+    logger.info(
+      { meeting_id: meta.id },
+      "notes.mapreduce.reduce_fallback_empty",
+    );
     return {
       notes: buildFallbackNotes(meta.title),
       usage,

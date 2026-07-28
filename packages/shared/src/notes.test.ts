@@ -122,7 +122,9 @@ describe("identifyNotes", () => {
   it("identifies the sales insight arms under their own prefixes", () => {
     const insights = validNotes.typeInsights;
     if (insights.kind !== "sales") throw new Error("expected the sales arm");
-    expect(insights.objections).toEqual([{ id: "ob1", text: "price too high" }]);
+    expect(insights.objections).toEqual([
+      { id: "ob1", text: "price too high" },
+    ]);
     expect(insights.buyingSignals).toEqual([
       { id: "bs1", text: "asked for a pilot" },
     ]);

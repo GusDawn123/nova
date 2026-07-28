@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-import type {
-  RagIndexerDb,
-  UnindexedMeeting,
-} from "../modules/rag/indexer.js";
 import type { TranscriptTurn } from "../modules/rag/index.js";
+import type { RagIndexerDb, UnindexedMeeting } from "../modules/rag/indexer.js";
 
 import { getSupabaseClient } from "./client.js";
 

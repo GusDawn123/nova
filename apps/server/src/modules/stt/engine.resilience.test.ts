@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { sttConfigSchema, type SttConfigInput } from "./config.js";
 import { createSttEngine } from "./engine.js";
@@ -23,8 +23,9 @@ import {
 
 const INFO: SttSessionInfo = { sessionId: "sess-A", sampleRateHz: 16000 };
 
-const cfg = (overrides: SttConfigInput = {}): ReturnType<typeof sttConfigSchema.parse> =>
-  sttConfigSchema.parse(overrides);
+const cfg = (
+  overrides: SttConfigInput = {},
+): ReturnType<typeof sttConfigSchema.parse> => sttConfigSchema.parse(overrides);
 
 function capture(): { emit: SttEmit; events: ServerLiveEvent[] } {
   const events: ServerLiveEvent[] = [];
@@ -52,13 +53,20 @@ describe("STT engine — failover", () => {
   it("[failover] switches to fallback after failoverThreshold primary failures: exactly one provider_switched, no client error, frames keep relaying", async () => {
     // One spare script beyond the threshold so an over-eager retry surfaces as a
     // clean connectAttempts assertion failure, not a "no script" crash.
-    const primary = new MockVendor({ id: "assemblyai", connections: failing(3) });
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: failing(3),
+    });
     const fallback = new MockVendor({
       id: "deepgram",
       connections: [{ events: [], terminal: "hang" }],
     });
     const engine = createSttEngine(
-      cfg({ failoverThreshold: 2, reconnectBackoffMs: [0], connectTimeoutMs: 1000 }),
+      cfg({
+        failoverThreshold: 2,
+        reconnectBackoffMs: [0],
+        connectTimeoutMs: 1000,
+      }),
       [primary, fallback],
     );
     const { emit, events } = capture();
@@ -86,7 +94,10 @@ describe("STT engine — reconnect", () => {
       id: "assemblyai",
       connections: [
         // conn 1 dies 10ms in (socket close mid-stream)
-        { events: [{ afterMs: 10, event: { type: "closed" } }], terminal: "close" },
+        {
+          events: [{ afterMs: 10, event: { type: "closed" } }],
+          terminal: "close",
+        },
         // conn 2 after the backoff-delayed reconnect
         { events: [], terminal: "hang" },
       ],
@@ -120,7 +131,10 @@ describe("STT engine — reconnect", () => {
       id: "assemblyai",
       connections: [
         // established, then dies; every subsequent reconnect fails
-        { events: [{ afterMs: 10, event: { type: "closed" } }], terminal: "close" },
+        {
+          events: [{ afterMs: 10, event: { type: "closed" } }],
+          terminal: "close",
+        },
         ...failing(6),
       ],
     });
@@ -146,8 +160,14 @@ describe("STT engine — reconnect", () => {
   });
 
   it("[reconnect-exhaust] emits a single typed error and stops when EVERY vendor is exhausted (never hangs)", async () => {
-    const primary = new MockVendor({ id: "assemblyai", connections: failing(8) });
-    const fallback = new MockVendor({ id: "deepgram", connections: failing(8) });
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: failing(8),
+    });
+    const fallback = new MockVendor({
+      id: "deepgram",
+      connections: failing(8),
+    });
     const engine = createSttEngine(
       cfg({
         maxReconnects: 2,

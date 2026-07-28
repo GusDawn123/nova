@@ -86,7 +86,6 @@ function callArgs(src: string, callee: string): string[] {
   return args;
 }
 
-
 /**
  * Every non-test `.ts` under `apps/server/src`, EXCLUDING any `testing/` directory —
  * those are deliberate in-repo test harnesses (e.g. `modules/llm/testing/router-harness.ts`
@@ -128,7 +127,6 @@ const VENDOR_SITES = [
 ] as const;
 
 describe("modules/metering wiring audit", () => {
-
   /**
    * The TREE-WIDE backstop. The per-file checks below prove the three KNOWN
    * wiring files are correct; this one proves no FOURTH file quietly appears.
@@ -144,7 +142,9 @@ describe("modules/metering wiring audit", () => {
         if (!src.includes(site.call)) continue;
         if (src.includes(site.defines)) continue; // the declaring module
         if (!site.seam.test(src)) {
-          offenders.push(`${file.slice(SRC_ROOT.length + 1)} builds ${site.what} without ${String(site.seam)}`);
+          offenders.push(
+            `${file.slice(SRC_ROOT.length + 1)} builds ${site.what} without ${String(site.seam)}`,
+          );
         }
       }
     }

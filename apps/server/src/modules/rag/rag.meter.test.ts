@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { createVoyageAdapter, type VoyageUsageLog } from "./adapters/voyage.js";
 import { ragConfig } from "./config.js";
 import type { RagHit } from "./ports.js";
 import { createRagService } from "./service.js";
 import {
-  createVoyageAdapter,
-  type VoyageUsageLog,
-} from "./adapters/voyage.js";
-import { MockEmbedder, MockStore, SpyReranker, makeHit } from "./testing/mock-rag.js";
+  MockEmbedder,
+  MockStore,
+  SpyReranker,
+  makeHit,
+} from "./testing/mock-rag.js";
 
 /**
  * [rag-meter] Phase 6 metering wire-through for the Voyage sinks (adr-0007;

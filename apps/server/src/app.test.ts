@@ -1,5 +1,5 @@
-import { healthResponseSchema } from "@nova/shared";
 import { describe, expect, it } from "vitest";
+import { healthResponseSchema } from "@nova/shared";
 
 import { buildApp } from "./app.js";
 import { version } from "./version.js";

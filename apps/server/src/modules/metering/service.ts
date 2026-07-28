@@ -1,12 +1,12 @@
 import type { Meter, UsageEntry } from "../llm/index.js";
 import { meteringConfig, type MeteringConfig } from "./config.js";
-import { createPricer, type Pricer } from "./pricing.js";
 import type {
   MeteringLogger,
   MeteringService,
   UsageEventInput,
   UsageKind,
 } from "./ports.js";
+import { createPricer, type Pricer } from "./pricing.js";
 
 /**
  * `createMeteringService` — the metering core (adr-0007 §2/§4/§5). It prices every

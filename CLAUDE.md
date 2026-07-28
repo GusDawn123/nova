@@ -162,6 +162,17 @@ npm run lint           # eslint . then apps/mobile expo lint
 npm run test           # vitest run (DB integration tests self-skip unless Supabase is up)
 npm run format         # prettier --write .   (format:check to verify only)
 
+# Code review — CodeRabbit (STRICT; see .coderabbit.yaml). Required before every PR.
+coderabbit auth login  # once per machine (browser OAuth; `auth status` to check)
+coderabbit review --agent              # all tracked changes, agent-readable findings
+coderabbit review --agent --uncommitted  # pre-commit pass over staged + tracked edits
+coderabbit review --agent --base development  # what the PR will actually contain
+coderabbit review findings             # re-read the last review without re-running
+#   In Claude Code the plugin exposes /coderabbit:review (same scopes).
+#   NOT an MCP server — CodeRabbit is an MCP *client*; the integration is CLI + plugin.
+#   Free tier is rate-limited (a few reviews/hour), so review the PR-shaped diff
+#   (--base development) rather than burning runs on every edit.
+
 # Local Supabase (real Postgres — never test against anything else)
 npm run db:start       # supabase start  (boots the local stack)
 npm run db:stop        # supabase stop

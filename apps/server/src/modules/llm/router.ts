@@ -310,7 +310,10 @@ function classifyPreCommit(
   if (ctx.abortReason === "ttft") {
     return "transient";
   }
-  if (isLlmError(error) && (error.kind === "auth" || error.kind === "invalid")) {
+  if (
+    isLlmError(error) &&
+    (error.kind === "auth" || error.kind === "invalid")
+  ) {
     return error.kind;
   }
   return "transient";

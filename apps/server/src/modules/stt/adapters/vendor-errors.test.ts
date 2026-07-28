@@ -24,7 +24,9 @@ describe("classifyVendorErrorText", () => {
 
   it("flags contract/shape failures as protocol", () => {
     expect(classifyVendorErrorText("failed to parse message")).toBe("protocol");
-    expect(classifyVendorErrorText("unexpected message frame")).toBe("protocol");
+    expect(classifyVendorErrorText("unexpected message frame")).toBe(
+      "protocol",
+    );
   });
 
   it("defaults everything else to transient", () => {
@@ -67,9 +69,9 @@ describe("toSttError", () => {
   });
 
   it("maps protocol text to SttProtocolError", () => {
-    expect(toSttError("deepgram", new Error("unparseable frame"))).toBeInstanceOf(
-      SttProtocolError,
-    );
+    expect(
+      toSttError("deepgram", new Error("unparseable frame")),
+    ).toBeInstanceOf(SttProtocolError);
   });
 
   it("maps unknown text to SttTransientError", () => {

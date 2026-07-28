@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import Fastify, { type FastifyInstance } from "fastify";
 import { Pool } from "pg";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   followUpDraftSchema,
   identifyNotes,
   notesReadResponseSchema,
   type MeetingNotes,
 } from "@nova/shared";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createNotesJobStore, type NotesJobStore } from "../../db/jobs.js";
 import {
@@ -47,23 +47,23 @@ const noPersist = {
 /** A valid notes object stored to force `notes_status='completed'` for follow-up. */
 const COMPLETED_NOTES: MeetingNotes = identifyNotes(
   {
-  conversationType: "sales",
-  title: "Renewal call",
-  tldr: "Agreed to renew on the Growth plan next quarter.",
-  overview:
-    "The rep and customer reviewed terms and aligned on the renewal path.",
-  decisions: [{ text: "Renew on the Growth plan.", quote: null }],
-  actionItems: [
-    {
-      text: "Send the renewal paperwork.",
-      owner: "Rep",
-      deadline: null,
-      deadlineRaw: null,
-      quote: null,
-    },
-  ],
-  openQuestions: [],
-  risks: [],
+    conversationType: "sales",
+    title: "Renewal call",
+    tldr: "Agreed to renew on the Growth plan next quarter.",
+    overview:
+      "The rep and customer reviewed terms and aligned on the renewal path.",
+    decisions: [{ text: "Renew on the Growth plan.", quote: null }],
+    actionItems: [
+      {
+        text: "Send the renewal paperwork.",
+        owner: "Rep",
+        deadline: null,
+        deadlineRaw: null,
+        quote: null,
+      },
+    ],
+    openQuestions: [],
+    risks: [],
     typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
   },
   "generated",
@@ -83,7 +83,7 @@ function replyRouter(bodyJson: string): LlmRouter {
 /** A mock router that throws a transport failure (drives the 503 path). */
 function throwingRouter(): LlmRouter {
   return {
-    // eslint-disable-next-line require-yield
+    // eslint-disable-next-line require-yield -- why: this fake exists to throw before any yield, driving the 503 transport-failure path.
     async *stream(): AsyncGenerator<LlmStreamEvent> {
       await Promise.resolve();
       throw LlmError.transient("provider down");

@@ -100,7 +100,11 @@ class SttSession implements SttSessionHandle {
   private async run(): Promise<void> {
     let pendingFrom: string | null = null;
 
-    for (let vendorIndex = 0; vendorIndex < this.vendors.length; vendorIndex++) {
+    for (
+      let vendorIndex = 0;
+      vendorIndex < this.vendors.length;
+      vendorIndex++
+    ) {
       const vendor = this.vendors[vendorIndex];
       if (this.stopped || vendor === undefined) return;
 

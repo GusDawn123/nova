@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createMeteringService, type MeteringServiceDeps } from "./service.js";
 import type { MeteringLogger, UsageEventInput, UsageKind } from "./ports.js";
+import { createMeteringService, type MeteringServiceDeps } from "./service.js";
 
 /**
  * MeteringService unit tests (adr-0007 §2/§4/§5):

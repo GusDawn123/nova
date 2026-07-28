@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 
-import type { ServerLiveEvent } from "@nova/shared";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { buildApp } from "../../app.js";
 import { notesConductorConfig } from "./notes-conductor-config.js";
@@ -179,7 +179,11 @@ describe.skipIf(!canRun)("live notes e2e (real socket + real LLM)", () => {
       const done = setTimeout(resolve, windowMs);
       ws.on("open", () => {
         ws.send(
-          JSON.stringify({ v: 1, type: "session.start", meeting_id: meetingId }),
+          JSON.stringify({
+            v: 1,
+            type: "session.start",
+            meeting_id: meetingId,
+          }),
         );
       });
       ws.on("message", (data: Buffer) => {
@@ -246,7 +250,8 @@ describe.skipIf(!canRun)("live notes e2e (real socket + real LLM)", () => {
     expect(updates.length).toBeGreaterThan(0);
 
     const first = updates[0];
-    if (first?.type !== "notes.update") throw new Error("expected notes.update");
+    if (first?.type !== "notes.update")
+      throw new Error("expected notes.update");
     expect(first.rev).toBeGreaterThanOrEqual(1);
     expect(first.notes.version).toBe(2);
     // The preview marker — this is what the tab keys its "still forming" state off.

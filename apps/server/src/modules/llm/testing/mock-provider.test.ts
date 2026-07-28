@@ -44,7 +44,11 @@ function expectLlmError(value: unknown): asserts value is LlmError {
 describe("makeMockProvider — happy path", () => {
   it("yields scripted events in order and records tokens", async () => {
     const provider = makeMockProvider("anthropic", {
-      events: [tok("Hel"), tok("lo"), { type: "done", usage: { outputTokens: 2 } }],
+      events: [
+        tok("Hel"),
+        tok("lo"),
+        { type: "done", usage: { outputTokens: 2 } },
+      ],
     });
 
     const { events, error } = await drain(
@@ -255,7 +259,9 @@ describe("makeMockProvider — scripting and DI", () => {
       { events: [tok("ok"), DONE] },
     ]);
 
-    const first = await drain(provider.stream(REQ, new AbortController().signal));
+    const first = await drain(
+      provider.stream(REQ, new AbortController().signal),
+    );
     expect(first.error).toBeInstanceOf(LlmError);
 
     const second = await drain(
@@ -265,7 +271,9 @@ describe("makeMockProvider — scripting and DI", () => {
     expect(second.events).toEqual([tok("ok"), DONE]);
 
     // Third call has no script of its own — the last one repeats.
-    const third = await drain(provider.stream(REQ, new AbortController().signal));
+    const third = await drain(
+      provider.stream(REQ, new AbortController().signal),
+    );
     expect(third.error).toBeUndefined();
     expect(third.events).toEqual([tok("ok"), DONE]);
     expect(provider.calls).toHaveLength(3);

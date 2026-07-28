@@ -4,8 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { createTranscriptPersister } from "./transcripts.js";
 import { createNotesJobStore, type NotesJobStore } from "./jobs.js";
+import { createTranscriptPersister } from "./transcripts.js";
 
 /**
  * `NotesJobStore` integration proof — the durable queue's SQL runs against the
@@ -334,7 +334,10 @@ describe.skipIf(!hasStack)("NotesJobStore (local stack)", () => {
     // The ONE eligible meeting. All excluded meetings below are made OLDER so that,
     // with limit=1 and ended_at-asc order, any exclusion leak would steal the slot
     // from `eligible` — the assertion then fails, making this a real detector.
-    const eligible = await newMeeting({ endedAt: old(30), notesStatus: "none" });
+    const eligible = await newMeeting({
+      endedAt: old(30),
+      notesStatus: "none",
+    });
 
     const withCompleted = await newMeeting({ endedAt: old(40) });
     await pool.query(

@@ -1,6 +1,11 @@
 import type { Pool } from "pg";
 import { z } from "zod";
 
+import {
+  createResilientPool,
+  PG_IDLE_TIMEOUT_MS,
+  PG_POOL_MAX,
+} from "../../../db/pg-pool.js";
 import { ragConfig, type RagConfig } from "../config.js";
 import { isRagError, RagError } from "../ports.js";
 import type {
@@ -9,12 +14,6 @@ import type {
   RagSource,
   VectorStore,
 } from "../ports.js";
-
-import {
-  createResilientPool,
-  PG_IDLE_TIMEOUT_MS,
-  PG_POOL_MAX,
-} from "../../../db/pg-pool.js";
 
 /**
  * pgvector {@link VectorStore} adapter (Phase 4) — the ONLY place the RAG hot
@@ -31,7 +30,6 @@ import {
  *
  * Design source: `docs/DECISIONS/adr-0005-rag-memory.md` §§2,3,4,5.
  */
-
 
 /** The config knobs the retrieval SQL reads (candidates/leg + the RRF constant). */
 export type PgVectorConfig = Pick<RagConfig, "candidatesPerLeg" | "rrfK">;
@@ -286,7 +284,9 @@ export function createPgVectorStore(opts: PgVectorStoreOptions): VectorStore {
 
         await client.query("commit");
 
-        const parsed = z.array(searchRowSchema).safeParse(result.rows as unknown);
+        const parsed = z
+          .array(searchRowSchema)
+          .safeParse(result.rows as unknown);
         if (!parsed.success) {
           throw RagError.storeFailed(
             `pgvector: unparseable search rows — ${parsed.error.message}`,

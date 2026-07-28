@@ -3,10 +3,10 @@ import type { AddressInfo } from "node:net";
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-import type { ServerLiveEvent } from "@nova/shared";
 import type { FastifyInstance } from "fastify";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { buildApp } from "../../app.js";
 

@@ -10,23 +10,23 @@ import {
   type NotesContent,
 } from "@nova/shared";
 
-import { createUsageEventsDb } from "../../db/usage-events.js";
+import { createNotesJobStore } from "../../db/jobs.js";
 import { createNotesSource } from "../../db/notes-source.js";
 import { createNotesWriter } from "../../db/notes.js";
+import { createUsageEventsDb } from "../../db/usage-events.js";
 import {
   createLlmRouter,
   llmConfigSchema,
   makeMockProvider,
 } from "../llm/index.js";
-import { createNotesJobStore } from "../../db/jobs.js";
 import { createNotesJobHandler } from "../notes/handler.js";
 import { createNotesPipeline } from "../notes/pipeline.js";
-import { createNotesWorker } from "../notes/worker.js";
 import type { NotesLogger, NotesPipeline } from "../notes/ports.js";
+import { createNotesWorker } from "../notes/worker.js";
 
 import { createKillSwitch } from "./kill-switch.js";
-import { createMeteringService } from "./service.js";
 import type { MeteringLogger } from "./ports.js";
+import { createMeteringService } from "./service.js";
 
 /**
  * E2E metering accuracy, part 1 (playbook VERIFY "Metering ±5%" — llm half): a
@@ -69,7 +69,9 @@ const SALES_NOTES: NotesContent = {
 };
 
 // Parsed through the shared schema so the cap-e2e handler returns typed notes.
-const SALES_NOTES_PARSED = meetingNotesSchema.parse(identifyNotes(SALES_NOTES, "generated"));
+const SALES_NOTES_PARSED = meetingNotesSchema.parse(
+  identifyNotes(SALES_NOTES, "generated"),
+);
 
 interface UsageRow {
   vendor: string;

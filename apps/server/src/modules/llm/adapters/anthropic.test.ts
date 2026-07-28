@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ChatMessage } from "../ports.js";
-import {
-  createAnthropicProvider,
-  toAnthropicMessages,
-} from "./anthropic.js";
+import { createAnthropicProvider, toAnthropicMessages } from "./anthropic.js";
 
 describe("adapters/anthropic — translation", () => {
   it("hoists system turns into a joined `system` string and maps the rest", () => {
@@ -32,6 +29,8 @@ describe("adapters/anthropic — translation", () => {
   });
 
   it("builds a provider with the anthropic id", () => {
-    expect(createAnthropicProvider({ apiKey: "test-key" }).id).toBe("anthropic");
+    expect(createAnthropicProvider({ apiKey: "test-key" }).id).toBe(
+      "anthropic",
+    );
   });
 });

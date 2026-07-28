@@ -1,4 +1,10 @@
 import cors from "@fastify/cors";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyServerOptions,
+} from "fastify";
+import type { z } from "zod";
 import {
   deletionResponseSchema,
   healthResponseSchema,
@@ -7,31 +13,25 @@ import {
   type HealthResponse,
   type MeResponse,
 } from "@nova/shared";
-import type { z } from "zod";
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyServerOptions,
-} from "fastify";
 
 import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
-import { createRoleReader } from "./db/roles.js";
-import {
-  isUsageEventsConfigured,
-  usageEventsDbFromEnv,
-} from "./db/usage-events.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createLiveNotesStore } from "./db/live-notes.js";
-import { createRagIndexerDb } from "./db/rag-indexer.js";
-import { createStaleCallReaper } from "./db/stale-call-reaper.js";
-import { isNotesWorkerEnabled } from "./env.js";
 import { createNotesSource } from "./db/notes-source.js";
 import {
   createFollowUpWriter,
   createNotesReader,
   createNotesWriter,
 } from "./db/notes.js";
+import { createRagIndexerDb } from "./db/rag-indexer.js";
+import { createRoleReader } from "./db/roles.js";
+import { createStaleCallReaper } from "./db/stale-call-reaper.js";
+import {
+  isUsageEventsConfigured,
+  usageEventsDbFromEnv,
+} from "./db/usage-events.js";
+import { isNotesWorkerEnabled } from "./env.js";
 import {
   maybeCreateKillSwitch,
   maybeCreateMetering,
@@ -41,17 +41,17 @@ import {
 } from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
 import {
-  type KillSwitch,
-  type MeteringService,
-  type QuotaChecker,
-} from "./modules/metering/index.js";
-import {
   AllProvidersFailedError,
   createLlmRouter,
   createProvidersFromEnv,
   llmConfigSchema,
   type LlmProviderEnv,
 } from "./modules/llm/index.js";
+import {
+  type KillSwitch,
+  type MeteringService,
+  type QuotaChecker,
+} from "./modules/metering/index.js";
 import {
   createNotesJobHandler,
   createNotesPipeline,
@@ -61,8 +61,8 @@ import {
   type FollowUpInput,
   type FollowUpResult,
 } from "./modules/notes/index.js";
-import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
+import { createRagIndexer } from "./modules/rag/indexer.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import { withLogRedaction } from "./plugins/log-redaction.js";
 import {

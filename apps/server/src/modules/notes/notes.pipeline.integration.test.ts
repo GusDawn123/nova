@@ -5,7 +5,11 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { meetingNotesSchema } from "@nova/shared";
 
-import { createNotesJobStore, type ClaimedJob, type NotesJobStore } from "../../db/jobs.js";
+import {
+  createNotesJobStore,
+  type ClaimedJob,
+  type NotesJobStore,
+} from "../../db/jobs.js";
 import { createNotesSource } from "../../db/notes-source.js";
 import { createNotesWriter } from "../../db/notes.js";
 import { createTranscriptPersister } from "../../db/transcripts.js";
@@ -13,8 +17,8 @@ import { createTranscriptPersister } from "../../db/transcripts.js";
 import { createNotesJobHandler } from "./handler.js";
 import { createNotesPipeline } from "./pipeline.js";
 import type { NotesJobHandler, NotesLogger, NotesWorker } from "./ports.js";
-import { createNotesWorker } from "./worker.js";
 import { makeNotesRouter } from "./testing/mock-notes-router.js";
+import { createNotesWorker } from "./worker.js";
 
 /**
  * Full-loop proof (playbook VERIFY) against the LIVE local Supabase Postgres with a
@@ -40,7 +44,9 @@ const url = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const hasStack = Boolean(dbUrl && url && serviceRoleKey);
 
-const noPersist = { auth: { persistSession: false, autoRefreshToken: false } } as const;
+const noPersist = {
+  auth: { persistSession: false, autoRefreshToken: false },
+} as const;
 const NOOP_LOGGER: NotesLogger = { info: () => {}, error: () => {} };
 
 /** A schema-valid single-pass sales notes object the mock generate call returns. */
@@ -48,7 +54,8 @@ const SALES_NOTES = {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Discussed the renewal and agreed on next steps.",
-  overview: "The rep and the customer reviewed the renewal terms and aligned on the path forward.",
+  overview:
+    "The rep and the customer reviewed the renewal terms and aligned on the path forward.",
   decisions: [],
   actionItems: [],
   openQuestions: [],
@@ -190,11 +197,16 @@ describe.skipIf(!hasStack)("notes pipeline full loop (local stack)", () => {
     await persister().markEnded(meetingId, userId);
     await enqueuePromise;
 
-    expect(await meetingNotesRow(meetingId).then((r) => r.notes_status)).toBe("queued");
+    expect(await meetingNotesRow(meetingId).then((r) => r.notes_status)).toBe(
+      "queued",
+    );
     const jobId = await activeJobId(meetingId);
     expect(jobId).not.toBeNull();
     // Make my job the oldest eligible row so the global claim picks it deterministically.
-    await pool.query("update jobs set run_at = now() - interval '1 day' where id = $1", [jobId]);
+    await pool.query(
+      "update jobs set run_at = now() - interval '1 day' where id = $1",
+      [jobId],
+    );
 
     const processed = await worker.tickOnce();
     expect(processed).toBe(1);
@@ -239,7 +251,9 @@ describe.skipIf(!hasStack)("notes pipeline full loop (local stack)", () => {
     // The partial unique index only blocks a SECOND active job; a completed job is
     // history, so a fresh enqueue is allowed.
     expect(await store.enqueue(meetingId, userId)).toBe("enqueued");
-    expect(await meetingNotesRow(meetingId).then((r) => r.notes_status)).toBe("queued");
+    expect(await meetingNotesRow(meetingId).then((r) => r.notes_status)).toBe(
+      "queued",
+    );
 
     // Exactly one active job again; a further enqueue collides (already_active).
     expect(await store.enqueue(meetingId, userId)).toBe("already_active");

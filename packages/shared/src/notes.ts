@@ -251,7 +251,10 @@ function identifyInsights(insights: TypeInsightsContent): TypeInsights {
     case "interview":
       return {
         kind: "interview",
-        questionsAsked: identifyStrings(insights.questionsAsked, "questionsAsked"),
+        questionsAsked: identifyStrings(
+          insights.questionsAsked,
+          "questionsAsked",
+        ),
         answersToRevisit: identifyStrings(
           insights.answersToRevisit,
           "answersToRevisit",
@@ -282,7 +285,10 @@ export function identifyNotes(
     title: content.title,
     tldr: content.tldr,
     overview: content.overview,
-    decisions: mintIds(content.decisions, "decisions", (d, id) => ({ ...d, id })),
+    decisions: mintIds(content.decisions, "decisions", (d, id) => ({
+      ...d,
+      id,
+    })),
     actionItems: mintIds(content.actionItems, "actionItems", (a, id) => ({
       ...a,
       id,

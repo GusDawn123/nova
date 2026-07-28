@@ -80,7 +80,10 @@ function fakeLiveNotes(seed: MeetingNotes | Error | null): LiveNotesStore {
 }
 
 /** Notes carrying one risk, so id carry-over is observable. */
-function notesWithRisk(text: string, source: "generated" | "live"): MeetingNotes {
+function notesWithRisk(
+  text: string,
+  source: "generated" | "live",
+): MeetingNotes {
   return identifyNotes(
     {
       conversationType: "casual",
@@ -99,7 +102,9 @@ function notesWithRisk(text: string, source: "generated" | "live"): MeetingNotes
 
 describe("createNotesJobHandler — live-notes reconciliation (Phase 8 §3)", () => {
   it("carries live ids onto the matching final items before the write", async () => {
-    const writeNotes = vi.fn<NotesWriter["writeNotes"]>(() => Promise.resolve());
+    const writeNotes = vi.fn<NotesWriter["writeNotes"]>(() =>
+      Promise.resolve(),
+    );
     // The live preview minted r1 for this risk during the call…
     const live = notesWithRisk("Budget freeze", "live");
     // …and the post-call pass re-derived it, freshly id'd as r1 too — but only
@@ -175,7 +180,9 @@ describe("createNotesJobHandler — live-notes reconciliation (Phase 8 §3)", ()
       NOTES,
       expect.any(Date),
     );
-    expect(error.mock.calls[0]?.[1]).toBe("notes.handler.live_notes_read_failed");
+    expect(error.mock.calls[0]?.[1]).toBe(
+      "notes.handler.live_notes_read_failed",
+    );
   });
 });
 
@@ -260,7 +267,9 @@ describe("createNotesJobHandler", () => {
 
   it("completes as a no-op for a soft-deleted meeting (no write)", async () => {
     const writeNotes = vi.fn(() => Promise.resolve());
-    const generate = vi.fn(() => Promise.resolve({ notes: NOTES, usage: USAGE }));
+    const generate = vi.fn(() =>
+      Promise.resolve({ notes: NOTES, usage: USAGE }),
+    );
     const handler = createNotesJobHandler({
       pipeline: fakePipeline(generate),
       source: fakeSource({

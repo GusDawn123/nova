@@ -61,7 +61,8 @@ export function classifyVendorErrorText(text: string): SttErrorKind {
   const lower = text.toLowerCase();
   if (AUTH_SIGNALS.some((signal) => lower.includes(signal))) return "auth";
   if (AUTH_HTTP_CODES.some((code) => lower.includes(code))) return "auth";
-  if (PROTOCOL_SIGNALS.some((signal) => lower.includes(signal))) return "protocol";
+  if (PROTOCOL_SIGNALS.some((signal) => lower.includes(signal)))
+    return "protocol";
   return "transient";
 }
 

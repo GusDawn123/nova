@@ -93,9 +93,7 @@ export interface LiveFoldRunnerDeps {
 
 const DEFAULT_CLASSIFY_HEAD_TOKENS = 500;
 
-export function createLiveFoldRunner(
-  deps: LiveFoldRunnerDeps,
-): LiveFoldRunner {
+export function createLiveFoldRunner(deps: LiveFoldRunnerDeps): LiveFoldRunner {
   const { router, config, logger } = deps;
   const classifyHeadTokens =
     deps.classifyHeadTokens ?? DEFAULT_CLASSIFY_HEAD_TOKENS;
@@ -147,7 +145,10 @@ export function createLiveFoldRunner(
       const proposed =
         request.classifiedType === undefined
           ? ladder.result.value
-          : { ...ladder.result.value, conversationType: request.classifiedType };
+          : {
+              ...ladder.result.value,
+              conversationType: request.classifiedType,
+            };
 
       const outcome = applyFold(request.prior, proposed, {
         config,

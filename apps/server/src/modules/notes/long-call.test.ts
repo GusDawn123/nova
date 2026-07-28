@@ -78,7 +78,10 @@ function factsForSegment(segment: string, facts: Fact[]): unknown {
   }[] = [];
   for (const fact of facts) {
     if (segment.includes(fact.decisionQuote)) {
-      decisions.push({ text: `Adopt the ${fact.decisionKeyword}`, quote: fact.decisionQuote });
+      decisions.push({
+        text: `Adopt the ${fact.decisionKeyword}`,
+        quote: fact.decisionQuote,
+      });
     }
     if (segment.includes(fact.actionQuote)) {
       actionItems.push({
@@ -91,12 +94,18 @@ function factsForSegment(segment: string, facts: Fact[]): unknown {
     }
   }
   return {
-    miniSummary: "A stretch of the renewal call. Terms were discussed. The parties aligned.",
+    miniSummary:
+      "A stretch of the renewal call. Terms were discussed. The parties aligned.",
     decisions,
     actionItems,
     openQuestions: [],
     risks: [],
-    insights: { objections: [], buyingSignals: [], questionsAsked: [], answersToRevisit: [] },
+    insights: {
+      objections: [],
+      buyingSignals: [],
+      questionsAsked: [],
+      answersToRevisit: [],
+    },
   };
 }
 
@@ -106,7 +115,9 @@ describe("long-call map-reduce (mock) — planted facts survive the boundary", (
     const manifest = manifestSchema.parse(readJson("long-call.expected.json"));
     const facts = [manifest.firstFact, manifest.lastFact];
 
-    const router = makeNotesRouter({ map: (seg) => factsForSegment(seg, facts) });
+    const router = makeNotesRouter({
+      map: (seg) => factsForSegment(seg, facts),
+    });
     // Gate below the fixture's ~21k tokens → the map-reduce arm; default 6k chunks
     // put the two plants in different chunks (they are ~80 minutes apart).
     const pipeline = createNotesPipeline({
@@ -132,7 +143,9 @@ describe("long-call map-reduce (mock) — planted facts survive the boundary", (
     const mapCalls = router.calls.filter((c) => c.stage === "map").length;
     expect(mapCalls).toBeGreaterThan(1);
 
-    const decisionText = notes.decisions.map((d) => d.text.toLowerCase()).join(" | ");
+    const decisionText = notes.decisions
+      .map((d) => d.text.toLowerCase())
+      .join(" | ");
     expect(decisionText).toContain("enterprise tier"); // first 10 min
     expect(decisionText).toContain("technical onboarding"); // last 10 min
 
@@ -150,7 +163,9 @@ describe("long-call map-reduce (mock) — planted facts survive the boundary", (
     expect((lastItem?.deadlineRaw ?? "").toLowerCase()).toContain("wednesday");
 
     // Both plants quote verbatim transcript lines → they verify (nothing flagged).
-    expect(notes.actionItems.every((a) => a.unverified === undefined)).toBe(true);
+    expect(notes.actionItems.every((a) => a.unverified === undefined)).toBe(
+      true,
+    );
     expect(notes.decisions.every((d) => d.unverified === undefined)).toBe(true);
   });
 });

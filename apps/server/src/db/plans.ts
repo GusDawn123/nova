@@ -2,8 +2,8 @@ import type { Pool } from "pg";
 import { z } from "zod";
 
 import type { PlanId } from "../modules/metering/config.js";
-import type { PlanWriter } from "../modules/metering/revenuecat.js";
 import type { PlanReader } from "../modules/metering/quota.js";
+import type { PlanWriter } from "../modules/metering/revenuecat.js";
 
 /**
  * `PlanReader`/`PlanWriter` over a direct `pg` Pool — the user-scoped

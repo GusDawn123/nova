@@ -85,21 +85,28 @@ type Manifest = z.infer<typeof manifestSchema>;
 type FixtureName = "sales" | "interview" | "casual";
 
 function loadFixture(name: FixtureName): Fixture {
-  const raw: unknown = JSON.parse(readFileSync(join(FIXTURE_DIR, `${name}.json`), "utf8"));
+  const raw: unknown = JSON.parse(
+    readFileSync(join(FIXTURE_DIR, `${name}.json`), "utf8"),
+  );
   return fixtureSchema.parse(raw);
 }
 
 function loadManifest(): Manifest {
-  const raw: unknown = JSON.parse(readFileSync(join(FIXTURE_DIR, "expected.json"), "utf8"));
+  const raw: unknown = JSON.parse(
+    readFileSync(join(FIXTURE_DIR, "expected.json"), "utf8"),
+  );
   return manifestSchema.parse(raw);
 }
 
 /** Only the keys that are actually set — exactOptionalPropertyTypes-safe. */
 function providerEnv(): LlmProviderEnv {
   const env: LlmProviderEnv = {};
-  if (process.env.ANTHROPIC_API_KEY) env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-  if (process.env.OPENAI_API_KEY) env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-  if (process.env.GOOGLE_API_KEY) env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+  if (process.env.ANTHROPIC_API_KEY)
+    env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+  if (process.env.OPENAI_API_KEY)
+    env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (process.env.GOOGLE_API_KEY)
+    env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
   if (process.env.GROQ_API_KEY) env.GROQ_API_KEY = process.env.GROQ_API_KEY;
   return env;
 }
@@ -137,8 +144,8 @@ function unverifiedCount(notes: MeetingNotes): number {
 
 const canRun = Boolean(
   process.env.ANTHROPIC_API_KEY ||
-    process.env.OPENAI_API_KEY ||
-    process.env.GOOGLE_API_KEY,
+  process.env.OPENAI_API_KEY ||
+  process.env.GOOGLE_API_KEY,
 );
 
 describe.skipIf(!canRun)("notes accuracy gate (live)", () => {
@@ -191,7 +198,9 @@ describe.skipIf(!canRun)("notes accuracy gate (live)", () => {
       item.text.toLowerCase().includes(spec.commitment.textKeyword),
     );
     expect(commitment, "a proposal action item should exist").toBeDefined();
-    expect((commitment?.owner ?? "").toLowerCase()).toContain(spec.commitment.ownerKeyword);
+    expect((commitment?.owner ?? "").toLowerCase()).toContain(
+      spec.commitment.ownerKeyword,
+    );
     expect(commitment?.deadline).toBe(spec.commitment.deadline);
     expect((commitment?.deadlineRaw ?? "").toLowerCase()).toContain(
       spec.commitment.deadlineRawKeyword,
@@ -214,11 +223,18 @@ describe.skipIf(!canRun)("notes accuracy gate (live)", () => {
       expect(blob, `interview notes should mention "${kw}"`).toContain(kw);
     }
 
-    expect(notes.openQuestions.length).toBeGreaterThanOrEqual(spec.minOpenQuestions);
-    if (spec.requireInsightsNonEmpty && notes.typeInsights.kind === "interview") {
+    expect(notes.openQuestions.length).toBeGreaterThanOrEqual(
+      spec.minOpenQuestions,
+    );
+    if (
+      spec.requireInsightsNonEmpty &&
+      notes.typeInsights.kind === "interview"
+    ) {
       expect(notes.typeInsights.questionsAsked.length).toBeGreaterThan(0);
     }
-    expect(unverifiedCount(notes), "every interview quote should verify").toBe(0);
+    expect(unverifiedCount(notes), "every interview quote should verify").toBe(
+      0,
+    );
   });
 
   it("classifies the casual catch-up with at most trivial action items", () => {
@@ -239,7 +255,9 @@ describe.skipIf(!canRun)("notes accuracy gate (live)", () => {
       results.get("interview"),
       results.get("casual"),
     ];
-    expect(notesList.every((n): n is MeetingNotes => n !== undefined)).toBe(true);
+    expect(notesList.every((n): n is MeetingNotes => n !== undefined)).toBe(
+      true,
+    );
     const types = new Set(notesList.map((n) => n?.conversationType));
     const kinds = new Set(notesList.map((n) => n?.typeInsights.kind));
     expect(types.size).toBe(3);
@@ -273,7 +291,9 @@ const longCallManifestSchema = z.object({
 describe.skipIf(!canRun)("notes long-call accuracy gate (live)", () => {
   let notes: MeetingNotes | undefined;
   const manifest = longCallManifestSchema.parse(
-    JSON.parse(readFileSync(join(FIXTURE_DIR, "long-call.expected.json"), "utf8")),
+    JSON.parse(
+      readFileSync(join(FIXTURE_DIR, "long-call.expected.json"), "utf8"),
+    ),
   );
 
   beforeAll(async () => {
@@ -308,10 +328,18 @@ describe.skipIf(!canRun)("notes long-call accuracy gate (live)", () => {
     if (!notes) return;
     const blob = notesTextBlob(notes);
     // First-10-min fact.
-    expect(blob, "first-chunk decision keyword").toContain(manifest.firstFact.decisionKeyword);
-    expect(blob, "first-chunk action keyword").toContain(manifest.firstFact.actionItemKeyword);
+    expect(blob, "first-chunk decision keyword").toContain(
+      manifest.firstFact.decisionKeyword,
+    );
+    expect(blob, "first-chunk action keyword").toContain(
+      manifest.firstFact.actionItemKeyword,
+    );
     // Last-10-min fact.
-    expect(blob, "last-chunk decision keyword").toContain(manifest.lastFact.decisionKeyword);
-    expect(blob, "last-chunk action keyword").toContain(manifest.lastFact.actionItemKeyword);
+    expect(blob, "last-chunk decision keyword").toContain(
+      manifest.lastFact.decisionKeyword,
+    );
+    expect(blob, "last-chunk action keyword").toContain(
+      manifest.lastFact.actionItemKeyword,
+    );
   });
 });
