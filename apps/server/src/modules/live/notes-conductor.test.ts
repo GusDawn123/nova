@@ -555,6 +555,48 @@ describe("[notes-conductor] hydration", () => {
     conductor.dispose();
   });
 
+  it("waits for a slow hydration before the first fold", async () => {
+    // Every other test here advances timers by 0 first, which lets hydration
+    // settle — so none of them exercise the race. `hydrate()` was fire-and-forget
+    // (`void hydrate()`) and `tick()` never waited on it, so a readLiveNotes
+    // slower than foldIntervalMs let the first fold run against empty notes at
+    // rev 0 and then write rev 1 OVER the persisted row — the exact overwrite the
+    // hydrate_failed comment warns about, but on the slow path rather than the
+    // failing one.
+    const gate = deferred();
+    const seeded = {
+      ...emptyLiveNotes("Acme call"),
+      risks: [{ id: "r7", text: "Carried over from before" }],
+    };
+    const conductor = makeConductor({
+      store: {
+        readLiveNotes: async () => {
+          await gate.promise;
+          return {
+            notes: seeded,
+            rev: 4,
+            updatedAt: "2026-07-26T10:05:00.000Z",
+          };
+        },
+        upsertLiveNotes: (input) =>
+          Promise.resolve({ status: "written" as const, rev: input.rev }),
+      },
+      router: scriptedRouter([ADD_ONE]),
+    });
+
+    // A turn lands and the whole fold interval elapses while the read is STILL out.
+    conductor.onFinal(...turn(1));
+    await vi.advanceTimersByTimeAsync(1000);
+
+    gate.resolve();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const last = notesUpdates().at(-1);
+    expect(last?.rev).toBe(5); // continues the hydrated rev 4, not a fresh rev 1
+    expect(last?.notes.risks.map((r) => r.id)).toContain("r7"); // prior work kept
+    conductor.dispose();
+  });
+
   it("starts from empty notes when hydration fails, rather than not at all", async () => {
     const errors: string[] = [];
     const conductor = makeConductor({

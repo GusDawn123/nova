@@ -253,8 +253,14 @@ export function createLiveNotesConductor(
   }
 
   async function tick(): Promise<void> {
+    // 0. Never fold against un-hydrated state. Awaiting the latch is a no-op once
+    //    the first read has landed; on a slow DB it is what stops the first fold
+    //    from overwriting the persisted row with a fresh rev 1.
+    await hydrated;
+
     // 1. Single in-flight latch — this is what makes overlapping folds
     //    impossible. The delta keeps accruing while a fold is out.
+    //    Re-checked AFTER the await: disposal can land while hydration is out.
     if (isDisposed() || isStopped() || inFlight !== null) {
       rearm();
       return;
@@ -426,7 +432,16 @@ export function createLiveNotesConductor(
     return Math.ceil(chars / CHARS_PER_TOKEN);
   }
 
-  void hydrate().catch((err: unknown) => {
+  /**
+   * The hydration latch. `tick()` awaits this before reading `notes`/`rev`.
+   *
+   * why: this used to be a bare `void hydrate()`, so a `readLiveNotes` slower than
+   * `foldIntervalMs` let the first fold run against empty notes at rev 0 and then
+   * write rev 1 straight over the persisted row — the same overwrite the catch
+   * below warns about, reached by being slow rather than by failing. Rejections
+   * are folded in here so awaiting the latch can never throw into the loop.
+   */
+  const hydrated: Promise<void> = hydrate().catch((err: unknown) => {
     // A hydration failure is survivable: the loop starts from empty notes rather
     // than not at all. It is NOT silent — an unnoticed one means the first fold
     // overwrites the row with a fresh set of ids.
