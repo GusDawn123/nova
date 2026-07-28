@@ -115,9 +115,31 @@ export function createNotesRoutes(
 
         // AFTER the 404 gate: that gate already proved ownership and
         // not-soft-deleted, and this way a 404 costs no second query.
-        const live = deps.liveNotes
-          ? await deps.liveNotes.readLiveNotes(meetingId, userId)
-          : null;
+        //
+        // BEST-EFFORT, matching the unwired posture and handler.ts's
+        // readLivePreview. why: this read used to be unguarded, so a live_notes
+        // outage turned a perfectly good notes read into a 500 — the durable
+        // payload is the contract here and the live preview is a cosmetic add-on.
+        // Absent store and failing store must land in the same place: null.
+        let live: Awaited<
+          ReturnType<LiveNotesStore["readLiveNotes"]>
+        > | null = null;
+        if (deps.liveNotes) {
+          try {
+            live = await deps.liveNotes.readLiveNotes(meetingId, userId);
+          } catch (err: unknown) {
+            // Degrading silently would hide a real outage.
+            logger.error(
+              {
+                request_id: request.id,
+                user_id: userId,
+                meeting_id: meetingId,
+                error: err instanceof Error ? err.message : String(err),
+              },
+              "notes.routes.live_notes_read_failed",
+            );
+          }
+        }
 
         const body: NotesReadResponse = notesReadResponseSchema.parse({
           notes_status: model.notesStatus,

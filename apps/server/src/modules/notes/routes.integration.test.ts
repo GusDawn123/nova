@@ -305,6 +305,47 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     expect(body.live_notes_rev).toBeNull();
   });
 
+  it("GET degrades live_notes to null when the store THROWS (best-effort)", async () => {
+    // The unwired case above already degrades to null and the pipeline's sibling
+    // read (handler.ts readLivePreview) catches. A WIRED store that fails must
+    // reach the same place: the primary notes payload is the contract and the
+    // live preview is a cosmetic add-on, so a live_notes outage must not turn a
+    // perfectly good read into a 500.
+    const meetingId = await newMeeting(userAId);
+    const brokenLog = capturingLogger();
+    const brokenApp = buildApp(
+      replyRouter(OK_FOLLOW_UP_BODY),
+      brokenLog.logger,
+      undefined,
+      undefined,
+      {
+        readLiveNotes: () =>
+          Promise.reject(new Error("live_notes read failed")),
+        upsertLiveNotes: () =>
+          Promise.reject(new Error("not exercised by this test")),
+      },
+    );
+
+    try {
+      const res = await brokenApp.inject({
+        method: "GET",
+        url: `/meetings/${meetingId}/notes`,
+        headers: auth(tokenA),
+      });
+
+      expect(res.statusCode).toBe(200);
+      const body = notesReadResponseSchema.parse(res.json());
+      expect(body.live_notes).toBeNull();
+      expect(body.live_notes_rev).toBeNull();
+      // Degrading silently would hide a real outage — it must be logged.
+      expect(brokenLog.lines.map((l) => l.msg)).toContain(
+        "notes.routes.live_notes_read_failed",
+      );
+    } finally {
+      await brokenApp.close();
+    }
+  });
+
   it("GET does not leak another user's live-notes preview", async () => {
     // The store is user-scoped in SQL as well as behind the ownership gate.
     const meetingId = await newMeeting(userAId);
