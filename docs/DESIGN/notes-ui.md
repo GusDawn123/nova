@@ -82,9 +82,19 @@ This is the load-bearing table; every row below is verified against the schema.
 
 `notes.overview` and `notes.typeInsights` (sales: objections/buyingSignals;
 interview: questionsAsked/answersToRevisit) have **no home in the mock**. They are
-real, populated data. Ruling: render `typeInsights` as one additional card below
-"open"/"risk", styled identically, titled by kind. `overview` is left unrendered —
-`tldr` covers the same ground in the space available.
+real, populated data.
+
+**Ruling (Gustavo, 2026-07-28):** `typeInsights` gets a **"coming soon" placeholder
+card** in the slot below open/risk — full glass styling, correct position and
+proportions, but the insight data is not rendered until the prompts behind it are
+refined. The card is titled by conversation kind so the layout is exercised, and
+turning it on later is a render swap inside one component, not a layout change.
+
+The placeholder appears only when `typeInsights.kind` is `sales` or `interview` — a
+`casual` call has no insights arm and shows nothing, rather than promising something
+that will never arrive.
+
+`overview` is left unrendered — `tldr` covers the same ground in the space available.
 
 ---
 
@@ -326,15 +336,25 @@ The mock's animations are decorative — none carries information that is lost w
 | `(app)/live.tsx` | **restyled** to the mock; keeps `useLiveSession`, keeps the role gate |
 | `(app)/meetings.tsx` | **new** — list |
 | `(app)/meetings/[id].tsx` | **new** — detail, three tabs |
-| `(app)/index.tsx` | unchanged (account: health, `/me`, sign-out, delete) |
+| `(app)/account.tsx` | **moved** from `index.tsx` — reached from the Meetings header |
 | `(app)/explore.tsx` | **deleted** — Expo starter template cruft |
 
-### 7.3 Tab bar
+### 7.3 Tab bar and Account
 
 The mock replaces the native tab bar with a floating glass pill (Live · Meetings),
 with a pulsing rec dot on Live. That means moving from `NativeTabs` to `Tabs` with a
-custom `tabBar`. The existing role gate (`use-role`, Test Live is developer/admin
-only) is preserved. See §11.1 for where Account lives.
+custom `tabBar`.
+
+**Account (Gustavo, 2026-07-28):** a glass avatar button in the **Meetings header**
+pushes the account screen. The tab bar stays exactly two pills, as drawn. The existing
+screen keeps its content unchanged (health, `/me`, sign-out, delete account) and is
+only restyled and rehomed; `index.tsx` becomes the Meetings list so the app opens
+there.
+
+**Live stays role-gated (Gustavo, 2026-07-28).** Without mic capture a customer cannot
+start a call, so shipping a Live tab whose orb does nothing is worse than not shipping
+it. `use-role` continues to hide it for customers, who see Meetings + Account. Phase 9
+removes the gate when the orb becomes real.
 
 ### 7.4 Features — `src/features/`
 
@@ -435,22 +455,19 @@ purge consumer (pre-launch blocker, tracked in live-notes.md §13 F3)
 
 ---
 
-## 11. Open questions for Gustavo
+## 11. Decisions
 
-**Settled 2026-07-28:** action-item completion is built, not cut (§6.3) · the in-call
-capture card is tabbed Transcript / Live notes (§5.1) · `explore.tsx` is deleted.
+All open questions were settled by Gustavo on 2026-07-28. Nothing here is pending.
 
-1. **Where does Account live?** The mock shows two tabs (Live, Meetings) but the app
-   has a real account screen (health, `/me`, sign-out, delete account). Options: a
-   third tab; a header button on Meetings; a sheet. **Recommendation:** header button
-   on Meetings — keeps the mock's two-tab bar exactly as drawn.
-2. **Does the Live tab stay role-gated?** Without mic capture a customer cannot start
-   a call, so Live is unusable for them until Phase 9. **Recommendation:** keep the
-   gate; customers see Meetings + Account. Revisit in Phase 9.
-3. **`typeInsights` treatment.** The data is real and populated (sales:
-   objections/buying-signals; interview: questions-asked/answers-to-revisit). §3 rules
-   it into one extra card below open/risk. Confirm that, or say whether it should be
-   held back behind a "coming soon" placeholder instead.
+| # | Decision | Where |
+|---|---|---|
+| 1 | Action-item completion is **built**, not cut | §6.3 |
+| 2 | The in-call capture card is **tabbed** Transcript / Live notes | §5.1 |
+| 3 | `typeInsights` ships as a **"coming soon" placeholder** card | §3 |
+| 4 | Account lives behind a **header button on Meetings** | §7.3 |
+| 5 | The Live tab **stays role-gated** until Phase 9 | §7.3 |
+| 6 | `explore.tsx` is **deleted** | §7.2 |
+| 7 | Meetings/transcript reads go through **new server routes**, not supabase-js | §6 |
 
 ---
 
