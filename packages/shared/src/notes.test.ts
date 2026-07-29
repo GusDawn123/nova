@@ -337,6 +337,35 @@ describe("notesReadResponseSchema (the GET read model)", () => {
     expect(notesReadResponseSchema.safeParse(withoutLive).success).toBe(false);
   });
 
+  it("defaults completed_item_ids to empty when the server omits it", () => {
+    // Deliberately NOT required: an installed mobile app cannot be force-updated,
+    // so a new client will at some point parse an older server's response. A hard
+    // failure there would take out the whole notes screen over a checkbox array.
+    const result = notesReadResponseSchema.safeParse(emptyModel);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.completed_item_ids).toEqual([]);
+  });
+
+  it("accepts completed action-item ids", () => {
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      completed_item_ids: ["a1", "a3"],
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.completed_item_ids).toEqual([
+      "a1",
+      "a3",
+    ]);
+  });
+
+  it("rejects a completed id that is not a minted note id", () => {
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      completed_item_ids: ["not-an-id"],
+    });
+    expect(result.success).toBe(false);
+  });
+
   it.each([-1, 2.5])("rejects a live_notes_rev of %s", (rev) => {
     const result = notesReadResponseSchema.safeParse({
       ...emptyModel,

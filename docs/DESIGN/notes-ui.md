@@ -436,8 +436,11 @@ Native Testing Library, wired into the root `npm run test`.
 - `PUT /meetings/:id/notes/items/:itemId` — 404 for an `itemId` absent from the notes,
   404 for foreign/deleted meetings, idempotent re-check, uncheck writes null
 - **The staleness rule (§6.3):** completion survives a reworded item at jaccard ≥ 0.6,
-  and is dropped when the item at that id is replaced by a dissimilar one — asserted
-  against a real regenerate, not a hand-built row
+  and is dropped when the item at that id is replaced by a dissimilar one. Asserted
+  against the DB state a regenerate LEAVES BEHIND (new notes written over the same
+  meeting), not against a live pipeline run — running the real pipeline would need a
+  vendor key and would be testing the pipeline, not the guard. The live→final case
+  does use the real `reconcileIds`, since that integration is the point.
 - RLS integration tests for all three, incl. proof that `authenticated` cannot write
   `note_item_state` directly (mirroring `live-notes-rls.integration.test.ts`)
 

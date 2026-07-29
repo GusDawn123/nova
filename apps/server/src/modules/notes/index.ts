@@ -38,7 +38,16 @@ export {
   type NotesConfig,
 } from "./config.js";
 export { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
-export { reconcileIds, RECONCILE_THRESHOLD } from "./reconcile-ids.js";
+export {
+  reconcileIds,
+  similarity,
+  RECONCILE_THRESHOLD,
+} from "./reconcile-ids.js";
+export {
+  completedItemIds,
+  isSameItem,
+  type StoredItemState,
+} from "./item-completion.js";
 /**
  * The live-notes fold (Phase 8). `modules/live`'s notes conductor owns the LOOP
  * and reaches the notes domain only through these — the prompt, the ops schema,

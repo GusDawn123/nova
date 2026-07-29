@@ -421,6 +421,30 @@ export const notesReadResponseSchema = z.object({
   live_notes: meetingNotesSchema.nullable(),
   /** `live_notes`' monotonic revision; null exactly when `live_notes` is null. */
   live_notes_rev: z.number().int().nonnegative().nullable(),
+  /**
+   * Action-item ids the user has checked off, filtered to those whose stored text
+   * still matches the item now at that id (Phase 8.5, `docs/DESIGN/notes-ui.md`
+   * §6.3). Empty when nothing is checked.
+   *
+   * A SEPARATE array rather than a `completed` flag on each action item, on
+   * purpose: `noteActionItemSchema` is the STORED notes shape, shared by `notes`
+   * and `live_notes` and written into `meetings.notes` verbatim. Threading a
+   * read-only, user-authored field through it would put presentation state into a
+   * server-authored document — and would imply live-notes items carry completion
+   * too, which they do not. The client renders
+   * `completed_item_ids.includes(item.id)`.
+   *
+   * Ordered by the notes' own action-item order, so the array is stable and
+   * diffable rather than dependent on the DB's row order.
+   *
+   * DEFAULTED rather than required, deliberately. This is a mobile wire contract:
+   * an installed app cannot be force-updated, so a new client will at some point
+   * parse a response from an older server (a staged rollout, a rollback), and a
+   * hard parse failure there would take out the entire notes screen over a
+   * checkbox array. Absent reads as "nothing checked", which is both the truthful
+   * answer for a server that has no completion state and the safe direction.
+   */
+  completed_item_ids: z.array(noteIdSchema).default([]),
 });
 export type NotesReadResponse = z.infer<typeof notesReadResponseSchema>;
 

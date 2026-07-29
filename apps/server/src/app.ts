@@ -19,6 +19,7 @@ import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createLiveNotesStore } from "./db/live-notes.js";
 import { createMeetingsReader } from "./db/meetings.js";
+import { createNoteItemStateStore } from "./db/note-item-state.js";
 import { createNotesSource } from "./db/notes-source.js";
 import {
   createFollowUpWriter,
@@ -471,6 +472,8 @@ function maybeRegisterNotesRoutes(
     createNotesRoutes({
       reader: createNotesReader(),
       liveNotes: createLiveNotesStore(pool),
+      // Action-item completion (Phase 8.5) — same memoised pool again.
+      noteItemState: createNoteItemStateStore(pool),
       followUpWriter: createFollowUpWriter(),
       store,
       followUp,

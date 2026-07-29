@@ -10,10 +10,15 @@ import {
 
 import type { NotesJobStore } from "../../db/jobs.js";
 import type { LiveNotesStore } from "../../db/live-notes.js";
+import type { NoteItemStateStore } from "../../db/note-item-state.js";
 import { requireAuth } from "../../plugins/auth.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
 
 import type { FollowUpInput, FollowUpResult } from "./follow-up.js";
+import {
+  readCompletedIds,
+  registerItemCompletionRoute,
+} from "./item-completion-routes.js";
 import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
 
 /**
@@ -61,6 +66,12 @@ export interface NotesRoutesDeps {
    * boot posture): unwired means `live_notes: null`, never a throw.
    */
   readonly liveNotes?: LiveNotesStore;
+  /**
+   * Action-item completion state (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3).
+   * Optional for the same DB-less boot posture as {@link liveNotes}: unwired means
+   * `completed_item_ids: []` and a 503 from the write route, never a throw.
+   */
+  readonly noteItemState?: NoteItemStateStore;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -69,6 +80,7 @@ const NOT_FOUND = { error: "not_found" } as const;
 const paramsSchema = z.object({ id: z.string().uuid() });
 /** POST /follow-up body — module-local (the request shape is a thin `{tone}`). */
 const followUpBodySchema = z.object({ tone: followUpToneSchema });
+
 
 /** The authenticated caller's id (requireAuth guarantees `request.user` is set). */
 function userIdOf(request: FastifyRequest): string {
@@ -140,6 +152,22 @@ export function createNotesRoutes(
           }
         }
 
+        // Completion is resolved against the notes the client will actually
+        // RENDER — post-call when they exist, else the live preview. That is what
+        // makes a checkmark made mid-call survive the hangup swap: `reconcileIds`
+        // carries the live item's id onto its post-call counterpart, so the stored
+        // row still matches by id, and the text guard still matches by similarity
+        // even though the post-call pass reworded it.
+        const rendered = model.notes ?? live?.notes ?? null;
+        const completed = await readCompletedIds(
+          deps.noteItemState,
+          rendered,
+          meetingId,
+          userId,
+          request.id,
+          logger,
+        );
+
         const body: NotesReadResponse = notesReadResponseSchema.parse({
           notes_status: model.notesStatus,
           notes: model.notes,
@@ -147,10 +175,23 @@ export function createNotesRoutes(
           notes_generated_at: model.notesGeneratedAt,
           live_notes: live?.notes ?? null,
           live_notes_rev: live?.rev ?? null,
+          completed_item_ids: completed,
         });
         return reply.code(200).send(body);
       },
     );
+
+    // Action-item completion (Phase 8.5). Registered from its own module: both
+    // halves of the feature (this write and the read helper the GET composes in)
+    // share the take-the-text-from-current-notes rule, and splitting them across
+    // files is how that rule drifts. See `item-completion-routes.ts`.
+    registerItemCompletionRoute(app, {
+      reader,
+      logger,
+      now,
+      ...(deps.noteItemState ? { noteItemState: deps.noteItemState } : {}),
+      ...(deps.liveNotes ? { liveNotes: deps.liveNotes } : {}),
+    });
 
     app.post(
       "/meetings/:id/notes/regenerate",
