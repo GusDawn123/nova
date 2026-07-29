@@ -5,6 +5,8 @@
   "private": true,
   "license": "UNLICENSED",
   "dependencies": {
+    "@expo-google-fonts/spline-sans": "^0.4.2",
+    "@expo-google-fonts/spline-sans-mono": "^0.4.2",
     "@expo/ui": "~57.0.7",
     "@nova/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",

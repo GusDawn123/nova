@@ -1,0 +1,99 @@
+import { render, screen } from '@testing-library/react';
+import { Text } from 'react-native';
+import { describe, expect, it, vi } from 'vitest';
+
+import { GlassPill, GlassSurface } from './glass';
+import { darkPalette, lightPalette, Radius } from './tokens';
+
+/**
+ * Glass surface behaviour (Phase 8.5, §7.1).
+ *
+ * `expo-glass-effect` is a native module with no web implementation, so it is mocked
+ * here — `vi.mock` hoists, which is why this lives in the test file rather than the
+ * shared setup. The mock reports glass as UNAVAILABLE, which makes these tests cover
+ * the case that actually matters: the fallback path taken on older iOS, Android and
+ * web, where the surface must still carry its own fill, border and radius rather
+ * than degrading to an invisible `View`.
+ *
+ * What real liquid glass looks like on iOS 26 is verified on the simulator by eye.
+ */
+vi.mock('expo-glass-effect', () => ({
+  GlassView: () => null,
+  isLiquidGlassAvailable: () => false,
+}));
+
+describe('GlassSurface', () => {
+  it('renders its children', () => {
+    render(
+      <GlassSurface palette={darkPalette}>
+        <Text>notes go here</Text>
+      </GlassSurface>,
+    );
+
+    expect(screen.getByText('notes go here')).toBeInTheDocument();
+  });
+
+  it('paints its own fill and border when liquid glass is unavailable', () => {
+    // The whole point of the fallback: without this the card is an invisible View
+    // on every platform below iOS 26.
+    render(<GlassSurface palette={darkPalette} testID="surface" />);
+
+    const style = getComputedStyle(screen.getByTestId('surface'));
+    expect(style.backgroundColor).not.toBe('');
+    expect(style.backgroundColor).not.toBe('rgba(0, 0, 0, 0)');
+    expect(parseFloat(style.borderTopWidth)).toBeGreaterThan(0);
+  });
+
+  it('uses the raised fill for tone="raised"', () => {
+    render(
+      <>
+        <GlassSurface palette={darkPalette} testID="regular" />
+        <GlassSurface palette={darkPalette} tone="raised" testID="raised" />
+      </>,
+    );
+
+    const regular = getComputedStyle(screen.getByTestId('regular'));
+    const raised = getComputedStyle(screen.getByTestId('raised'));
+    expect(raised.backgroundColor).not.toBe(regular.backgroundColor);
+  });
+
+  it('applies the requested radius, and the card radius by default', () => {
+    render(
+      <>
+        <GlassSurface palette={darkPalette} testID="default" />
+        <GlassSurface palette={darkPalette} radius={8} testID="custom" />
+      </>,
+    );
+
+    expect(getComputedStyle(screen.getByTestId('default')).borderTopLeftRadius).toBe(
+      `${String(Radius.card)}px`,
+    );
+    expect(getComputedStyle(screen.getByTestId('custom')).borderTopLeftRadius).toBe(
+      '8px',
+    );
+  });
+
+  it('renders differently under the two palettes', () => {
+    render(
+      <>
+        <GlassSurface palette={darkPalette} testID="dark" />
+        <GlassSurface palette={lightPalette} testID="light" />
+      </>,
+    );
+
+    expect(getComputedStyle(screen.getByTestId('dark')).backgroundColor).not.toBe(
+      getComputedStyle(screen.getByTestId('light')).backgroundColor,
+    );
+  });
+});
+
+describe('GlassPill', () => {
+  it('is fully rounded', () => {
+    render(<GlassPill palette={darkPalette} testID="pill" />);
+
+    const radius = parseFloat(
+      getComputedStyle(screen.getByTestId('pill')).borderTopLeftRadius,
+    );
+    expect(radius).toBeGreaterThanOrEqual(999);
+  });
+});
