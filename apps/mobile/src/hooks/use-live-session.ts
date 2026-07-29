@@ -225,7 +225,16 @@ export function useLiveSession(): UseLiveSession {
     const title = `Live session ${new Date().toLocaleString()}`;
     const inserted = await supabase
       .from('meetings')
-      .insert({ user_id: auth.session.user.id, title })
+      .insert({
+        user_id: auth.session.user.id,
+        title,
+        // `started_at` was never set, so EVERY meeting this app created was
+        // undatable — surfaced by the Phase 8.5 Meetings screen, which filed all
+        // of them under "earlier" and reported "no calls this month" while
+        // listing calls from today. `ended_at` was already being stamped (by the
+        // session close / stale-call reaper), so duration was unrecoverable too.
+        started_at: new Date().toISOString(),
+      })
       .select('id')
       .single<{ id: string }>();
     if (inserted.error) {

@@ -201,7 +201,20 @@ export const Space = {
   xxl: 26,
 } as const;
 
-/** Resolve a palette from the RN colour scheme (null/undefined → dark). */
-export function paletteFor(scheme: 'light' | 'dark' | null | undefined): Palette {
+/**
+ * Resolve a palette from the RN colour scheme.
+ *
+ * Anything that is not explicitly `'light'` resolves to DARK — which covers `null`
+ * (what `useColorScheme` returns before the system value arrives) and
+ * `'unspecified'` (what it returns on a platform that has no preference). Dark is
+ * the mock's default, so an unresolved scheme must not flash the light theme.
+ *
+ * The parameter is typed structurally rather than as RN's `ColorSchemeName` to keep
+ * this module free of React Native imports — it is pure data, and pure data is
+ * testable without a renderer.
+ */
+export function paletteFor(
+  scheme: 'light' | 'dark' | 'unspecified' | null | undefined,
+): Palette {
   return scheme === 'light' ? lightPalette : darkPalette;
 }

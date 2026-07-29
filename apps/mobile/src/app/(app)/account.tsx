@@ -136,7 +136,7 @@ function DeleteAccount({ session }: { session: Session }) {
   );
 }
 
-export default function HomeScreen() {
+export default function AccountScreen() {
   const auth = useAuth();
 
   // The (app) layout guard guarantees a session by the time this renders;

@@ -49,12 +49,14 @@ describe('paletteFor', () => {
     expect(paletteFor('light')).toBe(lightPalette);
   });
 
-  it('defaults to dark for dark, null, and undefined', () => {
-    // RN's useColorScheme returns null before the system value resolves. Dark is the
-    // mock's default, so an unresolved scheme must not flash the light theme.
+  it('defaults to dark for dark, null, undefined, and unspecified', () => {
+    // useColorScheme returns null before the system value resolves and
+    // 'unspecified' where the platform has no preference. Dark is the mock's
+    // default, so neither may flash the light theme.
     expect(paletteFor('dark')).toBe(darkPalette);
     expect(paletteFor(null)).toBe(darkPalette);
     expect(paletteFor(undefined)).toBe(darkPalette);
+    expect(paletteFor('unspecified')).toBe(darkPalette);
   });
 });
 
