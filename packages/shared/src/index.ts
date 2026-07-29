@@ -30,6 +30,16 @@ export {
   type TranscriptInputOrigin,
 } from "./live.js";
 export {
+  meetingListItemSchema,
+  meetingListResponseSchema,
+  meetingTranscriptResponseSchema,
+  meetingTranscriptTurnSchema,
+  type MeetingListItem,
+  type MeetingListResponse,
+  type MeetingTranscriptResponse,
+  type MeetingTranscriptTurn,
+} from "./meetings.js";
+export {
   meResponseSchema,
   roleSchema,
   type MeResponse,

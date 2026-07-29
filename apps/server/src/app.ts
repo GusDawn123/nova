@@ -18,6 +18,7 @@ import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createLiveNotesStore } from "./db/live-notes.js";
+import { createMeetingsReader } from "./db/meetings.js";
 import { createNotesSource } from "./db/notes-source.js";
 import {
   createFollowUpWriter,
@@ -47,6 +48,7 @@ import {
   llmConfigSchema,
   type LlmProviderEnv,
 } from "./modules/llm/index.js";
+import { createMeetingsRoutes } from "./modules/meetings/index.js";
 import {
   type KillSwitch,
   type MeteringService,
@@ -161,6 +163,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // when the notes DB seam is configured, so a keyless/DB-less boot never mounts
   // broken routes (it just doesn't expose them — /health still serves).
   maybeRegisterNotesRoutes(app, metering, quota, killSwitch);
+
+  // Meetings read surface (list + transcript). Gated on the DB ALONE — unlike the
+  // notes routes these call no provider, so they mount on a keyless boot too.
+  maybeRegisterMeetingsRoutes(app);
 
   // RevenueCat webhook (adr-0007 §7): server-to-server plan sync, registered
   // ONLY when REVENUECAT_WEBHOOK_TOKEN (+ the DB) is configured.
@@ -404,6 +410,26 @@ function maybeStartNotesWorker(
  * `AllProvidersFailedError`, mapped by the route). Request-scoped, so — unlike the
  * background worker — it is NOT gated on NODE_ENV.
  */
+/**
+ * Meetings read surface (Phase 8.5, `docs/DESIGN/notes-ui.md` §6): the list the
+ * Meetings screen renders and the turns its Transcript tab lazily loads.
+ *
+ * Gated on Supabase ALONE. These routes call no llm provider and touch no metered
+ * vendor path — they are pure reads of the caller's own rows — so unlike
+ * {@link maybeRegisterNotesRoutes} they mount on a fully keyless boot. A DB-less
+ * boot still omits them rather than mounting routes that would 500 on first use.
+ */
+function maybeRegisterMeetingsRoutes(app: FastifyInstance): void {
+  if (!isSupabaseConfigured(process.env)) return;
+
+  void app.register(
+    createMeetingsRoutes({
+      reader: createMeetingsReader(),
+      logger: app.log,
+    }),
+  );
+}
+
 function maybeRegisterNotesRoutes(
   app: FastifyInstance,
   metering: MeteringService | undefined,
