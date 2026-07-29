@@ -35,9 +35,12 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.22.0",
     "eslint-config-expo": "^57.0.0",
+    "jsdom": "^25.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {

@@ -407,8 +407,20 @@ The mock shows only happy paths. Required additions, styled to match:
 
 ## 9. Testing
 
-`apps/mobile` has **no test infrastructure today**. This PR adds vitest + React
-Native Testing Library, wired into the root `npm run test`.
+`apps/mobile` had **no test infrastructure at all**. This PR wires it into the root
+`npm run test`: jsdom, plus `@testing-library/react` rendering through
+**`react-native-web`** — the same path Expo Web already builds, so it is a target the
+app genuinely ships to rather than a shim invented for tests.
+
+Not `@testing-library/react-native`: that is Jest-shaped and fights this repo's
+vitest setup for no gain at this layer, since the assertions worth making are about
+behaviour rather than the native view tree.
+
+Be clear about what this proves. It covers component structure, props, state, and
+the pure logic underneath. It does **not** cover native layout, native gestures, or
+how iOS renders a blur — the mock's glass is verified on the simulator by eye, and
+nowhere else. Native-only modules are mocked per-file, where `vi.mock`'s hoisting
+applies.
 
 **Unit (pure, no renderer):**
 - `applyNotesUpdate` — accepts rev+1, **drops rev ≤ last**, drops out-of-order
