@@ -3,6 +3,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -13,7 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { paletteFor } from '@/design/tokens';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
+import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
 import { TranscriptList } from '@/features/live-call/transcript-list';
 import { useLiveSession } from '@/hooks/use-live-session';
 
@@ -34,13 +37,25 @@ import { useLiveSession } from '@/hooks/use-live-session';
 export default function LiveScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-  const live = useLiveSession();
+  const palette = paletteFor(scheme);
+  // The capture strip is TABBED (§5.1): live notes need a home during the call,
+  // and the design prototype's card is transcript-only.
+  const [captureTab, setCaptureTab] = useState<'transcript' | 'notes'>(
+    'transcript',
+  );
+  const live = useLiveSession({ notesPanelVisible: captureTab === 'notes' });
   const [draft, setDraft] = useState('');
 
   const send = (): void => {
     if (draft.trim() === '') return;
     live.sendInput(draft);
     setDraft('');
+  };
+
+  const showNotes = (): void => {
+    setCaptureTab('notes');
+    // Revealing the panel is what clears the dot — not the update that set it.
+    live.markNotesSeen();
   };
 
   return (
@@ -56,9 +71,50 @@ export default function LiveScreen() {
             </ThemedText>
           </View>
 
-          {/* Compact transcript strip — still visible, still scrollable. */}
+          {/* Tabbed capture strip (§5.1): Transcript | Live notes. Both panels
+              stay mounted so the hidden one keeps receiving updates — the unread
+              dot is meaningless if the tab has to be open to hear anything. */}
+          <View style={styles.captureTabs}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setCaptureTab('transcript');
+              }}
+            >
+              <ThemedText
+                type={captureTab === 'transcript' ? 'smallBold' : 'small'}
+                themeColor={
+                  captureTab === 'transcript' ? 'text' : 'textSecondary'
+                }
+              >
+                Transcript
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              onPress={showNotes}
+              style={styles.notesTab}
+            >
+              <ThemedText
+                type={captureTab === 'notes' ? 'smallBold' : 'small'}
+                themeColor={captureTab === 'notes' ? 'text' : 'textSecondary'}
+              >
+                Live notes
+              </ThemedText>
+              {live.liveNotes.hasUnseen ? (
+                <View style={[styles.unreadDot, { backgroundColor: palette.hot }]} />
+              ) : null}
+            </Pressable>
+          </View>
+
           <ThemedView type="backgroundElement" style={styles.transcriptStrip}>
-            <TranscriptList transcript={live.transcript} />
+            {captureTab === 'transcript' ? (
+              <TranscriptList transcript={live.transcript} />
+            ) : (
+              <ScrollView>
+                <LiveNotesPanel state={live.liveNotes} palette={palette} />
+              </ScrollView>
+            )}
           </ThemedView>
 
           {/* The copilot history owns the majority of the screen. */}
@@ -135,6 +191,14 @@ export default function LiveScreen() {
 }
 
 const styles = StyleSheet.create({
+  captureTabs: {
+    flexDirection: 'row',
+    gap: Spacing.four,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
+  },
+  notesTab: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  unreadDot: { width: 7, height: 7, borderRadius: 4 },
   container: {
     flex: 1,
   },
