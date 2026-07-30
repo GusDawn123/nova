@@ -6,6 +6,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { liveSocketUrl } from '@/constants/live';
+import {
+  applyNotesUpdate,
+  emptyLiveNotes,
+  markLiveNotesSeen,
+  type LiveNotesState,
+} from '@/features/notes/notes-update';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 
@@ -57,6 +63,11 @@ export interface LiveSessionState {
   readonly suggestions: readonly LiveSuggestion[];
   /** True when the real socket is live and typed input can be sent. */
   readonly canSend: boolean;
+  /**
+   * Live notes for this call, reduced through the rev rule (§5.3). `hasUnseen`
+   * drives the unread dot on the capture card's hidden tab (§5.1).
+   */
+  readonly liveNotes: LiveNotesState;
 }
 
 export interface UseLiveSession extends LiveSessionState {
@@ -66,15 +77,35 @@ export interface UseLiveSession extends LiveSessionState {
   sendInput: (text: string) => void;
   /** End the session (closes the socket). */
   stop: () => void;
+  /** Clear the unread dot — the live-notes panel just became visible. */
+  markNotesSeen: () => void;
 }
 
-export function useLiveSession(): UseLiveSession {
+export interface UseLiveSessionOptions {
+  /**
+   * Whether the live-notes panel is on screen right now. Read at APPLY time from a
+   * ref, not closed over: an update that lands while the user is reading the
+   * transcript tab is exactly what the unread dot exists for, and a stale closure
+   * would mark it seen anyway.
+   */
+  readonly notesPanelVisible?: boolean;
+}
+
+export function useLiveSession(
+  options: UseLiveSessionOptions = {},
+): UseLiveSession {
   const auth = useAuth();
 
   const [status, setStatus] = useState<LiveStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<readonly LiveTranscriptTurn[]>([]);
   const [suggestions, setSuggestions] = useState<readonly LiveSuggestion[]>([]);
+  const [liveNotes, setLiveNotes] = useState<LiveNotesState>(emptyLiveNotes);
+
+  const notesVisibleRef = useRef(options.notesPanelVisible ?? false);
+  useEffect(() => {
+    notesVisibleRef.current = options.notesPanelVisible ?? false;
+  }, [options.notesPanelVisible]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const turnSeq = useRef(0);
@@ -169,6 +200,18 @@ export function useLiveSession(): UseLiveSession {
             prev.filter((s) => s.id !== event.suggestion_id),
           );
           return;
+        case 'notes.update':
+          // The rev rule lives in ONE place (§5.3) and is already proven; this is
+          // only the routing. A dropped update returns the same object reference,
+          // so a re-emit across a reconnect costs no render.
+          setLiveNotes((prev) =>
+            applyNotesUpdate(
+              prev,
+              { notes: event.notes, rev: event.rev },
+              notesVisibleRef.current,
+            ),
+          );
+          return;
         case 'error':
           // Surface typed server errors (quota/paywall SCREENS ride Phase 8).
           setErrorMessage(`${event.code}: ${event.message}`);
@@ -189,7 +232,15 @@ export function useLiveSession(): UseLiveSession {
     setErrorMessage(null);
     setTranscript([]);
     setSuggestions([]);
+    // A new call starts with no notes and no unread dot. Carrying the previous
+    // call's rev forward would silently drop the next call's early updates, since
+    // revs are per-meeting and restart at 0.
+    setLiveNotes(emptyLiveNotes);
   }, [cancelFrame]);
+
+  const markNotesSeen = useCallback((): void => {
+    setLiveNotes((prev) => markLiveNotesSeen(prev));
+  }, []);
 
   const stop = useCallback((): void => {
     const socket = socketRef.current;
@@ -348,8 +399,10 @@ export function useLiveSession(): UseLiveSession {
     suggestions,
     // 'live' is only ever set by session.ready on the real socket.
     canSend: status === 'live',
+    liveNotes,
     start,
     sendInput,
     stop,
+    markNotesSeen,
   };
 }
