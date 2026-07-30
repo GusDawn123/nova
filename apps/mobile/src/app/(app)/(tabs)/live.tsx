@@ -9,11 +9,15 @@ import {
   View,
   useColorScheme,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { tabBarClearance } from '@/design/tab-bar-metrics';
 import { paletteFor } from '@/design/tokens';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
 import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
@@ -38,6 +42,7 @@ export default function LiveScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
   const palette = paletteFor(scheme);
+  const insets = useSafeAreaInsets();
   // The capture strip is TABBED (§5.1): live notes need a home during the call,
   // and the design prototype's card is transcript-only.
   const [captureTab, setCaptureTab] = useState<'transcript' | 'notes'>(
@@ -60,7 +65,15 @@ export default function LiveScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          // The tab bar floats (position: absolute) and reserves no layout space,
+          // so this screen has to leave room or the action row hides under it.
+          { paddingBottom: tabBarClearance(insets.bottom) },
+        ]}
+        edges={['top']}
+      >
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
