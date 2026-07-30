@@ -15,4 +15,18 @@
  */
 if (typeof document !== 'undefined') {
   await import('@testing-library/jest-dom/vitest');
+
+  // Unmount between tests. Testing Library's auto-cleanup only registers itself
+  // when the runner exposes afterEach as a global, and this repo runs vitest with
+  // globals OFF (every suite imports describe/it/expect explicitly) — so without
+  // this, renders ACCUMULATE in one document across a file's tests.
+  //
+  // That failure is worth naming because it lies in both directions: a query can
+  // throw "found multiple elements" for a component rendered once per test, and a
+  // test can PASS off a node an earlier test left behind.
+  const [{ cleanup }, { afterEach }] = await Promise.all([
+    import('@testing-library/react'),
+    import('vitest'),
+  ]);
+  afterEach(cleanup);
 }
