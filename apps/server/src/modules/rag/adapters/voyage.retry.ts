@@ -126,7 +126,10 @@ async function voyagePostOnce(
 
   if (res.status === 429) {
     // Retryable ONLY for background callers; the wrapper decides (adr-0005 §8).
-    return { kind: "rate_limited", retryAfterMs: parseRetryAfterMs(res.headers) };
+    return {
+      kind: "rate_limited",
+      retryAfterMs: parseRetryAfterMs(res.headers),
+    };
   }
   if (!res.ok) {
     // Status only — the response body can echo the input text; never surface it.
@@ -176,7 +179,12 @@ export async function voyagePost(
     }
 
     const waitMs = outcome.retryAfterMs ?? backoffMs(attempt);
-    retry.logBackoff({ vendor: "voyage", model: retry.model, attempt, wait_ms: waitMs });
+    retry.logBackoff({
+      vendor: "voyage",
+      model: retry.model,
+      attempt,
+      wait_ms: waitMs,
+    });
     await sleep(waitMs);
   }
 }

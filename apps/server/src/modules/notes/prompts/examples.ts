@@ -39,7 +39,12 @@ const INTERVIEW_EXAMPLE = {
   tldr: "Screened a backend candidate on systems design.",
   overview:
     "Discussed the candidate's experience with distributed queues and asked a design question. Strong on fundamentals, thin on observability.",
-  decisions: [{ text: "Advance to the onsite round", quote: "let's move them to the onsite" }],
+  decisions: [
+    {
+      text: "Advance to the onsite round",
+      quote: "let's move them to the onsite",
+    },
+  ],
   actionItems: [
     {
       text: "Schedule the onsite",

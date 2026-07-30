@@ -1,5 +1,5 @@
-import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
 import { approxTokens, promptConfig, type PromptConfig } from "./config.js";
+import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
 import {
   promptContextSchema,
   type AssembledPrompt,
@@ -125,7 +125,10 @@ export function assemble(
     sections.push(["RELEVANT CONTEXT FROM MEMORY", rendered].join("\n"));
   }
 
-  const window = windowTranscript(ctx.transcript, config.transcriptBudgetTokens);
+  const window = windowTranscript(
+    ctx.transcript,
+    config.transcriptBudgetTokens,
+  );
   const transcriptText = window.map(renderTurn).join("\n");
   // Transcript label is always present (even when empty) so the model always
   // sees where the current moment is.

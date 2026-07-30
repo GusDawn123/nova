@@ -2,8 +2,8 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { serverLiveEventSchema, type ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it, vi } from "vitest";
+import { serverLiveEventSchema, type ServerLiveEvent } from "@nova/shared";
 
 import type { SttEmit, SttEngine } from "../stt/ports.js";
 

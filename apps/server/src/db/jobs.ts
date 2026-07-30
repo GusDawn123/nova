@@ -1,5 +1,11 @@
-import { Pool } from "pg";
+import type { Pool } from "pg";
 import { z } from "zod";
+
+import {
+  createResilientPool,
+  PG_IDLE_TIMEOUT_MS,
+  PG_POOL_MAX,
+} from "./pg-pool.js";
 
 /**
  * `NotesJobStore` — the durable notes-generation queue over a direct `pg` Pool
@@ -24,8 +30,6 @@ import { z } from "zod";
  */
 
 const JOB_KIND = "generate_notes";
-const PG_POOL_MAX = 10;
-const PG_IDLE_TIMEOUT_MS = 30_000;
 
 // ---------------------------------------------------------------------------
 // Public contract (LOCKED — Tasks 4–5 compile against these).
@@ -247,7 +251,11 @@ export function createNotesJobStore(pool: Pool): NotesJobStore {
       );
     },
 
-    async fail(jobId: string, error: string, rawOutput?: string): Promise<void> {
+    async fail(
+      jobId: string,
+      error: string,
+      rawOutput?: string,
+    ): Promise<void> {
       const client = await pool.connect();
       try {
         await client.query("begin");
@@ -321,9 +329,9 @@ export function createNotesJobStore(pool: Pool): NotesJobStore {
       try {
         await client.query("begin");
         const res = await client.query(SWEEP_SQL, [limit]);
-        const rows = z.array(enqueuedRowSchema.omit({ id: true })).parse(
-          res.rows,
-        );
+        const rows = z
+          .array(enqueuedRowSchema.omit({ id: true }))
+          .parse(res.rows);
         for (const row of rows) {
           await client.query(
             "update meetings set notes_status = 'queued' where id = $1 and user_id = $2",
@@ -377,11 +385,14 @@ export function createJobsPool(source: NodeJS.ProcessEnv = process.env): Pool {
       "Notes job store is not configured: set SUPABASE_DB_URL.",
     );
   }
-  return new Pool({
-    connectionString: parsed.data.SUPABASE_DB_URL,
-    max: PG_POOL_MAX,
-    idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
-  });
+  return createResilientPool(
+    {
+      connectionString: parsed.data.SUPABASE_DB_URL,
+      max: PG_POOL_MAX,
+      idleTimeoutMillis: PG_IDLE_TIMEOUT_MS,
+    },
+    "jobs",
+  );
 }
 
 let cachedPool: Pool | undefined;
@@ -394,9 +405,10 @@ export function isJobStoreConfigured(
 }
 
 /** Lazily build + memoise the pool and wrap it as a {@link NotesJobStore}. */
-export function notesJobStoreFromEnv(
-  source: NodeJS.ProcessEnv = process.env,
-): { store: NotesJobStore; pool: Pool } {
+export function notesJobStoreFromEnv(source: NodeJS.ProcessEnv = process.env): {
+  store: NotesJobStore;
+  pool: Pool;
+} {
   cachedPool ??= createJobsPool(source);
   return { store: createNotesJobStore(cachedPool), pool: cachedPool };
 }

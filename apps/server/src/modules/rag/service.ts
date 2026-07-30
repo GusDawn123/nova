@@ -115,7 +115,11 @@ export interface RagServiceDeps {
 /** The public service contract — the only thing routes/sweeper are allowed to touch. */
 export interface RagService {
   ingest(userId: string, source: RagIngestSource): Promise<RagIngestResult>;
-  query(userId: string, text: string, opts: RagQueryOpts): Promise<RagQueryResult>;
+  query(
+    userId: string,
+    text: string,
+    opts: RagQueryOpts,
+  ): Promise<RagQueryResult>;
 }
 
 // ---------------------------------------------------------------------------
@@ -208,7 +212,10 @@ export function createRagService(deps: RagServiceDeps): RagService {
       // clears its stale chunks (idempotent). No embed call on nothing.
       if (drafts.length === 0) {
         await store.replaceSource(userId, ragSource, []);
-        logger?.info({ user_id: userId, kind: source.kind, chunks: 0 }, "rag.ingest");
+        logger?.info(
+          { user_id: userId, kind: source.kind, chunks: 0 },
+          "rag.ingest",
+        );
         return { chunks: 0 };
       }
 

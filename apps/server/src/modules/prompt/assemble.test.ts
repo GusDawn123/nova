@@ -39,12 +39,19 @@ describe("modules/prompt [prompt-assemble] dynamic suffix", () => {
   });
 
   it("[prompt-assemble] windows the transcript to the token budget, keeping the newest", () => {
-    const turns: PromptTranscriptTurn[] = Array.from({ length: 200 }, (_, i) => ({
-      speaker: i % 2 === 0 ? "me" : "them",
-      text: `turn number ${String(i)} with some filler words to add length here`,
-    }));
+    const turns: PromptTranscriptTurn[] = Array.from(
+      { length: 200 },
+      (_, i) => ({
+        speaker: i % 2 === 0 ? "me" : "them",
+        text: `turn number ${String(i)} with some filler words to add length here`,
+      }),
+    );
     const config = promptConfigSchema.parse({ transcriptBudgetTokens: 60 });
-    const { dynamicSuffix } = assemble("general", { transcript: turns }, config);
+    const { dynamicSuffix } = assemble(
+      "general",
+      { transcript: turns },
+      config,
+    );
 
     // The newest turn survives; an old one is dropped.
     expect(dynamicSuffix).toContain("turn number 199");

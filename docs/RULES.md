@@ -110,6 +110,19 @@ incrementally instead of big-banging.
   and a failure blocks everything.
 - `npm run check` (typecheck + lint + tests + migration shadow-apply) green = mergeable;
   anything less is not "done."
+- **`npm run check` green is necessary, not sufficient.** Every PR also gets a CodeRabbit
+  review (`coderabbit review --agent --base development`, or `/coderabbit:review` in
+  Claude Code). The reviewer runs on the `assertive` profile against `.coderabbit.yaml`,
+  which encodes this document as `path_instructions` — so a finding there is a RULES
+  violation, not an opinion. Critical and Warning findings are fixed or explicitly
+  argued down in the PR before merge; silently ignoring one is not an option.
+- **A suite is never made green by removing coverage.** `it.skip` / `it.only` / `it.todo`
+  are lint errors (`vitest/no-disabled-tests`, `no-focused-tests`, and a `no-restricted-syntax`
+  ban on `.todo` — which discards the test body and still reports green). A test with no
+  assertion is also an error (`vitest/expect-expect`; shared `expect*` helpers count).
+  The sanctioned way to not run a test is a RUNTIME condition — `describe.skipIf(!key)`
+  for the key-gated live smokes and DB integration suites — because it self-skips
+  without a key and runs for real with one.
 
 ## 8. Living documentation (docs-as-code)
 
@@ -134,7 +147,22 @@ industry-standard public patterns and this repo's own specs. Feature-level inspi
 
 Style is enforced by tools, not vibes: **Prettier** (formatting — zero debate) +
 **typescript-eslint `strict-type-checked`** presets, committed configs, run in
-`npm run check` and CI. What tools can't enforce, review does:
+`npm run check` and CI. What tools can't enforce, review does.
+
+**Mechanically enforced** (`eslint.config.mjs` — these fail the build, they are not
+advisory):
+- Vendor SDKs importable ONLY inside `modules/*/adapters/**` (§ports-and-adapters,
+  `no-restricted-imports`). Adding a vendor means adding it to `VENDOR_SDKS` there.
+- No reach-around imports four levels or deeper (`../../../../`). Three levels is
+  allowed because `modules/*/adapters/` legitimately sits that deep; enforcing the
+  stricter no-`../../../` wording below needs workspace path aliases first.
+- Import order, autofixable with `eslint --fix`.
+- Every `eslint-disable` carries a `-- why: …` on the SAME line
+  (`eslint-comments/require-description`), and a disable that stopped being needed
+  fails the build (`no-unused-disable`).
+- `@ts-ignore` and `@ts-nocheck` are banned outright; `@ts-expect-error` needs a
+  ≥10-char reason.
+- The testing anti-cheat rules in §7.
 
 ### TypeScript / server (Node 20+, Fastify)
 - **ES modules everywhere** (`"module": "NodeNext"`); no CommonJS in new code.

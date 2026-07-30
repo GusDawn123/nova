@@ -13,9 +13,27 @@ import { z } from "zod";
  * ladder's last rung: a deterministic, always-valid constant (proven by unit test)
  * so generation can never leave a meeting without notes.
  *
- * VERSIONING: `version: 1` is stamped on every notes object; a future breaking
- * change bumps the literal so a stale reader fails the parse rather than
- * mis-reading fields (same discipline as the live wire protocol).
+ * ── v2 (2026-07-25, live notes — docs/DESIGN/live-notes.md §2) ───────────────
+ * The contract is split in two so the SAME shape serves the streaming preview and
+ * the post-call final, without disturbing the post-call model contract:
+ *
+ *   {@link notesContentSchema}  id-LESS. Exactly the v1 body. This is what the
+ *                               post-call LLM is asked for, so NO post-call prompt
+ *                               changes and the accuracy gates are untouched.
+ *   {@link meetingNotesSchema}  v2, IDENTIFIED. What is stored, read, and sent down
+ *                               the live socket. Every itemized entry carries a
+ *                               server-minted `id` so the mobile client can diff by
+ *                               identity and animate add/update/retract rather than
+ *                               re-rendering the whole object.
+ *
+ * {@link identifyNotes} is the pure bridge between them (ids are minted in CODE at
+ * assembly — never asked of the model, which is hostile input per RULES §1).
+ *
+ * VERSIONING: `version` is stamped on every notes object. v2 is what every writer
+ * emits; {@link storedNotesSchema} is the READ boundary and accepts v1 ∪ v2,
+ * upcasting v1 in place. That is what keeps meetings generated before v2 readable —
+ * a bare literal bump would make every pre-v2 row throw on parse and answer 500 for
+ * the life of the meeting (both `db/notes.ts` and `db/schema.ts` parse this column).
  */
 
 /** The conversation shape the pipeline classifies a call into; selects the prompt + insights arm. */
@@ -23,16 +41,43 @@ export const conversationTypeSchema = z.enum(["sales", "interview", "casual"]);
 export type ConversationType = z.infer<typeof conversationTypeSchema>;
 
 /**
+ * A stable, server-minted item id: a short list prefix plus a 1-based counter
+ * (`d1` decisions, `a1` action items, `q1` open questions, `r1` risks, `ob1`/`bs1`
+ * sales arms, `qa1`/`ar1` interview arms). Deliberately tiny — it round-trips
+ * through the live-fold prompt on every tick, and it is echoed back by the model,
+ * so every byte is paid for repeatedly.
+ */
+export const noteIdSchema = z.string().regex(/^[a-z]{1,2}\d+$/);
+
+/** The id prefix owned by each itemized list. Shared with the live fold's reducer. */
+export const NOTE_ID_PREFIX = {
+  decisions: "d",
+  actionItems: "a",
+  openQuestions: "q",
+  risks: "r",
+  objections: "ob",
+  buyingSignals: "bs",
+  questionsAsked: "qa",
+  answersToRevisit: "ar",
+} as const;
+
+export type NoteListKey = keyof typeof NOTE_ID_PREFIX;
+
+// ---------------------------------------------------------------------------
+// Content shapes — id-less; the post-call LLM contract (v1 body, verbatim)
+// ---------------------------------------------------------------------------
+
+/**
  * A decision reached in the call. `quote` is the verbatim transcript evidence
  * (null when none); `unverified` is set (only ever `true`) when that quote failed
  * substring verification — the item is kept for recall, flagged for observability.
  */
-export const noteDecisionSchema = z.object({
+export const noteDecisionContentSchema = z.object({
   text: z.string().min(1),
   quote: z.string().nullable(),
   unverified: z.literal(true).optional(),
 });
-export type NoteDecision = z.infer<typeof noteDecisionSchema>;
+export type NoteDecisionContent = z.infer<typeof noteDecisionContentSchema>;
 
 /**
  * A committed action item. `owner` comes from diarized labels/named speakers only
@@ -40,7 +85,7 @@ export type NoteDecision = z.infer<typeof noteDecisionSchema>;
  * verbatim source phrase — BOTH null when the call stated no date (the model never
  * invents one). `unverified` flags a failed quote check (kept, not dropped).
  */
-export const noteActionItemSchema = z.object({
+export const noteActionItemContentSchema = z.object({
   text: z.string().min(1),
   owner: z.string().nullable(),
   // ISO calendar date (`YYYY-MM-DD`); null when no date was stated in the call.
@@ -52,14 +97,14 @@ export const noteActionItemSchema = z.object({
   quote: z.string().nullable(),
   unverified: z.literal(true).optional(),
 });
-export type NoteActionItem = z.infer<typeof noteActionItemSchema>;
+export type NoteActionItemContent = z.infer<typeof noteActionItemContentSchema>;
 
 /**
  * The type-specific section — the SHAPE difference between conversation types.
  * Discriminated on `kind` so a consumer's exhaustive switch breaks the build when a
  * new arm is added; `casual` carries no extra section.
  */
-export const typeInsightsSchema = z.discriminatedUnion("kind", [
+export const typeInsightsContentSchema = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("sales"),
     objections: z.array(z.string()),
@@ -72,30 +117,248 @@ export const typeInsightsSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("casual") }),
 ]);
+export type TypeInsightsContent = z.infer<typeof typeInsightsContentSchema>;
+
+/**
+ * The id-less notes body — what the post-call model is asked to produce (the
+ * pipeline's ladder validates against this, then {@link identifyNotes} stamps
+ * `version`/`source` and mints ids). `.strict()` rejects unknown keys so a model
+ * that pads the object fails the parse (RULES §1 — LLM output is hostile input).
+ */
+export const notesContentSchema = z
+  .object({
+    conversationType: conversationTypeSchema,
+    title: z.string().min(1),
+    tldr: z.string().min(1),
+    overview: z.string().min(1),
+    decisions: z.array(noteDecisionContentSchema),
+    actionItems: z.array(noteActionItemContentSchema),
+    openQuestions: z.array(z.string()),
+    risks: z.array(z.string()),
+    typeInsights: typeInsightsContentSchema,
+  })
+  .strict();
+export type NotesContent = z.infer<typeof notesContentSchema>;
+
+// ---------------------------------------------------------------------------
+// Identified shapes — v2; what is stored, read, and sent on the wire
+// ---------------------------------------------------------------------------
+
+/** A decision with its stable id. */
+export const noteDecisionSchema = noteDecisionContentSchema.extend({
+  id: noteIdSchema,
+});
+export type NoteDecision = z.infer<typeof noteDecisionSchema>;
+
+/** An action item with its stable id. */
+export const noteActionItemSchema = noteActionItemContentSchema.extend({
+  id: noteIdSchema,
+});
+export type NoteActionItem = z.infer<typeof noteActionItemSchema>;
+
+/**
+ * The identified form of a plain-string list entry (`openQuestions`, `risks`, and
+ * the insight arms). v1 held these as bare strings; v2 promotes them so EVERY list
+ * animates by identity, not just the two that were already objects.
+ */
+export const noteStringItemSchema = z.object({
+  id: noteIdSchema,
+  text: z.string().min(1),
+});
+export type NoteStringItem = z.infer<typeof noteStringItemSchema>;
+
+/** {@link typeInsightsContentSchema}, with each arm's entries identified. */
+export const typeInsightsSchema = z.discriminatedUnion("kind", [
+  z.object({
+    kind: z.literal("sales"),
+    objections: z.array(noteStringItemSchema),
+    buyingSignals: z.array(noteStringItemSchema),
+  }),
+  z.object({
+    kind: z.literal("interview"),
+    questionsAsked: z.array(noteStringItemSchema),
+    answersToRevisit: z.array(noteStringItemSchema),
+  }),
+  z.object({ kind: z.literal("casual") }),
+]);
 export type TypeInsights = z.infer<typeof typeInsightsSchema>;
 
 /**
- * The full notes object stored on a meeting. `.strict()` rejects unknown top-level
- * keys so a model that pads the object with extra fields fails the parse (RULES §1
- * — LLM output is hostile input; unmodelled keys are a smell, not silently kept).
- * `source` lets the UI key a retry affordance off `'fallback'`.
+ * Where a notes object came from. `generated`/`fallback` are the post-call
+ * pipeline's two outcomes (the UI keys a retry affordance off `fallback`);
+ * `live` marks the STREAMING PREVIEW written by the live-notes fold — accrued
+ * mid-call, not quote-verified against the full transcript, and superseded by the
+ * authoritative post-call object at call end.
+ */
+export const notesSourceSchema = z.enum(["generated", "fallback", "live"]);
+export type NotesSource = z.infer<typeof notesSourceSchema>;
+
+/**
+ * The full notes object stored on a meeting (v2). `.strict()` rejects unknown
+ * top-level keys so a model that pads the object with extra fields fails the parse
+ * (RULES §1 — LLM output is hostile input; unmodelled keys are a smell, not
+ * silently kept).
  */
 export const meetingNotesSchema = z
   .object({
-    version: z.literal(1),
+    version: z.literal(2),
     conversationType: conversationTypeSchema,
     title: z.string().min(1),
     tldr: z.string().min(1),
     overview: z.string().min(1),
     decisions: z.array(noteDecisionSchema),
     actionItems: z.array(noteActionItemSchema),
-    openQuestions: z.array(z.string()),
-    risks: z.array(z.string()),
+    openQuestions: z.array(noteStringItemSchema),
+    risks: z.array(noteStringItemSchema),
     typeInsights: typeInsightsSchema,
-    source: z.enum(["generated", "fallback"]),
+    source: notesSourceSchema,
   })
   .strict();
 export type MeetingNotes = z.infer<typeof meetingNotesSchema>;
+
+// ---------------------------------------------------------------------------
+// content → identified
+// ---------------------------------------------------------------------------
+
+/** `<prefix><1-based index>` — the deterministic mint used at every assembly point. */
+function mintIds<T, R>(
+  items: readonly T[],
+  list: NoteListKey,
+  build: (item: T, id: string) => R,
+): R[] {
+  return items.map((item, i) =>
+    build(item, `${NOTE_ID_PREFIX[list]}${String(i + 1)}`),
+  );
+}
+
+/** Promote a plain-string list to identified items under its own prefix. */
+function identifyStrings(
+  items: readonly string[],
+  list: NoteListKey,
+): NoteStringItem[] {
+  return mintIds(items, list, (text, id) => ({ id, text }));
+}
+
+/** Identify whichever insights arm is present, leaving `casual` alone (no lists). */
+function identifyInsights(insights: TypeInsightsContent): TypeInsights {
+  switch (insights.kind) {
+    case "sales":
+      return {
+        kind: "sales",
+        objections: identifyStrings(insights.objections, "objections"),
+        buyingSignals: identifyStrings(insights.buyingSignals, "buyingSignals"),
+      };
+    case "interview":
+      return {
+        kind: "interview",
+        questionsAsked: identifyStrings(
+          insights.questionsAsked,
+          "questionsAsked",
+        ),
+        answersToRevisit: identifyStrings(
+          insights.answersToRevisit,
+          "answersToRevisit",
+        ),
+      };
+    case "casual":
+      return { kind: "casual" };
+  }
+}
+
+/**
+ * The pure content → v2 bridge: mint an id for every itemized entry and stamp
+ * `version`/`source`. Deterministic (ids are positional), so the same content
+ * always yields the same object — which is what makes it safe to call on the read
+ * path for stored v1 rows as well as at post-call assembly.
+ *
+ * Ids are minted HERE, in code, and never requested from the model: the post-call
+ * prompt contract is unchanged by v2, and a hostile/sloppy model can never choose
+ * an item's identity.
+ */
+export function identifyNotes(
+  content: NotesContent,
+  source: NotesSource,
+): MeetingNotes {
+  return {
+    version: 2,
+    conversationType: content.conversationType,
+    title: content.title,
+    tldr: content.tldr,
+    overview: content.overview,
+    decisions: mintIds(content.decisions, "decisions", (d, id) => ({
+      ...d,
+      id,
+    })),
+    actionItems: mintIds(content.actionItems, "actionItems", (a, id) => ({
+      ...a,
+      id,
+    })),
+    openQuestions: identifyStrings(content.openQuestions, "openQuestions"),
+    risks: identifyStrings(content.risks, "risks"),
+    typeInsights: identifyInsights(content.typeInsights),
+    source,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The v1 read boundary
+// ---------------------------------------------------------------------------
+
+/**
+ * The v1 notes shape, FROZEN. Rows written before 2026-07-25 hold exactly this.
+ * Never extend it — it exists only so {@link storedNotesSchema} can recognise an
+ * old row and upcast it. New fields go on {@link meetingNotesSchema}.
+ */
+export const meetingNotesV1Schema = z
+  .object({
+    version: z.literal(1),
+    conversationType: conversationTypeSchema,
+    title: z.string().min(1),
+    tldr: z.string().min(1),
+    overview: z.string().min(1),
+    decisions: z.array(noteDecisionContentSchema),
+    actionItems: z.array(noteActionItemContentSchema),
+    openQuestions: z.array(z.string()),
+    risks: z.array(z.string()),
+    typeInsights: typeInsightsContentSchema,
+    source: z.enum(["generated", "fallback"]),
+  })
+  .strict();
+export type MeetingNotesV1 = z.infer<typeof meetingNotesV1Schema>;
+
+/** Upcast a stored v1 object to v2, minting positional ids. Pure + deterministic. */
+export function upcastNotesV1(v1: MeetingNotesV1): MeetingNotes {
+  return identifyNotes(
+    {
+      conversationType: v1.conversationType,
+      title: v1.title,
+      tldr: v1.tldr,
+      overview: v1.overview,
+      decisions: v1.decisions,
+      actionItems: v1.actionItems,
+      openQuestions: v1.openQuestions,
+      risks: v1.risks,
+      typeInsights: v1.typeInsights,
+    },
+    v1.source,
+  );
+}
+
+/**
+ * The READ boundary for `meetings.notes` — accepts either stored version and always
+ * yields v2, so every consumer downstream sees exactly one shape. Used by
+ * `db/notes.ts` (the REST read model) and `db/schema.ts` (the meetings row).
+ *
+ * This union is what keeps pre-v2 meetings readable. Writers never use it: they
+ * emit v2 via {@link identifyNotes}. Rows upgrade naturally on the next regenerate;
+ * no backfill migration is required (the column type does not change — only the
+ * jsonb payload's app-level version does).
+ */
+export const storedNotesSchema = z
+  .union([meetingNotesV1Schema, meetingNotesSchema])
+  .transform((notes): MeetingNotes =>
+    notes.version === 1 ? upcastNotesV1(notes) : notes,
+  );
 
 /** Tone of a generated follow-up draft. */
 export const followUpToneSchema = z.enum(["professional", "warm", "brief"]);
@@ -144,6 +407,20 @@ export const notesReadResponseSchema = z.object({
   notes: meetingNotesSchema.nullable(),
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
+  /**
+   * The live running-notes PREVIEW accrued during the call (Phase 8,
+   * `docs/DESIGN/live-notes.md` §7) — `source: "live"`, null until the notes
+   * conductor has folded at least once, and null forever for calls that predate
+   * the feature or run without the entitlement.
+   *
+   * The tab prefers `notes` when non-null and falls back to `live_notes`; the
+   * post-call pipeline stays authoritative. `notes_status` is UNCHANGED by this
+   * field — it still means what it always meant, and the retry affordance still
+   * keys off it.
+   */
+  live_notes: meetingNotesSchema.nullable(),
+  /** `live_notes`' monotonic revision; null exactly when `live_notes` is null. */
+  live_notes_rev: z.number().int().nonnegative().nullable(),
 });
 export type NotesReadResponse = z.infer<typeof notesReadResponseSchema>;
 
@@ -169,17 +446,18 @@ export const FALLBACK_TLDR =
  */
 export function buildFallbackNotes(title: string): MeetingNotes {
   const safeTitle = title.trim() === "" ? "Untitled call" : title;
-  return {
-    version: 1,
-    conversationType: "casual",
-    title: safeTitle,
-    tldr: FALLBACK_TLDR,
-    overview: FALLBACK_TLDR,
-    decisions: [],
-    actionItems: [],
-    openQuestions: [],
-    risks: [],
-    typeInsights: { kind: "casual" },
-    source: "fallback",
-  };
+  return identifyNotes(
+    {
+      conversationType: "casual",
+      title: safeTitle,
+      tldr: FALLBACK_TLDR,
+      overview: FALLBACK_TLDR,
+      decisions: [],
+      actionItems: [],
+      openQuestions: [],
+      risks: [],
+      typeInsights: { kind: "casual" },
+    },
+    "fallback",
+  );
 }

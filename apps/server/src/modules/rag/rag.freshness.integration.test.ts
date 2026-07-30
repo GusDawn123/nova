@@ -59,8 +59,11 @@ describe.skipIf(!hasStack)("rag freshness (local stack)", () => {
   let emptyMeeting: string;
   const userIds: string[] = [];
 
-  const logs: { level: string; fields: Record<string, unknown>; msg: string }[] =
-    [];
+  const logs: {
+    level: string;
+    fields: Record<string, unknown>;
+    msg: string;
+  }[] = [];
   const logger: IndexerLogger = {
     info: (fields, msg) => logs.push({ level: "info", fields, msg }),
     error: (fields, msg) => {

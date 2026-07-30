@@ -1,9 +1,9 @@
 import type { AddressInfo } from "node:net";
 
-import type { ServerLiveEvent } from "@nova/shared";
 import type { FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WebSocket } from "ws";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { buildApp } from "../../app.js";
 import { authenticateToken } from "../../plugins/auth.js";

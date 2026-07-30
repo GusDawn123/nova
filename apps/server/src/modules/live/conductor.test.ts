@@ -97,6 +97,34 @@ describe("modules/live [conductor] quiet + fire", () => {
     expect(done && "text" in done ? done.text : "").toBe("Answer here");
   });
 
+  it("[conductor] discards as no_response when a provider emits no token", async () => {
+    // Pins the contract that makes the conductor's empty-completion branch
+    // unreachable. A provider CAN complete having emitted nothing (a refusal, a
+    // safety stop), but the router classifies "stream ended without ever producing
+    // a token" as a transient failure (router.ts) and never surfaces it as a clean
+    // stream — so the conductor takes its catch path and clears the pane with
+    // `no_response` rather than sending `suggestion.done` with empty text.
+    //
+    // This is regression cover, not a bug fix: a CodeRabbit finding claimed the
+    // success path emitted an empty `suggestion.done`. It cannot, because of the
+    // router guarantee above. If that guarantee is ever relaxed, this test fails
+    // and the conductor genuinely will need its own empty-completion branch.
+    const c = makeConductor({
+      router: router({ firstTokenDelayMs: 20, tokens: [] }),
+    });
+    c.onFinal("What is your pricing model exactly?", "them");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const done = events.find((e) => e.type === "suggestion.done");
+    expect(done).toBeUndefined();
+
+    const discard = events.find((e) => e.type === "suggestion.discard");
+    expect(discard).toBeDefined();
+    expect(discard && "reason" in discard ? discard.reason : "").toBe(
+      "no_response",
+    );
+  });
+
   it("[conductor] coalesces many tokens into fewer deltas (~50ms batches)", async () => {
     const c = makeConductor({
       router: router({
@@ -199,5 +227,39 @@ describe("modules/live [conductor] supersede + deadline + meter", () => {
     c.dispose();
     await vi.advanceTimersByTimeAsync(1000);
     expect(types()).not.toContain("suggestion.done");
+  });
+});
+
+describe("modules/live [conductor] onDirectQuestion (Phase 8 typed-input fix)", () => {
+  it("[conductor] answers text the trigger gate would veto", async () => {
+    const c = makeConductor();
+    // A bare statement from the user: `evaluateTrigger` returns no_trigger, so
+    // the gated path stays silent. But this was typed straight AT the copilot —
+    // you asked it something, so it answers (the 2026-07-23 prompt-freedom
+    // decision: "the AI always answers").
+    c.onDirectQuestion("the customer seems hesitant");
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(types()).toContain("suggestion.start");
+    expect(events.find((e) => e.type === "suggestion.done")).toMatchObject({
+      text: "Answer here",
+    });
+  });
+
+  it("[conductor] stays silent on the SAME text through the gated path", async () => {
+    const c = makeConductor();
+    c.onFinal("the customer seems hesitant", "me");
+    await vi.advanceTimersByTimeAsync(500);
+    // Proves the previous test is exercising the bypass, not a lenient gate.
+    expect(events).toHaveLength(0);
+  });
+
+  it("[conductor] never emits a transcript event for a direct question", async () => {
+    const c = makeConductor();
+    c.onDirectQuestion("what did we quote Acme?");
+    await vi.advanceTimersByTimeAsync(500);
+    // The conductor speaks only in suggestion.* — nothing it emits can be
+    // mistaken for an utterance by the other party.
+    expect(types().every((t) => !t.startsWith("transcript."))).toBe(true);
   });
 });

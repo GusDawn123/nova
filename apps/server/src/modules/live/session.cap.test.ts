@@ -1,5 +1,5 @@
-import { serverLiveEventSchema, type ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it } from "vitest";
+import { serverLiveEventSchema, type ServerLiveEvent } from "@nova/shared";
 
 import type { SttEngine } from "../stt/ports.js";
 

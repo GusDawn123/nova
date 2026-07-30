@@ -162,10 +162,35 @@ npm run lint           # eslint . then apps/mobile expo lint
 npm run test           # vitest run (DB integration tests self-skip unless Supabase is up)
 npm run format         # prettier --write .   (format:check to verify only)
 
+# Code review — CodeRabbit (STRICT; see .coderabbit.yaml). Required before every PR.
+coderabbit auth login  # once per machine (browser OAuth; `auth status` to check)
+coderabbit review --agent              # all tracked changes, agent-readable findings
+coderabbit review --agent --uncommitted  # pre-commit pass over staged + tracked edits
+coderabbit review --agent --base development  # what the PR will actually contain
+coderabbit review findings             # re-read the last review without re-running
+#   In Claude Code the plugin exposes /coderabbit:review (same scopes).
+#   NOT an MCP server — CodeRabbit is an MCP *client*; the integration is CLI + plugin.
+#   Free tier is rate-limited (a few reviews/hour), so review the PR-shaped diff
+#   (--base development) rather than burning runs on every edit.
+
 # Local Supabase (real Postgres — never test against anything else)
 npm run db:start       # supabase start  (boots the local stack)
 npm run db:stop        # supabase stop
-npm run db:reset       # supabase db reset  (re-applies migrations from scratch)
+npm run db:migrate     # supabase migration up — FORWARD-applies only the PENDING
+                       #   migrations and KEEPS your data. This is the default way to
+                       #   pick up a new migration, and it mirrors how production
+                       #   works (`db push` diffs against the
+                       #   supabase_migrations.schema_migrations ledger; prod never
+                       #   replays and never resets).
+npm run db:reset       # supabase db reset — DROPS the database, replays all
+                       #   migrations from zero, then runs supabase/seed.sql. This is
+                       #   a TEST of the migrations (what CI does), not a way to apply
+                       #   them. It destroys all local data INCLUDING auth.users, so
+                       #   reach for db:migrate unless you specifically want the
+                       #   from-scratch replay proof.
+                       #   seed.sql recreates the dev account after every reset:
+                       #   dev@nova.test / nova-dev-1234, role 'developer' (a
+                       #   'customer' cannot see the Test Live tab).
 
 # Server workspace (apps/server, Fastify)
 npm run dev   --workspace apps/server   # tsx watch — GET /health => { ok, version }

@@ -105,9 +105,9 @@ describe("MockVendor connect", () => {
       connections: [{ connectDelayMs: 1000 }],
     });
 
-    await expect(
-      vendor.connect(INFO, AbortSignal.abort()),
-    ).rejects.toThrow(/abort/);
+    await expect(vendor.connect(INFO, AbortSignal.abort())).rejects.toThrow(
+      /abort/,
+    );
   });
 });
 

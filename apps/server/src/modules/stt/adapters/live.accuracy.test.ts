@@ -2,9 +2,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { sttConfigSchema } from "../config.js";
 import { createSttEngine } from "../engine.js";
@@ -243,9 +243,14 @@ describe.skipIf(!ASSEMBLYAI_KEY)("assemblyai — live accuracy", () => {
         pcm,
       );
 
-      const overlap = normalizedTokenOverlap(fixture.reference_text, hypothesisText(events));
+      const overlap = normalizedTokenOverlap(
+        fixture.reference_text,
+        hypothesisText(events),
+      );
       const finals = finalsWithSpeaker(events);
-      const speakers = new Set(finals.map((f) => f.speaker).filter((s) => s !== null));
+      const speakers = new Set(
+        finals.map((f) => f.speaker).filter((s) => s !== null),
+      );
       const alignment = boundaryAlignment(finals, fixture);
 
       console.log(
@@ -271,7 +276,9 @@ describe.skipIf(!ASSEMBLYAI_KEY)("assemblyai — live accuracy", () => {
       // issue (free and paid AssemblyAI keys run identical models) and NOT a code
       // defect — the labels are still correct, only their timestamps drift. Boundary
       // precision on REAL human phone audio is validated in Phase 9.
-      expect(alignment.matched).toBeGreaterThanOrEqual(MIN_BOUNDARIES_MATCHED_ASSEMBLYAI);
+      expect(alignment.matched).toBeGreaterThanOrEqual(
+        MIN_BOUNDARIES_MATCHED_ASSEMBLYAI,
+      );
     },
     NETWORK_TIMEOUT_MS,
   );
@@ -285,7 +292,10 @@ describe.skipIf(!ASSEMBLYAI_KEY)("assemblyai — live accuracy", () => {
         [createAssemblyAiVendor({ apiKey })],
         pcm,
       );
-      const overlap = normalizedTokenOverlap(fixture.reference_text, hypothesisText(events));
+      const overlap = normalizedTokenOverlap(
+        fixture.reference_text,
+        hypothesisText(events),
+      );
       console.log(`[assemblyai noisy] overlap=${(overlap * 100).toFixed(1)}%`);
       expect(overlap).toBeGreaterThanOrEqual(0.7);
     },
@@ -310,9 +320,14 @@ describe.skipIf(!DEEPGRAM_KEY)("deepgram — live accuracy", () => {
         pcm,
       );
 
-      const overlap = normalizedTokenOverlap(fixture.reference_text, hypothesisText(events));
+      const overlap = normalizedTokenOverlap(
+        fixture.reference_text,
+        hypothesisText(events),
+      );
       const finals = finalsWithSpeaker(events);
-      const speakers = new Set(finals.map((f) => f.speaker).filter((s) => s !== null));
+      const speakers = new Set(
+        finals.map((f) => f.speaker).filter((s) => s !== null),
+      );
       const alignment = boundaryAlignment(finals, fixture);
 
       console.log(
@@ -327,7 +342,9 @@ describe.skipIf(!DEEPGRAM_KEY)("deepgram — live accuracy", () => {
       expect(overlap).toBeGreaterThanOrEqual(0.8);
       expect(speakers.size).toBeGreaterThanOrEqual(2);
       // Deepgram keeps the STRICT boundary-alignment bar — it hits 7/7 on this audio.
-      expect(alignment.matched).toBeGreaterThanOrEqual(MIN_BOUNDARIES_MATCHED_DEEPGRAM);
+      expect(alignment.matched).toBeGreaterThanOrEqual(
+        MIN_BOUNDARIES_MATCHED_DEEPGRAM,
+      );
     },
     NETWORK_TIMEOUT_MS,
   );
@@ -341,7 +358,10 @@ describe.skipIf(!DEEPGRAM_KEY)("deepgram — live accuracy", () => {
         [createDeepgramVendor({ apiKey })],
         pcm,
       );
-      const overlap = normalizedTokenOverlap(fixture.reference_text, hypothesisText(events));
+      const overlap = normalizedTokenOverlap(
+        fixture.reference_text,
+        hypothesisText(events),
+      );
       console.log(`[deepgram noisy] overlap=${(overlap * 100).toFixed(1)}%`);
       expect(overlap).toBeGreaterThanOrEqual(0.7);
     },
@@ -353,36 +373,42 @@ describe.skipIf(!DEEPGRAM_KEY)("deepgram — live accuracy", () => {
 // Failover smoke — primary dead, fallback real (needs DEEPGRAM_KEY only)
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!DEEPGRAM_KEY)("failover — dead assemblyai → real deepgram", () => {
-  const deepgramKey = DEEPGRAM_KEY ?? "";
+describe.skipIf(!DEEPGRAM_KEY)(
+  "failover — dead assemblyai → real deepgram",
+  () => {
+    const deepgramKey = DEEPGRAM_KEY ?? "";
 
-  it(
-    "still transcribes via deepgram and emits provider_switched",
-    async () => {
-      const fixture = loadFixtureJson();
-      const pcm = readWavPcm("two-speaker-60s.wav");
-      // Primary points at an unroutable WS endpoint → connect fails fast → failover.
-      const deadPrimary = createAssemblyAiVendor({
-        apiKey: ASSEMBLYAI_KEY ?? "dead-key",
-        websocketBaseUrl: "wss://127.0.0.1:1/v3/ws",
-      });
-      const { events } = await streamThroughEngine(
-        [deadPrimary, createDeepgramVendor({ apiKey: deepgramKey })],
-        pcm,
-      );
+    it(
+      "still transcribes via deepgram and emits provider_switched",
+      async () => {
+        const fixture = loadFixtureJson();
+        const pcm = readWavPcm("two-speaker-60s.wav");
+        // Primary points at an unroutable WS endpoint → connect fails fast → failover.
+        const deadPrimary = createAssemblyAiVendor({
+          apiKey: ASSEMBLYAI_KEY ?? "dead-key",
+          websocketBaseUrl: "wss://127.0.0.1:1/v3/ws",
+        });
+        const { events } = await streamThroughEngine(
+          [deadPrimary, createDeepgramVendor({ apiKey: deepgramKey })],
+          pcm,
+        );
 
-      const switched = events.filter((e) => e.type === "provider_switched");
-      const overlap = normalizedTokenOverlap(fixture.reference_text, hypothesisText(events));
-      console.log(
-        `[failover] provider_switched=${String(switched.length)} ` +
-          `to=${switched.map((e) => e.to).join(",")} ` +
-          `overlap=${(overlap * 100).toFixed(1)}%`,
-      );
+        const switched = events.filter((e) => e.type === "provider_switched");
+        const overlap = normalizedTokenOverlap(
+          fixture.reference_text,
+          hypothesisText(events),
+        );
+        console.log(
+          `[failover] provider_switched=${String(switched.length)} ` +
+            `to=${switched.map((e) => e.to).join(",")} ` +
+            `overlap=${(overlap * 100).toFixed(1)}%`,
+        );
 
-      expect(switched.length).toBeGreaterThanOrEqual(1);
-      expect(switched.some((e) => e.to === "deepgram")).toBe(true);
-      expect(overlap).toBeGreaterThanOrEqual(0.7);
-    },
-    NETWORK_TIMEOUT_MS,
-  );
-});
+        expect(switched.length).toBeGreaterThanOrEqual(1);
+        expect(switched.some((e) => e.to === "deepgram")).toBe(true);
+        expect(overlap).toBeGreaterThanOrEqual(0.7);
+      },
+      NETWORK_TIMEOUT_MS,
+    );
+  },
+);

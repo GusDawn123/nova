@@ -14,8 +14,8 @@ import {
 
 import { createNotesJobStore, type NotesJobStore } from "../../db/jobs.js";
 import type { ClaimedJob, JobUsage } from "../../db/jobs.js";
-import { createNotesWorker } from "./worker.js";
 import type { NotesJobHandler, NotesLogger } from "./ports.js";
+import { createNotesWorker } from "./worker.js";
 
 /** Silent logger — the worker logs ids/counts, irrelevant to these assertions. */
 const silent: NotesLogger = { info: () => undefined, error: () => undefined };
@@ -74,7 +74,11 @@ class FakeStore implements NotesJobStore {
     return Promise.resolve();
   }
   fail(jobId: string, error: string, rawOutput?: string): Promise<void> {
-    this.failCalls.push({ jobId, error, ...(rawOutput !== undefined ? { rawOutput } : {}) });
+    this.failCalls.push({
+      jobId,
+      error,
+      ...(rawOutput !== undefined ? { rawOutput } : {}),
+    });
     return Promise.resolve();
   }
   reapExpired(leaseMs: number): Promise<number> {
@@ -183,7 +187,12 @@ describe("createNotesWorker — outcome mapping (tickOnce)", () => {
     let handled = 0;
     const worker = createNotesWorker({
       store,
-      handler: { handle: () => { handled += 1; return Promise.resolve({ outcome: "completed", usage: [] }); } },
+      handler: {
+        handle: () => {
+          handled += 1;
+          return Promise.resolve({ outcome: "completed", usage: [] });
+        },
+      },
       logger: silent,
     });
 
@@ -204,7 +213,12 @@ describe("createNotesWorker — lifecycle & timers", () => {
       store,
       handler: fixedHandler({ outcome: "completed", usage: [] }),
       logger: silent,
-      config: { pollIntervalMs: 1_000, reaperIntervalMs: 5_000, leaseMs: 42, sweepBatchSize: 7 },
+      config: {
+        pollIntervalMs: 1_000,
+        reaperIntervalMs: 5_000,
+        leaseMs: 42,
+        sweepBatchSize: 7,
+      },
     });
 
     worker.start();
@@ -334,7 +348,10 @@ describe.skipIf(!hasStack)("createNotesWorker — recovery (local stack)", () =>
     // A fresh worker picks up the requeued job and completes it — no lost meeting.
     const worker = createNotesWorker({
       store,
-      handler: fixedHandler({ outcome: "completed", usage: [{ provider: "test" }] }),
+      handler: fixedHandler({
+        outcome: "completed",
+        usage: [{ provider: "test" }],
+      }),
       logger: silent,
       workerId: "fresh-worker",
     });

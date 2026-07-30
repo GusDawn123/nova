@@ -157,10 +157,18 @@ export class MockVendor implements SttVendor {
     return this.cursor;
   }
 
+  /**
+   * Returns the CONCRETE {@link MockVendorConnection}, not the bare
+   * {@link SttVendorConnection} port: a test's whole reason to hold a mock
+   * connection is to inspect `framesReceived` / `isClosed`, and widening to the
+   * port erases both. Narrowing a return type still satisfies `implements
+   * SttVendor` (the concrete type is assignable to the port), so this costs the
+   * production contract nothing.
+   */
   async connect(
     opts: SttSessionInfo,
     signal: AbortSignal,
-  ): Promise<SttVendorConnection> {
+  ): Promise<MockVendorConnection> {
     const script = this.scripts[this.cursor];
     this.cursor += 1;
     this.connectCalls.push(opts);
@@ -192,7 +200,10 @@ export class MockVendor implements SttVendor {
 }
 
 /** Resolve when `promise` settles OR `signal` aborts; `true` if the signal won. */
-function raceAbort(promise: Promise<void>, signal: AbortSignal): Promise<boolean> {
+function raceAbort(
+  promise: Promise<void>,
+  signal: AbortSignal,
+): Promise<boolean> {
   const abortedFirst = Symbol("aborted");
   return new Promise<typeof abortedFirst | null>((resolve) => {
     const onAbort = (): void => {

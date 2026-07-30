@@ -2,13 +2,14 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { describe, expect, it } from "vitest";
+import { z } from "zod";
 import {
   followUpDraftSchema,
+  identifyNotes,
   type FollowUpTone,
   type MeetingNotes,
 } from "@nova/shared";
-import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import type {
   ChatMessage,
@@ -42,10 +43,10 @@ function capturingRouter(reply: string | (() => never)): {
     async *stream(req: ChatRequest): AsyncGenerator<LlmStreamEvent> {
       calls.push(req.messages);
       await Promise.resolve(); // async generator: yields on the microtask queue
-      if (typeof reply === "function") {
-        reply(); // throws (transport-failure simulation)
-      }
-      yield { type: "token", text: reply };
+      // `reply()` returns `never` (it throws — the transport-failure
+      // simulation), so this also narrows `reply` to string for the yield.
+      const text = typeof reply === "function" ? reply() : reply;
+      yield { type: "token", text };
       yield { type: "done", usage: { inputTokens: 12, outputTokens: 7 } };
     },
   };
@@ -58,31 +59,33 @@ function promptText(messages: ChatMessage[]): string {
 }
 
 /** Notes SUMMARISED from the sales fixture — worded so no transcript line is verbatim. */
-const DECISION_TEXT = "Recommend the Enterprise plan for SSO and the audit log.";
+const DECISION_TEXT =
+  "Recommend the Enterprise plan for SSO and the audit log.";
 const ACTION_TEXT = "Send a proposal with the forty-seat Enterprise pricing.";
 
-const SALES_NOTES: MeetingNotes = {
-  version: 1,
-  conversationType: "sales",
-  title: "Acme pricing call",
-  tldr: "Reviewed pricing tiers and aligned on the Enterprise plan for security needs.",
-  overview:
-    "The team compared Team, Growth, and Enterprise pricing and concluded Enterprise fit best given the SSO requirement.",
-  decisions: [{ text: DECISION_TEXT, quote: null }],
-  actionItems: [
-    {
-      text: ACTION_TEXT,
-      owner: "Marcus",
-      deadline: "2026-07-24",
-      deadlineRaw: "by Friday",
-      quote: null,
-    },
-  ],
-  openQuestions: ["Confirm the SOC 2 report scope."],
-  risks: ["A full SOC 2 report can take several days via compliance."],
-  typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
-  source: "generated",
-};
+const SALES_NOTES: MeetingNotes = identifyNotes(
+  {
+    conversationType: "sales",
+    title: "Acme pricing call",
+    tldr: "Reviewed pricing tiers and aligned on the Enterprise plan for security needs.",
+    overview:
+      "The team compared Team, Growth, and Enterprise pricing and concluded Enterprise fit best given the SSO requirement.",
+    decisions: [{ text: DECISION_TEXT, quote: null }],
+    actionItems: [
+      {
+        text: ACTION_TEXT,
+        owner: "Marcus",
+        deadline: "2026-07-24",
+        deadlineRaw: "by Friday",
+        quote: null,
+      },
+    ],
+    openQuestions: ["Confirm the SOC 2 report scope."],
+    risks: ["A full SOC 2 report can take several days via compliance."],
+    typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
+  },
+  "generated",
+);
 
 const VALID_REPLY = JSON.stringify({
   subject: "Acme pricing — Enterprise proposal to follow",
@@ -203,7 +206,11 @@ describe("generateFollowUp", () => {
     const run = generateFollowUp({ router, logger: NOOP_LOGGER });
 
     await expect(
-      run({ notes: SALES_NOTES, tone: "brief", meetingTitle: SALES_NOTES.title }),
+      run({
+        notes: SALES_NOTES,
+        tone: "brief",
+        meetingTitle: SALES_NOTES.title,
+      }),
     ).rejects.toBeInstanceOf(LlmError);
   });
 });

@@ -1,11 +1,12 @@
+import { z } from "zod";
 import {
   buildFallbackNotes,
   conversationTypeSchema,
-  meetingNotesSchema,
+  identifyNotes,
+  notesContentSchema,
   type ConversationType,
   type MeetingNotes,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
 import { withMeter, type LlmRouter, type Meter } from "../llm/index.js";
@@ -20,8 +21,11 @@ import type {
   NotesPipeline,
   TranscriptTurn,
 } from "./ports.js";
-import { buildClassifyMessages, buildGenerateMessages } from "./prompts/types.js";
 import { buildNotesRepairMessages } from "./prompts/repair.js";
+import {
+  buildClassifyMessages,
+  buildGenerateMessages,
+} from "./prompts/types.js";
 import { CHARS_PER_TOKEN, estimateTokens } from "./tokens.js";
 import { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
 
@@ -135,9 +139,12 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
     });
     usage.push(...ladder.usage);
 
+    // The ladder validates the model's id-LESS content; `identifyNotes` stamps
+    // version/source and mints the item ids in code (v2 — the model is never asked
+    // for an identity it could hallucinate). docs/DESIGN/live-notes.md §2.
     const generated: MeetingNotes =
       ladder.result.status === "ok"
-        ? { ...ladder.result.value, version: 1, source: "generated" }
+        ? identifyNotes(ladder.result.value, "generated")
         : buildFallbackNotes(meta.title);
 
     const notes = verifyNotes(generated, transcriptText);
@@ -200,8 +207,7 @@ export function createNotesPipeline(deps: NotesPipelineDeps): NotesPipeline {
  * (adr §8 — the arm is pinned by the schema, not just the prose).
  */
 function requestSchemaFor(type: ConversationType) {
-  return meetingNotesSchema
-    .omit({ version: true, source: true })
+  return notesContentSchema
     .extend({ conversationType: z.literal(type) })
     .refine((notes) => notes.typeInsights.kind === type, {
       message: `typeInsights.kind must be "${type}"`,

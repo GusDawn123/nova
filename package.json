@@ -13,21 +13,26 @@
     "apps/*"
   ],
   "scripts": {
-    "typecheck": "tsc -b && npm run typecheck --workspace apps/mobile",
+    "typecheck": "tsc -b && npm run typecheck:tests && npm run typecheck --workspace apps/mobile",
+    "typecheck:tests": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit",
     "lint": "eslint . && npm run lint --workspace apps/mobile",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:start": "supabase start",
+    "db:migrate": "supabase migration up",
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.7.2",
     "@eslint/js": "^9.18.0",
     "@types/node": "^22.10.7",
+    "@vitest/eslint-plugin": "^1.6.24",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-import": "^2.32.0",
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0",

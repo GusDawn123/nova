@@ -1,3 +1,8 @@
+import { pgVectorStoreFromEnv } from "./adapters/pgvector.js";
+import {
+  voyageAdapterFromEnv,
+  type VoyageUsageLog,
+} from "./adapters/voyage.js";
 import { chunker } from "./chunker.js";
 import { ragConfig, type RagConfig } from "./config.js";
 import { isRagError, RagError } from "./ports.js";
@@ -6,11 +11,6 @@ import {
   type RagLogger,
   type RagService,
 } from "./service.js";
-import { pgVectorStoreFromEnv } from "./adapters/pgvector.js";
-import {
-  voyageAdapterFromEnv,
-  type VoyageUsageLog,
-} from "./adapters/voyage.js";
 
 /**
  * Public surface of modules/rag — the ONLY things a route, the completion sweeper,

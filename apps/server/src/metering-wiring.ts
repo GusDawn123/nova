@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 
+import { createLiveNotesStore } from "./db/live-notes.js";
 import { createPlanReader, createPlanWriter } from "./db/plans.js";
 import {
   isUsageEventsConfigured,
@@ -9,6 +10,10 @@ import {
   createLiveConductor,
   type LiveConductorFactory,
 } from "./modules/live/conductor.js";
+import {
+  createLiveNotesConductor,
+  type LiveNotesConductorFactory,
+} from "./modules/live/notes-conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
 import {
   createLlmRouter,
@@ -17,6 +22,7 @@ import {
   type LlmProviderEnv,
 } from "./modules/llm/index.js";
 import {
+  canUseLiveNotes,
   createKillSwitch,
   createMeteringService,
   createQuotaChecker,
@@ -172,11 +178,19 @@ export function maybeCreateLiveConductorFactory(
   const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
   if (providers.length === 0) return undefined;
 
-  const router = createLlmRouter({ providers, config: liveLlmConfig() });
+  // FAIL CLOSED, exactly as `maybeCreateLiveNotesConductorFactory` below does.
+  // why: this used to build the router first and treat metering as optional
+  // (`...(metering ? { meter } : {})`), so a deployment holding vendor keys but no
+  // `usage_events` DB streamed real suggestions — and their Voyage grounding —
+  // that never reached the ledger. That is the unmetered vendor path the hard
+  // prohibition forbids, so the conductor must not exist without its meter.
   const metering = maybeCreateMetering(app);
+  if (!metering) return undefined;
+
+  const router = createLlmRouter({ providers, config: liveLlmConfig() });
   const rag = createRagFromEnv(process.env, {
     logger: app.log,
-    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+    logUsage: voyageMeteringSink(metering, app),
   });
 
   return ({ send, userId, meetingId }) =>
@@ -189,7 +203,60 @@ export function maybeCreateLiveConductorFactory(
       logger: app.log,
       // The per-call meter (adr-0007 §2): attribution travels with the call while
       // the router's breaker/bench state stays process-global.
-      ...(metering ? { meter: metering.meterFor(userId, meetingId) } : {}),
+      meter: metering.meterFor(userId, meetingId),
+    });
+}
+
+/**
+ * Build the running-notes conductor factory (Phase 8, docs/DESIGN/live-notes.md
+ * §8) — the SECOND live LLM path, and the one with a per-tick cadence, so it
+ * carries more enforcement than the copilot does.
+ *
+ * IT IS ITS OWN TOP-LEVEL FUNCTION ON PURPOSE. The metering audit splits these
+ * files into top-level `function` blocks and asserts per block that anything
+ * constructing a router also threads `meterFor`. Building this inside
+ * `maybeCreateLiveConductorFactory` would inherit that function's `meterFor` and
+ * the assertion would pass VACUOUSLY for a path that might not be metered at all.
+ *
+ * Undefined — so the conductor is never constructed and not one token is spent —
+ * unless ALL of: an LLM provider key, the DB (the `live_notes` store AND the plan
+ * reader behind the entitlement), and the metering service. That is the §8
+ * fail-closed posture stated literally rather than checked at runtime.
+ */
+export function maybeCreateLiveNotesConductorFactory(
+  app: FastifyInstance,
+): LiveNotesConductorFactory | undefined {
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
+  if (providers.length === 0) return undefined;
+  if (!isUsageEventsConfigured(process.env)) return undefined;
+
+  const metering = maybeCreateMetering(app);
+  if (!metering) return undefined;
+  const quota = maybeCreateQuotaChecker(app, metering);
+
+  const router = createLlmRouter({ providers, config: liveLlmConfig() });
+  const { pool } = usageEventsDbFromEnv(process.env);
+  const store = createLiveNotesStore(pool);
+  const plans = createPlanReader(pool);
+
+  return ({ send, userId, meetingId }) =>
+    createLiveNotesConductor({
+      send,
+      router,
+      store,
+      userId,
+      meetingId,
+      logger: app.log,
+      // The per-call meter (adr-0007 §2) — threaded into BOTH model calls the
+      // conductor makes (the fold and the one-shot classify).
+      meter: metering.meterFor(userId, meetingId),
+      // Resolved on the first tick, never at session start, then latched.
+      isEntitled: async () => canUseLiveNotes(await plans.getPlan(userId)),
+      // Recording spend is not limiting spend: the per-session fold budget is the
+      // conductor's own ceiling, and this is the per-user one.
+      ...(quota
+        ? { isOverQuota: () => quota.isOverQuota(userId, "llm_tokens") }
+        : {}),
     });
 }
 

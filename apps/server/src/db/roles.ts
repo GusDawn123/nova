@@ -1,6 +1,6 @@
 import type { Pool } from "pg";
-import { type Role } from "@nova/shared";
 import { z } from "zod";
+import { type Role } from "@nova/shared";
 
 /**
  * `RoleReader` over a direct `pg` Pool — the user-scoped `profiles.role` seam

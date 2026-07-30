@@ -8,7 +8,9 @@ import {
 
 describe("modules/live [speculation] jaccard + reconcile", () => {
   it("[speculation] identical texts score 1, disjoint score 0", () => {
-    expect(jaccardSimilarity("what is databricks", "what is databricks")).toBe(1);
+    expect(jaccardSimilarity("what is databricks", "what is databricks")).toBe(
+      1,
+    );
     expect(jaccardSimilarity("alpha beta", "gamma delta")).toBe(0);
     expect(jaccardSimilarity("", "")).toBe(1);
   });

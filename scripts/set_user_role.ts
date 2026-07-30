@@ -18,25 +18,42 @@ import { z } from "zod";
 const roleArgSchema = z.enum(["developer", "admin", "customer"]);
 const uuidSchema = z.string().uuid();
 
+/**
+ * The whole CLI boundary as ONE schema (RULES §1: zod-parse every boundary —
+ * argv is one). A tuple rejects both too few and too many arguments, so arity,
+ * identifier shape and role membership are decided in a single parse rather than
+ * by a hand-rolled truthiness check followed by a partial safeParse.
+ *
+ * The identifier is validated as email-or-uuid up front. Previously any non-empty
+ * string was accepted and a typo only surfaced as "no auth user found" AFTER
+ * opening a pool and querying auth.users.
+ */
+const cliArgsSchema = z.tuple([
+  z.union([z.string().email(), uuidSchema], {
+    errorMap: () => ({ message: "identifier must be an email or a user uuid" }),
+  }),
+  roleArgSchema,
+]);
+
 function fail(message: string): never {
   console.error(`set_user_role: ${message}`);
   process.exit(1);
 }
 
 async function main(): Promise<void> {
-  const [, , identifier, roleRaw] = process.argv;
-  if (!identifier || !roleRaw) {
+  const parsed = cliArgsSchema.safeParse(process.argv.slice(2));
+  if (!parsed.success) {
+    // Lead with the usage line — it is what the operator actually needs — then
+    // the specific complaint, so a wrong role still names the allowed set.
     fail(
-      "usage: npx tsx scripts/set_user_role.ts <email|user-uuid> <developer|admin|customer>",
+      [
+        "usage: npx tsx scripts/set_user_role.ts <email|user-uuid> <developer|admin|customer>",
+        ...parsed.error.issues.map((issue) => `  - ${issue.message}`),
+        `  allowed roles: ${roleArgSchema.options.join(", ")}`,
+      ].join("\n"),
     );
   }
-  const parsedRole = roleArgSchema.safeParse(roleRaw);
-  if (!parsedRole.success) {
-    fail(
-      `unknown role "${roleRaw}" — allowed: ${roleArgSchema.options.join(", ")}`,
-    );
-  }
-  const role = parsedRole.data;
+  const [identifier, role] = parsed.data;
 
   if (!process.env.SUPABASE_DB_URL) {
     try {

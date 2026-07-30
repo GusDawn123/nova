@@ -6,13 +6,10 @@ import { type LlmRouter, type Meter } from "../llm/index.js";
 import { assemble, type PromptTranscriptTurn } from "../prompt/index.js";
 import type { RagService } from "../rag/index.js";
 
-import {
-  conductorConfig,
-  type ConductorConfig,
-} from "./conductor-config.js";
+import { conductorConfig, type ConductorConfig } from "./conductor-config.js";
 import type { LiveLogger } from "./ports.js";
-import { evaluateTrigger, type TriggerDecision } from "./trigger.js";
 import { isConfidentPartial, reconcile } from "./speculation.js";
+import { evaluateTrigger, type TriggerDecision } from "./trigger.js";
 
 /**
  * The live copilot conductor (Phase 7, design: live-pipeline.md §modules/live).
@@ -30,6 +27,15 @@ import { isConfidentPartial, reconcile } from "./speculation.js";
 export interface LiveConductor {
   onPartial(text: string, speaker: string | null): void;
   onFinal(text: string, speaker: string | null): void;
+  /**
+   * A question typed straight AT the copilot (`transcript.input` with
+   * `origin: "copilot_question"`). Bypasses the trigger gate — the gate exists to
+   * decide whether an overheard utterance is worth spending on, and a question
+   * the user deliberately typed to their assistant already answered that. Matches
+   * the 2026-07-23 prompt-freedom decision ("the AI always answers"). The turn is
+   * recorded as the USER's own, never as the other party's.
+   */
+  onDirectQuestion(text: string): void;
   /** Abort any in-flight generation (teardown). No discard — the socket closes. */
   dispose(): void;
 }
@@ -164,7 +170,11 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
     });
     void generate(gen).catch((err: unknown) => {
       logger?.error(
-        { user_id: deps.userId ?? null, meeting_id: deps.meetingId ?? null, err },
+        {
+          user_id: deps.userId ?? null,
+          meeting_id: deps.meetingId ?? null,
+          err,
+        },
         "live.conductor.generate_failed",
       );
     });
@@ -192,7 +202,10 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
         timeout,
       ]);
       if (result === null) return []; // deadline won → proceed ungrounded
-      return result.snippets.map((s) => ({ header: s.header, content: s.content }));
+      return result.snippets.map((s) => ({
+        header: s.header,
+        content: s.content,
+      }));
     } catch (err: unknown) {
       // Grounding is best-effort: a keyless/failed RAG never blocks a suggestion.
       logger?.error(
@@ -210,7 +223,9 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
     const { stablePrefix, dynamicSuffix } = assemble("general", {
       transcript,
       ...(snippets.length > 0 ? { ragSnippets: snippets } : {}),
-      ...(deps.userContext !== undefined ? { userContext: deps.userContext } : {}),
+      ...(deps.userContext !== undefined
+        ? { userContext: deps.userContext }
+        : {}),
     });
 
     // Deadline ladder: abort if the router yields no first token in time.
@@ -294,7 +309,11 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       }
       active = null;
       logger?.error(
-        { user_id: deps.userId ?? null, meeting_id: deps.meetingId ?? null, err },
+        {
+          user_id: deps.userId ?? null,
+          meeting_id: deps.meetingId ?? null,
+          err,
+        },
         "live.conductor.stream_error",
       );
     }
@@ -329,7 +348,8 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
         );
         if (decision === "adopt") {
           // The bet paid off — keep the finished/in-flight answer; do not refire.
-          if (active !== null && active.id === spec.id) active.speculative = false;
+          if (active !== null && active.id === spec.id)
+            active.speculative = false;
           return;
         }
         // Diverged: clear the (possibly finished) speculative card, then refire.
@@ -349,6 +369,24 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       // newest question owns the focal pane (startGeneration discards the old one).
       const trigger = evaluateTrigger(finalText, isUserSpeaker(speaker));
       if (trigger.fire) startGeneration(trigger, finalText, false);
+    },
+
+    onDirectQuestion(text) {
+      if (disposed) return;
+      const asked = text.trim();
+      if (asked === "") return;
+      // The user's OWN turn — never "them" (that mislabel is the whole bug this
+      // channel exists to fix), and it stays in the ephemeral prompt window only.
+      pushTurn(asked, "me");
+      // A direct question supersedes the pane outright, so drop any outstanding
+      // speculation first: its generation is about to be discarded, and leaving
+      // it set would make the next final reconcile against a dead id.
+      speculation = null;
+      startGeneration(
+        { fire: true, kind: "answer", reason: "direct_question" },
+        asked,
+        false,
+      );
     },
 
     dispose() {

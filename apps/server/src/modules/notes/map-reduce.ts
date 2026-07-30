@@ -1,14 +1,16 @@
+import { z } from "zod";
 import {
   buildFallbackNotes,
   FALLBACK_TLDR,
-  typeInsightsSchema,
+  identifyNotes,
+  typeInsightsContentSchema,
   type ConversationType,
   type MeetingNotes,
-  type NoteActionItem,
-  type NoteDecision,
-  type TypeInsights,
+  type NoteActionItemContent,
+  type NoteDecisionContent,
+  type NotesContent,
+  type TypeInsightsContent,
 } from "@nova/shared";
-import { z } from "zod";
 
 import type { JobUsage } from "../../db/jobs.js";
 import type { LlmRouter } from "../llm/index.js";
@@ -114,7 +116,7 @@ function reduceRequestSchema(type: ConversationType) {
       overview: z.string().min(1),
       openQuestions: z.array(z.string()),
       risks: z.array(z.string()),
-      typeInsights: typeInsightsSchema,
+      typeInsights: typeInsightsContentSchema,
     })
     .strict()
     .refine((notes) => notes.typeInsights.kind === type, {
@@ -168,9 +170,9 @@ function dedupStrings(values: string[]): string[] {
 }
 
 /** Merge + dedup decisions by normalized text; first occurrence (earliest chunk) wins. */
-function dedupDecisions(items: ChunkFacts["decisions"]): NoteDecision[] {
+function dedupDecisions(items: ChunkFacts["decisions"]): NoteDecisionContent[] {
   const seen = new Set<string>();
-  const out: NoteDecision[] = [];
+  const out: NoteDecisionContent[] = [];
   for (const item of items) {
     const key = normalizeForMatch(item.text);
     if (key === "" || seen.has(key)) continue;
@@ -181,9 +183,11 @@ function dedupDecisions(items: ChunkFacts["decisions"]): NoteDecision[] {
 }
 
 /** Merge + dedup action items by normalized text; sanitize non-ISO deadlines to null. */
-function dedupActionItems(items: ChunkFacts["actionItems"]): NoteActionItem[] {
+function dedupActionItems(
+  items: ChunkFacts["actionItems"],
+): NoteActionItemContent[] {
   const seen = new Set<string>();
-  const out: NoteActionItem[] = [];
+  const out: NoteActionItemContent[] = [];
   for (const item of items) {
     const key = normalizeForMatch(item.text);
     if (key === "" || seen.has(key)) continue;
@@ -212,7 +216,7 @@ function insightsFor(
     questionsAsked: string[];
     answersToRevisit: string[];
   },
-): TypeInsights {
+): TypeInsightsContent {
   switch (type) {
     case "sales":
       return {
@@ -277,7 +281,8 @@ export async function runMapReduce(
         weekday,
       }),
       router,
-      repair: (invalidText, issues) => buildMapRepairMessages(invalidText, issues),
+      repair: (invalidText, issues) =>
+        buildMapRepairMessages(invalidText, issues),
     });
     usage.push(...ladder.usage);
     if (ladder.result.status === "ok") {
@@ -298,7 +303,9 @@ export async function runMapReduce(
   );
 
   // REDUCE (merge in code) — dedup facts by normalized text, first (earliest) wins.
-  const mergedDecisions = dedupDecisions(chunkResults.flatMap((c) => c.decisions));
+  const mergedDecisions = dedupDecisions(
+    chunkResults.flatMap((c) => c.decisions),
+  );
   const mergedActionItems = dedupActionItems(
     chunkResults.flatMap((c) => c.actionItems),
   );
@@ -307,7 +314,9 @@ export async function runMapReduce(
   );
   const mergedRisks = dedupStrings(chunkResults.flatMap((c) => c.risks));
   const mergedInsights = {
-    objections: dedupStrings(chunkResults.flatMap((c) => c.insights.objections)),
+    objections: dedupStrings(
+      chunkResults.flatMap((c) => c.insights.objections),
+    ),
     buyingSignals: dedupStrings(
       chunkResults.flatMap((c) => c.insights.buyingSignals),
     ),
@@ -349,7 +358,10 @@ export async function runMapReduce(
 
   // Reduce exhausted AND nothing to salvage → the deterministic fallback constant.
   if (reduceLadder.result.status !== "ok" && !hasContent) {
-    logger.info({ meeting_id: meta.id }, "notes.mapreduce.reduce_fallback_empty");
+    logger.info(
+      { meeting_id: meta.id },
+      "notes.mapreduce.reduce_fallback_empty",
+    );
     return {
       notes: buildFallbackNotes(meta.title),
       usage,
@@ -361,7 +373,7 @@ export async function runMapReduce(
   let narrative: { title: string; tldr: string; overview: string };
   let openQuestions: string[];
   let risks: string[];
-  let typeInsights: TypeInsights;
+  let typeInsights: TypeInsightsContent;
 
   if (reduceLadder.result.status === "ok") {
     const reduced = reduceLadder.result.value;
@@ -384,9 +396,10 @@ export async function runMapReduce(
     logger.info({ meeting_id: meta.id }, "notes.mapreduce.reduce_fallback");
   }
 
-  const assembled: MeetingNotes = {
-    version: 1,
-    source: "generated",
+  // The whole map/reduce pipeline works in id-LESS content terms (both model calls
+  // produce content); ids are minted exactly once, here, at assembly (v2 —
+  // docs/DESIGN/live-notes.md §2). The model never chooses an item's identity.
+  const content: NotesContent = {
     conversationType: type,
     title: narrative.title,
     tldr: narrative.tldr,
@@ -397,6 +410,7 @@ export async function runMapReduce(
     risks,
     typeInsights,
   };
+  const assembled: MeetingNotes = identifyNotes(content, "generated");
 
   const notes = verifyNotes(assembled, transcriptText);
   return rawText !== undefined ? { notes, usage, rawText } : { notes, usage };

@@ -83,10 +83,10 @@ function renderNotes(notes: MeetingNotes): string {
     renderList(actionItems),
     "",
     "OPEN QUESTIONS:",
-    renderList(notes.openQuestions),
+    renderList(notes.openQuestions.map((q) => q.text)),
     "",
     "RISKS:",
-    renderList(notes.risks),
+    renderList(notes.risks.map((r) => r.text)),
   ].join("\n");
 }
 

@@ -1,3 +1,5 @@
+import { isSmallTalk, normalize, stripFillerPrefix } from "./small-talk.js";
+
 /**
  * The tiered trigger gate (Phase 7, design: live-pipeline.md §modules/live). The
  * cheapest call is the one never made, so this is a PURE, synchronous heuristic
@@ -30,30 +32,6 @@ export type TriggerDecision =
 
 /** Utterances at or under this many non-space chars are never worth a call. */
 const MIN_UTTERANCE_CHARS = 8;
-
-/**
- * Small-talk phrases/backchannels. A whole utterance dominated by these is a
- * no-op window. Deliberately matched on a NORMALIZED (lowercased, de-punctuated)
- * form so "How are you?" and "how are you" collapse together.
- */
-const SMALL_TALK_PATTERNS: readonly RegExp[] = [
-  /^(hi|hey|hello|yo|hiya)\b/,
-  /^good (morning|afternoon|evening)\b/,
-  /how are you\b/,
-  /how'?s it going\b/,
-  /how have you been\b/,
-  /how was your (weekend|day|week)\b/,
-  /what'?s up\b/,
-  /nice to (meet|see) you\b/,
-  /good to (see|meet) you\b/,
-  /long time no see\b/,
-  /(take care|talk (to you )?later|catch you later|have a (good|great) (one|day))\b/,
-  /^(bye|goodbye|see ya|see you)\b/,
-  /^(thanks|thank you|thx|cheers)\b/,
-  /^(ok|okay|cool|nice|great|awesome|sweet|gotcha|got it|right|sure|yeah|yep|yup|yes|no|nope|totally|for sure|sounds good|makes sense|mhm|uh huh|haha|lol)\b/,
-  /nice weather\b/,
-  /how about (you|yourself)\b/,
-];
 
 /**
  * STRONG interrogatives — rare in declaratives, so a match in the first few
@@ -102,29 +80,6 @@ const QUESTION_PHRASES = [
   "explain",
   "describe",
 ] as const;
-
-/** Normalize for pattern matching: lowercase, collapse whitespace, trim. */
-function normalize(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-/** Is the utterance dominated by pleasantries/backchannels? */
-function isSmallTalk(normalized: string): boolean {
-  return SMALL_TALK_PATTERNS.some((re) => re.test(normalized));
-}
-
-/**
- * Leading backchannel/filler tokens that can precede a real question ("okay, so
- * how would you…"). Stripped so the small-talk veto re-tests the substance
- * behind them (the 2026-07-23 filler-prefix fix).
- */
-const FILLER_PREFIX =
-  /^(?:(?:ok|okay|cool|nice|great|awesome|right|sure|yeah|yep|yup|yes|no|nope|well|alright|so|um|uh|hey|hi|hello|but|and|anyway|honestly|actually)[,.!\s]+)+/;
-
-/** Drop leading filler/backchannel tokens from a normalized utterance. */
-function stripFillerPrefix(normalized: string): string {
-  return normalized.replace(FILLER_PREFIX, "");
-}
 
 /** Does the utterance read as a question (mark OR interrogative form)? */
 function looksLikeQuestion(raw: string, normalized: string): boolean {

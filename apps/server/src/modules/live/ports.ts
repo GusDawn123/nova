@@ -84,6 +84,30 @@ export interface TranscriptPersister {
  */
 export interface LiveLogger {
   error(fields: Record<string, unknown>, msg: string): void;
+  /**
+   * Optional info sink. The notes conductor reports fold telemetry through it
+   * (how many ops the reducer clamped, and why) — the signal that would tell you
+   * the model is fighting the churn ceiling. Optional so existing callers that
+   * only supply `error` keep type-checking; Fastify's `app.log` has both.
+   */
+  info?(fields: Record<string, unknown>, msg: string): void;
+}
+
+/**
+ * Anything that watches the call's transcript stream (Phase 8, §8). The session
+ * fans every transcript event out to a LIST of these instead of hardcoding
+ * `this.conductor?.on*` per consumer: Phase 7's copilot conductor is consumer #1,
+ * Phase 8's notes conductor #2, and Phase 9 gets it for free.
+ *
+ * Both handlers are optional — the notes conductor only wants finals, and
+ * speculating on partials is a copilot-only concern. `dispose` is not: every
+ * consumer owns session-scoped work (an in-flight model call, a timer) that must
+ * stop exactly once, so each registers its own entry on the session's disposer.
+ */
+export interface LiveTranscriptConsumer {
+  onPartial?(text: string, speaker: string | null): void;
+  onFinal?(text: string, speaker: string | null): void;
+  dispose(): void;
 }
 
 /** One flushed span of relayed audio attributed to the CURRENT stt vendor. */

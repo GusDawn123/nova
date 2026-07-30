@@ -22,7 +22,15 @@ function results(opts: {
           words:
             opts.speaker === undefined
               ? []
-              : [{ word: "hi", start: 0, end: 0.2, confidence: 0.9, speaker: opts.speaker }],
+              : [
+                  {
+                    word: "hi",
+                    start: 0,
+                    end: 0.2,
+                    confidence: 0.9,
+                    speaker: opts.speaker,
+                  },
+                ],
         },
       ],
     },
@@ -32,7 +40,9 @@ function results(opts: {
 
 describe("translateResults", () => {
   it("maps a non-final Results to a partial with ts_ms in milliseconds", () => {
-    const event = translateResults(results({ transcript: "hello", start: 1.25 }));
+    const event = translateResults(
+      results({ transcript: "hello", start: 1.25 }),
+    );
     expect(event).toEqual({
       type: "partial",
       text: "hello",
@@ -61,7 +71,9 @@ describe("translateResults", () => {
 
   it("ignores non-Results messages (Metadata / UtteranceEnd / SpeechStarted)", () => {
     expect(translateResults({ type: "Metadata", request_id: "z" })).toBeNull();
-    expect(translateResults({ type: "UtteranceEnd", last_word_end: 4 })).toBeNull();
+    expect(
+      translateResults({ type: "UtteranceEnd", last_word_end: 4 }),
+    ).toBeNull();
     expect(translateResults({ type: "SpeechStarted" })).toBeNull();
   });
 
@@ -70,7 +82,11 @@ describe("translateResults", () => {
   });
 
   it("returns a protocol error event when a Results payload breaks the schema", () => {
-    const event = translateResults({ type: "Results", start: "soon", channel: {} });
+    const event = translateResults({
+      type: "Results",
+      start: "soon",
+      channel: {},
+    });
     if (event?.type !== "error") throw new Error("expected error event");
     expect(event.error).toBeInstanceOf(SttProtocolError);
   });
@@ -78,7 +94,9 @@ describe("translateResults", () => {
 
 describe("mapDeepgramError", () => {
   it("maps auth failures to SttAuthError", () => {
-    expect(mapDeepgramError(new Error("invalid api key"))).toBeInstanceOf(SttAuthError);
+    expect(mapDeepgramError(new Error("invalid api key"))).toBeInstanceOf(
+      SttAuthError,
+    );
   });
 
   it("maps unknown failures to SttTransientError with a vendor prefix", () => {

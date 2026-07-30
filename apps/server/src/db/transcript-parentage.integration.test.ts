@@ -180,10 +180,7 @@ describe.skipIf(!hasStack)("transcript parentage (local stack)", () => {
 
     // Nothing was written against A's meeting (service role bypasses RLS to confirm).
     const children = unwrap(
-      await admin
-        .from("transcripts")
-        .select()
-        .eq("meeting_id", aMeeting.id),
+      await admin.from("transcripts").select().eq("meeting_id", aMeeting.id),
       "service-role read transcripts",
     );
     expect(children).toHaveLength(0);

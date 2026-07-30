@@ -4,25 +4,29 @@ import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { meetingNotesSchema } from "@nova/shared";
+import {
+  identifyNotes,
+  meetingNotesSchema,
+  type NotesContent,
+} from "@nova/shared";
 
-import { createUsageEventsDb } from "../../db/usage-events.js";
+import { createNotesJobStore } from "../../db/jobs.js";
 import { createNotesSource } from "../../db/notes-source.js";
 import { createNotesWriter } from "../../db/notes.js";
+import { createUsageEventsDb } from "../../db/usage-events.js";
 import {
   createLlmRouter,
   llmConfigSchema,
   makeMockProvider,
 } from "../llm/index.js";
-import { createNotesJobStore } from "../../db/jobs.js";
 import { createNotesJobHandler } from "../notes/handler.js";
 import { createNotesPipeline } from "../notes/pipeline.js";
-import { createNotesWorker } from "../notes/worker.js";
 import type { NotesLogger, NotesPipeline } from "../notes/ports.js";
+import { createNotesWorker } from "../notes/worker.js";
 
 import { createKillSwitch } from "./kill-switch.js";
-import { createMeteringService } from "./service.js";
 import type { MeteringLogger } from "./ports.js";
+import { createMeteringService } from "./service.js";
 
 /**
  * E2E metering accuracy, part 1 (playbook VERIFY "Metering ±5%" — llm half): a
@@ -51,7 +55,7 @@ const CLASSIFY_USAGE = { inputTokens: 111, outputTokens: 7 };
 const GENERATE_USAGE = { inputTokens: 2222, outputTokens: 333 };
 
 /** A schema-valid single-pass sales notes object the mock generate call returns. */
-const SALES_NOTES = {
+const SALES_NOTES: NotesContent = {
   conversationType: "sales",
   title: "Renewal call",
   tldr: "Discussed the renewal and agreed on next steps.",
@@ -65,11 +69,9 @@ const SALES_NOTES = {
 };
 
 // Parsed through the shared schema so the cap-e2e handler returns typed notes.
-const SALES_NOTES_PARSED = meetingNotesSchema.parse({
-  version: 1,
-  source: "generated",
-  ...SALES_NOTES,
-});
+const SALES_NOTES_PARSED = meetingNotesSchema.parse(
+  identifyNotes(SALES_NOTES, "generated"),
+);
 
 interface UsageRow {
   vendor: string;

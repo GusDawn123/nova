@@ -1,5 +1,5 @@
-import { type MeetingNotes, meetingNotesSchema } from "@nova/shared";
 import { z } from "zod";
+import { type MeetingNotes, storedNotesSchema } from "@nova/shared";
 
 /**
  * Shared `_smoke` contract for the db adapter: the runtime validator (zod) plus a
@@ -47,9 +47,14 @@ export type NotesStatus = z.infer<typeof notesStatusSchema>;
  * Runtime shape of a `meetings` row (the columns the server adapters touch). The
  * RAG columns `ended_at` (call finished) and `indexed_at` (memory caught up) drive
  * the completion sweeper; `started_at` seeds the meeting chunk header's date. The
- * Phase 5 notes columns: `notes` is ONLY ever a `meetingNotesSchema`-valid object
- * (the output ladder guarantees it, so it is parsed as such here, not left `unknown`);
- * `notes_status` is the read model, `follow_up` the latest draft (Task 5 owns its shape).
+ * Phase 5 notes columns: `notes` is ONLY ever a ladder-valid notes object (so it is
+ * parsed as such here, not left `unknown`); `notes_status` is the read model,
+ * `follow_up` the latest draft (Task 5 owns its shape).
+ *
+ * `notes` parses with {@link storedNotesSchema}, the v1 ∪ v2 READ boundary — NOT
+ * `meetingNotesSchema`, which is `version: z.literal(2)` and would throw on any row
+ * written before the v2 split. Stored v1 objects upcast to v2 in code on the way
+ * out; writers only ever emit v2 (docs/DESIGN/live-notes.md §2).
  */
 export const meetingRowSchema = z.object({
   id: z.string().uuid(),
@@ -58,7 +63,7 @@ export const meetingRowSchema = z.object({
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
   indexed_at: z.string().nullable(),
-  notes: meetingNotesSchema.nullable(),
+  notes: storedNotesSchema.nullable(),
   notes_status: notesStatusSchema,
   notes_generated_at: z.string().nullable(),
   follow_up: z.record(z.string(), z.unknown()).nullable(),

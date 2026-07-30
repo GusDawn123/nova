@@ -29,8 +29,10 @@ vi.setConfig({ testTimeout: 180_000, hookTimeout: 30_000 });
 function providerEnv(): LlmProviderEnv {
   const env: LlmProviderEnv = {};
   // Deliberately NOT reading ANTHROPIC_API_KEY (disabled by decision).
-  if (process.env.OPENAI_API_KEY) env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-  if (process.env.GOOGLE_API_KEY) env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+  if (process.env.OPENAI_API_KEY)
+    env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (process.env.GOOGLE_API_KEY)
+    env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
   if (process.env.GROQ_API_KEY) env.GROQ_API_KEY = process.env.GROQ_API_KEY;
   return env;
 }
@@ -115,25 +117,28 @@ function runMoment(
   });
 }
 
-describe.skipIf(!canRun)("modules/live [relevance] live suggestion relevance", () => {
-  it("[relevance] references the expected topic in >= 7/10 moments", async () => {
-    const providers = createProvidersFromEnv(providerEnv());
-    expect(providers.length).toBeGreaterThan(0);
-    const router = createLlmRouter({ providers, config: liveLlmConfig() });
+describe.skipIf(!canRun)(
+  "modules/live [relevance] live suggestion relevance",
+  () => {
+    it("[relevance] references the expected topic in >= 7/10 moments", async () => {
+      const providers = createProvidersFromEnv(providerEnv());
+      expect(providers.length).toBeGreaterThan(0);
+      const router = createLlmRouter({ providers, config: liveLlmConfig() });
 
-    let hits = 0;
-    const misses: string[] = [];
-    for (const moment of MOMENTS) {
-      const suggestion = (await runMoment(router, moment.q)).toLowerCase();
-      const hit = moment.keywords.some((k) => suggestion.includes(k));
-      if (hit) hits += 1;
-      else misses.push(`${moment.q} :: got="${suggestion.slice(0, 120)}"`);
-    }
+      let hits = 0;
+      const misses: string[] = [];
+      for (const moment of MOMENTS) {
+        const suggestion = (await runMoment(router, moment.q)).toLowerCase();
+        const hit = moment.keywords.some((k) => suggestion.includes(k));
+        if (hit) hits += 1;
+        else misses.push(`${moment.q} :: got="${suggestion.slice(0, 120)}"`);
+      }
 
-    console.log(
-      `[relevance] ${String(hits)}/10 moments referenced the expected topic (bar >= 7)`,
-    );
-    for (const m of misses) console.log(`[relevance] MISS ${m}`);
-    expect(hits).toBeGreaterThanOrEqual(7);
-  });
-});
+      console.log(
+        `[relevance] ${String(hits)}/10 moments referenced the expected topic (bar >= 7)`,
+      );
+      for (const m of misses) console.log(`[relevance] MISS ${m}`);
+      expect(hits).toBeGreaterThanOrEqual(7);
+    });
+  },
+);

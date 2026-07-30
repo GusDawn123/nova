@@ -33,7 +33,10 @@ import { randomUUID } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { Pool } from "pg";
 
-import { createPgPool, createPgVectorStore } from "../src/modules/rag/adapters/pgvector.js";
+import {
+  createPgPool,
+  createPgVectorStore,
+} from "../src/modules/rag/adapters/pgvector.js";
 import { ragConfig } from "../src/modules/rag/config.js";
 import type { EmbeddedChunk, VectorStore } from "../src/modules/rag/ports.js";
 
@@ -108,19 +111,49 @@ function unitVector(rand: () => number): number[] {
   }
   const norm = Math.sqrt(sumSq) || 1;
   for (let i = 0; i < DIMS; i++) {
-    v[i] = Math.round((v[i] ?? 0) / norm * 1e6) / 1e6;
+    v[i] = Math.round(((v[i] ?? 0) / norm) * 1e6) / 1e6;
   }
   return v;
 }
 
 /** A small business/sales vocabulary so the full-text leg matches real tokens. */
 const VOCAB = [
-  "pricing", "renewal", "discount", "contract", "quota", "onboarding",
-  "invoice", "migration", "rollout", "roadmap", "integration", "support",
-  "enterprise", "seat", "tier", "budget", "procurement", "stakeholder",
-  "timeline", "proposal", "demo", "pilot", "expansion", "churn",
-  "retention", "escalation", "compliance", "security", "latency", "throughput",
-  "dashboard", "analytics", "forecast", "pipeline", "deployment", "sla",
+  "pricing",
+  "renewal",
+  "discount",
+  "contract",
+  "quota",
+  "onboarding",
+  "invoice",
+  "migration",
+  "rollout",
+  "roadmap",
+  "integration",
+  "support",
+  "enterprise",
+  "seat",
+  "tier",
+  "budget",
+  "procurement",
+  "stakeholder",
+  "timeline",
+  "proposal",
+  "demo",
+  "pilot",
+  "expansion",
+  "churn",
+  "retention",
+  "escalation",
+  "compliance",
+  "security",
+  "latency",
+  "throughput",
+  "dashboard",
+  "analytics",
+  "forecast",
+  "pipeline",
+  "deployment",
+  "sla",
 ] as const;
 
 /** A realistic ~12-word content line drawn deterministically from the vocab. */
@@ -134,7 +167,11 @@ function content(rand: () => number): string {
 }
 
 /** Build `count` embedded chunks from a seeded stream (content + unit vector). */
-function makeChunks(rand: () => number, count: number, docLabel: string): EmbeddedChunk[] {
+function makeChunks(
+  rand: () => number,
+  count: number,
+  docLabel: string,
+): EmbeddedChunk[] {
   const chunks: EmbeddedChunk[] = [];
   for (let i = 0; i < count; i++) {
     const text = content(rand);
@@ -203,9 +240,14 @@ async function seedUser(
       [userId, `Bench source ${String(docIx)}`, "bench seed"],
     );
     const contextDocId = doc.rows[0]?.id;
-    if (contextDocId === undefined) throw new Error("bench: context_doc insert returned no id");
+    if (contextDocId === undefined)
+      throw new Error("bench: context_doc insert returned no id");
     const chunks = makeChunks(rand, n, `bench-${String(docIx)}`);
-    await store.replaceSource(userId, { kind: "context_doc", contextDocId }, chunks);
+    await store.replaceSource(
+      userId,
+      { kind: "context_doc", contextDocId },
+      chunks,
+    );
     done += n;
     docIx += 1;
   }
@@ -242,7 +284,8 @@ async function main(): Promise<void> {
         password: `Pw-${randomUUID()}`,
         email_confirm: true,
       });
-      if (created.error) throw new Error(`createUser: ${created.error.message}`);
+      if (created.error)
+        throw new Error(`createUser: ${created.error.message}`);
       userIds.push(created.data.user.id);
     }
     const [userA, ...noiseUsers] = userIds;
@@ -258,7 +301,13 @@ async function main(): Promise<void> {
     for (let i = 0; i < noiseUsers.length; i++) {
       const noiseId = noiseUsers[i];
       if (noiseId === undefined) continue;
-      await seedUser(store, pool, noiseId, NOISE_CHUNKS_EACH, mulberry32(1000 + i));
+      await seedUser(
+        store,
+        pool,
+        noiseId,
+        NOISE_CHUNKS_EACH,
+        mulberry32(1000 + i),
+      );
     }
     const totalChunks = BENCH_CHUNKS + NOISE_USERS * NOISE_CHUNKS_EACH;
     console.log(
@@ -283,14 +332,24 @@ async function main(): Promise<void> {
     for (let i = 0; i < WARMUP; i++) {
       const q = queries[i % queries.length];
       if (q === undefined) continue;
-      await store.search(userA, { vector: q.vector, text: q.text, model: MODEL, k: K });
+      await store.search(userA, {
+        vector: q.vector,
+        text: q.text,
+        model: MODEL,
+        k: K,
+      });
     }
 
     // --- timed run ---------------------------------------------------------
     const durations: number[] = [];
     for (const q of queries) {
       const t0 = performance.now();
-      await store.search(userA, { vector: q.vector, text: q.text, model: MODEL, k: K });
+      await store.search(userA, {
+        vector: q.vector,
+        text: q.text,
+        model: MODEL,
+        k: K,
+      });
       durations.push(performance.now() - t0);
     }
 
@@ -302,7 +361,9 @@ async function main(): Promise<void> {
     const pass = p95 < BAR_MS;
 
     console.log("");
-    console.log("RAG store latency benchmark — pgvector hybrid RRF (adr-0005 §5)");
+    console.log(
+      "RAG store latency benchmark — pgvector hybrid RRF (adr-0005 §5)",
+    );
     console.log(
       `  corpus:  ${String(BENCH_CHUNKS)} chunks (user A) + ` +
         `${String(NOISE_USERS * NOISE_CHUNKS_EACH)} noise = ${String(totalChunks)} total`,
@@ -333,9 +394,15 @@ async function main(): Promise<void> {
     // own throwaway users and their derived rows. Children first (FK order):
     // embeddings → chunks → context_docs → auth user.
     for (const id of userIds) {
-      await pool.query("delete from embeddings where user_id = $1", [id]).catch(() => undefined);
-      await pool.query("delete from chunks where user_id = $1", [id]).catch(() => undefined);
-      await pool.query("delete from context_docs where user_id = $1", [id]).catch(() => undefined);
+      await pool
+        .query("delete from embeddings where user_id = $1", [id])
+        .catch(() => undefined);
+      await pool
+        .query("delete from chunks where user_id = $1", [id])
+        .catch(() => undefined);
+      await pool
+        .query("delete from context_docs where user_id = $1", [id])
+        .catch(() => undefined);
       await admin.auth.admin.deleteUser(id).catch(() => undefined);
     }
     await pool.end();

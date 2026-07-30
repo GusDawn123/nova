@@ -44,7 +44,10 @@ function routerWith(firstTokenDelayMs: number) {
 
 function percentile(values: number[], p: number): number {
   const sorted = [...values].sort((a, b) => a - b);
-  const idx = Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1);
+  const idx = Math.min(
+    sorted.length - 1,
+    Math.ceil((p / 100) * sorted.length) - 1,
+  );
   return sorted[Math.max(0, idx)] ?? 0;
 }
 
@@ -101,10 +104,16 @@ describe("modules/live [latency] tested contract", () => {
       });
       const t0 = Date.now();
       // Fire on the confident partial, let it stream during the speech tail…
-      conductor.onPartial("what's your approach to handling data consistency", "them");
+      conductor.onPartial(
+        "what's your approach to handling data consistency",
+        "them",
+      );
       await vi.advanceTimersByTimeAsync(SPEECH_TAIL_MS);
       // …then the final lands. On a hit the answer is already visible.
-      conductor.onFinal("what's your approach to handling data consistency?", "them");
+      conductor.onFinal(
+        "what's your approach to handling data consistency?",
+        "them",
+      );
       await vi.advanceTimersByTimeAsync(200);
       const firstDelta = firstDeltaTime(t0);
       expect(firstDelta).not.toBeNull();

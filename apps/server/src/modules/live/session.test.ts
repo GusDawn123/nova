@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import type { SttEmit, SttEngine } from "../stt/ports.js";
 
@@ -467,6 +467,7 @@ describe("LiveSession meeting-ownership guard (C1)", () => {
 interface FakeConductor {
   partials: string[];
   finals: string[];
+  directQuestions: string[];
   disposed: number;
 }
 
@@ -475,13 +476,19 @@ function makeFakeConductor(): {
   calls: { userId: string; meetingId: string }[];
   conductor: FakeConductor;
 } {
-  const conductor: FakeConductor = { partials: [], finals: [], disposed: 0 };
+  const conductor: FakeConductor = {
+    partials: [],
+    finals: [],
+    directQuestions: [],
+    disposed: 0,
+  };
   const calls: { userId: string; meetingId: string }[] = [];
   const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
     calls.push({ userId: args.userId, meetingId: args.meetingId });
     return {
       onPartial: (text) => conductor.partials.push(text),
       onFinal: (text) => conductor.finals.push(text),
+      onDirectQuestion: (text) => conductor.directQuestions.push(text),
       dispose: () => {
         conductor.disposed += 1;
       },
@@ -541,9 +548,128 @@ describe("LiveSession live copilot conductor wiring (Phase 7)", () => {
   });
 });
 
+/** A notes conductor — finals only, no partials (the consumer's optional half). */
+function makeFakeNotesConductor(): {
+  factory: NonNullable<LiveSessionDeps["createNotesConductor"]>;
+  calls: { userId: string; meetingId: string }[];
+  finals: string[];
+  disposed: () => number;
+} {
+  const calls: { userId: string; meetingId: string }[] = [];
+  const finals: string[] = [];
+  let disposed = 0;
+  const factory: NonNullable<LiveSessionDeps["createNotesConductor"]> = (
+    args,
+  ) => {
+    calls.push({ userId: args.userId, meetingId: args.meetingId });
+    return {
+      onFinal: (text) => finals.push(text),
+      dispose: () => {
+        disposed += 1;
+      },
+    };
+  };
+  return { factory, calls, finals, disposed: () => disposed };
+}
+
+describe("LiveSession transcript-consumer fan-out (Phase 8)", () => {
+  it("feeds BOTH conductors the same finals, and partials only to the copilot", () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const n = makeFakeNotesConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+      createNotesConductor: n.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    fake.emit(partialEvent("we agreed to ship"));
+    fake.emit(finalEvent("we agreed to ship on Friday."));
+
+    expect(n.calls).toEqual([{ userId: USER_ID, meetingId: MEETING_ID }]);
+    expect(c.conductor.finals).toEqual(["we agreed to ship on Friday."]);
+    expect(n.finals).toEqual(["we agreed to ship on Friday."]);
+    // The notes conductor declares no onPartial — the fan-out must not call it.
+    expect(c.conductor.partials).toEqual(["we agreed to ship"]);
+  });
+
+  it("disposes every consumer exactly once on teardown", () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const n = makeFakeNotesConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+      createNotesConductor: n.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    session.close();
+    session.close();
+
+    expect(c.conductor.disposed).toBe(1);
+    expect(n.disposed()).toBe(1);
+  });
+
+  it("builds no notes conductor in echo mode", () => {
+    const fake = makeFakeEngine();
+    const n = makeFakeNotesConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      allowEcho: true,
+      createNotesConductor: n.factory,
+    });
+
+    session.handleTextMessage(startFrame(true));
+
+    expect(n.calls).toHaveLength(0);
+  });
+
+  it("[isolation] a throwing consumer does not starve the NEXT one or the relay", () => {
+    // The copilot registers first, so it is the one whose throw could swallow the
+    // notes conductor's turn. Without the fan-out's try/catch this test fails on
+    // BOTH assertions: no notes final, and the throw escapes into the relay.
+    const fake = makeFakeEngine();
+    const n = makeFakeNotesConductor();
+    const explodingCopilot: NonNullable<
+      LiveSessionDeps["createConductor"]
+    > = () => ({
+      onPartial: () => undefined,
+      onFinal: () => {
+        throw new Error("copilot conductor bug");
+      },
+      onDirectQuestion: () => undefined,
+      dispose: () => undefined,
+    });
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: explodingCopilot,
+      createNotesConductor: n.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    expect(() => {
+      fake.emit(finalEvent("we agreed to ship on Friday."));
+    }).not.toThrow();
+
+    expect(n.finals).toEqual(["we agreed to ship on Friday."]);
+    expect(sent.some((e) => e.type === "transcript.final")).toBe(true);
+  });
+});
+
 describe("LiveSession typed input (transcript.input, Phase 7)", () => {
-  const inputFrame = (text: string): string =>
-    JSON.stringify({ v: 1, type: "transcript.input", text });
+  const inputFrame = (text: string, origin?: string): string =>
+    JSON.stringify({
+      v: 1,
+      type: "transcript.input",
+      text,
+      ...(origin !== undefined ? { origin } : {}),
+    });
 
   it("refuses typed input before session.start with input_before_start", () => {
     const { session, sent } = makeSession();
@@ -598,6 +724,117 @@ describe("LiveSession typed input (transcript.input, Phase 7)", () => {
       content: "typed note about the deal",
       speaker: "them",
     });
+  });
+
+  it("[origin] a copilot_question is echoed as SPEAKER ME, never as 'them'", async () => {
+    const fake = makeFakeEngine();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("how should I price this?", "copilot_question"),
+    );
+
+    const echoed = sent.find((e) => e.type === "transcript.final");
+    expect(echoed).toMatchObject({
+      text: "how should I price this?",
+      speaker: "me",
+    });
+    // Scenario 1: nothing may claim the OTHER party said this.
+    expect(
+      sent.filter((e) => e.type === "transcript.final" && e.speaker === "them"),
+    ).toHaveLength(0);
+  });
+
+  it("[origin] a copilot_question is NEVER persisted (no notes/RAG contamination)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("should I offer the annual discount?", "copilot_question"),
+    );
+    await flush();
+
+    // Scenarios 1 + 2: no transcripts row => never read by the notes pipeline,
+    // never chunked/embedded into RAG memory.
+    expect(persister.saveCalls).toHaveLength(0);
+  });
+
+  it("[origin] a copilot_question reaches the conductor as a DIRECT question", async () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("what did we quote Acme?", "copilot_question"),
+    );
+
+    // Still answered (that is the whole point of typing to your copilot) —
+    // but through the direct channel, not as an utterance by the other party.
+    expect(c.conductor.directQuestions).toEqual(["what did we quote Acme?"]);
+    expect(c.conductor.finals).toEqual([]);
+  });
+
+  it("[origin] an explicit utterance still behaves exactly as before", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const c = makeFakeConductor();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(
+      inputFrame("we need this by Friday", "utterance"),
+    );
+    await flush();
+
+    expect(sent.find((e) => e.type === "transcript.final")).toMatchObject({
+      speaker: "them",
+    });
+    expect(persister.saveCalls).toHaveLength(1);
+    expect(c.conductor.finals).toEqual(["we need this by Friday"]);
+  });
+
+  it("[origin] an OMITTED origin stays an utterance (backward compatible)", async () => {
+    const fake = makeFakeEngine();
+    const persister = new FakePersister();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      persister,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(inputFrame("they said yes to the pilot"));
+    await flush();
+
+    expect(sent.find((e) => e.type === "transcript.final")).toMatchObject({
+      speaker: "them",
+    });
+    expect(persister.saveCalls).toHaveLength(1);
   });
 
   it("refuses typed input after teardown (disposed session)", async () => {

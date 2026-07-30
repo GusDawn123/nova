@@ -19,6 +19,7 @@ export {
 export {
   meteringConfigSchema,
   meteringConfig,
+  canUseLiveNotes,
   type MeteringConfig,
   type PlanId,
 } from "./config.js";

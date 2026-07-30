@@ -1,0 +1,289 @@
+# CodeRabbit — Nova. Strict by intent.
+#
+# Applies to PR reviews AND local `coderabbit review` runs from the repo root.
+# The path_instructions below encode docs/RULES.md (the engineering constitution)
+# so the reviewer enforces OUR invariants, not just generic best practice.
+#
+# Schema: https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+
+language: en-US
+
+# HARD LIMIT: 250 characters (schema maxLength). Tone ONLY — all substantive review
+# guidance belongs in reviews.path_instructions below, which has a 20,000-char budget.
+tone_instructions: >-
+  Strict senior reviewer. State objections plainly with the failing case; never soften to
+  be agreeable and never pad with praise. Prefer one concrete, verifiable objection over
+  three vague ones. Flag what merely looks correct but is unproven.
+
+reviews:
+  # 'assertive' surfaces substantially more than the 'chill' default. That is the point.
+  profile: assertive
+  request_changes_workflow: true
+  high_level_summary: true
+  review_status: true
+  collapse_walkthrough: false
+  # A poem in a review of billing code is noise.
+  poem: false
+  # Surface the review's own failures instead of letting a broken run look like a
+  # clean one — a silent no-op review is the worst possible outcome here.
+  fail_commit_status: true
+  estimate_code_review_effort: true
+  # Inline findings carry a machine-readable fix prompt, which is what makes the
+  # review → fix → re-review loop work with an agent.
+  enable_prompt_for_ai_agents: true
+
+  # PR-surface gates (no effect on local CLI runs). `error` + request_changes_workflow
+  # above means these block the merge rather than politely mentioning themselves.
+  pre_merge_checks:
+    title:
+      mode: error
+    description:
+      mode: error
+    docstrings:
+      mode: warning
+    custom_checks:
+      - name: Vitest coverage for new behavior
+        mode: error
+        instructions: >-
+          Verify every behavioral change in this PR ships with a vitest test in the SAME
+          PR (RULES §7 — behavior tests are written before implementation). PASS only if
+          each of the following holds. (1) Every new or modified exported function,
+          service method, route handler, adapter, or state machine has a corresponding
+          test in a co-located `*.test.ts` beside the source file. (2) Each new test
+          asserts on observable behavior — a returned value, an emitted event, a
+          persisted row, a thrown typed error — and NOT merely that a mock was called.
+          (3) The tests cover the failure and edge paths introduced, not just the happy
+          path: for a new error class, the error case; for a new branch, both branches;
+          for a new boundary, a rejected malformed input. (4) No test is disabled with
+          `.skip`, `.only`, or `.todo`; runtime `describe.skipIf(!key)` for key-gated
+          live-vendor or DB suites is acceptable because it self-skips without a key and
+          runs for real with one. (5) The test would actually FAIL if the change were
+          reverted — if a test passes against both the old and new behavior, it is not
+          coverage. FAIL the check and name the specific untested function or branch when
+          any of these is unmet. Pure refactors with no behavioral change, and
+          docs/config-only changes, PASS without new tests — say so explicitly.
+
+  # CodeRabbit drafts vitest tests for uncovered changes. Its output is a starting
+  # point for review, never a substitute for tests written alongside the code.
+  finishing_touches:
+    unit_tests:
+      enabled: true
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - development
+      - staging
+      - main
+
+  path_filters:
+    - "!**/dist/**"
+    - "!**/build/**"
+    - "!**/node_modules/**"
+    - "!**/.expo/**"
+    - "!package-lock.json"
+
+  path_instructions:
+    # ---- Applies everywhere: complexity, cleanliness, separation of concerns ----
+    - path: "**/*.{ts,tsx}"
+      instructions: >-
+        PRIORITY. Nova is a production product holding private call transcripts and
+        spending real money on vendor APIs, so rank every finding by consequence: a
+        data-isolation, privacy, or billing defect outranks a correctness bug, which
+        outranks a complexity problem, which outranks a naming nit. Treat "the tests
+        pass" as insufficient evidence when the tests do not exercise the changed path.
+        Never pad the list to look thorough — a short review of real defects beats a long
+        one of possibilities.
+
+        ALGORITHMIC EFFICIENCY. State the time and space complexity of any non-trivial
+        loop, recursion, or data-structure choice you review, and flag it when the
+        complexity is worse than it needs to be. Specifically call out: nested loops over
+        the same collection that could be a single pass with a Map or Set; an O(n)
+        `.find`/`.includes`/`.indexOf` inside a loop, making the whole thing O(n²);
+        repeated `.filter().map().reduce()` chains that walk a collection several times
+        where one pass would do; array `.shift()`/`.unshift()` in a hot loop; rebuilding a
+        derived value inside a loop instead of hoisting it; and unbounded growth of an
+        array, Map, or cache with no eviction — in a long-running call session that is a
+        memory leak, not a style question. Flag N+1 database or network calls inside a
+        loop and require batching. Do NOT invent micro-optimisations for cold paths: only
+        raise efficiency when the input can realistically grow (a transcript, a chunk
+        list, a result set, a per-frame or per-utterance path). Say WHICH input grows and
+        roughly how large before asking for a rewrite. Never assert something is faster
+        without a reason — RULES requires numbers, not vibes, for performance claims.
+
+        SEPARATION OF CONCERNS. Each module owns one job. Flag a function or file that
+        mixes distinct layers — I/O with business logic, transport parsing with domain
+        rules, persistence with formatting, orchestration with computation. Business logic
+        must be pure and testable without a socket, a DB, or a vendor: if reviewing a rule
+        requires standing up infrastructure, the layering is wrong. Enforce the module
+        anatomy: `ports.ts` declares interfaces and module-local zod, `adapters/` holds
+        vendor-specific code, `service.ts` holds domain logic, `routes.ts` only does
+        transport (parse the request, call the service, shape the response) — flag domain
+        logic that has leaked into a route handler. Dependencies point inward: a service
+        must depend on a port, never on a concrete adapter. Flag circular imports and
+        any module reaching into another module's internals rather than its public
+        surface. Watch for a "utils" or "helpers" file accreting unrelated functions —
+        that is missing structure, not a convenience.
+
+        CLEANLINESS. Flag duplicated logic that has drifted between copies (the dangerous
+        kind — two implementations of one rule that disagree). Flag dead code, unused
+        exports, unreachable branches, commented-out blocks (git remembers), and leftover
+        debug logging. Flag names that lie about what the thing does, and boolean
+        parameters at call sites where the argument is unreadable without opening the
+        function. Prefer early returns over deep nesting. Do NOT flag cosmetic formatting
+        — Prettier owns that, and a review that spends its budget on whitespace has
+        wasted it.
+
+    - path: "apps/server/src/**/*.ts"
+      instructions: >-
+        Enforce docs/RULES.md. Every external boundary (HTTP body, WebSocket frame, env
+        var, vendor response, DB row) must be zod-parsed before use — flag any value
+        that crosses a boundary and is trusted unparsed. TypeScript is strict: reject new
+        `any`, unchecked index access, and non-null assertions used to silence the
+        compiler. Reject `@ts-ignore` outright. Model state with discriminated unions and
+        exhaustive switches with a `never` check, never boolean soup. Use async/await
+        only — no `.then()` chains; every promise is awaited or explicitly voided with a
+        reason. No nested ternaries. Functions stay small and single-purpose; flag files
+        drifting past ~400 lines. Comments must explain WHY, never narrate WHAT; every
+        workaround or cast needs a `// why:`. Structured errors and logs must carry
+        request_id/user_id. NEVER log secrets or raw transcript text at info level —
+        treat any transcript content reaching a log as a privacy defect, not a nit.
+
+    - path: "apps/server/src/modules/*/adapters/**/*.ts"
+      instructions: >-
+        This is the ONLY layer permitted to import a vendor SDK — verify the SDK does not
+        leak upward through a return type, a thrown vendor error, or a re-export. Vendor
+        errors must be mapped to the module's own typed error class. Every path that
+        reaches a paid vendor API (LLM, STT, embeddings, rerank) MUST thread the metering
+        seam so usage lands in `usage_events`; an unmetered vendor call is a hard
+        blocker, not a suggestion. Raw audio must NEVER be written to disk or persisted.
+
+    - path: "apps/server/src/modules/metering/**/*.ts"
+      instructions: >-
+        Billing correctness. Verify `usage_events` stays append-only, that costs are
+        priced at write time, and that writes use the service role while reads stay
+        RLS-scoped to the owner. Check quota and kill-switch gates for fail-open vs
+        fail-closed posture matching adr-0007: ownership checks fail CLOSED, quota checks
+        fail OPEN. Any new vendor construction site must also be added to the static
+        metering audit test — flag it if it is not.
+
+    - path: "supabase/migrations/**"
+      instructions: >-
+        Migrations are append-only history. An already-applied migration must NEVER be
+        edited — flag any modification to an existing file as a blocker. Schema changes
+        follow expand → backfill → contract, never a destructive one-shot. Every new
+        table ships with RLS enabled AND its policies in the same migration; a table
+        without RLS is a data-isolation defect. Deletes are soft (`deleted_at`); hard
+        deletes belong only in scripts/purge/. Verify grants are column-scoped rather
+        than table-wide — a user JWT must never be able to self-set plan or role.
+
+    - path: "packages/shared/**/*.ts"
+      instructions: >-
+        This is the wire contract shared by server and mobile. Types must be DERIVED from
+        zod schemas via z.infer — flag any hand-written interface duplicating a schema.
+        Changes here are breaking across both clients: call out any field removal, rename,
+        or narrowed type, and require the change be additive or versioned.
+
+    - path: "apps/mobile/**/*.{ts,tsx}"
+      instructions: >-
+        NO vendor API keys in the mobile app, ever — flag any key, secret, or privileged
+        token reaching the client as a blocker. Screens stay dumb (render + navigation);
+        logic belongs in hooks. All styling flows through theme/tokens.ts — no inline hex,
+        no magic numbers. Every data-driven screen must handle loading, empty, error, and
+        loaded states; flag any that silently renders nothing on error.
+
+    # ---- Every source change must bring tests with it ----
+    - path: "{apps/server/src,packages/shared/src}/**/*.ts"
+      instructions: >-
+        TEST COVERAGE IS PART OF THE CHANGE, NOT A FOLLOW-UP. RULES §7: behavior tests are
+        written BEFORE implementation. For any new or modified exported function, service
+        method, route handler, adapter, job, or state transition in this file, require a
+        vitest test in a co-located `*.test.ts` beside it in the SAME change — flag the
+        specific function by name when one is missing. Reviewing the diff, ask: which new
+        branch, error path, or boundary has no test? Name it. New typed error classes,
+        new failure modes, new quota/gate decisions, and new zod boundaries each need a
+        test proving the REJECTION path, not only the happy path. Do not accept "covered
+        indirectly by an integration test" for a unit of logic that can be tested
+        directly. Do not accept a test added in a later PR. Pure refactors that provably
+        change no behavior, and config/docs-only edits, are exempt — say so rather than
+        staying silent.
+
+    - path: "**/*.test.ts"
+      instructions: >-
+        Tests are the evidence, so scrutinise them harder than the implementation. The
+        framework is VITEST (`describe`/`it`/`expect`, `vi` for mocks and fake timers) —
+        flag any Jest-only API (`jest.fn`, `jest.mock`, `jasmine`) or a stray import of
+        another test framework. Tests are co-located `*.test.ts` beside the code they
+        cover; fixtures live under `apps/server/fixtures/`.
+
+        Flag any test that asserts nothing, asserts only that a mock was called, or is
+        disabled via `.skip`/`.only`/`.todo`. Runtime `describe.skipIf(!key)` for
+        key-gated live-vendor and DB suites is legitimate — a hardcoded skip is not.
+        Verify the test actually exercises the changed code path rather than a mock
+        standing in for it, and that it would FAIL if the implementation regressed; a test
+        that passes against both old and new behavior is not coverage. A test written to
+        match buggy behavior is worse than no test — say so. Prefer real fixtures and
+        scripted mock vendors over mocking everything. Async tests must await their
+        assertions — flag a floating promise or a missing `await
+        expect(...).rejects`, which silently passes. Fake-timer tests must advance
+        deterministically rather than racing a real clock. The DB isolation (RLS) suites
+        are the crown jewels: any change weakening one is a blocker.
+
+    - path: "docs/**/*.md"
+      instructions: >-
+        Living documentation. Per RULES §8, a change to architecture, data model, or
+        behaviour must update the affected doc in the SAME change. Flag docs that describe
+        the past rather than the present, and any claim of a passing gate or benchmark
+        that is not backed by a number or a command someone can re-run.
+
+  # NOTE: `tools` nests under `reviews` — a top-level `tools:` key is silently
+  # ignored by the schema (verified against schema.v2.json).
+  tools:
+    # Enabled: what this stack actually runs, plus the security/privacy scanners
+    # that matter for a product holding private call transcripts.
+    eslint:
+      enabled: true
+    semgrep:
+      enabled: true
+    gitleaks:
+      enabled: true
+    trufflehog:
+      enabled: true
+    # Postgres migration linter — catches locking/destructive DDL, which pairs
+    # directly with the expand→backfill→contract rule.
+    squawk:
+      enabled: true
+    # Dependency vulnerability scanning.
+    osvScanner:
+      enabled: true
+    # PII detection. Nova stores real call transcripts; a transcript leaking into a
+    # fixture, log, or test file is exactly what this should catch.
+    presidio:
+      enabled: true
+    actionlint:
+      enabled: true
+    yamllint:
+      enabled: true
+    markdownlint:
+      enabled: true
+    # Disabled: not part of this stack, or redundant with the above. Enabling them
+    # produces noise, and noise is what makes a strict reviewer get ignored.
+    biome:
+      enabled: false
+    oxc:
+      enabled: false
+    checkov:
+      enabled: false
+    trivy:
+      enabled: false
+    sqlfluff:
+      enabled: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  learnings:
+    scope: auto

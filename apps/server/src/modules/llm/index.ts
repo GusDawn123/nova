@@ -46,16 +46,16 @@ export {
   createOpenAiProvider,
   type OpenAiProviderOptions,
 } from "./adapters/openai.js";
-export { createGroqProvider, type GroqProviderOptions } from "./adapters/groq.js";
+export {
+  createGroqProvider,
+  type GroqProviderOptions,
+} from "./adapters/groq.js";
 export {
   createGoogleProvider,
   type GoogleProviderOptions,
 } from "./adapters/google.js";
 
-export {
-  createProvidersFromEnv,
-  type LlmProviderEnv,
-} from "./factory.js";
+export { createProvidersFromEnv, type LlmProviderEnv } from "./factory.js";
 
 export {
   makeMockProvider,

@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { sttConfigSchema, type SttConfigInput } from "./config.js";
 import { createSttEngine } from "./engine.js";
@@ -11,8 +11,9 @@ import { MockVendor } from "./testing/mock-vendor.js";
  * Task 4 turns it green. Observable-only assertions.
  */
 
-const cfg = (overrides: SttConfigInput = {}): ReturnType<typeof sttConfigSchema.parse> =>
-  sttConfigSchema.parse(overrides);
+const cfg = (
+  overrides: SttConfigInput = {},
+): ReturnType<typeof sttConfigSchema.parse> => sttConfigSchema.parse(overrides);
 
 function capture(): { emit: SttEmit; events: ServerLiveEvent[] } {
   const events: ServerLiveEvent[] = [];
@@ -83,16 +84,24 @@ describe("STT engine — session isolation", () => {
 
     // Each emit saw only its own session's transcript.
     expect(
-      a.events.some((e) => e.type === "transcript.final" && e.text === "from-A"),
+      a.events.some(
+        (e) => e.type === "transcript.final" && e.text === "from-A",
+      ),
     ).toBe(true);
     expect(
-      a.events.some((e) => e.type === "transcript.final" && e.text === "from-B"),
+      a.events.some(
+        (e) => e.type === "transcript.final" && e.text === "from-B",
+      ),
     ).toBe(false);
     expect(
-      b.events.some((e) => e.type === "transcript.final" && e.text === "from-B"),
+      b.events.some(
+        (e) => e.type === "transcript.final" && e.text === "from-B",
+      ),
     ).toBe(true);
     expect(
-      b.events.some((e) => e.type === "transcript.final" && e.text === "from-A"),
+      b.events.some(
+        (e) => e.type === "transcript.final" && e.text === "from-A",
+      ),
     ).toBe(false);
 
     handleA.stop();

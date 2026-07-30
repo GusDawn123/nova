@@ -6,11 +6,13 @@ import {
   type ClientLiveEvent,
   type LiveErrorCode,
   type ServerLiveEvent,
+  type TranscriptInputOrigin,
 } from "@nova/shared";
 
 import type { SttEngine, SttSessionHandle } from "../stt/ports.js";
 
 import type { LiveConductor, LiveConductorFactory } from "./conductor.js";
+import type { LiveNotesConductorFactory } from "./notes-conductor.js";
 import {
   createDisposer,
   noopAudioFrameHandler,
@@ -19,6 +21,7 @@ import {
   type LiveLogger,
   type LiveMetering,
   type LiveSessionRegistry,
+  type LiveTranscriptConsumer,
   type TranscriptPersister,
 } from "./ports.js";
 
@@ -96,6 +99,13 @@ export interface LiveSessionDeps {
    * keyless boot — the session still transcribes, just without suggestions.
    */
   createConductor?: LiveConductorFactory;
+  /**
+   * The running-notes conductor factory (Phase 8). Same posture as
+   * {@link createConductor}: wired only when an LLM key AND the DB are present,
+   * built at `session.start` for a known owner, skipped in echo mode. It watches
+   * the same transcript stream and streams `notes.update` down THIS socket.
+   */
+  createNotesConductor?: LiveNotesConductorFactory;
 }
 
 export class LiveSession {
@@ -114,10 +124,18 @@ export class LiveSession {
   private readonly metering: LiveMetering | null;
   private readonly registry: LiveSessionRegistry | null;
   private readonly createConductor: LiveConductorFactory | null;
+  private readonly createNotesConductor: LiveNotesConductorFactory | null;
   private readonly initialSttVendor: string;
   private readonly quotaRecheckSeconds: number;
-  /** The live copilot conductor for this call; null until start (or unwired). */
+  /**
+   * The live copilot conductor for this call; null until start (or unwired). Kept
+   * as its own handle ALONGSIDE {@link consumers} because the typed-question
+   * channel (`onDirectQuestion`) is copilot-specific — it is not part of the
+   * transcript stream every consumer sees.
+   */
   private conductor: LiveConductor | null = null;
+  /** Everything watching this call's transcript, in registration order. */
+  private readonly consumers: LiveTranscriptConsumer[] = [];
 
   private started = false;
   private sessionId: string | null = null;
@@ -148,6 +166,7 @@ export class LiveSession {
     this.metering = deps.metering ?? null;
     this.registry = deps.registry ?? null;
     this.createConductor = deps.createConductor ?? null;
+    this.createNotesConductor = deps.createNotesConductor ?? null;
     // "unknown" only ever bills on a misconfigured wiring (the transport always
     // passes the lineup head when vendors exist); kept explicit, never invented.
     this.initialSttVendor = deps.initialSttVendor ?? "unknown";
@@ -232,7 +251,7 @@ export class LiveSession {
         this.sendError("invalid_event", "audio must be sent as binary frames");
         return;
       case "transcript.input":
-        this.onTranscriptInput(event.text);
+        this.onTranscriptInput(event.text, event.origin);
         return;
     }
   }
@@ -248,7 +267,10 @@ export class LiveSession {
    * before that it is refused with a typed error. No new vendor call site: any
    * resulting suggestion rides the conductor's already-metered router path.
    */
-  private onTranscriptInput(text: string): void {
+  private onTranscriptInput(
+    text: string,
+    origin: TranscriptInputOrigin = "utterance",
+  ): void {
     if (this.sessionId === null || this.disposer.disposed) {
       this.sendError(
         "input_before_start",
@@ -258,6 +280,27 @@ export class LiveSession {
     }
     const tsMs =
       this.startedAtMs !== null ? Date.now() - this.startedAtMs : Date.now();
+
+    if (origin === "copilot_question") {
+      // NOT part of the conversation — the user asked their assistant something.
+      // Echoed back as their OWN turn so the UI can show it, routed to the
+      // conductor's direct channel so it is always answered, and deliberately
+      // NOT run through `onServerEvent`: that is the path that persists, and a
+      // question to the copilot must never become a `transcripts` row (from
+      // there it would reach post-call notes and RAG memory as something the
+      // other party said — see docs/DESIGN/live-notes.md §13 F2).
+      this.send({
+        v: LIVE_PROTOCOL_VERSION,
+        type: "transcript.final",
+        text,
+        speaker: "me",
+        ts_ms: tsMs,
+        is_final: true,
+      });
+      this.conductor?.onDirectQuestion(text);
+      return;
+    }
+
     this.onServerEvent({
       v: LIVE_PROTOCOL_VERSION,
       type: "transcript.final",
@@ -450,9 +493,24 @@ export class LiveSession {
         meetingId,
       });
       this.conductor = conductor;
-      this.disposer.add(() => {
-        conductor.dispose();
-      });
+      this.registerConsumer(conductor);
+    }
+
+    // Running-notes conductor (Phase 8). Consumer #2 on the SAME stream, sharing
+    // nothing with the copilot above: its own cadence, gate, model call and state.
+    // Same gating — a factory, a known owner, and not echo mode.
+    if (
+      this.createNotesConductor !== null &&
+      this.userId !== null &&
+      !this.echo
+    ) {
+      this.registerConsumer(
+        this.createNotesConductor({
+          send: this.send,
+          userId: this.userId,
+          meetingId,
+        }),
+      );
     }
 
     // Start the STT relay for this call. Echo mode is the pre-vendor transit
@@ -480,13 +538,13 @@ export class LiveSession {
    */
   private readonly onServerEvent = (event: ServerLiveEvent): void => {
     this.send(event);
-    // Feed the copilot conductor the SAME transcript stream (off the relay's hot
-    // path — the conductor's own work is async/aborted, never blocking send).
+    // Feed every consumer the SAME transcript stream (off the relay's hot path —
+    // their own work is async/aborted, never blocking send).
     if (event.type === "transcript.partial") {
-      this.conductor?.onPartial(event.text, event.speaker);
+      this.fanOut((c) => c.onPartial?.(event.text, event.speaker));
     }
     if (event.type === "transcript.final") {
-      this.conductor?.onFinal(event.text, event.speaker);
+      this.fanOut((c) => c.onFinal?.(event.text, event.speaker));
       this.persistFinal(event.text, event.speaker, event.ts_ms);
     }
     if (event.type === "provider_switched") {
@@ -495,6 +553,37 @@ export class LiveSession {
       this.sttUsage?.onVendorSwitch(event.to);
     }
   };
+
+  /**
+   * Register a transcript consumer and hang its teardown on the exactly-once
+   * disposer. Consumers are built AFTER the gates and BEFORE STT starts, so LIFO
+   * teardown stops STT first (no new finals), then disposes them in reverse.
+   */
+  private registerConsumer(consumer: LiveTranscriptConsumer): void {
+    this.consumers.push(consumer);
+    this.disposer.add(() => {
+      consumer.dispose();
+    });
+  }
+
+  /**
+   * Deliver one transcript event to every consumer, ISOLATED. A synchronous throw
+   * from one must not skip the others or escape into the relay — with a single
+   * hardcoded consumer that was academic, but a notes-conductor bug taking the
+   * copilot down mid-call (or vice versa) is not.
+   */
+  private fanOut(deliver: (consumer: LiveTranscriptConsumer) => void): void {
+    for (const consumer of this.consumers) {
+      try {
+        deliver(consumer);
+      } catch (err: unknown) {
+        this.logger?.error(
+          { user_id: this.userId, meeting_id: this.meetingId, err },
+          "live.consumer_threw",
+        );
+      }
+    }
+  }
 
   /** Fire-and-forget persist of one final utterance; errors logged, never thrown. */
   private persistFinal(

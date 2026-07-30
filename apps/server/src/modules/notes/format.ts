@@ -13,7 +13,8 @@ export function formatTranscript(turns: TranscriptTurn[]): string {
   return turns
     .map((turn) => {
       const who = turn.speaker ?? "Unknown";
-      const stamp = turn.tsMs !== null ? `[${formatTimestamp(turn.tsMs)}] ` : "";
+      const stamp =
+        turn.tsMs !== null ? `[${formatTimestamp(turn.tsMs)}] ` : "";
       return `${stamp}${who}: ${turn.text}`;
     })
     .join("\n");

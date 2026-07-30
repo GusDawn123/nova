@@ -1,8 +1,4 @@
-import type {
-  ChatRequest,
-  LlmStreamEvent,
-  Meter,
-} from "../../llm/index.js";
+import type { ChatRequest, LlmStreamEvent, Meter } from "../../llm/index.js";
 import type { LlmRouter } from "../../llm/index.js";
 
 /**
@@ -45,7 +41,8 @@ export interface MockNotesRouter extends LlmRouter {
 }
 
 const DEFAULT_MAP = {
-  miniSummary: "A segment of the call. Nothing notable was extracted here. End.",
+  miniSummary:
+    "A segment of the call. Nothing notable was extracted here. End.",
   decisions: [],
   actionItems: [],
   openQuestions: [],
@@ -72,7 +69,8 @@ const DEFAULT_REDUCE = {
 function stageOf(req: ChatRequest): NotesStage {
   const system = req.messages.find((m) => m.role === "system")?.content ?? "";
   if (system.includes("label the type of a phone call")) return "classify";
-  if (system.includes("extract structured facts from ONE SEGMENT")) return "map";
+  if (system.includes("extract structured facts from ONE SEGMENT"))
+    return "map";
   if (system.includes("write the final notes for a LONG")) return "reduce";
   if (system.includes("fix a JSON object")) return "repair";
   return "generate";
@@ -102,8 +100,6 @@ export function makeNotesRouter(
         : { stage, userContent },
     );
     await Promise.resolve(); // async generator: yields on the microtask queue
-
-
 
     let text: string;
     if (stage === "classify") {

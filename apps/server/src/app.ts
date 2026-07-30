@@ -1,4 +1,10 @@
 import cors from "@fastify/cors";
+import Fastify, {
+  type FastifyInstance,
+  type FastifyReply,
+  type FastifyServerOptions,
+} from "fastify";
+import type { z } from "zod";
 import {
   deletionResponseSchema,
   healthResponseSchema,
@@ -7,30 +13,25 @@ import {
   type HealthResponse,
   type MeResponse,
 } from "@nova/shared";
-import type { z } from "zod";
-import Fastify, {
-  type FastifyInstance,
-  type FastifyReply,
-  type FastifyServerOptions,
-} from "fastify";
 
 import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
-import { createRoleReader } from "./db/roles.js";
-import {
-  isUsageEventsConfigured,
-  usageEventsDbFromEnv,
-} from "./db/usage-events.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
-import { createRagIndexerDb } from "./db/rag-indexer.js";
-import { createStaleCallReaper } from "./db/stale-call-reaper.js";
-import { isNotesWorkerEnabled } from "./env.js";
+import { createLiveNotesStore } from "./db/live-notes.js";
 import { createNotesSource } from "./db/notes-source.js";
 import {
   createFollowUpWriter,
   createNotesReader,
   createNotesWriter,
 } from "./db/notes.js";
+import { createRagIndexerDb } from "./db/rag-indexer.js";
+import { createRoleReader } from "./db/roles.js";
+import { createStaleCallReaper } from "./db/stale-call-reaper.js";
+import {
+  isUsageEventsConfigured,
+  usageEventsDbFromEnv,
+} from "./db/usage-events.js";
+import { isNotesWorkerEnabled } from "./env.js";
 import {
   maybeCreateKillSwitch,
   maybeCreateMetering,
@@ -40,17 +41,17 @@ import {
 } from "./metering-wiring.js";
 import { liveRoutes } from "./modules/live/routes.js";
 import {
-  type KillSwitch,
-  type MeteringService,
-  type QuotaChecker,
-} from "./modules/metering/index.js";
-import {
   AllProvidersFailedError,
   createLlmRouter,
   createProvidersFromEnv,
   llmConfigSchema,
   type LlmProviderEnv,
 } from "./modules/llm/index.js";
+import {
+  type KillSwitch,
+  type MeteringService,
+  type QuotaChecker,
+} from "./modules/metering/index.js";
 import {
   createNotesJobHandler,
   createNotesPipeline,
@@ -60,8 +61,8 @@ import {
   type FollowUpInput,
   type FollowUpResult,
 } from "./modules/notes/index.js";
-import { createRagIndexer } from "./modules/rag/indexer.js";
 import { createRagFromEnv } from "./modules/rag/index.js";
+import { createRagIndexer } from "./modules/rag/indexer.js";
 import { extractBearerToken, requireAuth } from "./plugins/auth.js";
 import { withLogRedaction } from "./plugins/log-redaction.js";
 import {
@@ -263,10 +264,14 @@ function maybeStartRagIndexer(
   const ragConfigured =
     Boolean(env.VOYAGE_API_KEY) && Boolean(env.SUPABASE_DB_URL);
   if (!ragConfigured || env.NODE_ENV === "test") return;
+  // why: SUPABASE_DB_URL above already implies metering, so this never fires in
+  // practice — it exists so the Voyage sink below can be unconditional. The
+  // indexer is a background embedder; without a ledger it must not run at all.
+  if (!metering) return;
 
   const ragService = createRagFromEnv(env, {
     logger: app.log,
-    ...(metering ? { logUsage: voyageMeteringSink(metering, app) } : {}),
+    logUsage: voyageMeteringSink(metering, app),
   });
   const indexer = createRagIndexer({
     ragService,
@@ -339,29 +344,32 @@ function maybeStartNotesWorker(
     );
     return;
   }
+  // why: the gate above already requires SUPABASE_DB_URL, so metering resolves —
+  // this early return is a no-op in practice. It replaces a conditional spread that
+  // merely satisfied the optional type: a `...(metering ? { meterFor } : {})` reads
+  // as "metered when convenient", and that is exactly how the live copilot shipped
+  // unmetered. Fail closed instead, and let the seam below be unconditional.
+  if (!metering) return;
 
   const { store } = notesJobStoreFromEnv(process.env);
   const router = createLlmRouter({
     providers,
     config: llmConfigSchema.parse({}),
   });
-  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
-  // gate); the conditional spread only satisfies the type, never skips the sink.
   const pipeline = createNotesPipeline({
     router,
     logger: app.log,
-    ...(metering
-      ? {
-          meterFor: (userId: string, meetingId?: string) =>
-            metering.meterFor(userId, meetingId),
-        }
-      : {}),
+    meterFor: (userId: string, meetingId?: string) =>
+      metering.meterFor(userId, meetingId),
   });
   const handler = createNotesJobHandler({
     pipeline,
     source: createNotesSource(),
     writer: createNotesWriter(),
     logger: app.log,
+    // Carry live-notes ids onto the final notes so the end-of-call swap animates
+    // a diff (Phase 8 §3). Same memoised pool as the job store above.
+    liveNotes: createLiveNotesStore(notesJobStoreFromEnv(process.env).pool),
     // Claim-time llm quota gate (adr-0007 §4): over-quota jobs dead-letter with
     // 'quota_exceeded' so the paywall stays visible. Present whenever metering is.
     ...(quota
@@ -410,29 +418,33 @@ function maybeRegisterNotesRoutes(
   }
 
   const providers = createProvidersFromEnv(llmProviderEnv(process.env));
-  // metering is always present here (this gate requires SUPABASE_DB_URL — its own
-  // gate); the conditional spread only satisfies the type, never skips the sink.
+  // why: metering joins the CONDITION rather than being spread in optionally, so the
+  // router is never constructed without its meter. The gate above already requires
+  // SUPABASE_DB_URL so metering resolves in practice; folding it in here means the
+  // unmetered branch is unrepresentable rather than merely unlikely. The notes REST
+  // surface still registers either way — only follow-up generation degrades, exactly
+  // as it already does with no provider key.
   const followUp: (input: FollowUpInput) => Promise<FollowUpResult> =
-    providers.length > 0
+    providers.length > 0 && metering
       ? generateFollowUp({
           router: createLlmRouter({
             providers,
             config: llmConfigSchema.parse({}),
           }),
           logger: app.log,
-          ...(metering
-            ? {
-                meterFor: (userId: string, meetingId?: string) =>
-                  metering.meterFor(userId, meetingId),
-              }
-            : {}),
+          meterFor: (userId: string, meetingId?: string) =>
+            metering.meterFor(userId, meetingId),
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 
-  const { store } = notesJobStoreFromEnv(process.env);
+  // The pool comes back with the store: this gate already required
+  // SUPABASE_DB_URL, so the live-notes store rides the same memoised pool rather
+  // than opening a fourth one (the db/plans.ts + db/roles.ts precedent).
+  const { store, pool } = notesJobStoreFromEnv(process.env);
   void app.register(
     createNotesRoutes({
       reader: createNotesReader(),
+      liveNotes: createLiveNotesStore(pool),
       followUpWriter: createFollowUpWriter(),
       store,
       followUp,

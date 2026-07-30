@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Meter, UsageEntry } from "./ports.js";
+import { withMeter } from "./router.js";
 import { makeMockProvider } from "./testing/mock-provider.js";
 import {
   doneWith,
@@ -9,7 +10,6 @@ import {
   REQ,
   tok,
 } from "./testing/router-harness.js";
-import { withMeter } from "./router.js";
 
 /**
  * [meter-opt] Phase 6 per-call meter injection (adr-0007 §2): `stream(req, opts)`
@@ -37,9 +37,7 @@ describe("router [meter-opt] — per-call meter override", () => {
       constructed.meter,
     );
 
-    const { error } = await drain(
-      router.stream(REQ, { meter: perCall.meter }),
-    );
+    const { error } = await drain(router.stream(REQ, { meter: perCall.meter }));
 
     expect(error).toBeUndefined();
     expect(perCall.recordUsage).toHaveBeenCalledTimes(1);

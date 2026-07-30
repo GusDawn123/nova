@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { LlmErrorKind, ProviderId } from "./index.js";
 import { makeMockProvider } from "./testing/mock-provider.js";
 import {
   asAllProvidersFailed,
@@ -10,6 +9,7 @@ import {
   REQ,
   tok,
 } from "./testing/router-harness.js";
+import type { LlmErrorKind, ProviderId } from "./index.js";
 
 /**
  * [order] `req.providerOrder` overrides config order for that request only;

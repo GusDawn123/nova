@@ -247,6 +247,12 @@ export function useLiveSession(): UseLiveSession {
       );
     };
     socket.onmessage = (message: WebSocketMessageEvent): void => {
+      // why: onerror and onclose below already ignore a superseded socket; this
+      // handler did not. A frame still in flight from a previous socket (stop then
+      // start again, or a reconnect) applied its transcript lines and suggestion
+      // deltas into the CURRENT session's state — the exact bug class the ref
+      // guard exists to prevent.
+      if (socketRef.current !== socket) return;
       let json: unknown;
       try {
         json = JSON.parse(String(message.data));
@@ -284,6 +290,19 @@ export function useLiveSession(): UseLiveSession {
     };
   }, [auth, stop, reset, applyEvent]);
 
+  /**
+   * Send what the user typed on the "Test Live" screen. That screen is a
+   * DEVELOPER surface (role-gated to developer/admin, adr-0008) whose job is to
+   * stand in for the mic until real capture lands in Phase 8/9 — so a typed line
+   * means "the other party said this", and goes up as `origin: "utterance"`.
+   * It is attributed to "them", persisted, and run through the trigger gate,
+   * which is exactly what makes the copilot behave as it would on a real call
+   * and what makes post-call notes testable without speaking.
+   *
+   * The sibling `origin: "copilot_question"` (answered but never persisted)
+   * exists on the wire and is server-tested; it belongs to the real product
+   * surface — "ask your copilot something mid-call" — not to this dev tool.
+   */
   const sendInput = useCallback((text: string): void => {
     const trimmed = text.trim();
     const socket = socketRef.current;
@@ -299,6 +318,7 @@ export function useLiveSession(): UseLiveSession {
         v: LIVE_PROTOCOL_VERSION,
         type: 'transcript.input',
         text: trimmed.slice(0, 2000),
+        origin: 'utterance',
       }),
     );
   }, []);

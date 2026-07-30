@@ -123,7 +123,10 @@ describe.skipIf(!hasStack)("pgvector store (local stack)", () => {
     pool = createPgPool(process.env);
     // Small candidate cut (2) so the full-text leg is the ONLY way C3 (far
     // semantically) can surface — that isolates the fts contribution.
-    store = createPgVectorStore({ pool, config: { candidatesPerLeg: 2, rrfK: 50 } });
+    store = createPgVectorStore({
+      pool,
+      config: { candidatesPerLeg: 2, rrfK: 50 },
+    });
     admin = createClient(url, serviceRoleKey, noPersist);
 
     const a = await admin.auth.admin.createUser({
@@ -162,7 +165,10 @@ describe.skipIf(!hasStack)("pgvector store (local stack)", () => {
     await pool.end();
   });
 
-  const sourceA = (): RagSource => ({ kind: "context_doc", contextDocId: docA });
+  const sourceA = (): RagSource => ({
+    kind: "context_doc",
+    contextDocId: docA,
+  });
 
   it("[insert] replaceSource inserts the whole corpus live", async () => {
     await store.replaceSource(userA, sourceA(), CORPUS);
@@ -177,7 +183,12 @@ describe.skipIf(!hasStack)("pgvector store (local stack)", () => {
   });
 
   it("[semantic] returns the nearest neighbor first (empty text → semantic only)", async () => {
-    const hits = await store.search(userA, { vector: Q, text: "", model: MODEL, k: 10 });
+    const hits = await store.search(userA, {
+      vector: Q,
+      text: "",
+      model: MODEL,
+      k: 10,
+    });
     expect(hits.length).toBeGreaterThan(0);
     expect(hits[0]?.content).toContain("alpha unique nearest");
     expect(hits[0]?.contextDocId).toBe(docA);
@@ -209,7 +220,12 @@ describe.skipIf(!hasStack)("pgvector store (local stack)", () => {
   });
 
   it("[isolation] user B's search sees zero of A's corpus", async () => {
-    const hits = await store.search(userB, { vector: Q, text: "XK-9930", model: MODEL, k: 10 });
+    const hits = await store.search(userB, {
+      vector: Q,
+      text: "XK-9930",
+      model: MODEL,
+      k: 10,
+    });
     expect(hits).toHaveLength(0);
   });
 
@@ -219,9 +235,16 @@ describe.skipIf(!hasStack)("pgvector store (local stack)", () => {
       "update chunks set deleted_at = now() where context_doc_id = $1 and content = $2 and deleted_at is null",
       [docA, "alpha unique nearest neighbor"],
     );
-    const hits = await store.search(userA, { vector: Q, text: "", model: MODEL, k: 10 });
+    const hits = await store.search(userA, {
+      vector: Q,
+      text: "",
+      model: MODEL,
+      k: 10,
+    });
     const contents = hits.map((h) => h.content);
-    expect(contents.some((c) => c.includes("alpha unique nearest"))).toBe(false);
+    expect(contents.some((c) => c.includes("alpha unique nearest"))).toBe(
+      false,
+    );
     expect(hits[0]?.content).toContain("delta combined");
   });
 });

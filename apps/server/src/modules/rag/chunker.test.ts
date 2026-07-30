@@ -66,9 +66,9 @@ describe("chunkTranscript — headers", () => {
   });
 
   it("renders a bare title-only header", () => {
-    expect(chunker.chunkTranscript(one, { title: "Sync" }, cfg)[0]?.header).toBe(
-      "Meeting: Sync",
-    );
+    expect(
+      chunker.chunkTranscript(one, { title: "Sync" }, cfg)[0]?.header,
+    ).toBe("Meeting: Sync");
   });
 });
 
@@ -96,7 +96,7 @@ describe("chunkTranscript — packing & overlap", () => {
     }
   });
 
-  it("renders a null speaker as \"Speaker\"", () => {
+  it('renders a null speaker as "Speaker"', () => {
     const chunks = chunker.chunkTranscript([turn(null, "solo")], meta, cfg);
     expect(chunks[0]?.content).toBe(render(null, "solo"));
     expect(chunks[0]?.content).toBe("Speaker: solo");
@@ -165,7 +165,11 @@ describe("chunkTranscript — edge cases", () => {
   });
 
   it("throws RagError(SOURCE_TOO_LARGE) past the per-source cap", () => {
-    const tiny: ChunkConfig = { ...cfg, targetChunkTokens: 1, maxChunksPerSource: 2 };
+    const tiny: ChunkConfig = {
+      ...cfg,
+      targetChunkTokens: 1,
+      maxChunksPerSource: 2,
+    };
     const turns = Array.from({ length: 5 }, (_v, i) =>
       turn("Alice", `turn number ${String(i)} here`),
     );
@@ -210,9 +214,7 @@ describe("chunkDoc", () => {
       "Alpha sentence one.\n\nBravo sentence two.\n\n" +
       "Charlie sentence three.\n\nDelta sentence four.";
     const chunks = chunker.chunkDoc(content, meta, cfg);
-    expect(chunks.map((c) => c.chunkIndex)).toEqual(
-      chunks.map((_c, i) => i),
-    );
+    expect(chunks.map((c) => c.chunkIndex)).toEqual(chunks.map((_c, i) => i));
   });
 
   it("sets tokenCount to approxTokens(header + ' ' + content)", () => {
@@ -244,9 +246,12 @@ describe("chunkDoc", () => {
   });
 
   it("throws RagError(SOURCE_TOO_LARGE) past the per-source cap", () => {
-    const tiny: ChunkConfig = { ...cfg, targetChunkTokens: 1, maxChunksPerSource: 2 };
-    const content =
-      "One.\n\nTwo.\n\nThree.\n\nFour.\n\nFive.\n\nSix.";
+    const tiny: ChunkConfig = {
+      ...cfg,
+      targetChunkTokens: 1,
+      maxChunksPerSource: 2,
+    };
+    const content = "One.\n\nTwo.\n\nThree.\n\nFour.\n\nFive.\n\nSix.";
     let thrown: unknown;
     try {
       chunker.chunkDoc(content, meta, tiny);

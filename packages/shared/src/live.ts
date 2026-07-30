@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { meetingNotesSchema } from "./notes.js";
+
 /**
  * Live-call wire protocol (Phase 3) — the typed envelope exchanged over the one
  * authenticated WebSocket per call (`GET /live`). Audio frames travel UP as raw
@@ -57,6 +59,30 @@ export const audioFrameMarkerSchema = z.object({
 });
 
 /**
+ * WHICH of the two things a `transcript.input` means. The channel was built to
+ * carry both (Phase 7) and the server could not tell them apart — so every
+ * question typed AT the copilot was recorded as a line the OTHER party spoke,
+ * and flowed on into post-call notes and RAG memory as a fact about the call.
+ *
+ *   utterance         The user is typing what was SAID (mic off / noisy room).
+ *                     Attributed to "them", echoed, persisted, indexed — the
+ *                     original Phase 7 behavior, and correct for this meaning.
+ *   copilot_question  The user is asking their COPILOT something. Answered (that
+ *                     is the point), echoed back as the user's OWN turn, and
+ *                     deliberately NOT persisted: it is not part of the call, so
+ *                     it must never reach the transcript, the notes, or memory.
+ *
+ * OPTIONAL, and an omitted value means `utterance` — the field is additive, so a
+ * client older than this schema keeps its exact prior behavior rather than
+ * silently changing what gets stored.
+ */
+export const transcriptInputOriginSchema = z.enum([
+  "utterance",
+  "copilot_question",
+]);
+export type TranscriptInputOrigin = z.infer<typeof transcriptInputOriginSchema>;
+
+/**
  * A TYPED utterance from the conversation (Phase 7, decision 2026-07-22): the
  * user types what was said — or a question to the copilot — instead of (or
  * alongside) the mic. The server treats it exactly like a FINAL transcript
@@ -71,6 +97,7 @@ export const transcriptInputSchema = z.object({
   v: version,
   type: z.literal("transcript.input"),
   text: z.string().min(1).max(2000),
+  origin: transcriptInputOriginSchema.optional(),
 });
 
 /** Gracefully end the session; triggers server-side teardown. */
@@ -230,6 +257,31 @@ export const audioEchoSchema = z.object({
   bytes: z.number().int().nonnegative(),
 });
 
+/**
+ * The running-notes preview, emitted after a fold that actually changed something
+ * (Phase 8, `docs/DESIGN/live-notes.md` §6). Carries the FULL v2 notes object, not
+ * a delta: the model returns ops, the server folds them into authoritative state,
+ * and only the folded result reaches the wire. The client diffs by item `id`
+ * (`noteIdSchema`) — ids are stable for the life of an item, which is what lets the
+ * tab animate a change instead of replacing the list.
+ *
+ * `rev` is a per-meeting monotonic counter, bumped once per fold that changed
+ * state. CLIENT RULE: drop any `notes.update` whose `rev` is <= the last one seen —
+ * a cheap guard against out-of-order delivery across a reconnect.
+ *
+ * Live notes are a PREVIEW: `notes.source === "live"` here, while the post-call
+ * pipeline stays authoritative and writes `generated`/`fallback`.
+ *
+ * No `meeting_id` field: the socket is already bound to one meeting by
+ * `session.start`, so carrying it would be a second source of truth.
+ */
+export const notesUpdateSchema = z.object({
+  v: version,
+  type: z.literal("notes.update"),
+  notes: meetingNotesSchema,
+  rev: z.number().int().nonnegative(),
+});
+
 /** Every JSON message the server may send down the socket. */
 export const serverLiveEventSchema = z.discriminatedUnion("type", [
   sessionReadySchema,
@@ -243,6 +295,7 @@ export const serverLiveEventSchema = z.discriminatedUnion("type", [
   liveErrorSchema,
   pongSchema,
   audioEchoSchema,
+  notesUpdateSchema,
 ]);
 
 export type ServerLiveEvent = z.infer<typeof serverLiveEventSchema>;

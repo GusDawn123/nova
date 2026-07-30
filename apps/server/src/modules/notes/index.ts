@@ -6,10 +6,7 @@
 
 export { createNotesWorker, type NotesWorkerDeps } from "./worker.js";
 export { createNotesPipeline, type NotesPipelineDeps } from "./pipeline.js";
-export {
-  createNotesJobHandler,
-  type NotesJobHandlerDeps,
-} from "./handler.js";
+export { createNotesJobHandler, type NotesJobHandlerDeps } from "./handler.js";
 export {
   generateFollowUp,
   buildFallbackFollowUp,
@@ -17,10 +14,7 @@ export {
   type FollowUpInput,
   type FollowUpResult,
 } from "./follow-up.js";
-export {
-  createNotesRoutes,
-  type NotesRoutesDeps,
-} from "./routes.js";
+export { createNotesRoutes, type NotesRoutesDeps } from "./routes.js";
 export {
   type NotesJobHandler,
   type NotesLogger,
@@ -43,3 +37,32 @@ export {
   computeBackoff,
   type NotesConfig,
 } from "./config.js";
+export { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
+export { reconcileIds, RECONCILE_THRESHOLD } from "./reconcile-ids.js";
+/**
+ * The live-notes fold (Phase 8). `modules/live`'s notes conductor owns the LOOP
+ * and reaches the notes domain only through these — the prompt, the ops schema,
+ * the reducer and the ladder all stay internal (RULES §2).
+ */
+export {
+  applyFold,
+  emptyLiveNotes,
+  initialFoldState,
+  deriveSeqCounters,
+  foldResultSchema,
+  MAX_OPS_PER_FOLD,
+  LIVE_FORMING_TLDR,
+  type FoldContext,
+  type FoldOutcome,
+  type FoldResult,
+  type FoldState,
+  type DroppedOp,
+  type LiveFoldConfig,
+  type SeqCounters,
+} from "./live-fold.js";
+export {
+  createLiveFoldRunner,
+  type FoldRequest,
+  type LiveFoldRunner,
+  type LiveFoldRunnerDeps,
+} from "./live-fold-runner.js";

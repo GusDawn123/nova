@@ -38,7 +38,8 @@ function mulberry32(seed: number): () => number {
 
 const SEED = 0x5eed_c0de;
 const rand = mulberry32(SEED);
-const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rand() * arr.length)] as T;
+const pick = <T>(arr: readonly T[]): T =>
+  arr[Math.floor(rand() * arr.length)] as T;
 
 // ---------------------------------------------------------------------------
 // Call shape.
@@ -198,7 +199,10 @@ const outDir = join(
   "notes",
 );
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, "long-call.json"), `${JSON.stringify(fixture, null, 2)}\n`);
+writeFileSync(
+  join(outDir, "long-call.json"),
+  `${JSON.stringify(fixture, null, 2)}\n`,
+);
 writeFileSync(
   join(outDir, "long-call.expected.json"),
   `${JSON.stringify(manifest, null, 2)}\n`,

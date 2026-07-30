@@ -100,10 +100,10 @@ describe("router [invalid] — immediate failover, once per provider, breaker co
       failBeforeFirstToken: { kind: "invalid" },
     });
     const b = makeMockProvider("openai", { events: WIN });
-    const router = makeRouter(
-      [a, b],
-      { defaultOrder: ["anthropic", "openai"], breakerThreshold: 2 },
-    );
+    const router = makeRouter([a, b], {
+      defaultOrder: ["anthropic", "openai"],
+      breakerThreshold: 2,
+    });
 
     await drain(router.stream(REQ)); // invalid #1 (a called)
     await drain(router.stream(REQ)); // invalid #2 → breaker trips open

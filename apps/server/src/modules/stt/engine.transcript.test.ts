@@ -1,5 +1,5 @@
-import type { ServerLiveEvent } from "@nova/shared";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ServerLiveEvent } from "@nova/shared";
 
 import { sttConfigSchema, type SttConfigInput } from "./config.js";
 import { createSttEngine } from "./engine.js";
@@ -16,8 +16,9 @@ import { MockVendor } from "./testing/mock-vendor.js";
 
 const INFO: SttSessionInfo = { sessionId: "sess-A", sampleRateHz: 16000 };
 
-const cfg = (overrides: SttConfigInput = {}): ReturnType<typeof sttConfigSchema.parse> =>
-  sttConfigSchema.parse(overrides);
+const cfg = (
+  overrides: SttConfigInput = {},
+): ReturnType<typeof sttConfigSchema.parse> => sttConfigSchema.parse(overrides);
 
 /** A capturing emit whose received events the test asserts against. */
 function capture(): { emit: SttEmit; events: ServerLiveEvent[] } {
@@ -66,7 +67,12 @@ describe("STT engine — transcript relay", () => {
           events: [
             {
               afterMs: 50,
-              event: { type: "partial", text: "hel", speaker: null, ts_ms: 100 },
+              event: {
+                type: "partial",
+                text: "hel",
+                speaker: null,
+                ts_ms: 100,
+              },
             },
             {
               afterMs: 50,
@@ -100,7 +106,9 @@ describe("STT engine — transcript relay", () => {
     // Advance only far enough for the first partial: a partial is visible and no
     // final has been emitted yet (interims stream ahead of the committed result).
     await vi.advanceTimersByTimeAsync(50);
-    expect(events.filter((e) => e.type === "transcript.partial").length).toBeGreaterThanOrEqual(1);
+    expect(
+      events.filter((e) => e.type === "transcript.partial").length,
+    ).toBeGreaterThanOrEqual(1);
     expect(events.some((e) => e.type === "transcript.final")).toBe(false);
     handle.stop();
   });

@@ -1,7 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { buildFallbackNotes, type MeetingNotes } from "@nova/shared";
+import {
+  FALLBACK_TLDR,
+  identifyNotes,
+  type MeetingNotes,
+  type NotesContent,
+} from "@nova/shared";
 
-import { joinTranscriptText, normalizeForMatch, verifyNotes } from "./verify-quotes.js";
+import {
+  joinTranscriptText,
+  normalizeForMatch,
+  verifyNotes,
+} from "./verify-quotes.js";
 
 /**
  * Quote/deadline guards vs hand-picked edge cases. The transcript corpus is a
@@ -12,21 +21,37 @@ import { joinTranscriptText, normalizeForMatch, verifyNotes } from "./verify-quo
 const TRANSCRIPT =
   "Alice: Let's ship the beta on Monday.\nBob: I'll send the proposal by Friday.";
 
-/** A generated-shaped notes object with the given decisions/actionItems spliced in. */
+/**
+ * A generated-shaped notes object with the given decisions/actionItems spliced in.
+ * Takes id-LESS content and mints ids via `identifyNotes` (v2) so each case reads as
+ * the facts under test, not as id bookkeeping.
+ */
 function notesWith(
-  overrides: Partial<Pick<MeetingNotes, "decisions" | "actionItems">>,
+  overrides: Partial<Pick<NotesContent, "decisions" | "actionItems">>,
 ): MeetingNotes {
-  return {
-    ...buildFallbackNotes("Test call"),
-    source: "generated",
-    ...overrides,
-  };
+  return identifyNotes(
+    {
+      conversationType: "casual",
+      title: "Test call",
+      tldr: FALLBACK_TLDR,
+      overview: FALLBACK_TLDR,
+      decisions: [],
+      actionItems: [],
+      openQuestions: [],
+      risks: [],
+      typeInsights: { kind: "casual" },
+      ...overrides,
+    },
+    "generated",
+  );
 }
 
 describe("verifyNotes — quote grounding", () => {
   it("keeps a decision whose quote is a verbatim transcript substring (no flag)", () => {
     const notes = notesWith({
-      decisions: [{ text: "Ship the beta Monday", quote: "ship the beta on Monday" }],
+      decisions: [
+        { text: "Ship the beta Monday", quote: "ship the beta on Monday" },
+      ],
     });
     const out = verifyNotes(notes, TRANSCRIPT);
     expect(out.decisions[0]?.unverified).toBeUndefined();
@@ -51,7 +76,12 @@ describe("verifyNotes — quote grounding", () => {
 
   it("flags (never drops) a decision whose quote is absent from the transcript", () => {
     const notes = notesWith({
-      decisions: [{ text: "Invented decision", quote: "we agreed to acquire the company" }],
+      decisions: [
+        {
+          text: "Invented decision",
+          quote: "we agreed to acquire the company",
+        },
+      ],
     });
     const out = verifyNotes(notes, TRANSCRIPT);
     expect(out.decisions).toHaveLength(1); // kept for recall
@@ -105,7 +135,9 @@ describe("verifyNotes — invented-date guard", () => {
 
 describe("normalization helpers", () => {
   it("joins turn texts into one corpus", () => {
-    expect(joinTranscriptText([{ text: "one" }, { text: "two" }])).toBe("one two");
+    expect(joinTranscriptText([{ text: "one" }, { text: "two" }])).toBe(
+      "one two",
+    );
   });
 
   it("collapses whitespace, folds case, and straightens curly quotes", () => {

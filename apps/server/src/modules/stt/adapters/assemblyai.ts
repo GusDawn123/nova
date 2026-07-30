@@ -10,10 +10,7 @@ import {
   type SttVendorConnection,
   type SttVendorEvent,
 } from "../ports.js";
-import {
-  AsyncEventQueue,
-  VendorStreamConnection,
-} from "./stream-bridge.js";
+import { AsyncEventQueue, VendorStreamConnection } from "./stream-bridge.js";
 import { toSttError } from "./vendor-errors.js";
 
 /**

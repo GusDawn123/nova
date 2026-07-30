@@ -40,8 +40,7 @@ export interface LadderTelemetry {
 
 /** Whether the ladder produced a schema-valid value or exhausted its rungs. */
 export type LadderResult<T> =
-  | { readonly status: "ok"; readonly value: T }
-  | { readonly status: "failed" };
+  { readonly status: "ok"; readonly value: T } | { readonly status: "failed" };
 
 /** The full ladder outcome: result + raw text + telemetry + per-call usage. */
 export interface LadderOutcome<T> {
@@ -151,7 +150,10 @@ type ParseAttempt<T> =
  * recovery beyond a clean `JSON.parse` was needed (so a clean-but-schema-wrong
  * response reports `salvaged:false`).
  */
-function parseStructured<T>(text: string, schema: z.ZodType<T>): ParseAttempt<T> {
+function parseStructured<T>(
+  text: string,
+  schema: z.ZodType<T>,
+): ParseAttempt<T> {
   const direct = tryJson(text);
   if (direct.ok) {
     return finish(direct.value, schema, false);

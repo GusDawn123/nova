@@ -40,7 +40,9 @@ const voyageKey = process.env.VOYAGE_API_KEY;
 const dbUrl = process.env.SUPABASE_DB_URL;
 const url = process.env.SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const hasLlm = Boolean(process.env.OPENAI_API_KEY || process.env.GOOGLE_API_KEY);
+const hasLlm = Boolean(
+  process.env.OPENAI_API_KEY || process.env.GOOGLE_API_KEY,
+);
 const canRun = Boolean(voyageKey && dbUrl && url && serviceRoleKey && hasLlm);
 
 const noPersist = {
@@ -53,8 +55,10 @@ const QUOTE_DIGITS = "47500";
 
 function providerEnv(): LlmProviderEnv {
   const env: LlmProviderEnv = {};
-  if (process.env.OPENAI_API_KEY) env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-  if (process.env.GOOGLE_API_KEY) env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+  if (process.env.OPENAI_API_KEY)
+    env.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+  if (process.env.GOOGLE_API_KEY)
+    env.GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
   if (process.env.GROQ_API_KEY) env.GROQ_API_KEY = process.env.GROQ_API_KEY;
   return env;
 }
@@ -76,7 +80,8 @@ function runQuestion(
     const conductor = createLiveConductor({
       send: (e: ServerLiveEvent) => {
         if (e.type === "suggestion.delta") text += e.text;
-        if (e.type === "suggestion.done" || e.type === "suggestion.discard") done();
+        if (e.type === "suggestion.done" || e.type === "suggestion.discard")
+          done();
       },
       router,
       rag,
@@ -103,7 +108,13 @@ describe.skipIf(!canRun)("modules/live [grounding] live RAG grounding", () => {
     pool = createPgPool(process.env);
     const store = createPgVectorStore({ pool, config: ragConfig });
     const { embedder, reranker } = voyageAdapterFromEnv(process.env, ragConfig);
-    rag = createRagService({ chunker, embedder, store, reranker, config: ragConfig });
+    rag = createRagService({
+      chunker,
+      embedder,
+      store,
+      reranker,
+      config: ragConfig,
+    });
     admin = createClient(url, serviceRoleKey, noPersist);
 
     const res = await admin.auth.admin.createUser({

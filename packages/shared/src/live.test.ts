@@ -7,10 +7,21 @@ import {
   serverLiveEventSchema,
   type ServerLiveEvent,
 } from "./live.js";
+import { buildFallbackNotes, type MeetingNotes } from "./notes.js";
 
 const MEETING_ID = "11111111-1111-4111-8111-111111111111";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const SUGGESTION_ID = "33333333-3333-4333-8333-333333333333";
+
+/**
+ * A minimal but schema-VALID v2 notes object, built through the same helper the
+ * output ladder's last rung uses so the fixture cannot drift from the schema.
+ * `source: "live"` is what a real `notes.update` carries (the preview marker).
+ */
+const LIVE_NOTES: MeetingNotes = {
+  ...buildFallbackNotes("Q3 renewal"),
+  source: "live",
+};
 
 /**
  * Representative accept + reject per event family (not exhaustive — the shape is
@@ -49,6 +60,40 @@ describe("clientLiveEventSchema", () => {
       text: "what did we quote them last time?",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("accepts transcript.input with an explicit origin (Phase 8 fix)", () => {
+    for (const origin of ["utterance", "copilot_question"]) {
+      const result = parseClientEvent({
+        v: 1,
+        type: "transcript.input",
+        text: "how should I price this?",
+        origin,
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("treats an OMITTED origin as absent (backward compatible)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "transcript.input",
+      text: "they said yes",
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === "transcript.input") {
+      expect(result.data.origin).toBeUndefined();
+    }
+  });
+
+  it("rejects an unknown transcript.input origin (closed set)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "transcript.input",
+      text: "hello there",
+      origin: "whatever",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("rejects transcript.input with empty or oversized text", () => {
@@ -95,9 +140,24 @@ describe("serverLiveEventSchema", () => {
       is_final: true,
     },
     { v: 1, type: "provider_switched", from: "assemblyai", to: "deepgram" },
-    { v: 1, type: "suggestion.start", suggestion_id: SUGGESTION_ID, kind: "answer" },
-    { v: 1, type: "suggestion.delta", suggestion_id: SUGGESTION_ID, text: "par" },
-    { v: 1, type: "suggestion.done", suggestion_id: SUGGESTION_ID, text: "full" },
+    {
+      v: 1,
+      type: "suggestion.start",
+      suggestion_id: SUGGESTION_ID,
+      kind: "answer",
+    },
+    {
+      v: 1,
+      type: "suggestion.delta",
+      suggestion_id: SUGGESTION_ID,
+      text: "par",
+    },
+    {
+      v: 1,
+      type: "suggestion.done",
+      suggestion_id: SUGGESTION_ID,
+      text: "full",
+    },
     {
       v: 1,
       type: "suggestion.discard",
@@ -114,6 +174,9 @@ describe("serverLiveEventSchema", () => {
     { v: 1, type: "error", code: "input_before_start", message: "no session" },
     { v: 1, type: "pong" },
     { v: 1, type: "audio.echo", bytes: 640 },
+    // Phase 8 (additive): the running-notes preview. rev 0 is the floor.
+    { v: 1, type: "notes.update", notes: LIVE_NOTES, rev: 0 },
+    { v: 1, type: "notes.update", notes: LIVE_NOTES, rev: 42 },
   ];
 
   it.each(accepted)("accepts a valid %o", (event) => {
@@ -137,6 +200,30 @@ describe("serverLiveEventSchema", () => {
       type: "error",
       code: "kaboom",
       message: "x",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it.each([-1, 1.5])("rejects notes.update with rev %s", (rev) => {
+    // rev is the client's out-of-order guard — a negative or fractional value
+    // would break the `<=` comparison it exists for.
+    const result = serverLiveEventSchema.safeParse({
+      v: 1,
+      type: "notes.update",
+      notes: LIVE_NOTES,
+      rev,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects notes.update carrying a v1 notes object", () => {
+    // The wire is v2-only. v1 upcasting is a READ-boundary concern
+    // (`storedNotesSchema`), never a wire one.
+    const result = serverLiveEventSchema.safeParse({
+      v: 1,
+      type: "notes.update",
+      notes: { ...LIVE_NOTES, version: 1 },
+      rev: 1,
     });
     expect(result.success).toBe(false);
   });
