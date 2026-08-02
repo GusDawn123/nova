@@ -59,9 +59,25 @@ export default defineConfig({
     // a browser implementation alongside the native one (react-native-svg) name it
     // `elements.web.js` next to `elements.js` and import it extensionless, with no
     // `exports` map to disambiguate; without this the native file wins and drags in
-    // react-native's untranspiled Flow source, which Node cannot parse. Nothing in
-    // this repo's own sources is named `*.web.*`, so this only ever changes which
-    // file a dependency of that shape resolves to.
+    // react-native's untranspiled Flow source, which Node cannot parse.
+    //
+    // This DOES also redirect two of our own modules — `hooks/use-color-scheme.web.ts`
+    // (reached extensionless from `hooks/use-theme.ts`, so it is live for anything
+    // that themes itself) and `components/animated-icon.web.tsx` (from
+    // `app/_layout.tsx`). That is the INTENDED resolution and not collateral: these
+    // suites run in jsdom and already alias `react-native` to `react-native-web`, so
+    // the web variant is the one the code under test would actually run against.
+    // Picking the native file here would be the wrong answer, not the safe one.
+    //
+    // REACH: this block is repo-global — the server and shared suites resolve under
+    // it too, because vitest 2.1 has no per-environment `resolve`, and the only way
+    // to scope it (a `vitest.workspace.ts` split) would cost the `fileParallelism:
+    // false` guarantee the DB suites below depend on. It is safe today because the
+    // two files above are the ONLY `*.web.*` sources in the repo and both are under
+    // `apps/mobile`. What would make it unsafe: a `*.web.*` file appearing under
+    // `apps/server` or `packages/shared`, where node — not a browser — is the real
+    // target, and where this ordering would silently hand tests the browser variant.
+    // If that day comes, scope this properly rather than deleting the entries.
     extensions: [
       ".web.mjs",
       ".web.js",
