@@ -5,7 +5,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
@@ -16,11 +15,11 @@ import {
   FontSize,
   Radius,
   Space,
-  paletteFor,
   type Palette,
 } from '@/design/tokens';
 import { statusToPill } from '@/features/meetings/format';
 import { NotesPanel } from '@/features/notes/notes-panel';
+import { usePalette } from '@/hooks/use-appearance';
 import { useMeetingNotes } from '@/hooks/use-meeting-notes';
 
 /**
@@ -43,8 +42,7 @@ const meetingIdSchema = z.string().uuid();
  * The Follow-up and Transcript tabs are slice 8; this ships the Notes tab.
  */
 export default function MeetingDetailScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
-  const palette = paletteFor(scheme);
+  const palette = usePalette();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams();

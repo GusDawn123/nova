@@ -263,20 +263,36 @@ export const Size = {
 } as const;
 
 /**
- * Resolve a palette from the RN colour scheme.
+ * What the OS can tell us about its appearance preference.
  *
- * Anything that is not explicitly `'light'` resolves to COBALT — which covers
- * `null` (what `useColorScheme` returns before the system value arrives) and
- * `'unspecified'` (what it returns on a platform with no preference). Cobalt is the
- * default theme, so an unresolved scheme must not flash paper.
- *
- * The parameter is typed structurally rather than as RN's `ColorSchemeName` to keep
- * this module free of React Native imports — it is pure data, and pure data is
- * testable without a renderer. `'unspecified'` is part of the union because RN's
- * `useColorScheme()` can return it, and every caller passes that value straight in.
+ * Typed structurally rather than as RN's `ColorSchemeName` to keep this module free
+ * of React Native imports — it is pure data, and pure data is testable without a
+ * renderer. `'unspecified'` is part of the union because RN's `useColorScheme()` can
+ * return it, and every caller passes that value straight in.
  */
-export function paletteFor(
-  scheme: 'light' | 'dark' | 'unspecified' | null | undefined,
-): Palette {
-  return PALETTES[scheme === 'light' ? 'paper' : 'cobalt'];
+export type ColorScheme = 'light' | 'dark' | 'unspecified' | null | undefined;
+
+/**
+ * Which theme an OS scheme asks for.
+ *
+ * Anything that is not explicitly `'light'` resolves to COBALT — which covers `null`
+ * (what `useColorScheme` returns before the system value arrives) and `'unspecified'`
+ * (what it returns on a platform with no preference). Cobalt is the default theme, so
+ * an unresolved scheme must not flash paper.
+ */
+export function themeForScheme(scheme: ColorScheme): ThemeName {
+  return scheme === 'light' ? 'paper' : 'cobalt';
+}
+
+/**
+ * The palette for a named theme — the seam an explicit user override paints through
+ * (`hooks/use-appearance`), where there is a theme but no scheme to read it from.
+ */
+export function paletteForTheme(theme: ThemeName): Palette {
+  return PALETTES[theme];
+}
+
+/** Resolve a palette straight from the OS scheme, for callers with no override. */
+export function paletteFor(scheme: ColorScheme): Palette {
+  return paletteForTheme(themeForScheme(scheme));
 }

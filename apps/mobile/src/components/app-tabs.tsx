@@ -6,7 +6,7 @@ import {
   type TabListProps,
   type TabTriggerSlotProps,
 } from 'expo-router/ui';
-import { Pressable, StyleSheet, Text, View, useColorScheme } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,9 +19,9 @@ import {
   Radius,
   Size,
   Space,
-  paletteFor,
   type Palette,
 } from '@/design/tokens';
+import { usePalette } from '@/hooks/use-appearance';
 import { useRole } from '@/hooks/use-role';
 
 /**
@@ -50,8 +50,7 @@ import { useRole } from '@/hooks/use-role';
  * 'customer' until proven otherwise, so the tab never flashes.
  */
 export default function AppTabs(): React.JSX.Element {
-  const scheme = useColorScheme();
-  const palette = paletteFor(scheme);
+  const palette = usePalette();
   const role = useRole();
   const isInternal = role === 'developer' || role === 'admin';
 

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   View,
-  useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -19,11 +18,11 @@ import {
   Radius,
   Space,
   eyebrowStyle,
-  paletteFor,
   type Palette,
 } from '@/design/tokens';
 import { groupMeetingsByRecency } from '@/features/meetings/format';
 import { MeetingCard } from '@/features/meetings/meeting-card';
+import { usePalette } from '@/hooks/use-appearance';
 import { useMeetings } from '@/hooks/use-meetings';
 
 /**
@@ -37,8 +36,7 @@ import { useMeetings } from '@/hooks/use-meetings';
  * keeps the bar at the two pills the mock draws (Gustavo, 2026-07-28).
  */
 export default function MeetingsScreen(): React.JSX.Element {
-  const scheme = useColorScheme();
-  const palette = paletteFor(scheme);
+  const palette = usePalette();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { state, refresh, refreshing } = useMeetings();

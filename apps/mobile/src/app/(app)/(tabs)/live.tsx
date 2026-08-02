@@ -18,11 +18,11 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
-import { paletteFor } from '@/design/tokens';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
 import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
 import { ModePicker } from '@/features/live-call/mode-picker';
 import { TranscriptList } from '@/features/live-call/transcript-list';
+import { usePalette } from '@/hooks/use-appearance';
 import { useLiveSession } from '@/hooks/use-live-session';
 
 /**
@@ -47,7 +47,7 @@ import { useLiveSession } from '@/hooks/use-live-session';
 export default function LiveScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-  const palette = paletteFor(scheme);
+  const palette = usePalette();
   const insets = useSafeAreaInsets();
   // The capture strip is TABBED (§5.1): live notes need a home during the call,
   // and the design prototype's card is transcript-only.
