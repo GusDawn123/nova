@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Pressable,
   RefreshControl,
@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassPill, GlassSurface } from '@/design/glass';
+import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   FontFamily,
   FontSize,
@@ -45,10 +46,20 @@ export default function MeetingsScreen(): React.JSX.Element {
   const router = useRouter();
   const { state, refresh, refreshing } = useMeetings();
 
+  // The section headings are a function of the current LOCAL day, so an app left
+  // foregrounded across midnight would keep calling yesterday "today". Re-read the
+  // clock whenever the screen is focused rather than running a timer for it.
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(
+    useCallback(() => {
+      setNow(new Date());
+    }, []),
+  );
+
   const sections = useMemo(() => {
     if (state.status !== 'success') return [];
-    return groupMeetingsByRecency(state.data.meetings, new Date());
-  }, [state]);
+    return groupMeetingsByRecency(state.data.meetings, now);
+  }, [state, now]);
 
   return (
     <View style={styles.root}>
@@ -67,8 +78,7 @@ export default function MeetingsScreen(): React.JSX.Element {
           styles.scroll,
           {
             paddingTop: insets.top + Space.md,
-            // Clear the floating tab bar: its offset plus its height.
-            paddingBottom: insets.bottom + 110,
+            paddingBottom: tabBarClearance(insets.bottom),
           },
         ]}
         refreshControl={
@@ -113,6 +123,10 @@ export default function MeetingsScreen(): React.JSX.Element {
           <Text style={[styles.message, { color: palette.ink3 }]}>
             Loading your calls…
           </Text>
+        ) : null}
+
+        {state.status === 'signed-out' ? (
+          <SignedOutCard palette={palette} />
         ) : null}
 
         {state.status === 'error' ? (
@@ -171,6 +185,25 @@ function EmptyState({ palette }: { palette: Palette }): React.JSX.Element {
       <Text style={[styles.stateBody, { color: palette.ink2 }]}>
         Nova listens on speakerphone, suggests what to say while you talk, and
         writes the notes afterwards. Your finished calls show up here.
+      </Text>
+    </GlassSurface>
+  );
+}
+
+/**
+ * No session. Deliberately WITHOUT a retry: nothing this screen can re-run produces
+ * a session, and `(app)/_layout.tsx` already redirects a signed-out user to
+ * `/sign-in` — so this is the brief window before that lands, not a dead end the
+ * user has to navigate out of themselves.
+ */
+function SignedOutCard({ palette }: { palette: Palette }): React.JSX.Element {
+  return (
+    <GlassSurface palette={palette} style={styles.stateCard} elevated>
+      <Text style={[styles.stateTitle, { color: palette.ink }]}>
+        You are signed out
+      </Text>
+      <Text style={[styles.stateBody, { color: palette.ink2 }]}>
+        Sign in to see your calls and the notes Nova wrote for them.
       </Text>
     </GlassSurface>
   );

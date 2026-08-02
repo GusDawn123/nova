@@ -9,6 +9,7 @@ import {
   useColorScheme,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { z } from 'zod';
 
 import { GlassPill, GlassSurface } from '@/design/glass';
 import {
@@ -24,6 +25,13 @@ import {
 import { statusToPill } from '@/features/meetings/format';
 import { NotesPanel } from '@/features/notes/notes-panel';
 import { useMeetingNotes } from '@/hooks/use-meeting-notes';
+
+/**
+ * A route param is external input: `id` arrives as `string | string[] | undefined`,
+ * and `meetingListItemSchema.id` is a uuid. Parsed, not asserted — an array or a
+ * missing value would otherwise be interpolated straight into a fetch URL.
+ */
+const meetingIdSchema = z.string().uuid();
 
 /**
  * The meeting detail screen (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.2).
@@ -42,8 +50,11 @@ export default function MeetingDetailScreen(): React.JSX.Element {
   const palette = paletteFor(scheme);
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, completedIds, toggleItem, refresh } = useMeetingNotes(id);
+  const { id } = useLocalSearchParams();
+  const parsedId = meetingIdSchema.safeParse(id);
+  const meetingId = parsedId.success ? parsedId.data : null;
+  const { state, completedIds, toggleItem, refresh } =
+    useMeetingNotes(meetingId);
 
   const notes =
     state.status === 'success'
@@ -120,7 +131,15 @@ export default function MeetingDetailScreen(): React.JSX.Element {
           </>
         ) : null}
 
-        {state.status === 'loading' ? (
+        {meetingId === null ? (
+          // Nothing was fetched, so every branch below is inert: this is the whole
+          // screen for a link that does not name a meeting.
+          <StateCard
+            palette={palette}
+            title="This meeting is not available"
+            body="That link does not point to a call we can open. Go back and pick the call from your list."
+          />
+        ) : state.status === 'loading' ? (
           <Text style={[styles.message, { color: palette.ink3 }]}>
             Loading notes…
           </Text>

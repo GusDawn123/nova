@@ -38,8 +38,9 @@ export function statusToPill(status: NotesStatus): StatusPill {
  * Call duration, e.g. "34 min", "1 hr 12 min", "48 sec".
  *
  * Returns null when either end is missing — a meeting created but never connected,
- * or one still running. The card omits the segment entirely rather than printing
- * "0 min", which would read as a call that happened and lasted no time.
+ * or one still running — and equally for a span under one second. The card omits
+ * the segment entirely rather than printing "0 sec", which would read as a call
+ * that happened and lasted no time.
  */
 export function formatDuration(
   startedAt: string | null,
@@ -52,7 +53,10 @@ export function formatDuration(
 
   const totalMinutes = Math.floor(ms / 60_000);
   if (totalMinutes < 1) {
-    const seconds = Math.max(0, Math.round(ms / 1000));
+    // FLOOR, not round: rounding 59.6s up prints "60 sec" for a span the minute
+    // branch has already declined to take.
+    const seconds = Math.floor(ms / 1000);
+    if (seconds < 1) return null;
     return `${String(seconds)} sec`;
   }
   if (totalMinutes < 60) return `${String(totalMinutes)} min`;

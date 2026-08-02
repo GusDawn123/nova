@@ -26,7 +26,11 @@ export interface UseMeetingNotes {
   refresh: () => void;
 }
 
-export function useMeetingNotes(meetingId: string): UseMeetingNotes {
+/**
+ * `meetingId` is null when the route param did not parse as a meeting id. The hook
+ * then stays idle — no fetch, no write — rather than putting a bad id in a URL.
+ */
+export function useMeetingNotes(meetingId: string | null): UseMeetingNotes {
   const auth = useAuth();
   const accessToken =
     auth.status === 'signed-in' ? auth.session.access_token : null;
@@ -43,7 +47,7 @@ export function useMeetingNotes(meetingId: string): UseMeetingNotes {
     // No token: nothing to fetch. DERIVED below rather than pushed through
     // setState — setting state synchronously inside an effect cascades a render
     // for a value that is a pure function of the session.
-    if (accessToken === null) return;
+    if (accessToken === null || meetingId === null) return;
     let cancelled = false;
 
     async function load(): Promise<void> {
@@ -86,7 +90,7 @@ export function useMeetingNotes(meetingId: string): UseMeetingNotes {
 
   const toggleItem = useCallback(
     (itemId: string, completed: boolean) => {
-      if (accessToken === null) return;
+      if (accessToken === null || meetingId === null) return;
 
       // Optimistic: the checkbox must feel instant. Reverted below on failure.
       setCompletedIds((prev) => {

@@ -78,6 +78,26 @@ describe('formatDuration', () => {
     );
   });
 
+  it('never prints "60 sec" at the minute boundary', () => {
+    // Rounding up here would name a duration the minute branch declined to take.
+    expect(
+      formatDuration('2026-07-22T10:00:00.000Z', '2026-07-22T10:00:59.600Z'),
+    ).toBe('59 sec');
+    expect(
+      formatDuration('2026-07-22T10:00:00.000Z', '2026-07-22T10:01:00.000Z'),
+    ).toBe('1 min');
+  });
+
+  it('returns null for a call that lasted no time at all', () => {
+    // Same instant at both ends: say nothing rather than "0 sec".
+    expect(
+      formatDuration('2026-07-22T12:40:00.000Z', '2026-07-22T12:40:00.000Z'),
+    ).toBeNull();
+    expect(
+      formatDuration('2026-07-22T12:40:00.000Z', '2026-07-22T12:40:00.400Z'),
+    ).toBeNull();
+  });
+
   it('returns null when either end is missing', () => {
     // A live call and a never-connected meeting both land here. Printing "0 min"
     // would read as a call that happened and lasted no time.

@@ -14,6 +14,8 @@ describe('mapFollowUpFailure', () => {
 
     expect(state.kind).toBe('notes_not_ready');
     expect(state.tonesDisabled).toBe(true);
+    // No retry affordance: the notes land on their own.
+    expect(state.canRetry).toBe(false);
   });
 
   it('offers no retry on a 429 quota block', () => {
@@ -22,6 +24,23 @@ describe('mapFollowUpFailure', () => {
 
     expect(state.kind).toBe('quota');
     expect(state.canRetry).toBe(false);
+  });
+
+  it('reads a 429 off the status alone, whatever code rides with it', () => {
+    // The mapper never inspects the code on a 429; a body without one must map the
+    // same way rather than falling through to the retryable bucket.
+    expect(mapFollowUpFailure(429, undefined)).toEqual(
+      mapFollowUpFailure(429, 'quota_exceeded'),
+    );
+  });
+
+  it('offers no retry once the meeting itself is gone', () => {
+    // A 404 is the meeting being deleted, not a hiccup: retrying can only 404 again.
+    const state = mapFollowUpFailure(404, undefined);
+
+    expect(state.kind).toBe('gone');
+    expect(state.canRetry).toBe(false);
+    expect(state.tonesDisabled).toBe(true);
   });
 
   it('blames the service, not the user, on a 503 daily cap', () => {

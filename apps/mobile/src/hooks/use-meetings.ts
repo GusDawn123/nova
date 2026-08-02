@@ -7,12 +7,28 @@ import { useAuth } from '@/hooks/use-auth';
 const MEETINGS_URL = `${API_BASE_URL}/meetings`;
 
 /**
+ * A request still unanswered here is hung, not slow: without a ceiling the promise
+ * never settles, so `refreshing` never clears and the spinner turns forever.
+ */
+const REQUEST_TIMEOUT_MS = 10_000;
+
+const TIMEOUT_MESSAGE =
+  'The request took too long. Check your connection and try again.';
+/** Fixed copy: a serialized ZodError is a diagnostic, not a sentence for a user. */
+const SCHEMA_MESSAGE =
+  'Nova sent something this version of the app could not read.';
+
+/**
  * The Meetings list round trip (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.5).
  * Discriminated union so the screen renders exactly one branch — the same shape as
  * `use-me` / `use-health`.
+ *
+ * `signed-out` is its OWN branch rather than an error with a message: an error card
+ * offers a retry, and nothing this hook can retry will produce a session.
  */
 export type MeetingsState =
   | { status: 'loading' }
+  | { status: 'signed-out' }
   | { status: 'success'; data: MeetingListResponse }
   | { status: 'error'; message: string };
 
@@ -61,25 +77,47 @@ export function useMeetings(): UseMeetings {
     if (accessToken === null) return;
 
     let cancelled = false;
+    const controller = new AbortController();
+    // Distinguishes the two aborts: the timeout is something to tell the user
+    // about, the cleanup abort is a render that no longer exists.
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
 
     async function load(): Promise<void> {
       try {
         const response = await fetch(MEETINGS_URL, {
           headers: { Authorization: `Bearer ${String(accessToken)}` },
+          signal: controller.signal,
         });
         if (!response.ok) {
           throw new Error(`server returned HTTP ${String(response.status)}`);
         }
         const body: unknown = await response.json();
-        const data = meetingListResponseSchema.parse(body);
-        if (!cancelled) setFetched({ status: 'success', data });
+        const parsed = meetingListResponseSchema.safeParse(body);
+        if (!parsed.success) {
+          // Field paths only — a transcript or a title must never reach the log.
+          console.warn(
+            'meetings response failed to parse',
+            parsed.error.issues.map((issue) => ({
+              path: issue.path.join('.'),
+              code: issue.code,
+            })),
+          );
+          throw new Error(SCHEMA_MESSAGE);
+        }
+        if (!cancelled) setFetched({ status: 'success', data: parsed.data });
       } catch (error) {
         if (!cancelled) {
-          const message =
-            error instanceof Error ? error.message : 'request failed';
-          setFetched({ status: 'error', message });
+          setFetched({
+            status: 'error',
+            message: timedOut ? TIMEOUT_MESSAGE : failureMessage(error),
+          });
         }
       } finally {
+        clearTimeout(timer);
         if (!cancelled) setRefreshing(false);
       }
     }
@@ -87,15 +125,19 @@ export function useMeetings(): UseMeetings {
     void load();
     return () => {
       cancelled = true;
+      clearTimeout(timer);
+      controller.abort();
     };
   }, [accessToken, nonce]);
 
   // Signed-out is derived, not stored: it is a pure function of the session, and a
   // stored copy could disagree with it for a render.
   const state: MeetingsState =
-    accessToken === null
-      ? { status: 'error', message: 'not signed in' }
-      : fetched;
+    accessToken === null ? { status: 'signed-out' } : fetched;
 
   return { state, refresh, refreshing };
+}
+
+function failureMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'request failed';
 }
