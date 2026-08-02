@@ -1,27 +1,39 @@
 import { Link } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Pressable, StyleSheet, Text } from 'react-native';
 
 import { AuthForm } from '@/components/auth-form';
-import { ThemedText } from '@/components/themed-text';
+import { FontFamily, FontSize } from '@/design/tokens';
+import { usePalette } from '@/hooks/use-appearance';
 import { useAuth } from '@/hooks/use-auth';
 
 /** Dumb screen: renders the shared form and wires it to the auth layer. */
 export default function SignInScreen() {
   const auth = useAuth();
+  const palette = usePalette();
 
   return (
     <AuthForm
-      title="Sign in"
-      submitLabel="Sign in"
+      submitLabel="SIGN IN"
       onSubmit={auth.signIn}
       disabledMessage={auth.status === 'unavailable' ? auth.message : undefined}
       footer={
         <Link href="/sign-up" asChild>
-          <Pressable>
-            <ThemedText type="linkPrimary">Need an account? Sign up</ThemedText>
+          <Pressable accessibilityRole="link">
+            <Text style={[styles.link, { color: palette.inkSoft }]}>
+              NEED AN ACCOUNT? SIGN UP
+            </Text>
           </Pressable>
         </Link>
       }
     />
   );
 }
+
+const styles = StyleSheet.create({
+  // A mono whisper, per spec §8 — the way out, not a second call to action.
+  link: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 1.5,
+  },
+});
