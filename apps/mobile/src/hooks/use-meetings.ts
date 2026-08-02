@@ -47,9 +47,12 @@ export function useMeetings(): UseMeetings {
   const [nonce, setNonce] = useState(0);
 
   const refresh = useCallback(() => {
+    // Signed out there is nothing to fetch and the effect below early-returns,
+    // so setting `refreshing` here would leave the spinner stuck on forever.
+    if (accessToken === null) return;
     setRefreshing(true);
     setNonce((n) => n + 1);
-  }, []);
+  }, [accessToken]);
 
   useEffect(() => {
     // No token: nothing to fetch. DERIVED below rather than pushed through
