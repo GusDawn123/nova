@@ -23,6 +23,7 @@ Files here are named for the screen they cover, flattening the route structure:
 
 | test                      | screen                              |
 | ------------------------- | ----------------------------------- |
+| `root-layout.test.tsx`    | `app/_layout.tsx`                   |
 | `sign-in.test.tsx`        | `app/(auth)/sign-in.tsx`            |
 | `sign-up.test.tsx`        | `app/(auth)/sign-up.tsx`            |
 | `app-layout.test.tsx`     | `app/(app)/_layout.tsx`             |

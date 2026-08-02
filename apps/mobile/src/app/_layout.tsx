@@ -37,13 +37,27 @@ export default function RootLayout() {
  * `preventAutoHideAsync` it existed to undo, so `expo-splash-screen` auto-hides on
  * the first commit and hands straight off to `(app)/_layout`'s in-brand waiting
  * frame. `app.json` paints the native launch screen `#0002DA` for the same reason.
+ *
+ * Which makes `contentStyle` below load-bearing rather than tidy. The overlay used to
+ * cover this navigator at `zIndex: 1000` for the whole cold-start handoff; with it
+ * gone, an unset `contentStyle` leaves React Navigation's own `theme.colors
+ * .background` — `rgb(1,1,1)` on Dark, `rgb(242,242,242)` on Default — as the thing
+ * on screen until the first route paints. Same defect `(app)/_layout.tsx` carries the
+ * same fix for one level down, and for the same reason: the screens paint
+ * `palette.canvas` anyway, so an opaque canvas here can never differ from what lands
+ * on top of it.
  */
 function ThemedStack() {
-  const { theme } = useAppearance();
+  const { theme, palette } = useAppearance();
 
   return (
     <ThemeProvider value={theme === 'paper' ? DefaultTheme : DarkTheme}>
-      <Stack screenOptions={{ headerShown: false }} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          contentStyle: { backgroundColor: palette.canvas },
+        }}
+      />
     </ThemeProvider>
   );
 }
