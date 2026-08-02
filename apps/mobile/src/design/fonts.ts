@@ -1,4 +1,17 @@
 import {
+  Inter_400Regular,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
+import {
+  Orbitron_700Bold,
+  Orbitron_900Black,
+} from '@expo-google-fonts/orbitron';
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+} from '@expo-google-fonts/space-mono';
+import {
   SplineSans_400Regular,
   SplineSans_500Medium,
   SplineSans_600SemiBold,
@@ -7,7 +20,14 @@ import {
 import { SplineSansMono_400Regular } from '@expo-google-fonts/spline-sans-mono';
 
 /**
- * Spline Sans — the mock's typeface (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.1).
+ * The Nova typefaces.
+ *
+ * Two sets live here on purpose, for exactly as long as the redesign takes. The
+ * trio — Orbitron for display, Inter for body, Space Mono for numerals and
+ * machine-voice text — is what the new screens are drawn in. Spline Sans is what
+ * the screens that have NOT been redrawn yet still name in `tokens.ts`; dropping
+ * it now would fall those screens back to SF Pro mid-redesign. It retires in the
+ * task that retires the last screen using it.
  *
  * Loaded at RUNTIME via `useFonts` rather than embedded through the `expo-font`
  * config plugin. The plugin produces a smaller, faster result, but it requires a
@@ -22,6 +42,14 @@ import { SplineSansMono_400Regular } from '@expo-google-fonts/spline-sans-mono';
  */
 export function useNovaFonts(): boolean {
   const [loaded] = useFonts({
+    Orbitron_700Bold,
+    Orbitron_900Black,
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    SpaceMono_400Regular,
+    SpaceMono_700Bold,
+    // Legacy — see the note above. Removed with the last Spline Sans screen.
     SplineSans_400Regular,
     SplineSans_500Medium,
     SplineSans_600SemiBold,

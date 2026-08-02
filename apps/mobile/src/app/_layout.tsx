@@ -15,7 +15,7 @@ SplashScreen.preventAutoHideAsync();
  */
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  // Spline Sans, the mock's typeface. Deliberately NOT gated on: an unresolved
+  // The Nova typefaces. Deliberately NOT gated on: an unresolved
   // fontFamily falls back to the system face, so rendering early costs one frame in
   // SF Pro rather than a held splash — or a blank screen if a font fails to load.
   useNovaFonts();
