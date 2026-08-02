@@ -35,7 +35,7 @@ const MARKERS = {
   },
   technical: {
     directive: "If the question calls for CODE",
-    example: "Range-partition on time",
+    example: "range-partition on time",
   },
   finance: {
     directive: "Structure the thinking with an established framework",

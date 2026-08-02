@@ -36,7 +36,7 @@ const PINNED: Record<PromptMode, string> = {
   behavioral:
     "85cdafd5b8846901f91e26264012411d031d91c1fbd3de071f533f5293e467d1",
   technical:
-    "94453f59f673aa36281ef10f169abeca01f7a6fe87dacf281398a265112ecccd",
+    "2313152fa97a748594ebc88547572ec0eba39cf57dcb0d3203bc9d946422f608",
   finance:
     "8aaa92fe9056666335e68987825c188a967f18b08c12febc5c7c068ec8ab3a90",
 };
