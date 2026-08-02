@@ -347,6 +347,28 @@ describe('createStreamDrain lifecycle', () => {
     d.dispose();
   });
 
+  it('never shows half of a character on its way past', () => {
+    // A tick emits one UTF-16 code unit at the base rate, so an unguarded slice
+    // splits every emoji and puts a `�` on screen for a frame.
+    vi.useFakeTimers();
+    const text = 'Ask for the raise 👍 — worth 🎯 it.';
+    let drained = '';
+    const d = createStreamDrain({
+      onText: (c) => {
+        expect(hasLoneSurrogate(c)).toBe(false);
+        drained += c;
+        expect(hasLoneSurrogate(drained)).toBe(false);
+      },
+      onDone: () => {},
+    });
+
+    d.push(text);
+    vi.advanceTimersByTime(5000);
+
+    expect(drained).toBe(text);
+    d.dispose();
+  });
+
   it('preserves order and loses nothing across interleaved pushes', () => {
     vi.useFakeTimers();
     const out: string[] = [];
@@ -420,6 +442,25 @@ describe('createStreamDrain lifecycle', () => {
     d.dispose();
   });
 });
+
+/**
+ * True when `text` holds a surrogate that lost its partner — the code-unit-level
+ * damage that renders as `�`. Written out rather than using `isWellFormed()`, which
+ * needs a newer lib than the Expo tsconfig targets.
+ */
+function hasLoneSurrogate(text: string): boolean {
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code >= 0xdc00 && code <= 0xdfff) return true; // low half, no high before it
+    if (code >= 0xd800 && code <= 0xdbff) {
+      const next = text.charCodeAt(i + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      i += 1; // a whole pair — step over its second half
+    }
+  }
+
+  return false;
+}
 
 /** A clock whose ticks can be delivered LATE, the way a busy JS thread delivers them. */
 function stalledClock(): {

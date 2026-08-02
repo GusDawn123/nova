@@ -35,6 +35,26 @@ const CATCHUP_CHARS = 80;
 /** Hard ceiling on catch-up: 3x base (~180cps), still legible as writing. */
 const CATCHUP_MAX_MULTIPLE = 2;
 
+/**
+ * Nudge a cut point off the seam of a surrogate pair.
+ *
+ * `slice` counts UTF-16 code units, and at the base rate a tick emits exactly ONE of
+ * them — so every emoji in an answer would be split down the middle and spend a frame
+ * on screen as a lone half-character (a `�` box) before its other half arrived. Not a
+ * rare race: at one unit per tick it happens to every pair, every time.
+ *
+ * Only the seam INSIDE the buffer is ours to fix. A delta that arrives already ending
+ * mid-pair is the transport's problem — holding the orphan back would stall the drain
+ * on a stream that may never send the other half.
+ */
+function wholeCharacters(text: string, cut: number): number {
+  if (cut >= text.length) return cut;
+  const last = text.charCodeAt(cut - 1);
+  const isHighSurrogate = last >= 0xd800 && last <= 0xdbff;
+
+  return isHighSurrogate ? cut + 1 : cut;
+}
+
 export interface StreamDrain {
   push(text: string): void; // socket tokens land here, any size
   end(): void; // no more input; onDone fires when buffer empties
@@ -97,7 +117,10 @@ export function createStreamDrain(opts: StreamDrainOptions): StreamDrain {
         (1 + Math.min(buffer.length / CATCHUP_CHARS, CATCHUP_MAX_MULTIPLE));
       // `max(1, …)` guarantees forward progress: rounding a sub-character tick to
       // zero would stall the stream forever at low rates.
-      const n = Math.max(1, Math.round((cps * dtMs) / 1000));
+      const n = wholeCharacters(
+        buffer,
+        Math.max(1, Math.round((cps * dtMs) / 1000)),
+      );
       const chunk = buffer.slice(0, n);
       buffer = buffer.slice(n);
       onText(chunk);
