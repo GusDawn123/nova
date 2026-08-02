@@ -12,10 +12,12 @@
  * blue canvas with white ink, paper is white canvas with blue ink, and every
  * derived band sits at the same opacity in both.
  *
- * A LEGACY block at the bottom of {@link Palette} carries the glass-era surface
- * names (`glass`, `stroke`, `ink2`, …) that the not-yet-redrawn screens still ask
- * for. Their VALUES are duotone, so those screens render wrong-but-duotone rather
- * than reintroducing a colour; each name dies with the screen that last uses it.
+ * Through the redesign this file also carried a LEGACY block — the glass-era surface
+ * names (`glass`, `stroke`, `ink2`, the shadow quintet, the Spline Sans families, the
+ * old type scale) held at duotone VALUES so the not-yet-redrawn screens rendered
+ * wrong-but-duotone rather than reintroducing a colour. Every name died with the
+ * screen that last used it, and the tab bar took the last of them. What is below is
+ * now the whole vocabulary: seven colour tokens, three families, one scale.
  */
 
 /** The two mirror themes. Cobalt is the default; `paper` is the light mirror. */
@@ -45,38 +47,6 @@ export interface Palette {
    * own literal so the mirror holds in both themes.
    */
   onInk: string;
-
-  // ---------------------------------------------------------------------------
-  // LEGACY — the glass-era names, retained only so the screens that have not been
-  // redrawn yet compile. Duotone values, no new colours. Each retires with its
-  // screen; the block goes with the last one.
-  // ---------------------------------------------------------------------------
-  /** LEGACY → `canvas`. */
-  screenBase: string;
-  /** LEGACY → `inkSoft`. */
-  ink2: string;
-  /** LEGACY → `inkFaint`. */
-  ink3: string;
-  /** LEGACY → `inkFill`. */
-  glass: string;
-  /** LEGACY → `inkHairline`; kept distinct from `glass` so raised still reads. */
-  glassHi: string;
-  /** LEGACY → `inkHairline`. */
-  stroke: string;
-  /** LEGACY → `inkSoft` (the stronger of the two glass borders). */
-  stroke2: string;
-  /** LEGACY → `inkFill`. */
-  sheen: string;
-  /** LEGACY → `ink`. The duotone has no alarm colour; risk is said in words. */
-  hot: string;
-
-  /** LEGACY drop shadow, split into RN's separate shadow props. */
-  shadowColor: string;
-  shadowOpacity: number;
-  shadowRadius: number;
-  shadowOffsetY: number;
-  /** LEGACY Android elevation approximating the same shadow. */
-  elevation: number;
 }
 
 /** Blue canvas, white ink — the default theme. */
@@ -88,24 +58,6 @@ export const cobaltPalette: Palette = {
   inkHairline: 'rgba(255,255,255,0.35)',
   inkFill: 'rgba(255,255,255,0.10)',
   onInk: BRAND_BLUE,
-
-  screenBase: BRAND_BLUE,
-  ink2: 'rgba(255,255,255,0.75)',
-  ink3: 'rgba(255,255,255,0.45)',
-  glass: 'rgba(255,255,255,0.10)',
-  glassHi: 'rgba(255,255,255,0.35)',
-  stroke: 'rgba(255,255,255,0.35)',
-  stroke2: 'rgba(255,255,255,0.75)',
-  sheen: 'rgba(255,255,255,0.10)',
-  hot: BRAND_WHITE,
-
-  // Blue on blue: the legacy shadow all but vanishes on this theme, which is the
-  // correct duotone answer — a black shadow would be a third colour.
-  shadowColor: BRAND_BLUE,
-  shadowOpacity: 0.55,
-  shadowRadius: 50,
-  shadowOffsetY: 22,
-  elevation: 12,
 };
 
 /** White canvas, blue ink — the mirror. */
@@ -117,22 +69,6 @@ export const paperPalette: Palette = {
   inkHairline: 'rgba(0,2,218,0.35)',
   inkFill: 'rgba(0,2,218,0.10)',
   onInk: BRAND_WHITE,
-
-  screenBase: BRAND_WHITE,
-  ink2: 'rgba(0,2,218,0.75)',
-  ink3: 'rgba(0,2,218,0.45)',
-  glass: 'rgba(0,2,218,0.10)',
-  glassHi: 'rgba(0,2,218,0.35)',
-  stroke: 'rgba(0,2,218,0.35)',
-  stroke2: 'rgba(0,2,218,0.75)',
-  sheen: 'rgba(0,2,218,0.10)',
-  hot: BRAND_BLUE,
-
-  shadowColor: BRAND_BLUE,
-  shadowOpacity: 0.14,
-  shadowRadius: 44,
-  shadowOffsetY: 18,
-  elevation: 8,
 };
 
 const PALETTES: Record<ThemeName, Palette> = {
@@ -164,11 +100,6 @@ export const FontFamily = {
   bodyBold: 'Inter_700Bold',
   mono: 'SpaceMono_400Regular',
   monoBold: 'SpaceMono_700Bold',
-
-  // LEGACY — the not-yet-redrawn screens. Removed with the Spline Sans packages
-  // once the last of them is redrawn.
-  sans: 'SplineSans_400Regular',
-  sansSemibold: 'SplineSans_600SemiBold',
 } as const;
 
 /**
@@ -187,17 +118,6 @@ export const FontSize = {
   mono: 11,
   monoSm: 10,
   monoXs: 8.5,
-
-  // LEGACY — the glass-era scale, retired screen by screen.
-  screenTitle: 30,
-  detailTitle: 27,
-  cardTitle: 16.5,
-  tldr: 15,
-  label: 13.5,
-  labelSmall: 13,
-  meta: 12.5,
-  metaSmall: 12,
-  captionSmall: 11,
 } as const;
 
 /**

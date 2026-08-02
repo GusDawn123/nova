@@ -20,8 +20,8 @@ import { vi } from 'vitest';
  * rather than an inference.
  *
  * What that leaves unproven: that the sweep travels, the arc turns, and the caret
- * blinks on a device. Those are simulator checks, the same bargain `glass.test.tsx`
- * makes.
+ * blinks on a device. Those are simulator checks — the same bargain every visual
+ * assertion in this suite makes.
  *
  * ---------------------------------------------------------------------------
  * Using it

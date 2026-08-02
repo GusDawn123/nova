@@ -25,6 +25,24 @@ import {
 
 const KEYS = Object.keys(cobaltPalette) as (keyof Palette)[];
 
+/**
+ * The whole vocabulary, and nothing else. The redesign ran with a LEGACY block
+ * alongside these — the glass-era names (`glass`, `stroke`, `ink2`, `hot`, the
+ * shadow quintet) held at duotone values so the not-yet-redrawn screens compiled —
+ * and every one of them died with the screen that last used it. This list is what
+ * "the block is empty" means as an assertion rather than a note: a name coming back
+ * has to be argued for here first.
+ */
+const DUOTONE_KEYS: readonly (keyof Palette)[] = [
+  'canvas',
+  'ink',
+  'inkSoft',
+  'inkFaint',
+  'inkHairline',
+  'inkFill',
+  'onInk',
+];
+
 describe('palettes', () => {
   it('define exactly the same keys in both themes', () => {
     // A token present in one theme and missing in the other is the classic dark-mode
@@ -32,12 +50,15 @@ describe('palettes', () => {
     expect(Object.keys(paperPalette).sort()).toEqual([...KEYS].sort());
   });
 
+  it('carry the seven duotone names and no survivors of the glass era', () => {
+    expect([...KEYS].sort()).toEqual([...DUOTONE_KEYS].sort());
+  });
+
   it.each(KEYS)('defines %s in both themes with no empty values', (key) => {
     for (const palette of [cobaltPalette, paperPalette]) {
       const value = palette[key];
       expect(value).toBeDefined();
-      if (typeof value === 'string') expect(value.length).toBeGreaterThan(0);
-      else expect(Number.isFinite(value)).toBe(true);
+      expect(value.length).toBeGreaterThan(0);
     }
   });
 
@@ -58,7 +79,6 @@ describe('palettes', () => {
     for (const { name, palette, rgb } of themes) {
       for (const key of KEYS) {
         const value = palette[key];
-        if (typeof value !== 'string') continue;
         const isDuotone =
           value === BRAND_BLUE ||
           value === BRAND_WHITE ||
