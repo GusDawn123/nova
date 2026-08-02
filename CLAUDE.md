@@ -128,6 +128,34 @@ techniques-only — prompt text stays Nova-authored, never transcribed (RULES §
 NOT DONE: the paid live gates (relevance/grounding/quiet) have NOT been re-run
 against any of the 2026-08-01 prompt text — those numbers above are the legacy
 prompt's. Field check 2026-08-01 (Gustavo, simulator): answers read natural.**
+**UI REDESIGN (2026-08-02, `dev-claude-ui-design`): the mobile app is redrawn
+ground-up against `docs/superpowers/specs/2026-08-02-nova-ui-design.md` (ratified
+mockup by mockup; the HTML in `.superpowers/brainstorm/21792-1785648574/content/` is
+the visual source of truth). STRICT DUOTONE — one blue `#0002DA`, one white, two
+mirror themes (cobalt/paper, picked in Account); every other value is an opacity of
+the theme's ink, and `apps/mobile/src/design/tokens.ts` is the whole vocabulary:
+seven colour tokens, three type voices (Orbitron display / Inter body / Space Mono
+labels), one scale. A third colour is a spec violation — risk and failure are said in
+WORDS (`testing/duotone.ts::expectDuotoneOnly` fails a screen test that paints one).
+Control language: chamfered = actionable (`design/chamfer.tsx`, SVG polygon — RN has
+no `clip-path`), soft radii = readable. The mascot is drawn live
+(`features/mascot/`), the copilot's answers arrive by character drain
+(`features/stream/`), and every loop is reduced-motion gated. Five screens rebuilt
+(auth, meetings, meeting detail, live cockpit, account) plus a three-tab floating bar
+(`▤ MEETINGS · ◉ LIVE · ◌ ACCOUNT`; Live still role-gated, Account now a tab). The
+glass era is fully retired: `design/glass.tsx`, the LEGACY palette block, Spline Sans,
+`expo-glass-effect` and `expo-linear-gradient` are gone. MVP BRIDGE: mic capture is
+still Phase 9, so the Live screen's steer field is how a question reaches the
+copilot. WIRE WORKSTREAM the redesign surfaced (spec §10 — backend, NOT done here):
+the notes read model carries no meeting title/`started_at`/duration (detail header
+degraded); no mobile regenerate hook for failed notes (the POST exists server-side);
+follow-up POST unwired (4 of 5 kinds unreachable); `use-meeting-notes` still lacks the
+timeout + `safeParse` the transcript hook got; `useLiveSession` exposes no meeting id
+at session end (the ended state can only link home); each refused quota retry mints a
+`meetings` row (reaper stamps `ended_at` — noise, not corruption); and `/me` carries
+no plan tier, so Account's ACTIVE chip is a placeholder. NOT DONE: simulator
+verification is Gustavo's (jsdom + react-native-web prove structure and colour, never
+native layout or how a blur lands).**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

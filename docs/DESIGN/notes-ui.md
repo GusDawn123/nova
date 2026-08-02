@@ -308,6 +308,12 @@ is a trivial insert with no projection or versioning concern. Noted as a follow-
 
 ## 7. Mobile architecture
 
+> **SUPERSEDED (2026-08-02).** The token table, `design/glass.tsx`, the two-pill bar
+> and the Account-in-the-header decision below are the glass era. The mobile app was
+> redrawn ground-up as a strict duotone with a three-tab bar — see
+> `docs/superpowers/specs/2026-08-02-nova-ui-design.md` for what actually ships.
+> §7.4-7.6 (features/hooks/pure-logic split) still hold.
+
 ### 7.1 Design system — `src/design/`
 
 The current `constants/theme.ts` carries five colours and a spacing scale. The mock
