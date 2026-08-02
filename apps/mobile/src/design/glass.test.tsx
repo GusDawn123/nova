@@ -73,6 +73,27 @@ describe('GlassSurface', () => {
     );
   });
 
+  it('casts its shadow from OUTSIDE the node that clips', () => {
+    // iOS clips the shadow of any view that also sets `overflow: hidden`, so a
+    // surface doing both on one node loses its shadow there while Android's
+    // `elevation` — drawn by the platform, not the layer — keeps showing. Split or
+    // it regresses on exactly one platform, silently.
+    render(<GlassSurface palette={darkPalette} elevated testID="elevated" />);
+
+    const clipped = screen.getByTestId('elevated');
+    const shadowCaster = clipped.parentElement;
+    if (shadowCaster === null) throw new Error('expected a wrapping node');
+
+    expect(getComputedStyle(clipped).overflowX).toBe('hidden');
+    expect(getComputedStyle(clipped).boxShadow).toBe('');
+    expect(getComputedStyle(shadowCaster).boxShadow).not.toBe('');
+    expect(getComputedStyle(shadowCaster).overflowX).not.toBe('hidden');
+    // The radius has to be on both, or the shadow is cast as a rectangle.
+    expect(getComputedStyle(shadowCaster).borderTopLeftRadius).toBe(
+      `${String(Radius.card)}px`,
+    );
+  });
+
   it('renders differently under the two palettes', () => {
     render(
       <>

@@ -100,9 +100,14 @@ export default function LiveScreen() {
           {/* Tabbed capture strip (§5.1): Transcript | Live notes. Both panels
               stay mounted so the hidden one keeps receiving updates — the unread
               dot is meaningless if the tab has to be open to hear anything. */}
-          <View style={styles.captureTabs}>
+          <View accessibilityRole="tablist" style={styles.captureTabs}>
             <Pressable
-              accessibilityRole="button"
+              accessibilityRole="tab"
+              // `aria-selected` alongside accessibilityState: react-native-web
+              // renders the aria-* props as DOM attributes, which is the only way
+              // the current tab is announced on the web target.
+              accessibilityState={{ selected: captureTab === 'transcript' }}
+              aria-selected={captureTab === 'transcript'}
               onPress={() => {
                 setCaptureTab('transcript');
               }}
@@ -117,7 +122,9 @@ export default function LiveScreen() {
               </ThemedText>
             </Pressable>
             <Pressable
-              accessibilityRole="button"
+              accessibilityRole="tab"
+              accessibilityState={{ selected: captureTab === 'notes' }}
+              aria-selected={captureTab === 'notes'}
               onPress={showNotes}
               style={styles.notesTab}
             >

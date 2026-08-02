@@ -140,7 +140,11 @@ function StatusPill({
   palette: Palette;
   pill: ReturnType<typeof statusToPill>;
 }): React.JSX.Element {
-  const shimmer = useShimmer(120);
+  const sweeping = pill.tone === 'shimmer';
+  // Gated, not skipped: the hook must be called unconditionally, but a static pill
+  // must not leave an infinite `withRepeat` running behind a style nobody reads —
+  // a 40-row list is 40 of them.
+  const shimmer = useShimmer(120, sweeping);
 
   const dotColor =
     pill.tone === 'accent'
@@ -161,7 +165,7 @@ function StatusPill({
       ]}
       testID={`status-${pill.tone}`}
     >
-      {pill.tone === 'shimmer' ? (
+      {sweeping ? (
         <Animated.View
           style={[
             styles.shimmerBand,

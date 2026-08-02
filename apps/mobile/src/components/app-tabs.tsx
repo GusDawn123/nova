@@ -16,6 +16,7 @@ import {
   FontFamily,
   FontSize,
   Radius,
+  Size,
   Space,
   paletteFor,
   type Palette,
@@ -86,6 +87,10 @@ function GlassTabList({
   return (
     <View
       {...props}
+      // The triggers below carry `accessibilityRole="tab"`, which is only a valid
+      // role inside a tablist — without this the selected state announces against
+      // nothing.
+      accessibilityRole="tablist"
       style={[
         styles.barWrap,
         // The mock floats the bar 26px off the bottom; on a device with a home
@@ -114,13 +119,21 @@ function TabButton({
   isFocused,
   ...props
 }: TabButtonProps): React.JSX.Element {
-  const pulse = usePulse(true);
+  // Only the tab that actually draws the dot animates. The hook is still called
+  // unconditionally (Reanimated's rule); the flag gates the repeating timeline.
+  const pulse = usePulse(showRecordDot);
 
   return (
     <Pressable
       {...props}
-      accessibilityRole="button"
+      accessibilityRole="tab"
+      // `aria-selected` rather than accessibilityState alone: react-native-web
+      // renders the aria-* props as real DOM attributes, and accessibilityState
+      // .selected reaches neither the DOM nor VoiceOver here — so which tab is
+      // current would be silent to assistive tech. Both are set: the aria prop
+      // for the web target, accessibilityState for native.
       accessibilityState={{ selected: isFocused }}
+      aria-selected={isFocused === true}
       style={[
         styles.tab,
         isFocused === true && { backgroundColor: palette.accent },
@@ -134,7 +147,7 @@ function TabButton({
       <Text
         style={[
           styles.tabLabel,
-          { color: isFocused === true ? '#ffffff' : palette.ink2 },
+          { color: isFocused === true ? palette.onAccent : palette.ink2 },
         ]}
       >
         {label}
@@ -151,12 +164,12 @@ const styles = StyleSheet.create({
   },
   bar: {
     flexDirection: 'row',
-    gap: 6,
-    padding: 6,
+    gap: Space.xs2,
+    padding: Space.xs2,
   },
   tab: {
     flex: 1,
-    minHeight: 46,
+    minHeight: Size.tapTarget,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -168,8 +181,8 @@ const styles = StyleSheet.create({
     fontSize: FontSize.label,
   },
   recordDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: Size.dot,
+    height: Size.dot,
+    borderRadius: Radius.pill,
   },
 });

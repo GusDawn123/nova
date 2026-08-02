@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { AccessibilityInfo, type ViewStyle } from 'react-native';
 import {
   Easing,
@@ -48,6 +48,12 @@ import {
  * lost when stilled — the states they decorate are all also stated in text. So
  * {@link useReducedMotion} resolves once and the hooks settle straight to their
  * resting value instead of looping.
+ *
+ * Every hook below reads that setting, and a meetings list mounts dozens of them at
+ * once, so the OS subscription is MODULE-LEVEL: one `AccessibilityInfo` listener and
+ * one cached boolean for the whole app, handed to components through
+ * `useSyncExternalStore`. Per-hook subscriptions would have every card asking the
+ * platform the same question.
  */
 
 /** The mock's shared entrance curve: `cubic-bezier(.2,.8,.2,1)`. */
@@ -71,29 +77,55 @@ export const Duration = {
 } as const;
 
 /**
+ * The one reduced-motion subscription, shared by every hook in this file.
+ *
+ * The cached value outlives the last subscriber on purpose: a screen that unmounts
+ * and remounts should not repeat the async first read and flash a frame of motion at
+ * someone who asked for none.
+ */
+let reducedMotion = false;
+const reducedMotionListeners = new Set<() => void>();
+let reducedMotionSubscription: { remove: () => void } | null = null;
+
+function setReducedMotion(value: boolean): void {
+  if (value === reducedMotion) return;
+  reducedMotion = value;
+  for (const notify of reducedMotionListeners) notify();
+}
+
+function subscribeToReducedMotion(onChange: () => void): () => void {
+  reducedMotionListeners.add(onChange);
+  if (reducedMotionListeners.size === 1) {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion);
+    reducedMotionSubscription = AccessibilityInfo.addEventListener(
+      'reduceMotionChanged',
+      setReducedMotion,
+    );
+  }
+  return () => {
+    reducedMotionListeners.delete(onChange);
+    if (reducedMotionListeners.size === 0) {
+      reducedMotionSubscription?.remove();
+      reducedMotionSubscription = null;
+    }
+  };
+}
+
+function getReducedMotion(): boolean {
+  return reducedMotion;
+}
+
+/**
  * Whether the OS asks for reduced motion. Resolves asynchronously, so it starts
  * `false` and flips if the setting is on — a decorative animation running for one
  * frame before settling is not worth blocking first paint over.
  */
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((value) => {
-      if (active) setReduced(value);
-    });
-    const sub = AccessibilityInfo.addEventListener(
-      'reduceMotionChanged',
-      setReduced,
-    );
-    return () => {
-      active = false;
-      sub.remove();
-    };
-  }, []);
-
-  return reduced;
+  return useSyncExternalStore(
+    subscribeToReducedMotion,
+    getReducedMotion,
+    getReducedMotion,
+  );
 }
 
 /**
@@ -241,13 +273,20 @@ export function useDotWave(index: number, running = true): AnimatedStyle<ViewSty
  *
  * Returns a translateX in multiples of the element's width; the consumer supplies
  * the width so the gradient travels the right distance.
+ *
+ * @param running false where the sweep is not rendered. Reanimated requires the hook
+ *   itself to be called unconditionally, so the CALLER gates the infinite `withRepeat`
+ *   through this flag rather than by skipping the hook.
  */
-export function useShimmer(width: number): AnimatedStyle<ViewStyle> {
+export function useShimmer(
+  width: number,
+  running = true,
+): AnimatedStyle<ViewStyle> {
   const progress = useSharedValue(0);
   const reduced = useReducedMotion();
 
   useEffect(() => {
-    if (reduced) {
+    if (reduced || !running) {
       progress.value = 0.5;
       return;
     }
@@ -256,7 +295,7 @@ export function useShimmer(width: number): AnimatedStyle<ViewStyle> {
       -1,
       false,
     );
-  }, [progress, reduced]);
+  }, [progress, reduced, running]);
 
   return useAnimatedStyle(() => ({
     // Mock: background-position -160% → 260%.

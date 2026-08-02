@@ -1,13 +1,21 @@
+import { LIVE_PROTOCOL_VERSION, type MeetingNotes } from '@nova/shared';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useLiveSession } from './use-live-session';
 
 /**
- * The mode half of `useLiveSession`: the hook owns the pick (screens dumb, hooks
- * smart), puts it on the `session.start` frame, and refuses to change it once a
- * call is in flight — the server locks the mode at start, so a picker that still
- * looked live mid-call would be lying.
+ * The two halves of `useLiveSession` that can actually be wrong.
+ *
+ * MODE: the hook owns the pick (screens dumb, hooks smart), puts it on the
+ * `session.start` frame, and refuses to change it once a call is in flight — the
+ * server locks the mode at start, so a picker that still looked live mid-call would
+ * be lying.
+ *
+ * NOTES VISIBILITY: whether an arriving `notes.update` counts as unseen depends on
+ * which capture tab is open, read from a REF at apply time rather than closed over.
+ * The rev rule itself is pure and tested in `notes-update.test.ts`; what is tested
+ * here is the plumbing between the screen's prop and the socket handler.
  *
  * Everything the hook reaches for is stubbed at its own seam: the auth session,
  * the supabase meeting insert, and the socket itself, which is where the
@@ -15,6 +23,31 @@ import { useLiveSession } from './use-live-session';
  */
 
 const MEETING_ID = '11111111-1111-4111-8111-111111111111';
+
+/** A minimal notes object that really parses as `meetingNotesSchema` (v2). */
+const NOTES: MeetingNotes = {
+  version: 2,
+  conversationType: 'sales',
+  title: 'Northwind discovery',
+  tldr: 'Budget ceiling near $40k.',
+  overview: 'A discovery call about pricing.',
+  decisions: [],
+  actionItems: [],
+  openQuestions: [],
+  risks: [],
+  typeInsights: { kind: 'sales', objections: [], buyingSignals: [] },
+  source: 'live',
+};
+
+/** The wire frame the live-notes fold emits after a rev-bumping fold. */
+function notesUpdate(rev: number): unknown {
+  return {
+    v: LIVE_PROTOCOL_VERSION,
+    type: 'notes.update',
+    notes: NOTES,
+    rev,
+  };
+}
 
 vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => ({
@@ -63,6 +96,11 @@ class FakeSocket {
   open(): void {
     this.readyState = FakeSocket.OPEN;
     this.onopen?.();
+  }
+
+  /** Push a server frame down the wire, as JSON, exactly as the gateway does. */
+  receive(event: unknown): void {
+    this.onmessage?.({ data: JSON.stringify(event) });
   }
 }
 
@@ -148,5 +186,52 @@ describe('useLiveSession mode', () => {
       result.current.setMode('finance');
     });
     expect(result.current.mode).toBe('behavioral');
+  });
+});
+
+describe('useLiveSession live notes', () => {
+  it('flags an update that lands while the notes panel is hidden', async () => {
+    const { result } = renderHook(() =>
+      useLiveSession({ notesPanelVisible: false }),
+    );
+
+    await act(async () => {
+      await result.current.start();
+    });
+    const socket = FakeSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket?.open());
+
+    act(() => {
+      socket?.receive(notesUpdate(1));
+    });
+
+    expect(result.current.liveNotes.rev).toBe(1);
+    expect(result.current.liveNotes.hasUnseen).toBe(true);
+  });
+
+  it('marks an update seen when the panel is already on screen', async () => {
+    // The tab is switched AFTER the socket is up, which is the case a closure over
+    // `notesPanelVisible` gets wrong: the handler was installed while the panel was
+    // hidden, so only a ref read at apply time sees the change.
+    const { result, rerender } = renderHook(
+      (props: { notesPanelVisible: boolean }) => useLiveSession(props),
+      { initialProps: { notesPanelVisible: false } },
+    );
+
+    await act(async () => {
+      await result.current.start();
+    });
+    const socket = FakeSocket.instances[0];
+    expect(socket).toBeDefined();
+    act(() => socket?.open());
+
+    rerender({ notesPanelVisible: true });
+    act(() => {
+      socket?.receive(notesUpdate(1));
+    });
+
+    expect(result.current.liveNotes.notes?.tldr).toBe(NOTES.tldr);
+    expect(result.current.liveNotes.hasUnseen).toBe(false);
   });
 });

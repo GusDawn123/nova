@@ -31,6 +31,12 @@ export interface Palette {
   accentGlow: string;
   /** accent @ ~16-18% — the tinted chip fill ("you", "Notes ready"). */
   accentFill: string;
+  /**
+   * Text and glyphs drawn ON TOP of `accent` — the selected tab label, the checked
+   * checkbox's tick. Must stay legible against `accent` in BOTH themes, which is
+   * why it is a token and not each surface's own literal.
+   */
+  onAccent: string;
   /** oklch(0.70 0.16 24) dark · oklch(0.58 0.18 24) light — the record dot, risk. */
   hot: string;
 
@@ -70,6 +76,7 @@ export const darkPalette: Palette = {
   accentSoft: 'rgba(130,161,246,0.60)',
   accentGlow: 'rgba(130,161,246,0.30)',
   accentFill: 'rgba(130,161,246,0.18)',
+  onAccent: '#ffffff',
   hot: '#f2716c',
 
   screenBase: '#06070d',
@@ -99,6 +106,7 @@ export const lightPalette: Palette = {
   accentSoft: 'rgba(79,109,204,0.60)',
   accentGlow: 'rgba(79,109,204,0.30)',
   accentFill: 'rgba(79,109,204,0.16)',
+  onAccent: '#ffffff',
   hot: '#cf4042',
 
   screenBase: '#eceef5',
@@ -191,14 +199,34 @@ export const eyebrowStyle = {
   textTransform: 'uppercase',
 } as const;
 
-/** Spacing scale, in the increments the mock actually uses. */
+/**
+ * Spacing scale, in the increments the mock actually uses — which is not a clean
+ * geometric run, so `xs2` and `sm2` are half-steps sitting between the named sizes
+ * rather than rounding the mock's 6 and 8 onto the 4/7/10 rungs. A pixel either way
+ * is invisible alone and visible once a card stacks four of them.
+ */
 export const Space = {
   xs: 4,
+  /** Half-step (mock 6): dot→label gutters, chip rows. */
+  xs2: 6,
   sm: 7,
+  /** Half-step (mock 8): the stack gap inside the condensed in-call cards. */
+  sm2: 8,
   md: 10,
   lg: 14,
   xl: 18,
   xxl: 26,
+} as const;
+
+/**
+ * Fixed sizes the mock declares outright. Separate from {@link Space} because they
+ * measure a thing rather than the distance between two things.
+ */
+export const Size = {
+  /** Status and record dots (mock 7). Pair with `Radius.pill` for a circle. */
+  dot: 7,
+  /** Minimum height of a tappable control — clears the 44pt platform floor. */
+  tapTarget: 46,
 } as const;
 
 /**

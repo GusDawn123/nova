@@ -56,7 +56,11 @@ describe('mobile test harness', () => {
     // The alias is declared globally in vitest.config.mjs; a broken path here is a
     // config error that would otherwise surface as a confusing import failure deep
     // inside a component suite.
+    // Resolution only — what this module's values MEAN is notes-update.test.ts's
+    // job. A product assertion here would fail twice for one bug and tell you
+    // nothing about which layer broke.
     const mod = await import('@/features/notes/notes-update');
-    expect(mod.emptyLiveNotes.rev).toBeNull();
+    expect(typeof mod.applyNotesUpdate).toBe('function');
+    expect(mod.emptyLiveNotes).toBeDefined();
   });
 });

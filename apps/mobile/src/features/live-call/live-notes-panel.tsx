@@ -6,6 +6,7 @@ import {
   FontSize,
   Radius,
   Space,
+  eyebrowStyle,
   type Palette,
 } from '@/design/tokens';
 import type { LiveNotesState } from '@/features/notes/notes-update';
@@ -143,19 +144,14 @@ function Chip({
 
 const styles = StyleSheet.create({
   root: { gap: Space.sm },
-  card: { padding: Space.md, gap: 8 },
+  card: { padding: Space.md, gap: Space.sm2 },
   empty: { paddingVertical: Space.lg, paddingHorizontal: Space.sm },
   emptyText: {
     fontFamily: FontFamily.sans,
     fontSize: FontSize.labelSmall,
     lineHeight: FontSize.labelSmall * 1.5,
   },
-  eyebrow: {
-    fontFamily: FontFamily.mono,
-    fontSize: 10,
-    letterSpacing: 1.4,
-    textTransform: 'uppercase',
-  },
+  eyebrow: { ...eyebrowStyle },
   tldr: {
     fontFamily: FontFamily.sans,
     fontSize: FontSize.label,
@@ -166,12 +162,12 @@ const styles = StyleSheet.create({
     fontSize: FontSize.labelSmall,
     lineHeight: FontSize.labelSmall * 1.42,
   },
-  itemRow: { gap: 6 },
-  chips: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
+  itemRow: { gap: Space.xs2 },
+  chips: { flexDirection: 'row', gap: Space.xs2, flexWrap: 'wrap' },
   chip: {
     fontFamily: FontFamily.sans,
-    fontSize: 11,
-    paddingVertical: 4,
+    fontSize: FontSize.captionSmall,
+    paddingVertical: Space.xs,
     paddingHorizontal: 9,
     borderRadius: Radius.chip,
     borderWidth: StyleSheet.hairlineWidth,

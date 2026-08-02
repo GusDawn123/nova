@@ -1,5 +1,12 @@
 import type { MeetingNotes } from '@nova/shared';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { GlassSurface } from '@/design/glass';
@@ -211,7 +218,11 @@ function ActionItemRow({
           checked && { backgroundColor: palette.accent },
         ]}
       >
-        {checked ? <Text style={styles.checkGlyph}>{'✓'}</Text> : null}
+        {checked ? (
+          <Text style={[styles.checkGlyph, { color: palette.onAccent }]}>
+            {'✓'}
+          </Text>
+        ) : null}
       </View>
       <View style={styles.actionText}>
         <Text
@@ -270,7 +281,7 @@ function Card({
   children: React.ReactNode;
   delay: number;
   raised?: boolean;
-  style?: object;
+  style?: StyleProp<ViewStyle>;
 }): React.JSX.Element {
   const entrance = useCardInTransformOnly(delay);
   return (
@@ -347,7 +358,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkGlyph: { color: '#ffffff', fontSize: 12, lineHeight: 14 },
+  // Colour comes from `palette.onAccent` at the call site: this glyph sits on the
+  // accent fill, so it is theme-dependent even though the box it sits in is not.
+  checkGlyph: { fontSize: 12, lineHeight: 14 },
   actionText: { flex: 1, gap: 6 },
   struck: { textDecorationLine: 'line-through' },
   metaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
