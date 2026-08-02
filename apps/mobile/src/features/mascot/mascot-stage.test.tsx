@@ -2,6 +2,7 @@ import { act, render, screen, waitFor } from '@testing-library/react';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette } from '@/design/tokens';
+import { normaliseColor } from '@/testing/duotone';
 import { reanimatedSpies } from '@/testing/reanimated-stub';
 
 import { MascotStage } from './mascot-stage';
@@ -40,6 +41,14 @@ vi.mock('react-native-reanimated', async () => {
  * the `testID` and which file was asked for — and drops everything else. Under vite an
  * image import resolves to its path, so `source` arrives as a readable string.
  */
+/**
+ * `contentFit` reaches no DOM attribute and no style, so it is RECORDED here by
+ * testID. `fill` versus `contain` on the eye patch is the difference between a
+ * registered blink and a letterboxed rectangle hung over her face — invisible in
+ * jsdom, and until this map, silently deletable.
+ */
+const contentFits = vi.hoisted(() => new Map<string, string>());
+
 vi.mock('expo-image', async () => {
   const { View } = await import('react-native');
   return {
@@ -55,19 +64,24 @@ vi.mock('expo-image', async () => {
       tintColor?: string;
       contentFit?: string;
       testID?: string;
-    }) => (
-      // `tintColor` and `contentFit` are forwarded as data attributes rather than
-      // dropped: the tint is the only thing that makes an echo a DUOTONE echo, and
-      // `fill` vs `contain` on the eye patch is the difference between a registered
-      // blink and a letterboxed rectangle over her face. Neither is visible in
-      // jsdom, and neither may be silently deletable.
-      <View
-        testID={testID}
-        style={style}
-        dataSet={{ tint: tintColor ?? '', fit: contentFit ?? '' }}
-        accessibilityLabel={typeof source === 'string' ? source : ''}
-      />
-    ),
+    }) => {
+      if (testID !== undefined && contentFit !== undefined) {
+        contentFits.set(testID, contentFit);
+      }
+      return (
+        // The tint is painted as a BACKGROUND, the way `sign-in.test.tsx`'s stub
+        // does it: that is the only channel through which the colour the real
+        // (native) Image would have tinted an echo with becomes visible to a test.
+        <View
+          testID={testID}
+          style={[
+            style,
+            tintColor === undefined ? null : { backgroundColor: tintColor },
+          ]}
+          accessibilityLabel={typeof source === 'string' ? source : ''}
+        />
+      );
+    },
   };
 });
 
@@ -195,7 +209,10 @@ describe('MascotStage — the figure', () => {
     expect(percent(patch, 'height')).toBeCloseTo(CONTRACT.height, 3);
     // And STRETCHED back into that box, not fitted inside it: `contain` would
     // letterbox the crop and hang a misregistered rectangle over her eyes.
-    expect(screen.getByTestId('mascot-patch-art')).toHaveAttribute('data-fit', 'fill');
+    expect(contentFits.get('mascot-patch-art')).toBe('fill');
+    // The full frame is the opposite case, and the pair is what makes the line
+    // above an assertion about the PATCH rather than about expo-image's default.
+    expect(contentFits.get('mascot-base')).toBe('contain');
   });
 
   it('keeps the patch invisible between blinks', () => {
@@ -252,11 +269,14 @@ describe('MascotStage — the tear', () => {
     // The hot echo carries a TINT, and that tint is the ink it was handed — the one
     // place in her tree where a colour is applied rather than drawn, and the one the
     // first-image-only check above used to walk straight past.
-    const tinted = screen
-      .getByTestId('mascot-ghost-a')
-      .querySelectorAll('[data-tint]:not([data-tint=""])');
+    const tinted = [
+      ...screen.getByTestId('mascot-ghost-a').querySelectorAll('[aria-label]'),
+    ].filter(
+      (layer) =>
+        normaliseColor(getComputedStyle(layer).backgroundColor) ===
+        normaliseColor(INK),
+    );
     expect(tinted).toHaveLength(1);
-    expect(tinted[0].getAttribute('data-tint')).toBe(INK);
   });
 
   it('breathes on a loop', () => {
