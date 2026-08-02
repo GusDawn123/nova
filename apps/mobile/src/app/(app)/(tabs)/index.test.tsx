@@ -210,30 +210,17 @@ describe('MeetingsScreen — nothing yet', () => {
 });
 
 describe('MeetingsScreen — waiting, failing, signed out', () => {
-  it('holds three card-shaped places while the list loads', () => {
+  it('shows the skeletons and nothing else while the list loads', () => {
+    // The skeletons' own behaviour — the bars, and what reduced motion does to the
+    // sheen — belongs to `features/meetings/loading-list.test.tsx`. What is asserted
+    // here is only that the loading BRANCH reaches them, and reaches nothing else.
     meetings.state = { status: 'loading' };
 
     render(<MeetingsScreen />);
 
     expect(screen.getAllByTestId(/^skeleton-card-/)).toHaveLength(3);
-    expect(screen.getAllByTestId('skeleton-sheen').length).toBeGreaterThan(0);
     expect(screen.queryByTestId('mascot-stage')).toBeNull();
-  });
-
-  it('keeps the skeletons and drops the shimmer when motion is off', () => {
-    // The bars stay — they are the shape of what is coming. The moving highlight
-    // goes entirely rather than parking halfway along, which would read as a bug.
-    //
-    // Asserted through the TREE rather than through the `withRepeat` spy: the loop
-    // inside `useShimmer` reads `useReducedMotion` within its own module, where a
-    // module mock cannot reach it, so a spy assertion here would prove nothing.
-    reduced.value = true;
-    meetings.state = { status: 'loading' };
-
-    render(<MeetingsScreen />);
-
-    expect(screen.getAllByTestId(/^skeleton-card-/)).toHaveLength(3);
-    expect(screen.queryByTestId('skeleton-sheen')).toBeNull();
+    expect(screen.queryByTestId('error-card')).toBeNull();
   });
 
   it('says what went wrong and offers the retry it always had', () => {

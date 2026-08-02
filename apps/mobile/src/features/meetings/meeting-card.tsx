@@ -176,9 +176,12 @@ export function MeetingCard({
               <Text style={[styles.meta, { color: palette.inkFaint }]}>·</Text>
             ) : null}
             {saysStatus ? (
+              // Secondary ink, NOT the faint placeholder wash: these words are the
+              // only carrier of "working" and "failed" now that no colour is, and
+              // spec §11 holds secondary text at 75% so it stays legible.
               <Text
                 testID={`meeting-status-${meeting.id}`}
-                style={[styles.meta, { color: palette.inkFaint }]}
+                style={[styles.meta, { color: palette.inkSoft }]}
               >
                 {statusWords}
               </Text>

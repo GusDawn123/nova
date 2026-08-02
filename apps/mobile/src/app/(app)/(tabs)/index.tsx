@@ -7,13 +7,10 @@ import {
   StyleSheet,
   Text,
   View,
-  type DimensionValue,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChamferSurface } from '@/design/chamfer';
-import { useReducedMotion, useShimmer } from '@/design/motion';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   Chamfer,
@@ -27,6 +24,7 @@ import {
 } from '@/design/tokens';
 import { MascotStage } from '@/features/mascot/mascot-stage';
 import { type RecencyGroup, groupMeetingsByRecency } from '@/features/meetings/format';
+import { LoadingList } from '@/features/meetings/loading-list';
 import { MeetingCard } from '@/features/meetings/meeting-card';
 import { usePalette } from '@/hooks/use-appearance';
 import { useMeetings } from '@/hooks/use-meetings';
@@ -227,85 +225,6 @@ function EmptyState({
   );
 }
 
-/** The bars a skeleton card stands in for: a title, then its meta line. */
-const SKELETON_BARS: { width: DimensionValue; height: number }[] = [
-  { width: '64%', height: 13 },
-  { width: '38%', height: 9 },
-];
-
-/** Three of them — enough to read as "a list is coming", few enough to stay quiet. */
-const SKELETON_COUNT = 3;
-
-function LoadingList({ palette }: { palette: Palette }): React.JSX.Element {
-  return (
-    <View style={styles.section}>
-      {Array.from({ length: SKELETON_COUNT }, (_, index) => (
-        <View
-          key={index}
-          testID={`skeleton-card-${String(index)}`}
-          style={[styles.card, { borderColor: palette.inkHairline }]}
-        >
-          {SKELETON_BARS.map((bar) => (
-            <SkeletonBar
-              key={String(bar.width)}
-              palette={palette}
-              width={bar.width}
-              height={bar.height}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
- * One shimmering bar. Its own component because each bar needs its own hook — a
- * Reanimated style belongs to a single view.
- *
- * Reduced motion REMOVES the sheen rather than parking it, exactly as `LightSweep`
- * drops its band: a highlight stopped halfway along a bar reads as a rendering
- * artefact, and the bars alone already say "a list is coming". The loop is gated on
- * the same flag that removes it, so nothing repeats behind a view nobody renders.
- */
-function SkeletonBar({
-  palette,
-  width,
-  height,
-}: {
-  palette: Palette;
-  width: DimensionValue;
-  height: number;
-}): React.JSX.Element {
-  const reduced = useReducedMotion();
-  const shimmer = useShimmer(SHIMMER_TRAVEL, !reduced);
-
-  return (
-    <View
-      style={[
-        styles.skeletonBar,
-        { width, height, backgroundColor: palette.inkFill },
-      ]}
-    >
-      {/* Ink fill over ink fill: the sheen is the same wash again, so the highlight
-          is the two stacking rather than a brighter colour from somewhere else. */}
-      {reduced ? null : (
-        <Animated.View
-          testID="skeleton-sheen"
-          style={[
-            styles.skeletonSheen,
-            { backgroundColor: palette.inkFill },
-            shimmer,
-          ]}
-        />
-      )}
-    </View>
-  );
-}
-
-/** Travel for the skeleton sheen, in points — roughly a card's width. */
-const SHIMMER_TRAVEL = 90;
-
 /**
  * No session. Deliberately WITHOUT a retry: nothing this screen can re-run produces
  * a session, and `(app)/_layout.tsx` already redirects a signed-out user to
@@ -410,22 +329,6 @@ const styles = StyleSheet.create({
     ...eyebrowStyle,
     textAlign: 'center',
     paddingTop: Space.xs,
-  },
-  card: {
-    borderRadius: Radius.soft,
-    borderWidth: StyleSheet.hairlineWidth,
-    padding: Space.lg,
-    gap: Space.md,
-  },
-  skeletonBar: {
-    borderRadius: Radius.chip,
-    overflow: 'hidden',
-  },
-  skeletonSheen: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: SHIMMER_TRAVEL / 2,
   },
   empty: {
     alignItems: 'center',

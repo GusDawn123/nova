@@ -73,9 +73,9 @@ function item(overrides: Partial<MeetingListItem> = {}): MeetingListItem {
 function renderCard(
   overrides: Partial<MeetingListItem> = {},
   props: { today?: boolean; palette?: typeof cobaltPalette } = {},
-): { onPress: ReturnType<typeof vi.fn>; container: HTMLElement } {
+): ReturnType<typeof render> & { onPress: ReturnType<typeof vi.fn> } {
   const onPress = vi.fn<(id: string) => void>();
-  const { container } = render(
+  const result = render(
     <MeetingCard
       meeting={item(overrides)}
       palette={props.palette ?? cobaltPalette}
@@ -83,7 +83,7 @@ function renderCard(
       onPress={onPress}
     />,
   );
-  return { onPress, container };
+  return { ...result, onPress };
 }
 
 /** The meta row's own node — the one line every status branch writes into. */
@@ -174,6 +174,22 @@ describe('MeetingCard — status without colour', () => {
       expect(container.querySelector('polygon')).toBeNull();
     });
     expectDuotoneOnly(container, cobaltPalette);
+  });
+
+  it('draws the status words at reading strength in either theme', () => {
+    // They are the whole signal, so they sit at the secondary-ink floor (75%, spec
+    // §11) rather than in the faint wash reserved for placeholders and disabled
+    // copy — a status nobody can read is a status the card does not carry.
+    for (const palette of [cobaltPalette, paperPalette]) {
+      const { unmount } = renderCard({ notes_status: 'processing' }, { palette });
+
+      expect(
+        normaliseColor(
+          getComputedStyle(screen.getByTestId(`meeting-status-${ID}`)).color,
+        ),
+      ).toBe(normaliseColor(palette.inkSoft));
+      unmount();
+    }
   });
 
   it('still SAYS it is working when motion is off', async () => {
