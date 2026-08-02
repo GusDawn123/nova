@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { TAB_BAR_HEIGHT, tabBarClearance } from './tab-bar-metrics';
+import {
+  TAB_BAR_HEIGHT,
+  recordDotColor,
+  tabBarClearance,
+  tabBarFloatOffset,
+} from './tab-bar-metrics';
+import { cobaltPalette, paperPalette, type Palette } from './tokens';
 
 /**
  * The floating tab bar is `position: absolute`, so it reserves NO layout space.
@@ -30,8 +36,68 @@ describe('tabBarClearance', () => {
 
   it('leaves the bar a visible gap rather than butting content against it', () => {
     const inset = 34;
-    const barTopFromBottom = Math.max(26, inset + 10) + TAB_BAR_HEIGHT;
+    const barTopFromBottom = tabBarFloatOffset(inset) + TAB_BAR_HEIGHT;
 
     expect(tabBarClearance(inset)).toBeGreaterThan(barTopFromBottom);
   });
+
+  it('is built on the same float the bar is positioned by', () => {
+    // `app-tabs.tsx` sets its `bottom` from `tabBarFloatOffset` too. When those were
+    // two matching literals, moving the bar left every screen's padding behind.
+    for (const inset of [0, 34]) {
+      expect(tabBarClearance(inset)).toBe(
+        tabBarFloatOffset(inset) + TAB_BAR_HEIGHT + 10,
+      );
+    }
+  });
+});
+
+/**
+ * In a duotone, "is the record dot visible" is not a matter of taste — it is an
+ * equality check against the surface under it. That surface changes with focus (the
+ * focused tab is filled with `ink`, the unfocused one shows the bar's raised fill),
+ * so no single token satisfies both, which is exactly the regression this guards.
+ */
+const THEMES: { name: string; palette: Palette }[] = [
+  { name: 'cobalt', palette: cobaltPalette },
+  { name: 'paper', palette: paperPalette },
+];
+
+/**
+ * What the dot is drawn on: the selected tab's full-ink fill when focused, and the
+ * bar's own opaque canvas slab when not (`app-tabs.tsx` — keep the two in step).
+ */
+function surfaceUnderDot(palette: Palette, isFocused: boolean): string {
+  return isFocused ? palette.ink : palette.canvas;
+}
+
+describe('recordDotColor', () => {
+  it.each(THEMES)(
+    'never matches the surface under it, focused or not ($name)',
+    ({ palette }) => {
+      for (const isFocused of [true, false]) {
+        expect(recordDotColor(palette, isFocused)).not.toBe(
+          surfaceUnderDot(palette, isFocused),
+        );
+      }
+    },
+  );
+
+  it.each(THEMES)(
+    'takes the canvas colour on the focused tab, whose fill is full ink ($name)',
+    ({ palette }) => {
+      // During a live call the user is normally ON this tab, so this is the case
+      // that must not regress.
+      expect(recordDotColor(palette, true)).toBe(palette.onInk);
+      expect(recordDotColor(palette, true)).toBe(palette.canvas);
+    },
+  );
+
+  it.each(THEMES)(
+    'takes full ink on an unfocused tab, where the canvas colour would vanish ($name)',
+    ({ palette }) => {
+      expect(recordDotColor(palette, false)).toBe(palette.ink);
+      expect(recordDotColor(palette, false)).not.toBe(palette.canvas);
+    },
+  );
 });

@@ -128,6 +128,40 @@ techniques-only — prompt text stays Nova-authored, never transcribed (RULES §
 NOT DONE: the paid live gates (relevance/grounding/quiet) have NOT been re-run
 against any of the 2026-08-01 prompt text — those numbers above are the legacy
 prompt's. Field check 2026-08-01 (Gustavo, simulator): answers read natural.**
+**UI REDESIGN (2026-08-02, `dev-claude-ui-design`): the mobile app is redrawn
+ground-up against `docs/superpowers/specs/2026-08-02-nova-ui-design.md` (ratified
+mockup by mockup; the HTML in `.superpowers/brainstorm/21792-1785648574/content/` is
+the visual source of truth). STRICT DUOTONE — one blue `#0002DA`, one white, two
+mirror themes (cobalt/paper, picked in Account); every other value is an opacity of
+the theme's ink, and `apps/mobile/src/design/tokens.ts` is the whole vocabulary:
+seven colour tokens, three type voices (Orbitron display / Inter body / Space Mono
+labels), one scale. A third colour is a spec violation — risk and failure are said in
+WORDS (`testing/duotone.ts::expectDuotoneOnly` fails a screen test that paints one).
+Control language: chamfered = actionable (`design/chamfer.tsx`, SVG polygon — RN has
+no `clip-path`), soft radii = readable. The mascot is drawn live
+(`features/mascot/`), the copilot's answers arrive by character drain
+(`features/stream/`), and every loop is reduced-motion gated. DECORATIVE-A11Y RULING
+(final review, binding on every future component): every purely-decorative layer
+ships hidden from assistive tech — spread `design/decorative.ts` on the highest
+wholly-decorative container (mascot stage incl. sparkles, chamfer's SVG layer,
+scanlines, ring orbit, light sweep, the stream caret), never on a wrapper that also
+holds content; all three props, because react-native-web 0.21 forwards neither native
+one and `aria-hidden` is the only form a test can see. Five screens rebuilt
+(auth, meetings, meeting detail, live cockpit, account) plus a three-tab floating bar
+(`▤ MEETINGS · ◉ LIVE · ◌ ACCOUNT`; Live still role-gated, Account now a tab). The
+glass era is fully retired: `design/glass.tsx`, the LEGACY palette block, Spline Sans,
+`expo-glass-effect` and `expo-linear-gradient` are gone. MVP BRIDGE: mic capture is
+still Phase 9, so the Live screen's steer field is how a question reaches the
+copilot. WIRE WORKSTREAM the redesign surfaced (spec §10 — backend, NOT done here):
+the notes read model carries no meeting title/`started_at`/duration (detail header
+degraded); no mobile regenerate hook for failed notes (the POST exists server-side);
+follow-up POST unwired (4 of 5 kinds unreachable); `use-meeting-notes` still lacks the
+timeout + `safeParse` the transcript hook got; `useLiveSession` exposes no meeting id
+at session end (the ended state can only link home); each refused quota retry mints a
+`meetings` row (reaper stamps `ended_at` — noise, not corruption); and `/me` carries
+no plan tier, so Account's ACTIVE chip is a placeholder. NOT DONE: simulator
+verification is Gustavo's (jsdom + react-native-web prove structure and colour, never
+native layout or how a blur lands).**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by
@@ -255,6 +289,11 @@ run against real Postgres instead of self-skipping. `npm run check` is the local
 - Module anatomy: `ports.ts / adapters/ / service.ts / routes.ts`; module-local zod
   lives in `ports.ts` (shared wire types in `packages/shared`); tests are co-located
   `*.test.ts` beside the code; fixtures under `apps/server/fixtures/`
+- ONE exception to co-location: **no `*.test.*` under `apps/mobile/src/app/`** — Expo
+  Router makes every file there a route, so a co-located screen test is bundled into
+  the running app and crashes it at launch while vitest/tsc/lint all stay green. Screen
+  tests live in `apps/mobile/src/screen-tests/` (see its README); enforced by
+  `apps/mobile/src/testing/router-directory.test.ts`
 - Soft cap ~400 lines/file — split before you blow past it
 - Structured errors + logs with `request_id`/`user_id`; never log secrets or raw
   transcripts at info level

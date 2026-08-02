@@ -1,293 +1,251 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-  useColorScheme,
-} from 'react-native';
-import {
-  SafeAreaView,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors, FontSize, Spacing } from '@/constants/theme';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
-import { paletteFor } from '@/design/tokens';
-import { CopilotHistory } from '@/features/live-call/copilot-history';
-import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
-import { ModePicker } from '@/features/live-call/mode-picker';
-import { TranscriptList } from '@/features/live-call/transcript-list';
-import { useLiveSession } from '@/hooks/use-live-session';
+import { Space } from '@/design/tokens';
+import { useCallClock } from '@/features/live-call/call-clock';
+import {
+  CapturePane,
+  type CaptureTab,
+} from '@/features/live-call/capture-pane';
+import {
+  CopilotPane,
+  copilotEntries,
+} from '@/features/live-call/copilot-pane';
+import {
+  HudRail,
+  LiveHeader,
+  SessionBanner,
+} from '@/features/live-call/live-header';
+import { liveAlertFor, type LiveAlert } from '@/features/live-call/session-alert';
+import {
+  EndedSummary,
+  IdlePanel,
+  QuotaCard,
+} from '@/features/live-call/session-views';
+import { SteerBar } from '@/features/live-call/steer-bar';
+import {
+  emptySteerPairing,
+  pairSteerArrivals,
+  steerSubmitted,
+} from '@/features/live-call/steer-pairing';
+import { usePalette } from '@/hooks/use-appearance';
+import { useLiveSession, type LiveStatus } from '@/hooks/use-live-session';
 
 /**
- * "Test Live" — the typed-question testing playground for the Phase 7 copilot
- * (renamed from "Live" 2026-07-23 so the real mic-driven Live screen of Phase
- * 8/9 can own that name; it will replace this playground at this same route).
- * Layout per Gustavo's 2026-07-22 direction: a COMPACT transcript strip on top,
- * the scrollable COPILOT HISTORY taking the majority below, and a
- * typed-question input at the bottom. Dumb: the `useLiveSession` hook owns the
- * socket, the meeting, and all state.
+ * The Live cockpit (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §4) — the
+ * teleprompter screen the whole product exists for.
  *
- * "Start session" creates a meeting + connects the real authed socket; typing
- * a question sends `transcript.input` and the answer streams back as a REAL
- * LLM suggestion. Every suggestion on this screen is real — the canned replay
- * was removed 2026-07-23 at Gustavo's direction. Real mic capture is Phase 8/9.
+ * Top to bottom while a call is up: the wordmark and the `◉ LIVE · mm:ss` HUD, the
+ * capture pane (what was just said), the rail naming the prompt this call is locked
+ * to, the copilot history — and at the bottom the steer field and the one key.
  *
- * The MODE PICKER above the capture strip chooses which prompt answers this call
- * (General / Behavioral / Technical / Finance). It is a pre-call choice: the
- * server locks the mode at `session.start`, so the row is inert while a session
- * is connecting or live — `useLiveSession` owns both the pick and that lock.
+ * Dumb, as the guardrails require: `useLiveSession` owns the socket, the meeting and
+ * every piece of session state. What this screen owns is presentation state only —
+ * which capture tab is open, and which answer each steer belongs to.
+ *
+ * ---------------------------------------------------------------------------
+ * The MVP bridge
+ * ---------------------------------------------------------------------------
+ * why: spec §10. The one-button model needs a manual-trigger wire event that carries
+ * the steer as USER GUIDANCE; that is a later server workstream. Until it lands
+ * RESPOND rides the EXISTING `transcript.input` — so the key is armed only when the
+ * field has something in it, and the steer is echoed back down as a `them` turn by
+ * the server (spec §4 says the steer is never a fake transcript turn: that half of
+ * the promise is the wire's to keep, not this screen's). The chip already renders
+ * against the answer it shaped, so when the wire is swapped underneath this UI does
+ * not change.
  */
-export default function LiveScreen() {
-  const scheme = useColorScheme();
-  const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-  const palette = paletteFor(scheme);
+
+/** Which of the four screens §4 draws is on. */
+type CockpitView = 'idle' | 'cockpit' | 'ended' | 'quota';
+
+/**
+ * The view, from the session's own state.
+ *
+ * `ran` is what separates the two meanings of `closed`: a call that finished has a
+ * handoff worth showing, and a start that never connected has nothing to hand off.
+ *
+ * The quota answer outranks the status because the server has already closed the
+ * call by the time it arrives — but it is a VIEW, not a mode the screen gets stuck
+ * in: the idle panel renders under that card, and the next start clears the error
+ * that put it there.
+ */
+function cockpitView(
+  status: LiveStatus,
+  alert: LiveAlert | null,
+  ran: boolean,
+): CockpitView {
+  if (alert?.kind === 'quota') return 'quota';
+  if (status === 'connecting' || status === 'live') return 'cockpit';
+  if (status === 'idle') return 'idle';
+  return ran ? 'ended' : 'idle';
+}
+
+/**
+ * What the HUD should SAY, which is not always what the socket's status is called.
+ *
+ * `closed` covers two different things, and `ran` is what tells them apart. A start
+ * that never connected leaves the socket `closed` while the screen shows the idle
+ * panel — and `◌ ENDED · 00:00` printed over "start a session" is the HUD announcing
+ * a call that did not happen. A call that really ran keeps ENDED, which is the one
+ * place the final duration is still readable.
+ */
+function hudStatus(status: LiveStatus, ran: boolean): LiveStatus {
+  return status === 'closed' && !ran ? 'idle' : status;
+}
+
+export default function LiveScreen(): React.JSX.Element {
+  const palette = usePalette();
   const insets = useSafeAreaInsets();
-  // The capture strip is TABBED (§5.1): live notes need a home during the call,
-  // and the design prototype's card is transcript-only.
-  const [captureTab, setCaptureTab] = useState<'transcript' | 'notes'>(
-    'transcript',
-  );
+  const router = useRouter();
+
+  // The capture pane is TABBED (`docs/DESIGN/notes-ui.md` §5.1): live notes need a
+  // home during the call, and the design prototype's card is transcript-only.
+  const [captureTab, setCaptureTab] = useState<CaptureTab>('transcript');
   const live = useLiveSession({ notesPanelVisible: captureTab === 'notes' });
-  const [draft, setDraft] = useState('');
+  // Which press we are on. The clock needs it because this screen is a TAB and never
+  // unmounts: without it, a start that fails would inherit the previous call's
+  // summary. Every start path bumps it, including the ones that fail before the hook
+  // ever reaches `connecting`.
+  const [attempt, setAttempt] = useState(0);
+  const clock = useCallClock(live.status === 'live', attempt);
 
-  const send = (): void => {
-    if (draft.trim() === '') return;
-    live.sendInput(draft);
-    setDraft('');
+  const [pairing, setPairing] = useState(emptySteerPairing);
+  // Prop-derived state, adjusted DURING RENDER — the same shape `StreamingText`
+  // uses, and the only one this repo's `set-state-in-effect` lint leaves open. The
+  // pairing is idempotent per suggestion id, so this settles on the first pass.
+  const paired = pairSteerArrivals(
+    pairing,
+    live.suggestions.map((suggestion) => suggestion.id),
+  );
+  if (paired !== pairing) setPairing(paired);
+
+  const alert = liveAlertFor(live.errorMessage);
+  const view = cockpitView(live.status, alert, clock.ran);
+  const inSession = live.status === 'connecting' || live.status === 'live';
+
+  const start = (): void => {
+    // A new call starts with no chips: the steers of the last one belong to answers
+    // that are already gone.
+    setPairing(emptySteerPairing);
+    setAttempt((previous) => previous + 1);
+    // `start()` clears the hook's `errorMessage`, which is what lets a refused call —
+    // a spent quota included — be tried again rather than leaving the screen parked
+    // on the card that reported it. The server re-gates the attempt.
+    void live.start();
   };
 
-  const showNotes = (): void => {
-    setCaptureTab('notes');
+  const respond = (steer: string): void => {
+    setPairing((previous) => steerSubmitted(previous, steer));
+    live.sendInput(steer);
+  };
+
+  const showNotes = (tab: CaptureTab): void => {
+    setCaptureTab(tab);
     // Revealing the panel is what clears the dot — not the update that set it.
-    live.markNotesSeen();
+    if (tab === 'notes') live.markNotesSeen();
   };
+
+  const banner =
+    alert?.kind === 'banner' ? (
+      <SessionBanner palette={palette} text={alert.text} />
+    ) : null;
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={[styles.root, { backgroundColor: palette.canvas }]}>
       <SafeAreaView
         style={[
           styles.safeArea,
           // The tab bar floats (position: absolute) and reserves no layout space,
-          // so this screen has to leave room or the action row hides under it.
+          // so this screen has to leave room or the bottom bar hides under it.
           { paddingBottom: tabBarClearance(insets.bottom) },
         ]}
         edges={['top']}
       >
+        {/* Load-bearing on iOS: the steer field sits at the bottom of the screen,
+            and without this the keyboard covers the thing being typed into. */}
         <KeyboardAvoidingView
-          style={styles.flex}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.header}>
-            <ThemedText type="title">Test Live</ThemedText>
-            <ThemedText type="small" themeColor="textSecondary">
-              {live.status}
-            </ThemedText>
-          </View>
-
-          {/* Which prompt answers this call. Locked once it starts. */}
-          <ModePicker
-            mode={live.mode}
-            onSelect={live.setMode}
-            disabled={!live.canPickMode}
+          style={styles.column}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        >
+          <LiveHeader
+            palette={palette}
+            status={hudStatus(live.status, clock.ran)}
+            elapsedMs={clock.elapsedMs}
+            onEnd={inSession ? live.stop : null}
           />
 
-          {/* Tabbed capture strip (§5.1): Transcript | Live notes. Both panels
-              stay mounted so the hidden one keeps receiving updates — the unread
-              dot is meaningless if the tab has to be open to hear anything. */}
-          <View accessibilityRole="tablist" style={styles.captureTabs}>
-            <Pressable
-              accessibilityRole="tab"
-              // `aria-selected` alongside accessibilityState: react-native-web
-              // renders the aria-* props as DOM attributes, which is the only way
-              // the current tab is announced on the web target.
-              accessibilityState={{ selected: captureTab === 'transcript' }}
-              aria-selected={captureTab === 'transcript'}
-              onPress={() => {
-                setCaptureTab('transcript');
-              }}
-            >
-              <ThemedText
-                type={captureTab === 'transcript' ? 'smallBold' : 'small'}
-                themeColor={
-                  captureTab === 'transcript' ? 'text' : 'textSecondary'
-                }
-              >
-                Transcript
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="tab"
-              accessibilityState={{ selected: captureTab === 'notes' }}
-              aria-selected={captureTab === 'notes'}
-              onPress={showNotes}
-              style={styles.notesTab}
-            >
-              <ThemedText
-                type={captureTab === 'notes' ? 'smallBold' : 'small'}
-                themeColor={captureTab === 'notes' ? 'text' : 'textSecondary'}
-              >
-                Live notes
-              </ThemedText>
-              {live.liveNotes.hasUnseen ? (
-                <View style={[styles.unreadDot, { backgroundColor: palette.hot }]} />
-              ) : null}
-            </Pressable>
-          </View>
-
-          <ThemedView type="backgroundElement" style={styles.transcriptStrip}>
-            {captureTab === 'transcript' ? (
-              <TranscriptList transcript={live.transcript} />
-            ) : (
-              <ScrollView>
-                <LiveNotesPanel state={live.liveNotes} palette={palette} />
-              </ScrollView>
-            )}
-          </ThemedView>
-
-          {/* The copilot history owns the majority of the screen. */}
-          <CopilotHistory suggestions={live.suggestions} status={live.status} />
-
-          {live.errorMessage !== null && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {live.errorMessage}
-            </ThemedText>
-          )}
-
-          {live.canSend ? (
-            <View style={styles.inputRow}>
-              <TextInput
-                testID="live-input"
-                style={[
-                  styles.input,
-                  {
-                    color: colors.text,
-                    backgroundColor: colors.backgroundElement,
-                  },
-                ]}
-                placeholder="Type what they said…"
-                placeholderTextColor={colors.textSecondary}
-                value={draft}
-                onChangeText={setDraft}
-                onSubmitEditing={send}
-                returnKeyType="send"
-                multiline={false}
+          {view === 'cockpit' ? (
+            <>
+              <CapturePane
+                tab={captureTab}
+                onSelect={showNotes}
+                turns={live.transcript}
+                notes={live.liveNotes}
+                palette={palette}
               />
-              <Pressable
-                testID="live-send-button"
-                accessibilityRole="button"
-                onPress={send}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView type="backgroundSelected" style={styles.sendButton}>
-                  <ThemedText type="smallBold">Send</ThemedText>
-                </ThemedView>
-              </Pressable>
+              <HudRail palette={palette} mode={live.mode} />
+              {banner}
+              <CopilotPane
+                entries={copilotEntries(live.suggestions, paired)}
+                palette={palette}
+                status={live.status}
+              />
+              <SteerBar
+                palette={palette}
+                canSend={live.canSend}
+                onRespond={respond}
+              />
+            </>
+          ) : (
+            <View style={styles.stack}>
+              {banner}
+              {view === 'quota' ? <QuotaCard palette={palette} /> : null}
+              {view === 'ended' ? (
+                <EndedSummary
+                  palette={palette}
+                  onSeeCalls={() => {
+                    router.push('/');
+                  }}
+                />
+              ) : null}
+              {/* Under the quota card too. Spec §4's "no dead retry" is about the
+                  REFUSED call — nothing here re-runs it — and not about locking the
+                  user out of the screen: this one stays mounted for the life of the
+                  app, so a card with no way off it would outlive the quota that
+                  raised it. Starting again is a new session the server re-gates. */}
+              <IdlePanel
+                palette={palette}
+                mode={live.mode}
+                onSelectMode={live.setMode}
+                canPickMode={live.canPickMode}
+                onStart={start}
+              />
             </View>
-          ) : null}
-
-          <View style={styles.actions}>
-            {live.status === 'live' || live.status === 'connecting' ? (
-              <Pressable
-                testID="live-stop-button"
-                accessibilityRole="button"
-                onPress={() => live.stop()}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView
-                  type="backgroundSelected"
-                  style={styles.primaryButton}>
-                  <ThemedText type="smallBold">End session</ThemedText>
-                </ThemedView>
-              </Pressable>
-            ) : (
-              <Pressable
-                testID="live-start-button"
-                accessibilityRole="button"
-                onPress={() => void live.start()}
-                style={({ pressed }) => pressed && styles.pressed}>
-                <ThemedView
-                  type="backgroundSelected"
-                  style={styles.primaryButton}>
-                  <ThemedText type="smallBold">Start session</ThemedText>
-                </ThemedView>
-              </Pressable>
-            )}
-          </View>
+          )}
         </KeyboardAvoidingView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  captureTabs: {
-    flexDirection: 'row',
-    gap: Spacing.four,
-    alignItems: 'center',
-    paddingHorizontal: Spacing.two,
-  },
-  notesTab: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  unreadDot: { width: 7, height: 7, borderRadius: 4 },
-  container: {
-    flex: 1,
-  },
+  root: { flex: 1 },
   safeArea: {
     flex: 1,
-    paddingHorizontal: Spacing.three,
+    paddingHorizontal: Space.xl,
   },
-  flex: {
+  column: {
     flex: 1,
-    gap: Spacing.two,
+    gap: Space.lg,
+    paddingTop: Space.lg,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    paddingTop: Spacing.two,
-  },
-  // COMPACT (Gustavo's direction): the transcript is a strip, not the star.
-  transcriptStrip: {
-    height: 120,
-    borderRadius: Spacing.three,
-    paddingHorizontal: Spacing.three,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    alignItems: 'center',
-  },
-  input: {
+  // The inner views sit UNDER the header, which already carries the top padding.
+  stack: {
     flex: 1,
-    fontSize: FontSize.body,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    minHeight: 44,
-  },
-  sendButton: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
-    minHeight: 44,
-    justifyContent: 'center',
-  },
-  actions: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingBottom: Spacing.two,
-  },
-  primaryButton: {
-    alignItems: 'center',
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  pressed: {
-    opacity: 0.7,
+    gap: Space.lg,
   },
 });

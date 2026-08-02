@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { MeetingTranscriptTurn } from '@nova/shared';
 
-import { formatCallClock, groupTranscriptBySpeaker } from './transcript';
+import {
+  formatCallClock,
+  groupTranscriptBySpeaker,
+  speakerTag,
+} from './transcript';
 
 /**
  * Transcript tab presentation logic (§7.6). Pure, so the real edge cases live here:
@@ -86,5 +90,23 @@ describe('groupTranscriptBySpeaker', () => {
 
   it('returns no blocks for an empty transcript', () => {
     expect(groupTranscriptBySpeaker([])).toEqual([]);
+  });
+});
+
+describe('speakerTag', () => {
+  it('reads the live convention: `me` is the user, `them` is the other side', () => {
+    expect(speakerTag('me')).toBe('ME');
+    expect(speakerTag('Me')).toBe('ME');
+    expect(speakerTag('them')).toBe('THEM');
+  });
+
+  it('shows a diarized label as GIVEN rather than guessing who it is', () => {
+    // The vendor's `spk_0` names a voice, not a person. Calling it THEM would
+    // claim the user is not that speaker, which the diarizer never said.
+    expect(speakerTag('spk_0')).toBe('SPK_0');
+  });
+
+  it('has no tag for an unlabelled turn', () => {
+    expect(speakerTag(null)).toBeNull();
   });
 });

@@ -1,9 +1,10 @@
-import type { MeetingListItem } from '@nova/shared';
+import type { ConversationType, MeetingListItem } from '@nova/shared';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { GlassPill, GlassSurface } from '@/design/glass';
-import { useCardInTransformOnly, useShimmer } from '@/design/motion';
+import { ChamferSurface } from '@/design/chamfer';
+import { LightSweep } from '@/design/light-sweep';
+import { useCardInTransformOnly } from '@/design/motion';
 import {
   FontFamily,
   FontSize,
@@ -13,29 +14,77 @@ import {
 } from '@/design/tokens';
 
 import {
-  cardChips,
   formatDuration,
   formatStartTime,
-  formatWeekday,
   statusToPill,
+  type StatusPill,
 } from './format';
 
 /**
- * One meeting card (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.4).
+ * One meeting card (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5).
  *
- * Entrance uses {@link useCardInTransformOnly}, NOT `useCardIn`: the card wraps a
- * `GlassView`, and an opacity ramp from 0 would stop the glass rendering entirely
- * (see `design/motion.ts`). Slides and scales in instead.
+ * A soft surface — square-ish corners, no chamfer — because the card is something
+ * you READ; the one thing on it that is a control-language shape is the notes chip,
+ * and the tap target is the whole card. Today's calls carry an ink wash so the top
+ * of the list has weight without a second colour or a second size.
+ *
+ * STATUS IS SAID, NOT COLOURED. The palette has one ink, so the four coloured pills
+ * this card used to wear were four spellings of the same grey. What replaces them:
+ *
+ *   - notes ready → the one chamfered chip, ink-filled, `NOTES READY`;
+ *   - still working → NO chip. A light sweep under the title and a mono whisper in
+ *     the meta row. A chip labels something that will stay true; this state exists
+ *     precisely because it is about to stop being true;
+ *   - failed → plain words in the meta row, and nothing that pretends to be working;
+ *   - no notes → silence. A card with nothing to say says nothing (spec §5).
+ *
+ * Entrance is TRANSFORM-ONLY: the card's text is the content, so an opacity ramp
+ * that never completes — a dropped frame, a stubbed clock — would leave a call
+ * invisible rather than merely unanimated.
  */
 
 export interface MeetingCardProps {
   meeting: MeetingListItem;
   palette: Palette;
   onPress: (id: string) => void;
-  /** Stagger index — the mock brings the list in one card at a time. */
+  /** Stagger index — the list arrives one card at a time. */
   index?: number;
-  /** The mock gives the newest card a raised, larger treatment. */
-  featured?: boolean;
+  /** Today's calls take the ink wash; older ones stay outlined. */
+  today?: boolean;
+}
+
+/**
+ * The meta line's third segment. A `Record` so a fourth conversation type fails to
+ * compile here rather than printing a raw wire value at the user.
+ */
+const TYPE_LABELS: Record<ConversationType, string> = {
+  sales: 'Sales',
+  interview: 'Interview',
+  casual: 'Casual',
+};
+
+/** How a status is DRAWN. Deliberately four shapes, and no colour among them. */
+type StatusTreatment = 'chip' | 'sweep' | 'words' | 'silent';
+
+/**
+ * `statusToPill`'s tone, read as a treatment.
+ *
+ * The tone names are from the glass era, when they were colours; they survive as the
+ * status grouping the list has always had (ready / working / failed / nothing), which
+ * is exactly the distinction the duotone now has to draw in shape and words. Switched
+ * exhaustively, so a fifth tone is a type error here rather than an undrawn status.
+ */
+function treatmentFor(tone: StatusPill['tone']): StatusTreatment {
+  switch (tone) {
+    case 'accent':
+      return 'chip';
+    case 'shimmer':
+      return 'sweep';
+    case 'hot':
+      return 'words';
+    case 'muted':
+      return 'silent';
+  }
 }
 
 export function MeetingCard({
@@ -43,213 +92,162 @@ export function MeetingCard({
   palette,
   onPress,
   index = 0,
-  featured = false,
+  today = false,
 }: MeetingCardProps): React.JSX.Element {
   // Cap the stagger: a 40-meeting list must not take four seconds to appear.
   const entrance = useCardInTransformOnly(Math.min(index, 6) * 60);
-  const pill = statusToPill(meeting.notes_status);
-  const chips = cardChips(meeting);
 
-  const duration = formatDuration(meeting.started_at, meeting.ended_at);
-  const time = formatStartTime(meeting.started_at);
-  const weekday = formatWeekday(meeting.started_at);
-  // Only the parts we actually have — a call with no timestamps shows no subtitle
-  // rather than a lonely separator.
-  const subtitle = [weekday, duration, time].filter((p) => p !== null).join(' · ');
+  const status = statusToPill(meeting.notes_status);
+  const treatment = treatmentFor(status.tone);
+  // The words are the whole signal, so they are spelt in the mono register the rest
+  // of the machine speech uses. `textTransform` would leave the DOM text mixed-case,
+  // which is a difference a screen reader hears.
+  const statusWords = status.label.toUpperCase();
+
+  // Only the parts we actually have — a call with no timestamps shows no meta line
+  // rather than a row of lonely separators.
+  const meta = [
+    formatStartTime(meeting.started_at),
+    formatDuration(meeting.started_at, meeting.ended_at),
+    meeting.conversation_type === null
+      ? null
+      : TYPE_LABELS[meeting.conversation_type],
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
+
+  const saysStatus = treatment === 'sweep' || treatment === 'words';
+
+  // The card is ONE button, so its label is everything it says — a `Text` inside a
+  // labelled control is not announced, and with status now carried by words alone,
+  // a label of just the title would be a card whose status is silent to VoiceOver.
+  const spoken = [meeting.title, meta, treatment === 'silent' ? null : statusWords]
+    .filter((part) => part !== null && part !== '')
+    .join(' · ');
 
   return (
     <Animated.View style={entrance}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={meeting.title}
+        accessibilityLabel={spoken}
         onPress={() => {
           onPress(meeting.id);
         }}
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}
       >
-        <GlassSurface
-          palette={palette}
-          tone={featured ? 'raised' : 'regular'}
-          radius={featured ? Radius.card : Radius.cardSmall}
-          elevated={featured}
-          style={styles.card}
+        <View
           testID={`meeting-card-${meeting.id}`}
+          style={[
+            styles.card,
+            { borderColor: palette.inkHairline },
+            today && { backgroundColor: palette.inkFill },
+          ]}
         >
           <View style={styles.headRow}>
-            <View style={styles.headText}>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.title,
-                  {
-                    color: palette.ink,
-                    fontSize: featured ? FontSize.cardTitle : FontSize.tldr,
-                  },
-                ]}
+            <Text
+              numberOfLines={1}
+              style={[styles.title, { color: palette.ink }]}
+            >
+              {meeting.title}
+            </Text>
+            {treatment === 'chip' ? (
+              <ChamferSurface
+                fill={palette.ink}
+                style={styles.chip}
+                contentStyle={styles.chipContent}
+                testID={`meeting-chip-${meeting.id}`}
               >
-                {meeting.title}
-              </Text>
-              {subtitle.length > 0 ? (
-                <Text style={[styles.subtitle, { color: palette.ink3 }]}>
-                  {subtitle}
+                <Text style={[styles.chipText, { color: palette.onInk }]}>
+                  {statusWords}
                 </Text>
-              ) : null}
-            </View>
-            <StatusPill palette={palette} pill={pill} />
+              </ChamferSurface>
+            ) : null}
           </View>
 
-          {meeting.tldr !== null ? (
+          {treatment === 'sweep' ? (
+            <LightSweep color={palette.ink} style={styles.sweep} />
+          ) : null}
+
+          <View testID={`meeting-meta-${meeting.id}`} style={styles.metaRow}>
+            {meta === '' ? null : (
+              <Text style={[styles.meta, { color: palette.inkSoft }]}>{meta}</Text>
+            )}
+            {saysStatus && meta !== '' ? (
+              <Text style={[styles.meta, { color: palette.inkFaint }]}>·</Text>
+            ) : null}
+            {saysStatus ? (
+              // Secondary ink, NOT the faint placeholder wash: these words are the
+              // only carrier of "working" and "failed" now that no colour is, and
+              // spec §11 holds secondary text at 75% so it stays legible.
+              <Text
+                testID={`meeting-status-${meeting.id}`}
+                style={[styles.meta, { color: palette.inkSoft }]}
+              >
+                {statusWords}
+              </Text>
+            ) : null}
+          </View>
+
+          {meeting.tldr === null ? null : (
             <Text
-              numberOfLines={3}
-              style={[styles.tldr, { color: palette.ink2 }]}
+              testID={`meeting-preview-${meeting.id}`}
+              numberOfLines={1}
+              style={[styles.preview, { color: palette.inkSoft }]}
             >
               {meeting.tldr}
             </Text>
-          ) : null}
-
-          {chips.length > 0 ? (
-            <View style={styles.chipRow}>
-              {chips.map((chip) => (
-                <View
-                  key={chip}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: palette.glass,
-                      borderColor: palette.stroke,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.chipText, { color: palette.ink2 }]}>
-                    {chip}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </GlassSurface>
+          )}
+        </View>
       </Pressable>
     </Animated.View>
   );
 }
 
-/** The status pill. `shimmer` sweeps; the rest are static. */
-function StatusPill({
-  palette,
-  pill,
-}: {
-  palette: Palette;
-  pill: ReturnType<typeof statusToPill>;
-}): React.JSX.Element {
-  const sweeping = pill.tone === 'shimmer';
-  // Gated, not skipped: the hook must be called unconditionally, but a static pill
-  // must not leave an infinite `withRepeat` running behind a style nobody reads —
-  // a 40-row list is 40 of them.
-  const shimmer = useShimmer(120, sweeping);
-
-  const dotColor =
-    pill.tone === 'accent'
-      ? palette.accent
-      : pill.tone === 'hot'
-        ? palette.hot
-        : palette.ink3;
-
-  return (
-    <GlassPill
-      palette={palette}
-      style={[
-        styles.statusPill,
-        pill.tone === 'accent' && {
-          backgroundColor: palette.accentFill,
-          borderColor: palette.accentSoft,
-        },
-      ]}
-      testID={`status-${pill.tone}`}
-    >
-      {sweeping ? (
-        <Animated.View
-          style={[
-            styles.shimmerBand,
-            { backgroundColor: palette.sheen },
-            shimmer,
-          ]}
-        />
-      ) : (
-        <View
-          style={[styles.statusDot, { backgroundColor: dotColor }]}
-        />
-      )}
-      <Text style={[styles.statusText, { color: palette.ink2 }]}>
-        {pill.label}
-      </Text>
-    </GlassPill>
-  );
-}
-
 const styles = StyleSheet.create({
   card: {
-    padding: Space.xl,
-    gap: Space.md,
+    borderRadius: Radius.soft,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Space.lg,
+    gap: Space.xs2,
   },
   headRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     gap: Space.md,
   },
-  headText: {
-    flex: 1,
-    gap: 3,
-  },
   title: {
-    fontFamily: FontFamily.sansSemibold,
-    letterSpacing: -0.25,
+    flex: 1,
+    fontFamily: FontFamily.bodySemibold,
+    fontSize: FontSize.bodySm,
   },
-  subtitle: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.metaSmall,
-  },
-  tldr: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.45,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    alignItems: 'center',
-  },
-  chip: {
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-    borderRadius: Radius.chip,
-    borderWidth: StyleSheet.hairlineWidth,
+  chip: { alignSelf: 'flex-start' },
+  chipContent: {
+    paddingHorizontal: Space.sm2,
+    paddingVertical: Space.xs,
   },
   chipText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
+    fontFamily: FontFamily.monoBold,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 1.5,
   },
-  statusPill: {
+  // Under the title, not across the card: the sweep belongs to the thing that is
+  // being worked on, which is this call's notes.
+  sweep: { marginTop: Space.xs },
+  metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    flexWrap: 'wrap',
+    gap: Space.xs2,
   },
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
+  meta: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 0.5,
   },
-  statusText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
+  preview: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
   },
-  shimmerBand: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 40,
-    opacity: 0.35,
-  },
+  pressed: { opacity: 0.7 },
 });

@@ -1,44 +1,41 @@
-import { liveModeSchema, type LiveMode } from '@nova/shared';
-import { Pressable, StyleSheet, View } from 'react-native';
+import type { LiveMode } from '@nova/shared';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { ChamferSurface } from '@/design/chamfer';
+import { FontFamily, FontSize, Size, Space, type Palette } from '@/design/tokens';
+
+import { MODE_LABELS, MODE_ORDER } from './modes';
 
 /**
- * The copilot mode picker: a row of segmented pills chosen BEFORE the call.
+ * The copilot mode picker: the row of pills chosen BEFORE the call
+ * (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §4).
+ *
+ * Chamfered, because they act (spec §3), and the picked one is FILLED rather than
+ * tinted — the duotone has one ink, so "selected" cannot be a lighter shade of
+ * anything. Fill and its inverse text is the only contrast the palette can spend.
  *
  * Mode is per session — the server locks it at `session.start` so the assembled
- * prompt prefix stays byte-stable for the whole call — so the row goes inert once
- * a session is connecting or live rather than pretending a mid-call switch works.
+ * prompt prefix stays byte-stable for the whole call — so the row goes inert once a
+ * session is connecting or live rather than pretending a mid-call switch works.
  *
  * Dumb by construction: it holds no state. The picked mode and the lock both come
  * from `useLiveSession`, which is what actually knows whether a call is in flight.
  */
-
-/**
- * Picker copy per mode. A `Record<LiveMode, string>` on purpose: a mode added to
- * the wire enum fails to compile here until it has a label, so the picker cannot
- * silently offer three of four modes.
- */
-const MODE_LABELS: Record<LiveMode, string> = {
-  general: 'General',
-  behavioral: 'Behavioral',
-  technical: 'Technical',
-  finance: 'Finance',
-};
-
-/** Order comes from the enum itself, so the row and the wire cannot disagree. */
-const MODE_ORDER: readonly LiveMode[] = liveModeSchema.options;
 
 export interface ModePickerProps {
   readonly mode: LiveMode;
   readonly onSelect: (mode: LiveMode) => void;
   /** True while a session is connecting/live — mode is locked for the call. */
   readonly disabled: boolean;
+  readonly palette: Palette;
 }
 
-export function ModePicker({ mode, onSelect, disabled }: ModePickerProps) {
+export function ModePicker({
+  mode,
+  onSelect,
+  disabled,
+  palette,
+}: ModePickerProps): React.JSX.Element {
   return (
     // radiogroup/radio rather than buttons: this is one choice out of four, and
     // it is the role that carries the SELECTED state to a screen reader (and to
@@ -60,19 +57,28 @@ export function ModePicker({ mode, onSelect, disabled }: ModePickerProps) {
             onPress={() => {
               onSelect(value);
             }}
-            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+            style={({ pressed }) => [
+              styles.pill,
+              // Locked reads as unavailable rather than as a fifth unselected pill.
+              disabled ? styles.locked : undefined,
+              pressed ? styles.pressed : undefined,
+            ]}
           >
-            <ThemedView
-              type={selected ? 'backgroundSelected' : 'backgroundElement'}
-              style={[styles.pill, disabled && styles.locked]}
+            <ChamferSurface
+              fill={selected ? palette.ink : 'transparent'}
+              stroke={selected ? undefined : palette.inkHairline}
+              style={styles.surface}
+              contentStyle={styles.surfaceContent}
             >
-              <ThemedText
-                type={selected ? 'smallBold' : 'small'}
-                themeColor={selected ? 'text' : 'textSecondary'}
+              <Text
+                style={[
+                  styles.label,
+                  { color: selected ? palette.onInk : palette.inkSoft },
+                ]}
               >
                 {MODE_LABELS[value]}
-              </ThemedText>
-            </ThemedView>
+              </Text>
+            </ChamferSurface>
           </Pressable>
         );
       })}
@@ -83,19 +89,29 @@ export function ModePicker({ mode, onSelect, disabled }: ModePickerProps) {
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    paddingHorizontal: Spacing.two,
+    gap: Space.sm2,
   },
-  pill: {
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: Spacing.four,
+  // The full 44pt floor as a REAL box rather than `hitSlop`: react-native-web ignores
+  // hitSlop, and Expo Web is this project's verification target, so a slop-only
+  // target would pass by eye and be untestable. Same call on the capture tabs and
+  // the END key.
+  pill: { flex: 1, minHeight: Size.tapTarget },
+  surface: { flex: 1 },
+  surfaceContent: {
+    flex: 1,
+    paddingVertical: Space.md,
+    paddingHorizontal: Space.xs2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  // Locked reads as unavailable rather than as a fourth unselected pill.
-  locked: {
-    opacity: 0.5,
+  label: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 1.5,
+    // Uppercase on screen only: the DOM text stays "General", so a screen reader
+    // says the word rather than spelling out a shouted one.
+    textTransform: 'uppercase',
   },
-  pressed: {
-    opacity: 0.7,
-  },
+  locked: { opacity: 0.5 },
+  pressed: { opacity: 0.7 },
 });

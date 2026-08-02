@@ -1,11 +1,14 @@
 import { Redirect, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { RingOrbit } from '@/design/ring-orbit';
+import { FontFamily, FontSize, Space } from '@/design/tokens';
+import { usePalette } from '@/hooks/use-appearance';
 import { useAuth } from '@/hooks/use-auth';
+
+/** The cross-fade between screens (spec §11: transitions are quiet, ~200ms). */
+const TRANSITION_MS = 200;
 
 /**
  * Guard for the authenticated app: while the session is still resolving show a
@@ -13,25 +16,30 @@ import { useAuth } from '@/hooks/use-auth';
  * unavailable misconfig) is sent to the auth flow, where the reason is shown.
  * Only a real session renders the app.
  *
- * A STACK, not the tab navigator directly (Phase 8.5, `docs/DESIGN/notes-ui.md`
- * §7.3). The tabs are one screen in it; Account and the meeting detail are pushed
- * on top. That structure is forced by the design: `expo-router/ui` removes a route
- * from navigation entirely when no `TabTrigger` renders for it, so a screen that
- * must be reachable WITHOUT being a tab — Account, per Gustavo's two-pill bar —
- * cannot live inside the tab navigator at all.
+ * A STACK, not the tab navigator directly. The tabs are one screen in it and the
+ * meeting detail is pushed on top — Account used to be pushed here too, and moved
+ * into the tab group when it became a tab of its own.
  */
 export default function AppLayout() {
   const auth = useAuth();
+  const palette = usePalette();
 
   if (auth.status === 'loading') {
+    // In brand from the first frame — this is the app's opening moment. The double
+    // ring is the app's one waiting shape (spec §6), so the first thing the user
+    // ever sees is the mark itself, doing the waiting.
     return (
-      <ThemedView style={styles.center}>
+      <View
+        testID="app-waiting"
+        style={[styles.center, { backgroundColor: palette.canvas }]}
+      >
         <SafeAreaView style={styles.center}>
-          <ThemedText type="default" themeColor="textSecondary">
-            loading…
-          </ThemedText>
+          <RingOrbit size={36} color={palette.ink} />
+          <Text style={[styles.waiting, { color: palette.inkFaint }]}>
+            ◌ ONE MOMENT
+          </Text>
         </SafeAreaView>
-      </ThemedView>
+      </View>
     );
   }
 
@@ -43,9 +51,21 @@ export default function AppLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        // The glass screens paint their own gradient edge-to-edge; a card
-        // presentation over an opaque default background would flash white on push.
-        contentStyle: { backgroundColor: 'transparent' },
+        // A CROSS-FADE, not a slide. Every screen in this app is the same canvas
+        // with different words on it, so a horizontal push reads as the whole field
+        // sliding away rather than as content changing — and the fade is the gentler
+        // answer for reduced motion besides, which is why it is not itself gated.
+        animation: 'fade',
+        animationDuration: TRANSITION_MS,
+        // OPAQUE, in the same canvas the screens paint. A transparent screen is
+        // exactly what lets the container behind it show through at the fade's
+        // midpoint — and behind this stack is React Navigation's own theme, whose
+        // `colors.background` is near-black on Dark and near-white on Default. So
+        // transparent buys a push that darkens toward black in cobalt and lightens
+        // toward grey in paper. Painting `palette.canvas` here cannot go wrong the
+        // same way: every screen already paints this exact colour edge-to-edge, so
+        // the backdrop can never differ from what is on top of it.
+        contentStyle: { backgroundColor: palette.canvas },
       }}
     />
   );
@@ -56,6 +76,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Space.lg,
+  },
+  waiting: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
   },
 });

@@ -27,8 +27,12 @@ export function statusToPill(status: NotesStatus): StatusPill {
     case 'queued':
       return { label: 'Queued', tone: 'shimmer' };
     case 'failed':
-      // Named as an action rather than a state: this pill is the retry affordance.
-      return { label: 'Retry notes', tone: 'hot' };
+      // A STATE, not an instruction. These words are spoken now — they are read
+      // out inside the meeting card's accessibility label and printed in the
+      // detail screen's meta line — and "retry notes" heard in that position is a
+      // control the user is being told to press, not the status of their call.
+      // The retry affordance is a drawn key that says TRY AGAIN next to it.
+      return { label: 'Notes failed', tone: 'hot' };
     case 'none':
       return { label: 'No notes', tone: 'muted' };
   }
@@ -83,14 +87,37 @@ export function formatStartTime(
 }
 
 /** Weekday for the "earlier this week" rows, e.g. "Wed". */
-export function formatWeekday(
-  startedAt: string | null,
+function formatWeekday(startedAt: string, locale?: string): string {
+  return new Date(startedAt).toLocaleDateString(locale, { weekday: 'short' });
+}
+
+/**
+ * How far back a moment is, in the words a person would use: "Today", then the
+ * weekday for the rest of the week, then a date.
+ *
+ * The ladder matters more than the format. Inside a week a weekday is the fastest
+ * thing to place ("Mon" needs no arithmetic); past that a weekday is ambiguous
+ * — WHICH Monday — so it becomes a date. The boundaries are LOCAL midnight and the
+ * same rolling seven days {@link groupMeetingsByRecency} uses, so the detail screen
+ * and the list section a call was tapped from cannot disagree about what "today" is.
+ */
+export function formatRelativeDay(
+  isoTime: string | null,
+  now: Date,
   locale?: string,
 ): string | null {
-  if (startedAt === null) return null;
-  const date = new Date(startedAt);
+  if (isoTime === null) return null;
+  const date = new Date(isoTime);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(locale, { weekday: 'short' });
+
+  const day = startOfLocalDay(date);
+  const today = startOfLocalDay(now);
+  if (day === today) return 'Today';
+
+  const weekStart = startOfLocalDaysAgo(now, 6);
+  if (day >= weekStart && day < today) return formatWeekday(isoTime, locale);
+
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 /** The mock's section headings. */
@@ -107,6 +134,24 @@ function startOfLocalDay(date: Date): number {
     date.getFullYear(),
     date.getMonth(),
     date.getDate(),
+  ).getTime();
+}
+
+/**
+ * Midnight LOCAL time `days` CALENDAR days before the day `from` falls in.
+ *
+ * Counted on the calendar rather than by subtracting `days * 86_400_000`, because a
+ * day is not always 86,400 seconds long. Across a DST change that subtraction lands
+ * an hour either side of midnight — so the week's far edge falls at 01:00 or 23:00
+ * on the boundary day, and a call in that hour is filed under the wrong heading.
+ * `Date` normalises an out-of-range day-of-month (a zero or a negative rolls back
+ * into the previous month), so this needs no month arithmetic of its own.
+ */
+function startOfLocalDaysAgo(from: Date, days: number): number {
+  return new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate() - days,
   ).getTime();
 }
 
@@ -128,8 +173,8 @@ export function groupMeetingsByRecency(
 ): MeetingSection[] {
   const todayStart = startOfLocalDay(now);
   // Seven days back, so "this week" is a rolling week rather than one that empties
-  // out every Monday morning.
-  const weekStart = todayStart - 6 * 24 * 60 * 60 * 1000;
+  // out every Monday morning. Counted in CALENDAR days — see `startOfLocalDaysAgo`.
+  const weekStart = startOfLocalDaysAgo(now, 6);
 
   const buckets: Record<RecencyGroup, MeetingListItem[]> = {
     today: [],
@@ -157,16 +202,4 @@ export function groupMeetingsByRecency(
   return order
     .filter((group) => buckets[group].length > 0)
     .map((group) => ({ group, meetings: buckets[group] }));
-}
-
-/** The tag chips under a card's summary line. */
-export function cardChips(meeting: MeetingListItem): string[] {
-  const chips: string[] = [];
-  if (meeting.conversation_type !== null) chips.push(meeting.conversation_type);
-  if (meeting.action_item_count > 0) {
-    const n = meeting.action_item_count;
-    chips.push(`${String(n)} action item${n === 1 ? '' : 's'}`);
-  }
-  if (meeting.has_follow_up) chips.push('follow-up drafted');
-  return chips;
 }

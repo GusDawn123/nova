@@ -1,13 +1,29 @@
 import {
-  SplineSans_400Regular,
-  SplineSans_500Medium,
-  SplineSans_600SemiBold,
-  useFonts,
-} from '@expo-google-fonts/spline-sans';
-import { SplineSansMono_400Regular } from '@expo-google-fonts/spline-sans-mono';
+  Inter_400Regular,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
+import {
+  Orbitron_700Bold,
+  Orbitron_900Black,
+} from '@expo-google-fonts/orbitron';
+import {
+  SpaceMono_400Regular,
+  SpaceMono_700Bold,
+} from '@expo-google-fonts/space-mono';
+import { useFonts } from 'expo-font';
 
 /**
- * Spline Sans — the mock's typeface (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.1).
+ * The Nova typefaces: Orbitron for display, Inter for body, Space Mono for numerals
+ * and machine-voice text (spec §2). One trio, and only this trio — Spline Sans rode
+ * along through the redesign so the not-yet-redrawn screens would not fall back to
+ * SF Pro mid-flight, and retired with the last of them.
+ *
+ * `useFonts` comes from `expo-font` rather than from one of the font packages. The
+ * `@expo-google-fonts/*` packages all re-export the same hook, so importing it from
+ * one of them works — right up until that package is the one being uninstalled, at
+ * which point the app loses its font loading along with a face nothing was using.
+ * Naming the real owner makes the packages what they are: face data, nothing else.
  *
  * Loaded at RUNTIME via `useFonts` rather than embedded through the `expo-font`
  * config plugin. The plugin produces a smaller, faster result, but it requires a
@@ -22,10 +38,13 @@ import { SplineSansMono_400Regular } from '@expo-google-fonts/spline-sans-mono';
  */
 export function useNovaFonts(): boolean {
   const [loaded] = useFonts({
-    SplineSans_400Regular,
-    SplineSans_500Medium,
-    SplineSans_600SemiBold,
-    SplineSansMono_400Regular,
+    Orbitron_700Bold,
+    Orbitron_900Black,
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    SpaceMono_400Regular,
+    SpaceMono_700Bold,
   });
   return loaded;
 }

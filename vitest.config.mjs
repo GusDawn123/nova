@@ -44,10 +44,71 @@ export default defineConfig({
       // implementations under jsdom. Exact match only: `react-native-web`,
       // `react-native-svg` etc. must NOT be caught by it.
       { find: /^react-native$/, replacement: "react-native-web" },
+      // react-native-svg declares no `exports` map, so the bare specifier resolves by
+      // `main` — the CommonJS build, which vite hands straight to Node and which
+      // reaches react-native's Flow source. Point at the ESM build instead: that one
+      // vite processes itself, which is what lets the alias above and the `.web.*`
+      // extensions below apply to everything the package imports internally.
+      {
+        find: /^react-native-svg$/,
+        replacement: "react-native-svg/lib/module/index.js",
+      },
+    ],
+    // `.web.*` FIRST — the platform-extension convention Metro and the Expo web
+    // build both use, which vite does not know about on its own. Packages that ship
+    // a browser implementation alongside the native one (react-native-svg) name it
+    // `elements.web.js` next to `elements.js` and import it extensionless, with no
+    // `exports` map to disambiguate; without this the native file wins and drags in
+    // react-native's untranspiled Flow source, which Node cannot parse.
+    //
+    // This DOES also redirect one of our own modules — `hooks/use-color-scheme.web.ts`,
+    // reached extensionless from `hooks/use-theme.ts`. That is the INTENDED
+    // resolution and not collateral: these suites run in jsdom and already alias
+    // `react-native` to `react-native-web`, so the web variant is the one the code
+    // under test would actually run against. Picking the native file here would be
+    // the wrong answer, not the safe one. (There were two until the Expo template's
+    // `components/animated-icon.web.tsx` went with the splash overlay.)
+    //
+    // REACH: this block is repo-global — the server and shared suites resolve under
+    // it too, because vitest 2.1 has no per-environment `resolve`, and the only way
+    // to scope it (a `vitest.workspace.ts` split) would cost the `fileParallelism:
+    // false` guarantee the DB suites below depend on. It is safe today because the
+    // file above is the ONLY `*.web.*` source in the repo and it is under
+    // `apps/mobile`. What would make it unsafe: a `*.web.*` file appearing under
+    // `apps/server` or `packages/shared`, where node — not a browser — is the real
+    // target, and where this ordering would silently hand tests the browser variant.
+    // If that day comes, scope this properly rather than deleting the entries.
+    //
+    // That precondition is no longer only a paragraph: `apps/mobile/src/testing/
+    // web-extension.test.ts` fails the build the moment a `*.web.*` file is tracked
+    // outside `apps/mobile`.
+    extensions: [
+      ".web.mjs",
+      ".web.js",
+      ".web.mts",
+      ".web.ts",
+      ".web.jsx",
+      ".web.tsx",
+      ".mjs",
+      ".js",
+      ".mts",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".json",
     ],
   },
   test: {
     fileParallelism: false,
+    server: {
+      deps: {
+        // react-native-svg has to go THROUGH vite rather than round Node: only then
+        // do the `react-native` alias and the `.web.*` extensions above apply to its
+        // internals. Externalised, it loads its native build and throws a syntax
+        // error before any test runs.
+        inline: ["react-native-svg"],
+      },
+    },
     // Only mobile gets a DOM. Server and shared suites stay on `node`, where
     // installing jsdom globals would be pure overhead and could mask a real
     // Node-only assumption.

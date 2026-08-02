@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { MeetingListItem, NotesStatus } from '@nova/shared';
 
 import {
-  cardChips,
   formatDuration,
+  formatRelativeDay,
   formatStartTime,
   groupMeetingsByRecency,
   statusToPill,
@@ -35,7 +35,7 @@ describe('statusToPill', () => {
     ['completed', 'Notes ready'],
     ['processing', 'Writing notes'],
     ['queued', 'Queued'],
-    ['failed', 'Retry notes'],
+    ['failed', 'Notes failed'],
     ['none', 'No notes'],
   ];
 
@@ -50,9 +50,69 @@ describe('statusToPill', () => {
     expect(statusToPill('none').tone).toBe('muted');
   });
 
-  it('presents a failure as a retry action, not a dead end', () => {
+  it('states the failure rather than commanding a retry', () => {
+    // These words are now SPOKEN — they land inside the card's accessibility
+    // label and in the detail screen's meta line, where "retry notes" is heard
+    // as a control the user is being told to operate rather than as the status
+    // of the call they are looking at.
     expect(statusToPill('failed').tone).toBe('hot');
-    expect(statusToPill('failed').label).toMatch(/retry/i);
+    expect(statusToPill('failed').label).not.toMatch(/retry/i);
+  });
+});
+
+describe('formatRelativeDay', () => {
+  const now = new Date(2026, 6, 22, 15, 0);
+
+  it('names today as today', () => {
+    expect(formatRelativeDay(new Date(2026, 6, 22, 9).toISOString(), now)).toBe(
+      'Today',
+    );
+  });
+
+  it('names a day inside the last week by its weekday', () => {
+    // 'en-US' pinned: the runner's default locale is not the user's, and an
+    // unpinned assertion would pass or fail on the machine rather than the code.
+    expect(
+      formatRelativeDay(new Date(2026, 6, 20, 9).toISOString(), now, 'en-US'),
+    ).toBe('Mon');
+  });
+
+  it('falls back to a date for anything older', () => {
+    expect(
+      formatRelativeDay(new Date(2026, 5, 2, 9).toISOString(), now, 'en-US'),
+    ).toBe('Jun 2');
+  });
+
+  it('holds the weekday to the sixth day back, and no further', () => {
+    // The rolling window's two edges. Without this pair its WIDTH is unconstrained
+    // and an off-by-one — or a DST-shifted boundary — is invisible.
+    expect(
+      formatRelativeDay(new Date(2026, 6, 16, 9).toISOString(), now, 'en-US'),
+    ).toBe('Thu');
+    expect(
+      formatRelativeDay(new Date(2026, 6, 15, 9).toISOString(), now, 'en-US'),
+    ).toBe('Jul 15');
+  });
+
+  it('counts the window in calendar days, not in 24-hour blocks', () => {
+    // A day is not always 86,400 seconds long. Subtracting six of them lands an
+    // hour either side of local midnight across a DST change, which files a call in
+    // that hour under the wrong heading. Counted on the calendar, the boundary is
+    // midnight on the sixth day back wherever this runs and whenever it runs.
+    const edge = new Date(2026, 6, 16, 0, 0, 0);
+    expect(formatRelativeDay(edge.toISOString(), now, 'en-US')).toBe('Thu');
+    expect(
+      formatRelativeDay(
+        new Date(2026, 6, 15, 23, 59, 59).toISOString(),
+        now,
+        'en-US',
+      ),
+    ).toBe('Jul 15');
+  });
+
+  it('has nothing to say about a missing or unparseable moment', () => {
+    expect(formatRelativeDay(null, now)).toBeNull();
+    expect(formatRelativeDay('not a date', now)).toBeNull();
   });
 });
 
@@ -170,6 +230,25 @@ describe('groupMeetingsByRecency', () => {
     expect(sections[0]?.group).toBe('today');
   });
 
+  it('runs the week to the sixth day back and stops there', () => {
+    // Same two edges the relative-day ladder is pinned on, so the section a call was
+    // tapped from and the day printed on the detail screen cannot disagree.
+    const sections = groupMeetingsByRecency(
+      [
+        item({ id: 'inside', started_at: localIso(2026, 6, 16, 0) }),
+        item({ id: 'outside', started_at: localIso(2026, 6, 15, 23) }),
+      ],
+      now,
+    );
+
+    expect(sections.find((s) => s.group === 'this week')?.meetings[0]?.id).toBe(
+      'inside',
+    );
+    expect(sections.find((s) => s.group === 'earlier')?.meetings[0]?.id).toBe(
+      'outside',
+    );
+  });
+
   it('drops empty sections rather than rendering bare headings', () => {
     const sections = groupMeetingsByRecency(
       [item({ id: 'a', started_at: localIso(2026, 6, 22) })],
@@ -206,31 +285,5 @@ describe('groupMeetingsByRecency', () => {
 
   it('returns nothing for an empty list', () => {
     expect(groupMeetingsByRecency([], now)).toEqual([]);
-  });
-});
-
-describe('cardChips', () => {
-  it('builds type, count and follow-up chips', () => {
-    expect(cardChips(item())).toEqual([
-      'sales',
-      '3 action items',
-      'follow-up drafted',
-    ]);
-  });
-
-  it('singularises one action item', () => {
-    expect(cardChips(item({ action_item_count: 1 }))).toContain('1 action item');
-  });
-
-  it('omits every chip it has no data for', () => {
-    expect(
-      cardChips(
-        item({
-          conversation_type: null,
-          action_item_count: 0,
-          has_follow_up: false,
-        }),
-      ),
-    ).toEqual([]);
   });
 });
