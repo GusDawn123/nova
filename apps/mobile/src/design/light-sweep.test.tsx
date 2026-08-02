@@ -1,6 +1,8 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { reanimatedSpies } from '@/testing/reanimated-stub';
+
 import { LightSweep } from './light-sweep';
 import { RingOrbit } from './ring-orbit';
 import { Scanlines } from './scanlines';
@@ -16,48 +18,13 @@ import { cobaltPalette } from './tokens';
  * both sides — the moving node is absent from the tree, AND no repeating animation
  * was ever started.
  *
- * ---------------------------------------------------------------------------
- * Why Reanimated is mocked
- * ---------------------------------------------------------------------------
- * Its web build reaches react-native-web's style compiler through `require()`, which
- * exists under Metro and not under vite; the call fails silently there and the first
- * prop update on a late-mounting animated view throws inside the library. So the real
- * package cannot drive a DOM in this suite whatever we do, and pretending otherwise
- * would only buy a crash. The stub keeps the parts these components actually depend
- * on — a shared value, a style updater that RUNS (so a broken transform still fails
- * here), and `withRepeat` as a spy, which is what makes "no loop starts under reduced
- * motion" an assertion rather than an inference.
- *
- * What that leaves unproven: that the sweep travels and the arc turns on a device.
- * That is a simulator check, the same bargain `glass.test.tsx` makes.
+ * Reanimated cannot render under vitest at all; the shared stub in
+ * `testing/reanimated-stub.ts` says why, and carries the `withRepeat` spy the
+ * reduced-motion assertions below read.
  */
-const animation = vi.hoisted(() => ({ withRepeat: vi.fn((value: unknown) => value) }));
-
 vi.mock('react-native-reanimated', async () => {
-  const { useRef } = await import('react');
-  const { View } = await import('react-native');
-
-  const passThroughEasing = (value: number): number => value;
-
-  return {
-    default: { View },
-    Easing: {
-      linear: passThroughEasing,
-      ease: passThroughEasing,
-      bezier: () => passThroughEasing,
-      inOut: () => passThroughEasing,
-    },
-    // Identity across renders, like the real one: the components put it in effect
-    // dependency arrays.
-    useSharedValue: (initial: number) => useRef({ value: initial }).current,
-    // Run the updater for real, so a style function that throws or returns nonsense
-    // is caught here rather than on a device.
-    useAnimatedStyle: (updater: () => unknown) => updater(),
-    withRepeat: animation.withRepeat,
-    withTiming: (toValue: number) => toValue,
-    withDelay: (_delayMs: number, animated: unknown) => animated,
-    withSequence: (...steps: unknown[]) => steps[steps.length - 1],
-  };
+  const { reanimatedStub } = await import('@/testing/reanimated-stub');
+  return reanimatedStub();
 });
 
 /**
@@ -122,7 +89,7 @@ beforeEach(() => {
   box.width = 100;
   box.height = 100;
   reduced.value = false;
-  animation.withRepeat.mockClear();
+  reanimatedSpies.withRepeat.mockClear();
 });
 
 describe('LightSweep', () => {
@@ -135,7 +102,7 @@ describe('LightSweep', () => {
     await waitFor(() => {
       expect(container.querySelector('linearGradient')).toBeTruthy();
     });
-    expect(animation.withRepeat).toHaveBeenCalled();
+    expect(reanimatedSpies.withRepeat).toHaveBeenCalled();
   });
 
   it('paints the light in the colour it was handed', async () => {
@@ -179,7 +146,7 @@ describe('LightSweep', () => {
     expect(container.firstElementChild).toBeTruthy();
     expect(screen.queryByTestId('light-sweep-band')).toBeNull();
     expect(container.querySelector('svg')).toBeNull();
-    expect(animation.withRepeat).not.toHaveBeenCalled();
+    expect(reanimatedSpies.withRepeat).not.toHaveBeenCalled();
   });
 });
 
@@ -199,7 +166,7 @@ describe('RingOrbit', () => {
     // The dash pattern IS the arc: one dash, then a gap the length of the circle.
     expect(innerCircle(container).getAttribute('stroke-dasharray')).toBeTruthy();
     expect(screen.getByTestId('ring-orbit-rotor')).toBeInTheDocument();
-    expect(animation.withRepeat).toHaveBeenCalled();
+    expect(reanimatedSpies.withRepeat).toHaveBeenCalled();
   });
 
   it('takes the size it is given', () => {
@@ -222,7 +189,7 @@ describe('RingOrbit', () => {
     // has to GO, not just stop moving — two whole rings is the resting form.
     expect(innerCircle(container).hasAttribute('stroke-dasharray')).toBe(false);
     expect(screen.queryByTestId('ring-orbit-rotor')).toBeNull();
-    expect(animation.withRepeat).not.toHaveBeenCalled();
+    expect(reanimatedSpies.withRepeat).not.toHaveBeenCalled();
   });
 });
 
@@ -271,6 +238,6 @@ describe('Scanlines', () => {
     await waitFor(() => {
       expect(container.querySelectorAll('rect')).toHaveLength(25);
     });
-    expect(animation.withRepeat).not.toHaveBeenCalled();
+    expect(reanimatedSpies.withRepeat).not.toHaveBeenCalled();
   });
 });
