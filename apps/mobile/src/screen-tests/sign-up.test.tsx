@@ -7,7 +7,7 @@ import type { AuthActionResult, UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import SignUpScreen from './sign-up';
+import SignUpScreen from '../app/(auth)/sign-up';
 
 /**
  * Sign-up mirrors the front door (spec §8) — same identity block, same key, one

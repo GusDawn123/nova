@@ -10,7 +10,7 @@ import type { MeetingsState } from '@/hooks/use-meetings';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import MeetingsScreen from './index';
+import MeetingsScreen from '../app/(app)/(tabs)/index';
 
 /**
  * Meetings — the archive (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5).

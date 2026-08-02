@@ -8,7 +8,7 @@ import type { AuthActionResult, UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import SignInScreen from './sign-in';
+import SignInScreen from '../app/(auth)/sign-in';
 
 /**
  * The front door (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §8).

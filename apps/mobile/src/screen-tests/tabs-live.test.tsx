@@ -8,7 +8,7 @@ import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 import { FakeLiveSocket, installFakeWebSocket } from '@/testing/live-socket-stub';
 
-import LiveScreen from './live';
+import LiveScreen from '../app/(app)/(tabs)/live';
 
 /**
  * The cockpit (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §4).

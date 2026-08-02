@@ -283,6 +283,11 @@ run against real Postgres instead of self-skipping. `npm run check` is the local
 - Module anatomy: `ports.ts / adapters/ / service.ts / routes.ts`; module-local zod
   lives in `ports.ts` (shared wire types in `packages/shared`); tests are co-located
   `*.test.ts` beside the code; fixtures under `apps/server/fixtures/`
+- ONE exception to co-location: **no `*.test.*` under `apps/mobile/src/app/`** — Expo
+  Router makes every file there a route, so a co-located screen test is bundled into
+  the running app and crashes it at launch while vitest/tsc/lint all stay green. Screen
+  tests live in `apps/mobile/src/screen-tests/` (see its README); enforced by
+  `apps/mobile/src/testing/router-directory.test.ts`
 - Soft cap ~400 lines/file — split before you blow past it
 - Structured errors + logs with `request_id`/`user_id`; never log secrets or raw
   transcripts at info level

@@ -9,7 +9,7 @@ import type { UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import AccountScreen from './account';
+import AccountScreen from '../app/(app)/(tabs)/account';
 
 /**
  * Account — the quiet screen (spec §8).

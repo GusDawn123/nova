@@ -8,7 +8,7 @@ import type { MeetingTranscriptState } from '@/hooks/use-meeting-transcript';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import MeetingDetailScreen from './[id]';
+import MeetingDetailScreen from '../app/(app)/meetings/[id]';
 
 /**
  * The meeting detail (spec §5).

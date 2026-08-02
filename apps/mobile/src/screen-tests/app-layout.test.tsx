@@ -6,7 +6,7 @@ import { cobaltPalette } from '@/design/tokens';
 import type { UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 
-import AppLayout from './_layout';
+import AppLayout from '../app/(app)/_layout';
 
 /**
  * The authenticated shell — the guard, the waiting frame, and how one screen
