@@ -255,6 +255,21 @@ describe('MascotStage — sparkles', () => {
 
     expect(screen.queryByText('✦')).toBeNull();
   });
+
+  it('never lets one of them become a screen-reader stop', () => {
+    // THE DECORATIVE RULING (`design/decorative.ts`). `pointerEvents: 'none'` on the
+    // stage stops a tap and does nothing at all for assistive tech, so five bare `✦`
+    // glyphs were five stops on the way into the screen. The whole stage is hidden,
+    // which is why the assertion is that each sparkle sits INSIDE the hidden node
+    // rather than that each carries the attribute itself.
+    render(<MascotStage color={INK} />);
+
+    const stage = screen.getByTestId('mascot-stage');
+    expect(stage).toHaveAttribute('aria-hidden', 'true');
+    for (const sparkle of screen.getAllByText('✦')) {
+      expect(stage).toContainElement(sparkle);
+    }
+  });
 });
 
 describe('MascotStage — reduced motion', () => {

@@ -10,6 +10,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
+import { decorative } from './decorative';
 import { useReducedMotion } from './motion';
 
 /**
@@ -120,7 +121,10 @@ export function RingOrbit({
   );
 
   return (
-    <View style={[styles.root, { width: size, height: size }]}>
+    // Hidden from assistive tech (`decorative`): the ring says WAITING to an eye,
+    // and every place it is used says the same thing in words beside it — "◌ ONE
+    // MOMENT", "WRITING NOTES". A spinner announced on its own is a shape, not news.
+    <View {...decorative} style={[styles.root, { width: size, height: size }]}>
       <Svg width={size} height={size}>
         <Circle
           cx={center}

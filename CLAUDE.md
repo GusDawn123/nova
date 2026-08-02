@@ -140,7 +140,13 @@ WORDS (`testing/duotone.ts::expectDuotoneOnly` fails a screen test that paints o
 Control language: chamfered = actionable (`design/chamfer.tsx`, SVG polygon — RN has
 no `clip-path`), soft radii = readable. The mascot is drawn live
 (`features/mascot/`), the copilot's answers arrive by character drain
-(`features/stream/`), and every loop is reduced-motion gated. Five screens rebuilt
+(`features/stream/`), and every loop is reduced-motion gated. DECORATIVE-A11Y RULING
+(final review, binding on every future component): every purely-decorative layer
+ships hidden from assistive tech — spread `design/decorative.ts` on the highest
+wholly-decorative container (mascot stage incl. sparkles, chamfer's SVG layer,
+scanlines, ring orbit, light sweep, the stream caret), never on a wrapper that also
+holds content; all three props, because react-native-web 0.21 forwards neither native
+one and `aria-hidden` is the only form a test can see. Five screens rebuilt
 (auth, meetings, meeting detail, live cockpit, account) plus a three-tab floating bar
 (`▤ MEETINGS · ◉ LIVE · ◌ ACCOUNT`; Live still role-gated, Account now a tab). The
 glass era is fully retired: `design/glass.tsx`, the LEGACY palette block, Spline Sans,

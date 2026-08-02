@@ -133,6 +133,15 @@ describe('LightSweep', () => {
     expect(getComputedStyle(thickTrack).height).toBe('6px');
   });
 
+  it('says nothing to a screen reader', () => {
+    // THE DECORATIVE RULING (`design/decorative.ts`). The rail is the wordless half
+    // of a message — "WRITING NOTES" is always beside it — and it reports no progress
+    // a reader could announce, so the whole track is out of the tree.
+    const { container } = render(<LightSweep color={cobaltPalette.ink} />);
+
+    expect(container.firstElementChild).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('stills to a faint line under reduced motion', async () => {
     reduced.value = true;
 

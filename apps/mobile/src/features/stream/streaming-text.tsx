@@ -16,6 +16,7 @@ import Animated, {
   type AnimatedStyle,
 } from 'react-native-reanimated';
 
+import { decorative } from '@/design/decorative';
 import { useReducedMotion } from '@/design/motion';
 import { FontFamily, FontSize } from '@/design/tokens';
 
@@ -91,8 +92,13 @@ function Caret({ color }: { color: string }): React.JSX.Element {
 
   // An inline View inside Text is what puts the block ON the write-head rather than
   // at the end of the paragraph box; it needs the explicit size it has above.
+  //
+  // Hidden from assistive tech (`decorative`). It sits INSIDE the paragraph, so left
+  // visible it interrupts the sentence being read — and its whole meaning, "still
+  // arriving", is one a reader gets from the text changing under it anyway.
   return (
     <Animated.View
+      {...decorative}
       style={[styles.caret, { backgroundColor: color }, blink]}
       testID="stream-caret"
     />

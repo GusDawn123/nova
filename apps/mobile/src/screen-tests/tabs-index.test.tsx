@@ -209,6 +209,23 @@ describe('MeetingsScreen — nothing yet', () => {
     expect(router.push).toHaveBeenCalledWith('/live');
   });
 
+  it('puts her out of the reading order entirely', () => {
+    // The empty state is the first screen a new account sees, and she is 220pt of
+    // pure atmosphere at the top of it — five `✦` glyphs included. Under the
+    // decorative ruling (`design/decorative.ts`) a reader walks straight past all of
+    // it to `NO CALLS YET`, which is where the screen actually starts talking.
+    realMascot.value = true;
+    succeed([], 0);
+
+    render(<MeetingsScreen />);
+
+    expect(screen.getByTestId('mascot-stage')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    expect(screen.getByText('NO CALLS YET')).not.toHaveAttribute('aria-hidden');
+  });
+
   it('names its key without the glyph', () => {
     // The ruling `app-tabs.tsx` sets out: `◉` is decoration, so the accessible name
     // is the words alone. This is the primary call to action on the first screen a

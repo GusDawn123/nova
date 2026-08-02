@@ -16,6 +16,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 
+import { decorative } from './decorative';
 import { useReducedMotion } from './motion';
 
 /**
@@ -124,7 +125,14 @@ export function LightSweep({
   const gradientId = `light-sweep-${useId().replace(/:/g, '')}`;
 
   return (
-    <View style={[styles.track, { height }, style]} onLayout={handleLayout}>
+    // Hidden from assistive tech (`decorative`): the whole track is the wordless half
+    // of a message whose words are always next to it, and it reports no progress a
+    // reader could usefully announce.
+    <View
+      {...decorative}
+      style={[styles.track, { height }, style]}
+      onLayout={handleLayout}
+    >
       <View
         style={[
           StyleSheet.absoluteFill,

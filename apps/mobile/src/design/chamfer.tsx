@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import Svg, { Polygon, Polyline } from 'react-native-svg';
 
+import { decorative } from './decorative';
 import { Chamfer } from './tokens';
 
 /**
@@ -142,8 +143,10 @@ export function ChamferSurface({
         // The layer is FIRST in the tree, which puts it behind the children on both
         // targets: native paints siblings in order, and every react-native-web view
         // is `position: relative; z-index: 0`, so document order is paint order there
-        // too. It is decoration, so it must never intercept a tap for the control.
-        <View style={[StyleSheet.absoluteFill, styles.layer]}>
+        // too. It is decoration, so it must never intercept a tap for the control —
+        // nor be walked into by a screen reader on the way to the control's label.
+        // Only this LAYER is hidden; `children` are the content and stay reachable.
+        <View {...decorative} style={[StyleSheet.absoluteFill, styles.layer]}>
           <Svg width={drawn.width} height={drawn.height}>
             <Polygon
               points={chamferPoints(drawn.width, drawn.height, cut)}

@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 
+import { decorative } from '@/design/decorative';
 import { useReducedMotion } from '@/design/motion';
 import { Scanlines } from '@/design/scanlines';
 
@@ -220,7 +221,15 @@ export function MascotStage({
   const tear = { elapsed, doubling, size };
 
   return (
-    <View style={[styles.stage, { width: size, height: size }]} testID="mascot-stage">
+    // The WHOLE stage is hidden from assistive tech (`decorative`), which is the
+    // highest wholly-decorative container here — she carries no information at all,
+    // and the sparkles are the sharp end of it: five bare `✦` glyphs are five stops
+    // before `NOVA` on sign-in, sign-up and the meetings empty state.
+    <View
+      {...decorative}
+      style={[styles.stage, { width: size, height: size }]}
+      testID="mascot-stage"
+    >
       {sparkles
         ? SPARKLES.map((sparkle) => (
             <Sparkle
@@ -354,7 +363,8 @@ function Sparkle({
 
 const styles = StyleSheet.create({
   // She is a picture, never a control: nothing here may take a tap meant for the
-  // button she is sitting above.
+  // button she is sitting above — and, per `decorative` on the stage, nothing here
+  // may take a screen-reader stop on the way to it either.
   stage: { position: 'relative', pointerEvents: 'none' },
   frame: { width: '100%', height: '100%' },
   sparkle: { position: 'absolute' },

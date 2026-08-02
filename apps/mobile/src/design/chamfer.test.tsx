@@ -162,4 +162,27 @@ describe('ChamferSurface', () => {
     expect(labelIsAfterSvg).toBeTruthy();
     expect(getComputedStyle(layer).pointerEvents).toBe('none');
   });
+
+  it('hides the drawn layer from assistive tech and nothing else', async () => {
+    // THE DECORATIVE RULING (`design/decorative.ts`), on the primitive every button,
+    // field, chip and key in the app is built from — so this is the case that would
+    // do the most damage if the ruling were applied one level too high. BOTH halves
+    // are asserted: the outline is silent, and the label inside it is not, because
+    // hiding the surface would take every control's accessible name with it.
+    const { container } = render(
+      <ChamferSurface fill={cobaltPalette.canvas} testID="surface">
+        <Text>tap target</Text>
+      </ChamferSurface>,
+    );
+
+    await waitFor(() => {
+      expect(container.querySelector('svg')).toBeTruthy();
+    });
+    const layer = container.querySelector('svg')?.parentElement;
+    if (layer == null) throw new Error('expected the svg to sit in a layer');
+
+    expect(layer).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByTestId('surface')).not.toHaveAttribute('aria-hidden');
+    expect(layer).not.toContainElement(screen.getByText('tap target'));
+  });
 });

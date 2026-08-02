@@ -221,6 +221,19 @@ describe('StreamingText — the caret is the completion signal', () => {
     expect(getComputedStyle(caret).backgroundColor).toBe('rgb(255, 255, 255)');
   });
 
+  it('does not interrupt the sentence it is sitting in', () => {
+    // THE DECORATIVE RULING (`design/decorative.ts`), and the case with the most to
+    // lose by it: the caret is an inline block INSIDE the paragraph, so left visible
+    // to assistive tech it lands in the middle of the text being read. What it means
+    // — "still arriving" — a reader gets from the text changing under it anyway.
+    render(<StreamingText text="Ask" done={false} color={INK} />);
+
+    expect(screen.getByTestId('stream-caret')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+  });
+
   it('leaves no timer running when it unmounts mid-stream', () => {
     const { unmount } = render(
       <StreamingText text={'x'.repeat(300)} done={false} color={INK} />,

@@ -2,6 +2,8 @@ import { useCallback, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Rect } from 'react-native-svg';
 
+import { decorative } from './decorative';
+
 /**
  * Scanlines — the hologram texture
  * (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §7): 1px lines every 4px,
@@ -62,6 +64,7 @@ export function Scanlines({
 
   return (
     <View
+      {...decorative}
       style={[StyleSheet.absoluteFill, styles.overlay, { opacity }]}
       onLayout={handleLayout}
     >
@@ -85,6 +88,6 @@ export function Scanlines({
 
 const styles = StyleSheet.create({
   // It lies over content by definition, so it must never take a tap meant for what
-  // it covers.
+  // it covers — nor an assistive-tech stop, which is the `decorative` spread above.
   overlay: { pointerEvents: 'none' },
 });
