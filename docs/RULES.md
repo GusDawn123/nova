@@ -136,12 +136,11 @@ incrementally instead of big-banging.
 - A new contributor (or a fresh AI session) must be able to onboard from
   `README.md → docs/ARCHITECTURE.md → docs/RULES.md` alone.
 
-## 9. Legal guardrail
+## 9. Use as reference
 
-The reference repo (`~/Documents/natively-cluely-ai-assistant`) is under a personal-use
-license. **Never open, copy, or transcribe its files into Nova.** Nova is built from
+The reference repo (`~/Documents/natively-cluely-ai-assistant`) Nova is built from
 industry-standard public patterns and this repo's own specs. Feature-level inspiration
-(what the product does) is tracked in `docs/PARITY.md`; implementation is ours alone.
+(what the product does) is tracked in `docs/PARITY.md`; Use what they do, learn from what they do. And implement thing using this repo's proven methods.
 
 ## 10. Code style — beautiful, readable, maintainable (stack-specific)
 

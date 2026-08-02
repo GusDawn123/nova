@@ -156,9 +156,6 @@ deferred), iOS-simulator verification deferred (Expo web + Playwright instead). 
 
 ## Hard prohibitions
 
-- **NEVER read, copy, or transcribe from `~/Documents/natively-cluely-ai-assistant`.**
-  Personal-use license; legally off-limits for this commercial product (RULES §9).
-  If you need to know "how X works," derive from public patterns and docs/ specs here.
 - No secrets in the repo. No vendor keys in the mobile app, ever.
 - No unmetered paths to paid vendor APIs — **DONE and audit-enforced as of Phase 6**: the
   unified `modules/metering` is live (llm per-call meters, STT relayed-byte spans, Voyage

@@ -12,14 +12,6 @@ multi-LLM routing (Anthropic / OpenAI / Google / Groq).
 
 ---
 
-## Legal ground rule (applies to EVERY loop)
-
-> The reference repo `~/Documents/natively-cluely-ai-assistant` is under a
-> personal-use license that forbids commercial use of its code, prompts, and
-> implementation details. **No loop may open, copy, or transcribe files from that
-> repo.** All implementations come from industry-standard public patterns and the
-> specs in `docs/`. If a loop is tempted to "check how the reference did it" —
-> that's a STOP condition.
 
 ## Global guardrails (paste into every loop session)
 
