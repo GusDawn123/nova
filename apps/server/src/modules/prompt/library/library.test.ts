@@ -52,6 +52,19 @@ describe("system prompt", () => {
     // own structure, or behavioral answers get squeezed back into narration.
     expect(SYSTEM_PROMPT.toLowerCase()).toContain("mode");
   });
+
+  it("is anchored in the LIVE moment, and sounds like a person", () => {
+    // Second field report (2026-08-01): first person now, but press-release
+    // first person — "too direct". The public pattern for this class of tool is
+    // concrete voice mechanics, not "be casual": spoken rhythm, contractions,
+    // a named blacklist of machine-tell words.
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("real time");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("contraction");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("across a table");
+    // The machine-tell blacklist exists and names the usual suspects.
+    expect(SYSTEM_PROMPT).toContain('"leverage"');
+    expect(SYSTEM_PROMPT).toContain('"delve"');
+  });
 });
 
 describe("modes", () => {

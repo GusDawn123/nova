@@ -66,17 +66,17 @@ Keep actions in the order they happened. Outcomes should answer "and then what",
       // the user can speak as their own, committing to concrete-but-generic
       // specifics rather than describing what specifics would be good.
       transcript: `them: so tell me, why should we hire you for this C++ position?`,
-      response: `I've spent my career building systems where C++ is the right tool because performance is the product — services where latency budgets are measured in microseconds and an allocation in the hot path shows up in the numbers.
+      response: `Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where performance is the product — the kind where an allocation in the hot path shows up in the numbers, and "fast enough" is a measured claim, not a feeling.
 
 - **What I bring**
-  - Deep, modern C++ — move semantics, lock-free structures where they pay for themselves, and the discipline to profile before optimizing
-  - A track record of making performance measurable: I don't say "faster", I say by how much, under what load
+  - Modern C++ that other people can maintain — move semantics and lock-free structures where they pay for themselves, and profiling before optimizing, every time
+  - I don't say "faster" — I say by how much, and under what load
 
-- **Why this role**
-  - The problems here are the kind I do best: tight constraints, real throughput targets, and code that other engineers have to be able to maintain
-  - I ramp fast on legacy codebases — my first instinct is to read the allocator and the build before touching anything
+- **Why here**
+  - Tight constraints and real throughput targets are where I do my best work
+  - I ramp fast on legacy code — my first move is reading the allocator and the build, not rewriting anything
 
-I'd rather show than claim: give me one slow path in your current system, and I'll walk through exactly how I'd attack it.`,
+And I'd rather show you than tell you: pick one slow path in your current system, and I'll walk through how I'd attack it.`,
     },
   ],
 };
