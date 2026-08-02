@@ -208,6 +208,21 @@ describe('MeetingsScreen — nothing yet', () => {
     fireEvent.click(screen.getByTestId('start-session-key'));
     expect(router.push).toHaveBeenCalledWith('/live');
   });
+
+  it('names its key without the glyph', () => {
+    // The ruling `app-tabs.tsx` sets out: `◉` is decoration, so the accessible name
+    // is the words alone. This is the primary call to action on the first screen a
+    // new account ever sees, which makes it the worst one to leave reading as
+    // "fisheye start a session" — or, on the readers that skip the glyph entirely,
+    // as an unlabelled button.
+    succeed([], 0);
+
+    render(<MeetingsScreen />);
+
+    expect(screen.getByLabelText('Start a session')).toBe(
+      screen.getByTestId('start-session-key'),
+    );
+  });
 });
 
 describe('MeetingsScreen — waiting, failing, signed out', () => {

@@ -153,6 +153,16 @@ describe('LiveScreen — before the call', () => {
     expect(screen.queryByTestId('steer-field')).toBeNull();
   });
 
+  it('names its key without the glyph', () => {
+    // The ruling `app-tabs.tsx` sets out: `◉` is decoration, so the accessible name
+    // is the words alone — the same shape `steer-bar.tsx`'s RESPOND key already has.
+    render(<LiveScreen />);
+
+    expect(screen.getByLabelText('Start session')).toBe(
+      screen.getByTestId('start-session-key'),
+    );
+  });
+
   it('takes the picker away once the mode is locked, and names it on the rail', async () => {
     // The lock is structural: the server fixes the mode at `session.start`, so the
     // control that could change it is GONE for the length of the call and the rail

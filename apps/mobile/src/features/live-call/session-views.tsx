@@ -63,6 +63,9 @@ export function IdlePanel({
       <Pressable
         testID="start-session-key"
         accessibilityRole="button"
+        // The glyph is decoration, per `app-tabs.tsx`: `◉ START SESSION` read
+        // literally is noise, and most screen readers say nothing for a fisheye.
+        accessibilityLabel="Start session"
         onPress={onStart}
         style={({ pressed }) => (pressed ? styles.pressed : undefined)}
       >

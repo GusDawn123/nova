@@ -187,6 +187,9 @@ function EmptyState({
       <Pressable
         testID="start-session-key"
         accessibilityRole="button"
+        // The glyph is decoration, per `app-tabs.tsx`: `◉ START A SESSION` read
+        // literally is noise, and most screen readers say nothing for a fisheye.
+        accessibilityLabel="Start a session"
         onPress={onStart}
         style={({ pressed }) => (pressed ? styles.pressed : undefined)}
       >
