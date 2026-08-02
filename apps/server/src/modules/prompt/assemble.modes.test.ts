@@ -31,7 +31,7 @@ function fullPrompt(mode: PromptMode): string {
 const MARKERS = {
   behavioral: {
     directive: "NEVER invent details about the user",
-    example: "Reorganized the team into pairs",
+    example: "stuck alone with their piece",
   },
   technical: {
     directive: "If the question calls for CODE",

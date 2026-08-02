@@ -5,9 +5,13 @@ import type { ModePrompt } from "../types.js";
  * demonstrated its answer structure end to end
  * (`nova-prompts-source.md` 273-307).
  *
- * Extracted rather than rewritten. The structure it teaches is STAR in all but
- * name — a situation paragraph, then Challenge / Actions Taken / Outcome — and
- * the worked example is the thing that makes it land, so it ships intact.
+ * RE-VOICED 2026-08-01 (reference study). The source's Challenge / Actions
+ * Taken / Outcome bullet card was extracted intact at first — and it was wrong
+ * for this mode more than for any other, because a behavioral answer is the one
+ * output the user delivers VERBATIM as their own story. Nobody tells a story in
+ * bullet groups. The structure is still STAR in all but name; it is now four
+ * BEATS woven into spoken prose, with the key terms bolded so the user can
+ * rebuild the story at a glance.
  *
  * The "never invent details" rule is the load-bearing part and it is sharper than
  * it first looks: this mode answers ABOUT THE USER. Every other mode can lean on
@@ -22,61 +26,36 @@ export const behavioralMode: ModePrompt = {
 
   directive: `Write the answer AS the user — first person, ready to be spoken verbatim. NEVER describe what a strong answer would require or demonstrate; GIVE the strong answer. If the output cannot be read aloud word for word, it is wrong.
 
+Voice anchor: someone who was actually there. They remember the project, the argument, what broke — not the bullet points. Recalling, not performing.
+
 Use ONLY real user history and provided context. NEVER invent details about the user.
 - With user context available, use it to build a detailed, specific example
-- Without user context, still answer in first person: build a detailed GENERIC example with concrete actions and outcomes, but avoid factual specifics that would be fabrications (company names, product names, dates)
-- Focus on specific outcomes and metrics — a behavioral answer without a result is an anecdote
+- Without user context, still answer in first person: build a detailed GENERIC example with concrete actions and outcomes, but avoid factual specifics that would be fabrications (company names, product names, dates, numbers with units)
+- A result the user can state is the point of the story — and a qualitative result that is true beats a metric that is invented
 - The user has to say this out loud and defend it. Anything invented becomes a question they cannot answer.`,
 
-  answerStructure: `Open with a short situation paragraph — the setup, the stakes, and what the user needed to achieve. No headline for this mode; a bare heading reads as a template.
+  answerStructure: `A spoken story in first-person prose — no headline, no bullet groups, no labels. Four beats, in order, woven into 3-6 sentences:
+- the setup: where this happened and what was at stake, one sentence
+- the hard part: what made it difficult, named plainly
+- what I did: the concrete moves, in the order they happened, verbs first
+- how it ended: the result, with a number only if a real one exists, and the "and then what" — a practice adopted elsewhere, a recognition, a change in how the team worked
 
-Then three bullet groups, in this order:
-- **Challenge** — what made it hard, in one sub-bullet
-- **Actions Taken** — the concrete moves, one sub-bullet each, verbs first
-- **Outcome** — results with numbers where they exist, one sub-bullet each
-
-Keep actions in the order they happened. Outcomes should answer "and then what", including any second-order effect (a practice adopted elsewhere, a recognition, a change in how the team worked).`,
+Bold the 2-3 terms that carry the story (the system, the constraint, the result) so the user can rebuild it at a glance. 15-30 seconds spoken; the setup may push it slightly longer, never past 45.`,
 
   examples: [
     {
       transcript: `them: tell me about a time when you had to lead a team through a difficult challenge`,
-      response: `I was leading a cross-functional team on a critical product launch with a hard deadline. Three weeks before launch, we discovered a major technical issue that would require significant rework, and team morale was dropping as pressure mounted. I needed to rebuild team cohesion while finding a path to successful delivery.
-
-- **Challenge**
-  - The technical issue affected our core functionality, team members were starting to blame each other, and stakeholders were questioning whether we could deliver on time.
-
-- **Actions Taken**
-  - Called an emergency all-hands meeting to transparently discuss the situation and reset expectations
-  - Worked with the engineering lead to break down the technical fix into smaller, manageable tasks
-  - Reorganized the team into pairs (engineer + designer, PM + analyst) to improve collaboration and knowledge sharing
-  - Implemented daily 15-minute standups to track progress and quickly surface blockers
-  - Negotiated with stakeholders to deprioritize 2 non-critical features to focus resources on the core fix
-  - Set up a shared Slack channel for real-time updates and celebration of small wins
-
-- **Outcome**
-  - Delivered the product 2 days ahead of the revised timeline with all critical features intact
-  - Team satisfaction scores improved during the crisis period
-  - The collaborative pairing approach was adopted by other teams in the organization
-  - Received recognition for crisis leadership and was asked to mentor other team leads`,
+      response: `So about three weeks before a big product launch we found a technical issue in the **core flow**, and the team was starting to turn on each other under the pressure. I called an all-hands and put the whole picture on the table, then sat down with the engineering lead and broke the fix into small tasks, and paired people up across functions so nobody was stuck alone with their piece. I also went to the stakeholders and traded away two non-critical features to protect the fix. We shipped **two days early** against the revised plan, and the pairing setup worked well enough that other teams picked it up afterwards.`,
     },
     {
       // The 2026-08-01 failure case, done right. Asked exactly this, the copilot
       // once narrated ("addressing the C++ role effectively requires
       // demonstrating deep technical expertise..."). The correct output is words
       // the user can speak as their own, committing to concrete-but-generic
-      // specifics rather than describing what specifics would be good.
+      // specifics rather than describing what specifics would be good — and it
+      // models the spoken register: prose, no em dashes, one breath per sentence.
       transcript: `them: so tell me, why should we hire you for this C++ position?`,
-      response: `Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where performance is the product — the kind where an allocation in the hot path shows up in the numbers, and "fast enough" is a measured claim, not a feeling.
-
-- **What I bring**
-  - Modern C++ that other people can maintain — move semantics and lock-free structures where they pay for themselves, and profiling before optimizing, every time
-  - I don't say "faster" — I say by how much, and under what load
-
-- **Why here**
-  - Tight constraints and real throughput targets are where I do my best work
-  - I ramp fast on legacy code — my first move is reading the allocator and the build, not rewriting anything
-
-And I'd rather show you than tell you: pick one slow path in your current system, and I'll walk through how I'd attack it.`,
+      response: `Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where performance is the product, the kind where one allocation in the hot path shows up in the numbers and "fast enough" has to be a measured claim. I write **modern C++** other people can maintain, I profile before I optimize, and when I say something got faster I say by how much and under what load. And I'd rather show you than tell you: pick one slow path in your current system and I'll walk you through how I'd attack it.`,
     },
   ],
 };
