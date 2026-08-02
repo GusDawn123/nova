@@ -47,11 +47,17 @@ import { vi } from 'vitest';
  */
 
 /**
- * The stubbed animation calls worth watching. `withRepeat` is the one that matters:
- * an infinite loop is exactly what reduced motion must not start.
+ * The stubbed animation calls worth watching.
+ *
+ * `withRepeat` is the one that matters most: an infinite loop is exactly what
+ * reduced motion must not start. `withSequence` covers the one-shot animations a
+ * loop spy cannot see — the thinking word's 220ms flick on each swap is a sequence,
+ * not a repeat, and reduced motion has to suppress it while the word underneath
+ * keeps advancing.
  */
 export const reanimatedSpies = {
   withRepeat: vi.fn((value: unknown) => value),
+  withSequence: vi.fn((...steps: unknown[]) => steps[steps.length - 1]),
 };
 
 /** Easing curves are irrelevant without a running clock — every one is identity. */
@@ -76,6 +82,6 @@ export function reanimatedStub(): Record<string, unknown> {
     withRepeat: reanimatedSpies.withRepeat,
     withTiming: (toValue: number) => toValue,
     withDelay: (_delayMs: number, animated: unknown) => animated,
-    withSequence: (...steps: unknown[]) => steps[steps.length - 1],
+    withSequence: reanimatedSpies.withSequence,
   };
 }
