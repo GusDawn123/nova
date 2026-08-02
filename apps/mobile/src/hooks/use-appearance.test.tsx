@@ -161,6 +161,36 @@ describe('AppearanceProvider', () => {
     expect(screen.getByTestId('canvas')).toHaveTextContent(BRAND_BLUE);
   });
 
+  it('does not let a slow storage read undo a pick already made', async () => {
+    // The Account row is one tap away on the frame after mount, and the restore is
+    // a round trip. Landing the stored value on top of a pick made in the meantime
+    // would rewrite the user's choice in front of them, a beat after they made it.
+    let answer: (value: string | null) => void = () => undefined;
+    storage.getItem.mockReturnValue(
+      new Promise<string | null>((resolve) => {
+        answer = resolve;
+      }),
+    );
+
+    render(
+      <AppearanceProvider>
+        <Probe />
+      </AppearanceProvider>,
+    );
+
+    act(() => {
+      screen.getByTestId('cycle').click();
+    });
+    expect(screen.getByTestId('choice')).toHaveTextContent('cobalt');
+
+    await act(async () => {
+      answer('paper');
+      await Promise.resolve();
+    });
+
+    expect(screen.getByTestId('choice')).toHaveTextContent('cobalt');
+  });
+
   it('survives a storage that refuses to answer', async () => {
     storage.getItem.mockRejectedValue(new Error('no storage on this platform'));
 

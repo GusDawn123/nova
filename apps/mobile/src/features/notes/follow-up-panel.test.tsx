@@ -81,6 +81,9 @@ describe('FollowUpPanel', () => {
   it('offers no retry for notes that simply have not landed', () => {
     renderPanel({ failure: mapFollowUpFailure(409, 'notes_not_ready') });
 
+    // Anchored on what the panel DOES draw first: without this, a panel that
+    // rendered nothing at all would satisfy the absence check below.
+    expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
     expect(screen.queryByTestId('follow-up-retry')).toBeNull();
   });
 

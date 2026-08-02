@@ -5,10 +5,12 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useColorScheme } from 'react-native';
+import { z } from 'zod';
 
 import {
   paletteFor,
@@ -54,9 +56,17 @@ export function nextAppearance(choice: AppearanceChoice): AppearanceChoice {
   return APPEARANCE_ORDER[(index + 1) % APPEARANCE_ORDER.length];
 }
 
+/**
+ * Storage is a boundary, so it is PARSED (RULES §1) rather than hand-checked — and
+ * the schema is built from {@link APPEARANCE_ORDER}, so a fourth theme cannot be
+ * offered by the picker and rejected by the reader.
+ */
+const choiceSchema = z.enum(APPEARANCE_ORDER);
+
 /** Anything else under the storage key is no preference — not a crash, not a blank. */
 function parseChoice(stored: string | null): AppearanceChoice | null {
-  return APPEARANCE_ORDER.find((choice) => choice === stored) ?? null;
+  const parsed = choiceSchema.safeParse(stored);
+  return parsed.success ? parsed.data : null;
 }
 
 /** The theme actually painted: the explicit pick, or the OS's answer on `auto`. */
@@ -89,6 +99,10 @@ export function AppearanceProvider({
   // else would flash a theme the user did not choose before landing on the one they
   // did — so the first frame is the OS's answer, which is also the default.
   const [choice, setChoiceState] = useState<AppearanceChoice>('auto');
+  // The restore is a round trip, and the Account row is one tap away on the frame
+  // after mount. A pick made while storage is still answering must WIN — landing the
+  // stored value on top of it would undo the user's tap in front of them.
+  const chosen = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,7 +110,7 @@ export function AppearanceProvider({
     async function restore(): Promise<void> {
       try {
         const stored = parseChoice(await AsyncStorage.getItem(APPEARANCE_STORAGE_KEY));
-        if (stored !== null && !cancelled) {
+        if (stored !== null && !cancelled && !chosen.current) {
           setChoiceState(stored);
         }
       } catch {
@@ -113,6 +127,7 @@ export function AppearanceProvider({
   }, []);
 
   const setChoice = useCallback((next: AppearanceChoice) => {
+    chosen.current = true;
     setChoiceState(next);
     // Fire and forget: the pick is already applied on screen, and a failed write
     // costs the user the preference on next launch, not this tap.

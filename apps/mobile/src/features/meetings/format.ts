@@ -114,7 +114,7 @@ export function formatRelativeDay(
   const today = startOfLocalDay(now);
   if (day === today) return 'Today';
 
-  const weekStart = today - 6 * 24 * 60 * 60 * 1000;
+  const weekStart = startOfLocalDaysAgo(now, 6);
   if (day >= weekStart && day < today) return formatWeekday(isoTime, locale);
 
   return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
@@ -138,6 +138,24 @@ function startOfLocalDay(date: Date): number {
 }
 
 /**
+ * Midnight LOCAL time `days` CALENDAR days before the day `from` falls in.
+ *
+ * Counted on the calendar rather than by subtracting `days * 86_400_000`, because a
+ * day is not always 86,400 seconds long. Across a DST change that subtraction lands
+ * an hour either side of midnight — so the week's far edge falls at 01:00 or 23:00
+ * on the boundary day, and a call in that hour is filed under the wrong heading.
+ * `Date` normalises an out-of-range day-of-month (a zero or a negative rolls back
+ * into the previous month), so this needs no month arithmetic of its own.
+ */
+function startOfLocalDaysAgo(from: Date, days: number): number {
+  return new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    from.getDate() - days,
+  ).getTime();
+}
+
+/**
  * Group meetings into the mock's sections, preserving the server's order inside
  * each and dropping empty sections.
  *
@@ -155,8 +173,8 @@ export function groupMeetingsByRecency(
 ): MeetingSection[] {
   const todayStart = startOfLocalDay(now);
   // Seven days back, so "this week" is a rolling week rather than one that empties
-  // out every Monday morning.
-  const weekStart = todayStart - 6 * 24 * 60 * 60 * 1000;
+  // out every Monday morning. Counted in CALENDAR days — see `startOfLocalDaysAgo`.
+  const weekStart = startOfLocalDaysAgo(now, 6);
 
   const buckets: Record<RecencyGroup, MeetingListItem[]> = {
     today: [],

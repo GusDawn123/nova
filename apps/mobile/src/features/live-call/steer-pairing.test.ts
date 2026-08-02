@@ -77,14 +77,24 @@ describe('steer pairing', () => {
   });
 
   it('does not hand a discarded answer’s steer to the next one', () => {
-    // `suggestion.discard` removes the entry from the list. The steer went with
-    // that card; the answer that arrives next was not shaped by it.
+    // `suggestion.discard` removes the entry from the list. The steer went with that
+    // card; the answer that arrives next was shaped by the steer BEHIND it in the
+    // queue, not by the one the discarded card took with it.
+    //
+    // The queue is deliberately non-empty throughout: with nothing pending, "s2 got
+    // no steer" is true for the trivial reason and the release path is untested.
     let pairing = steerSubmitted(emptySteerPairing, 'first');
+    pairing = steerSubmitted(pairing, 'second');
     pairing = pairSteerArrivals(pairing, ['s1']);
+    // s1 is discarded, and a third steer goes up before its answer starts.
     pairing = pairSteerArrivals(pairing, []);
+    pairing = steerSubmitted(pairing, 'third');
+
     pairing = pairSteerArrivals(pairing, ['s2']);
 
-    expect(pairing.byId.get('s2')).toBeUndefined();
+    expect(pairing.byId.get('s2')?.text).toBe('second');
+    expect(pairing.byId.get('s1')?.text).toBe('first');
+    expect(pairing.pending.map((steer) => steer.text)).toEqual(['third']);
   });
 
   it('gives every steer its own key, and never renumbers one', () => {

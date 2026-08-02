@@ -35,6 +35,10 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  // Here rather than at the end of the one test that installs them: a failed
+  // assertion skips the rest of its test body, and fake timers left running leak
+  // into every test after it in this file.
+  vi.useRealTimers();
 });
 
 function respond(body: unknown, ok = true, status = 200): void {
@@ -158,6 +162,20 @@ describe('useMeetingTranscript', () => {
     expect(result.current.state.message).toBe(
       'The request took too long. Check your connection and try again.',
     );
+  });
+
+  it('says a missing meeting in words, not in a status code', async () => {
+    // A 404 is the one failure with a cause the user can act on — the call is gone
+    // or deleted — so it gets a sentence rather than `server returned HTTP 404`.
+    respond({}, false, 404);
+
+    const { result } = renderHook(() => useMeetingTranscript(MEETING_ID, true));
+
+    await waitFor(() => {
+      expect(result.current.state.status).toBe('error');
+    });
+    if (result.current.state.status !== 'error') throw new Error('unreachable');
+    expect(result.current.state.message).toBe('This meeting is no longer available.');
   });
 
   it('can be asked again after a failure', async () => {

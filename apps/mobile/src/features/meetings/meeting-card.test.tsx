@@ -172,10 +172,11 @@ describe('MeetingCard — status without colour', () => {
     expect(meta()).toHaveTextContent('NOTES FAILED');
     expect(screen.queryByTestId(`meeting-chip-${ID}`)).toBeNull();
     expect(screen.queryByTestId('light-sweep-band')).toBeNull();
-    // The failure is the classic place a third colour arrives (spec §11).
-    await waitFor(() => {
-      expect(container.querySelector('polygon')).toBeNull();
-    });
+    // The failure is the classic place a third colour arrives (spec §11). A
+    // `waitFor` on an ABSENCE passes on its first tick and proves nothing — settle
+    // on a node the failure card does draw, then assert the absence once.
+    await screen.findByTestId(`meeting-meta-${ID}`);
+    expect(container.querySelector('polygon')).toBeNull();
     expectDuotoneOnly(container, cobaltPalette);
   });
 

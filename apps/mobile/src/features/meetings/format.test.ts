@@ -83,6 +83,33 @@ describe('formatRelativeDay', () => {
     ).toBe('Jun 2');
   });
 
+  it('holds the weekday to the sixth day back, and no further', () => {
+    // The rolling window's two edges. Without this pair its WIDTH is unconstrained
+    // and an off-by-one — or a DST-shifted boundary — is invisible.
+    expect(
+      formatRelativeDay(new Date(2026, 6, 16, 9).toISOString(), now, 'en-US'),
+    ).toBe('Thu');
+    expect(
+      formatRelativeDay(new Date(2026, 6, 15, 9).toISOString(), now, 'en-US'),
+    ).toBe('Jul 15');
+  });
+
+  it('counts the window in calendar days, not in 24-hour blocks', () => {
+    // A day is not always 86,400 seconds long. Subtracting six of them lands an
+    // hour either side of local midnight across a DST change, which files a call in
+    // that hour under the wrong heading. Counted on the calendar, the boundary is
+    // midnight on the sixth day back wherever this runs and whenever it runs.
+    const edge = new Date(2026, 6, 16, 0, 0, 0);
+    expect(formatRelativeDay(edge.toISOString(), now, 'en-US')).toBe('Thu');
+    expect(
+      formatRelativeDay(
+        new Date(2026, 6, 15, 23, 59, 59).toISOString(),
+        now,
+        'en-US',
+      ),
+    ).toBe('Jul 15');
+  });
+
   it('has nothing to say about a missing or unparseable moment', () => {
     expect(formatRelativeDay(null, now)).toBeNull();
     expect(formatRelativeDay('not a date', now)).toBeNull();
@@ -201,6 +228,25 @@ describe('groupMeetingsByRecency', () => {
       now,
     );
     expect(sections[0]?.group).toBe('today');
+  });
+
+  it('runs the week to the sixth day back and stops there', () => {
+    // Same two edges the relative-day ladder is pinned on, so the section a call was
+    // tapped from and the day printed on the detail screen cannot disagree.
+    const sections = groupMeetingsByRecency(
+      [
+        item({ id: 'inside', started_at: localIso(2026, 6, 16, 0) }),
+        item({ id: 'outside', started_at: localIso(2026, 6, 15, 23) }),
+      ],
+      now,
+    );
+
+    expect(sections.find((s) => s.group === 'this week')?.meetings[0]?.id).toBe(
+      'inside',
+    );
+    expect(sections.find((s) => s.group === 'earlier')?.meetings[0]?.id).toBe(
+      'outside',
+    );
   });
 
   it('drops empty sections rather than rendering bare headings', () => {

@@ -48,6 +48,19 @@ export const NO_NOTES_TO_DRAFT_FROM: FollowUpFailure = {
   tonesDisabled: true,
 };
 
+/**
+ * The notes have not landed yet — the same wait the POST answers with a 409, reached
+ * from the READ side (a meeting whose `notes_status` is queued or processing).
+ *
+ * Built THROUGH the mapping rather than written out again, so the two roads to this
+ * state cannot drift apart, and named here so the detail screen does not have to
+ * quote an HTTP status it never received.
+ */
+export const NOTES_NOT_READY_TO_DRAFT_FROM: FollowUpFailure = mapFollowUpFailure(
+  409,
+  'notes_not_ready',
+);
+
 export function mapFollowUpFailure(
   status: number,
   code: string | undefined,

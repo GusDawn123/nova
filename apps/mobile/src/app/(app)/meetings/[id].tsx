@@ -11,7 +11,7 @@ import { formatRelativeDay, formatStartTime } from '@/features/meetings/format';
 import { StateCard } from '@/features/meetings/state-card';
 import {
   NO_NOTES_TO_DRAFT_FROM,
-  mapFollowUpFailure,
+  NOTES_NOT_READY_TO_DRAFT_FROM,
   type FollowUpFailure,
 } from '@/features/notes/follow-up';
 import { FollowUpPanel } from '@/features/notes/follow-up-panel';
@@ -195,7 +195,10 @@ function followUpFailure(status: NotesStatus | null): FollowUpFailure | null {
       return null;
     case 'queued':
     case 'processing':
-      return mapFollowUpFailure(409, 'notes_not_ready');
+      // The named constant, not a hand-written 409: this screen never made that
+      // request, and quoting a status it did not receive invites the next reader to
+      // believe it did.
+      return NOTES_NOT_READY_TO_DRAFT_FROM;
     case 'failed':
     case 'none':
       return NO_NOTES_TO_DRAFT_FROM;

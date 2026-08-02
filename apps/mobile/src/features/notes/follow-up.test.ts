@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { FOLLOW_UP_FAILURE_COPY, mapFollowUpFailure } from './follow-up';
+import {
+  FOLLOW_UP_FAILURE_COPY,
+  NO_NOTES_TO_DRAFT_FROM,
+  NOTES_NOT_READY_TO_DRAFT_FROM,
+  mapFollowUpFailure,
+} from './follow-up';
 
 /**
  * The follow-up failure map (§8). Every row of that table is a different thing to
@@ -16,6 +21,14 @@ describe('mapFollowUpFailure', () => {
     expect(state.tonesDisabled).toBe(true);
     // No retry affordance: the notes land on their own.
     expect(state.canRetry).toBe(false);
+  });
+
+  it('gives the read side the same wait the POST answers with', () => {
+    // The detail screen reaches this state from `notes_status`, never from a 409 it
+    // received. One constant, built through the mapping, so the two cannot drift.
+    expect(NOTES_NOT_READY_TO_DRAFT_FROM).toEqual(
+      mapFollowUpFailure(409, 'notes_not_ready'),
+    );
   });
 
   it('offers no retry on a 429 quota block', () => {
@@ -74,14 +87,20 @@ describe('mapFollowUpFailure', () => {
 });
 
 describe('FOLLOW_UP_FAILURE_COPY', () => {
-  it('has a sentence for every kind the mapping can produce', () => {
+  it('has a sentence for every kind, including the one no POST produces', () => {
     const kinds = [
       mapFollowUpFailure(409, 'notes_not_ready'),
       mapFollowUpFailure(404, undefined),
       mapFollowUpFailure(429, undefined),
       mapFollowUpFailure(503, undefined),
       mapFollowUpFailure(500, undefined),
+      // `no_notes` is read off the MEETING, not off a failed request, so deriving
+      // the list from the mapping alone would leave the panel's most common empty
+      // state out of the copy check entirely.
+      NO_NOTES_TO_DRAFT_FROM,
     ].map((failure) => failure.kind);
+
+    expect(kinds).toContain('no_notes');
 
     for (const kind of kinds) {
       expect(FOLLOW_UP_FAILURE_COPY[kind].title.length).toBeGreaterThan(0);
