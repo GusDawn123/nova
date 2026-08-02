@@ -3,17 +3,25 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
   useColorScheme,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors, FontSize, Spacing } from '@/constants/theme';
+import { tabBarClearance } from '@/design/tab-bar-metrics';
+import { paletteFor } from '@/design/tokens';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
+import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
+import { ModePicker } from '@/features/live-call/mode-picker';
 import { TranscriptList } from '@/features/live-call/transcript-list';
 import { useLiveSession } from '@/hooks/use-live-session';
 
@@ -30,11 +38,23 @@ import { useLiveSession } from '@/hooks/use-live-session';
  * a question sends `transcript.input` and the answer streams back as a REAL
  * LLM suggestion. Every suggestion on this screen is real — the canned replay
  * was removed 2026-07-23 at Gustavo's direction. Real mic capture is Phase 8/9.
+ *
+ * The MODE PICKER above the capture strip chooses which prompt answers this call
+ * (General / Behavioral / Technical / Finance). It is a pre-call choice: the
+ * server locks the mode at `session.start`, so the row is inert while a session
+ * is connecting or live — `useLiveSession` owns both the pick and that lock.
  */
 export default function LiveScreen() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === 'dark' ? 'dark' : 'light'];
-  const live = useLiveSession();
+  const palette = paletteFor(scheme);
+  const insets = useSafeAreaInsets();
+  // The capture strip is TABBED (§5.1): live notes need a home during the call,
+  // and the design prototype's card is transcript-only.
+  const [captureTab, setCaptureTab] = useState<'transcript' | 'notes'>(
+    'transcript',
+  );
+  const live = useLiveSession({ notesPanelVisible: captureTab === 'notes' });
   const [draft, setDraft] = useState('');
 
   const send = (): void => {
@@ -43,9 +63,23 @@ export default function LiveScreen() {
     setDraft('');
   };
 
+  const showNotes = (): void => {
+    setCaptureTab('notes');
+    // Revealing the panel is what clears the dot — not the update that set it.
+    live.markNotesSeen();
+  };
+
   return (
     <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <SafeAreaView
+        style={[
+          styles.safeArea,
+          // The tab bar floats (position: absolute) and reserves no layout space,
+          // so this screen has to leave room or the action row hides under it.
+          { paddingBottom: tabBarClearance(insets.bottom) },
+        ]}
+        edges={['top']}
+      >
         <KeyboardAvoidingView
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -56,9 +90,64 @@ export default function LiveScreen() {
             </ThemedText>
           </View>
 
-          {/* Compact transcript strip — still visible, still scrollable. */}
+          {/* Which prompt answers this call. Locked once it starts. */}
+          <ModePicker
+            mode={live.mode}
+            onSelect={live.setMode}
+            disabled={!live.canPickMode}
+          />
+
+          {/* Tabbed capture strip (§5.1): Transcript | Live notes. Both panels
+              stay mounted so the hidden one keeps receiving updates — the unread
+              dot is meaningless if the tab has to be open to hear anything. */}
+          <View accessibilityRole="tablist" style={styles.captureTabs}>
+            <Pressable
+              accessibilityRole="tab"
+              // `aria-selected` alongside accessibilityState: react-native-web
+              // renders the aria-* props as DOM attributes, which is the only way
+              // the current tab is announced on the web target.
+              accessibilityState={{ selected: captureTab === 'transcript' }}
+              aria-selected={captureTab === 'transcript'}
+              onPress={() => {
+                setCaptureTab('transcript');
+              }}
+            >
+              <ThemedText
+                type={captureTab === 'transcript' ? 'smallBold' : 'small'}
+                themeColor={
+                  captureTab === 'transcript' ? 'text' : 'textSecondary'
+                }
+              >
+                Transcript
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityState={{ selected: captureTab === 'notes' }}
+              aria-selected={captureTab === 'notes'}
+              onPress={showNotes}
+              style={styles.notesTab}
+            >
+              <ThemedText
+                type={captureTab === 'notes' ? 'smallBold' : 'small'}
+                themeColor={captureTab === 'notes' ? 'text' : 'textSecondary'}
+              >
+                Live notes
+              </ThemedText>
+              {live.liveNotes.hasUnseen ? (
+                <View style={[styles.unreadDot, { backgroundColor: palette.hot }]} />
+              ) : null}
+            </Pressable>
+          </View>
+
           <ThemedView type="backgroundElement" style={styles.transcriptStrip}>
-            <TranscriptList transcript={live.transcript} />
+            {captureTab === 'transcript' ? (
+              <TranscriptList transcript={live.transcript} />
+            ) : (
+              <ScrollView>
+                <LiveNotesPanel state={live.liveNotes} palette={palette} />
+              </ScrollView>
+            )}
           </ThemedView>
 
           {/* The copilot history owns the majority of the screen. */}
@@ -135,6 +224,14 @@ export default function LiveScreen() {
 }
 
 const styles = StyleSheet.create({
+  captureTabs: {
+    flexDirection: 'row',
+    gap: Spacing.four,
+    alignItems: 'center',
+    paddingHorizontal: Spacing.two,
+  },
+  notesTab: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  unreadDot: { width: 7, height: 7, borderRadius: 4 },
   container: {
     flex: 1,
   },

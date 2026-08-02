@@ -1,11 +1,18 @@
 import {
   LIVE_PROTOCOL_VERSION,
   serverLiveEventSchema,
+  type LiveMode,
   type ServerLiveEvent,
 } from '@nova/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { liveSocketUrl } from '@/constants/live';
+import {
+  applyNotesUpdate,
+  emptyLiveNotes,
+  markLiveNotesSeen,
+  type LiveNotesState,
+} from '@/features/notes/notes-update';
 import { useAuth } from '@/hooks/use-auth';
 import { supabase } from '@/lib/supabase';
 
@@ -57,24 +64,64 @@ export interface LiveSessionState {
   readonly suggestions: readonly LiveSuggestion[];
   /** True when the real socket is live and typed input can be sent. */
   readonly canSend: boolean;
+  /** The copilot mode the NEXT session will start with (`general` by default). */
+  readonly mode: LiveMode;
+  /**
+   * Whether the mode can still be changed. Mode is per call — the server locks it
+   * at `session.start` so the assembled prompt prefix stays byte-stable — so this
+   * goes false the moment a session is connecting or live.
+   */
+  readonly canPickMode: boolean;
+  /**
+   * Live notes for this call, reduced through the rev rule (§5.3). `hasUnseen`
+   * drives the unread dot on the capture card's hidden tab (§5.1).
+   */
+  readonly liveNotes: LiveNotesState;
 }
 
 export interface UseLiveSession extends LiveSessionState {
   /** Create a meeting + connect the real authed socket. */
   start: () => Promise<void>;
+  /** Pick the copilot mode for the next call. Ignored while one is in flight. */
+  setMode: (mode: LiveMode) => void;
   /** Send a typed utterance/question (`transcript.input`) up the live socket. */
   sendInput: (text: string) => void;
   /** End the session (closes the socket). */
   stop: () => void;
+  /** Clear the unread dot — the live-notes panel just became visible. */
+  markNotesSeen: () => void;
 }
 
-export function useLiveSession(): UseLiveSession {
+export interface UseLiveSessionOptions {
+  /**
+   * Whether the live-notes panel is on screen right now. Read at APPLY time from a
+   * ref, not closed over: an update that lands while the user is reading the
+   * transcript tab is exactly what the unread dot exists for, and a stale closure
+   * would mark it seen anyway.
+   */
+  readonly notesPanelVisible?: boolean;
+}
+
+export function useLiveSession(
+  options: UseLiveSessionOptions = {},
+): UseLiveSession {
   const auth = useAuth();
 
   const [status, setStatus] = useState<LiveStatus>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<readonly LiveTranscriptTurn[]>([]);
   const [suggestions, setSuggestions] = useState<readonly LiveSuggestion[]>([]);
+  const [liveNotes, setLiveNotes] = useState<LiveNotesState>(emptyLiveNotes);
+  const [mode, setModeState] = useState<LiveMode>('general');
+
+  // The lock is derived from status, not tracked separately: "a call is in
+  // flight" already has one source of truth and a second one would drift.
+  const canPickMode = status !== 'connecting' && status !== 'live';
+
+  const notesVisibleRef = useRef(options.notesPanelVisible ?? false);
+  useEffect(() => {
+    notesVisibleRef.current = options.notesPanelVisible ?? false;
+  }, [options.notesPanelVisible]);
 
   const socketRef = useRef<WebSocket | null>(null);
   const turnSeq = useRef(0);
@@ -169,6 +216,18 @@ export function useLiveSession(): UseLiveSession {
             prev.filter((s) => s.id !== event.suggestion_id),
           );
           return;
+        case 'notes.update':
+          // The rev rule lives in ONE place (§5.3) and is already proven; this is
+          // only the routing. A dropped update returns the same object reference,
+          // so a re-emit across a reconnect costs no render.
+          setLiveNotes((prev) =>
+            applyNotesUpdate(
+              prev,
+              { notes: event.notes, rev: event.rev },
+              notesVisibleRef.current,
+            ),
+          );
+          return;
         case 'error':
           // Surface typed server errors (quota/paywall SCREENS ride Phase 8).
           setErrorMessage(`${event.code}: ${event.message}`);
@@ -189,7 +248,28 @@ export function useLiveSession(): UseLiveSession {
     setErrorMessage(null);
     setTranscript([]);
     setSuggestions([]);
+    // A new call starts with no notes and no unread dot. Carrying the previous
+    // call's rev forward would silently drop the next call's early updates, since
+    // revs are per-meeting and restart at 0.
+    setLiveNotes(emptyLiveNotes);
   }, [cancelFrame]);
+
+  const markNotesSeen = useCallback((): void => {
+    setLiveNotes((prev) => markLiveNotesSeen(prev));
+  }, []);
+
+  /**
+   * Enforced HERE and not only by disabling the pills: the screen's lock is a
+   * courtesy, this is the guarantee. A mode changed mid-call would silently
+   * disagree with the prompt the server is already committed to for this session.
+   */
+  const setMode = useCallback(
+    (next: LiveMode): void => {
+      if (!canPickMode) return;
+      setModeState(next);
+    },
+    [canPickMode],
+  );
 
   const stop = useCallback((): void => {
     const socket = socketRef.current;
@@ -225,7 +305,16 @@ export function useLiveSession(): UseLiveSession {
     const title = `Live session ${new Date().toLocaleString()}`;
     const inserted = await supabase
       .from('meetings')
-      .insert({ user_id: auth.session.user.id, title })
+      .insert({
+        user_id: auth.session.user.id,
+        title,
+        // `started_at` was never set, so EVERY meeting this app created was
+        // undatable — surfaced by the Phase 8.5 Meetings screen, which filed all
+        // of them under "earlier" and reported "no calls this month" while
+        // listing calls from today. `ended_at` was already being stamped (by the
+        // session close / stale-call reaper), so duration was unrecoverable too.
+        started_at: new Date().toISOString(),
+      })
       .select('id')
       .single<{ id: string }>();
     if (inserted.error) {
@@ -243,6 +332,9 @@ export function useLiveSession(): UseLiveSession {
           v: LIVE_PROTOCOL_VERSION,
           type: 'session.start',
           meeting_id: meetingId,
+          // Sent even for 'general' (which the server would infer from an absent
+          // field) so a captured frame says which prompt answered the call.
+          mode,
         }),
       );
     };
@@ -288,7 +380,7 @@ export function useLiveSession(): UseLiveSession {
         }
       }
     };
-  }, [auth, stop, reset, applyEvent]);
+  }, [auth, stop, reset, applyEvent, mode]);
 
   /**
    * Send what the user typed on the "Test Live" screen. That screen is a
@@ -339,8 +431,13 @@ export function useLiveSession(): UseLiveSession {
     suggestions,
     // 'live' is only ever set by session.ready on the real socket.
     canSend: status === 'live',
+    liveNotes,
+    mode,
+    canPickMode,
     start,
+    setMode,
     sendInput,
     stop,
+    markNotesSeen,
   };
 }

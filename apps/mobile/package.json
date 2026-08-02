@@ -5,6 +5,8 @@
   "private": true,
   "license": "UNLICENSED",
   "dependencies": {
+    "@expo-google-fonts/spline-sans": "^0.4.2",
+    "@expo-google-fonts/spline-sans-mono": "^0.4.2",
     "@expo/ui": "~57.0.7",
     "@nova/shared": "*",
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -15,6 +17,7 @@
     "expo-font": "~57.0.1",
     "expo-glass-effect": "~57.0.1",
     "expo-image": "~57.0.1",
+    "expo-linear-gradient": "~57.0.1",
     "expo-linking": "~57.0.3",
     "expo-router": "~57.0.7",
     "expo-splash-screen": "~57.0.4",
@@ -35,9 +38,12 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "~19.2.2",
     "eslint": "^9.22.0",
     "eslint-config-expo": "^57.0.0",
+    "jsdom": "^25.0.1",
     "typescript": "~6.0.3"
   },
   "scripts": {

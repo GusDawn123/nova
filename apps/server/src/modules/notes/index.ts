@@ -38,7 +38,14 @@ export {
   type NotesConfig,
 } from "./config.js";
 export { joinTranscriptText, verifyNotes } from "./verify-quotes.js";
-export { reconcileIds, RECONCILE_THRESHOLD } from "./reconcile-ids.js";
+/**
+ * `similarity`, `RECONCILE_THRESHOLD` and `isSameItem` are NOT re-exported: their
+ * only callers are inside this module (RULES §2 — a barrel exposes what consumers
+ * use, not everything a file happens to export). `StoredItemState` stays; it is the
+ * shape `db/note-item-state.ts` returns.
+ */
+export { reconcileIds } from "./reconcile-ids.js";
+export { completedItemIds, type StoredItemState } from "./item-completion.js";
 /**
  * The live-notes fold (Phase 8). `modules/live`'s notes conductor owns the LOOP
  * and reaches the notes domain only through these — the prompt, the ops schema,

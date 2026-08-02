@@ -10,11 +10,17 @@ import {
 
 import type { NotesJobStore } from "../../db/jobs.js";
 import type { LiveNotesStore } from "../../db/live-notes.js";
+import type { NoteItemStateStore } from "../../db/note-item-state.js";
 import { requireAuth } from "../../plugins/auth.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
 
 import type { FollowUpInput, FollowUpResult } from "./follow-up.js";
+import {
+  readCompletedIds,
+  registerItemCompletionRoute,
+} from "./item-completion-routes.js";
 import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
+import { selectRenderedNotes, userIdOf } from "./route-helpers.js";
 
 /**
  * The authed notes REST surface (adr-0006 §REST-surface). Three routes, all behind
@@ -35,7 +41,16 @@ import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
 export interface NotesRoutesDeps {
   readonly reader: NotesReader;
   readonly followUpWriter: FollowUpWriter;
-  readonly store: NotesJobStore;
+  /**
+   * The durable job queue behind `POST /notes/regenerate`. OPTIONAL for the same
+   * partially-configured boot posture as {@link liveNotes}: the queue needs
+   * `SUPABASE_DB_URL`, while the READ surface needs only the supabase-js seam, and a
+   * boot with one but not the other must still serve the notes a user already has.
+   * Unwired means a typed 503 from regenerate — never an unmounted route, because an
+   * unmounted route 404s and the mobile screen reads a 404 as "this meeting is no
+   * longer available".
+   */
+  readonly store?: NotesJobStore;
   /** The follow-up runner (cites notes by construction — {@link FollowUpInput}). */
   readonly followUp: (input: FollowUpInput) => Promise<FollowUpResult>;
   readonly logger: NotesLogger;
@@ -61,6 +76,12 @@ export interface NotesRoutesDeps {
    * boot posture): unwired means `live_notes: null`, never a throw.
    */
   readonly liveNotes?: LiveNotesStore;
+  /**
+   * Action-item completion state (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3).
+   * Optional for the same DB-less boot posture as {@link liveNotes}: unwired means
+   * `completed_item_ids: []` and a 503 from the write route, never a throw.
+   */
+  readonly noteItemState?: NoteItemStateStore;
 }
 
 /** Uniform not-found body — a deleted/foreign/unknown meeting is indistinguishable. */
@@ -69,16 +90,6 @@ const NOT_FOUND = { error: "not_found" } as const;
 const paramsSchema = z.object({ id: z.string().uuid() });
 /** POST /follow-up body — module-local (the request shape is a thin `{tone}`). */
 const followUpBodySchema = z.object({ tone: followUpToneSchema });
-
-/** The authenticated caller's id (requireAuth guarantees `request.user` is set). */
-function userIdOf(request: FastifyRequest): string {
-  const user = request.user;
-  if (user === undefined) {
-    // Unreachable: requireAuth either populated user or already replied.
-    throw new Error("requireAuth did not populate request.user");
-  }
-  return user.id;
-}
 
 /** Parse `:id`; reply a uniform 404 and return null when it is not a uuid. */
 async function parseMeetingId(
@@ -97,7 +108,7 @@ async function parseMeetingId(
 export function createNotesRoutes(
   deps: NotesRoutesDeps,
 ): (app: FastifyInstance) => Promise<void> {
-  const { reader, followUpWriter, store, followUp, logger } = deps;
+  const { reader, followUpWriter, followUp, logger } = deps;
   const now = deps.now ?? ((): Date => new Date());
 
   // eslint-disable-next-line @typescript-eslint/require-await -- why: Fastify's plugin signature is `(app) => Promise<void>`; registration awaits nothing.
@@ -140,6 +151,22 @@ export function createNotesRoutes(
           }
         }
 
+        // Completion is resolved against the notes the client will actually
+        // RENDER — post-call when they exist, else the live preview. That is what
+        // makes a checkmark made mid-call survive the hangup swap: `reconcileIds`
+        // carries the live item's id onto its post-call counterpart, so the stored
+        // row still matches by id, and the text guard still matches by similarity
+        // even though the post-call pass reworded it.
+        const rendered = selectRenderedNotes(model.notes, live?.notes ?? null);
+        const completed = await readCompletedIds(
+          deps.noteItemState,
+          rendered,
+          meetingId,
+          userId,
+          request.id,
+          logger,
+        );
+
         const body: NotesReadResponse = notesReadResponseSchema.parse({
           notes_status: model.notesStatus,
           notes: model.notes,
@@ -147,10 +174,23 @@ export function createNotesRoutes(
           notes_generated_at: model.notesGeneratedAt,
           live_notes: live?.notes ?? null,
           live_notes_rev: live?.rev ?? null,
+          completed_item_ids: completed,
         });
         return reply.code(200).send(body);
       },
     );
+
+    // Action-item completion (Phase 8.5). Registered from its own module: both
+    // halves of the feature (this write and the read helper the GET composes in)
+    // share the take-the-text-from-current-notes rule, and splitting them across
+    // files is how that rule drifts. See `item-completion-routes.ts`.
+    registerItemCompletionRoute(app, {
+      reader,
+      logger,
+      now,
+      ...(deps.noteItemState ? { noteItemState: deps.noteItemState } : {}),
+      ...(deps.liveNotes ? { liveNotes: deps.liveNotes } : {}),
+    });
 
     app.post(
       "/meetings/:id/notes/regenerate",
@@ -164,6 +204,14 @@ export function createNotesRoutes(
         // uniformly BEFORE we ever enqueue a job for it.
         const model = await reader.readNotes(meetingId, userId);
         if (model === null) return reply.code(404).send(NOT_FOUND);
+
+        // Queue unwired (the partially-configured boot posture) — a typed 503, the
+        // same shape the completion write answers. A silent success would leave the
+        // client waiting forever for a job nobody enqueued.
+        const store = deps.store;
+        if (!store) {
+          return reply.code(503).send({ error: "regenerate_unavailable" });
+        }
 
         if (await store.hasActive(meetingId)) {
           return reply.code(409).send({ error: "already_running" });

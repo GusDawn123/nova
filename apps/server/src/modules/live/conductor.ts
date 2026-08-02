@@ -3,7 +3,11 @@ import { randomUUID } from "node:crypto";
 import { LIVE_PROTOCOL_VERSION, type ServerLiveEvent } from "@nova/shared";
 
 import { type LlmRouter, type Meter } from "../llm/index.js";
-import { assemble, type PromptTranscriptTurn } from "../prompt/index.js";
+import {
+  assemble,
+  type PromptMode,
+  type PromptTranscriptTurn,
+} from "../prompt/index.js";
 import type { RagService } from "../rag/index.js";
 
 import { conductorConfig, type ConductorConfig } from "./conductor-config.js";
@@ -45,6 +49,13 @@ export interface ConductorFactoryArgs {
   readonly send: (event: ServerLiveEvent) => void;
   readonly userId: string;
   readonly meetingId: string;
+  /**
+   * The copilot mode this call picked, off `session.start`. REQUIRED here (not
+   * optional-with-a-default) so a transport that forgets to thread it fails to
+   * compile: the alternative is every call quietly running general, which looks
+   * like the copilot being vague rather than like a wiring bug.
+   */
+  readonly mode: PromptMode;
 }
 
 /**
@@ -73,6 +84,14 @@ export interface LiveConductorDeps {
   meter?: Meter;
   /** User-provided context (profile / scripts); hard-guarded in the suffix. */
   userContext?: string;
+  /**
+   * The mode this session picked; fixed for the conductor's whole life, which is
+   * what keeps its assembled prefix byte-stable (and the vendor cache warm).
+   * Omitted → `general`, matching the wire rule for a `session.start` with no
+   * mode. Held per conductor — never module state — so one call's pick can never
+   * be read by another's.
+   */
+  mode?: PromptMode;
   logger?: LiveLogger;
   config?: ConductorConfig;
   /** Injected clock (fake-timer tests); defaults to Date.now. */
@@ -100,6 +119,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
   const now = deps.now ?? Date.now;
   const newId = deps.generateSuggestionId ?? randomUUID;
   const logger = deps.logger;
+  const mode = deps.mode ?? "general";
 
   const transcript: PromptTranscriptTurn[] = [];
   let active: ActiveGeneration | null = null;
@@ -220,7 +240,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
     const snippets = await groundingSnippets(gen.triggerText);
     if (!isCurrent(gen)) return;
 
-    const { stablePrefix, dynamicSuffix } = assemble("general", {
+    const { stablePrefix, dynamicSuffix } = assemble(mode, {
       transcript,
       ...(snippets.length > 0 ? { ragSnippets: snippets } : {}),
       ...(deps.userContext !== undefined

@@ -1,5 +1,10 @@
 import { approxTokens, promptConfig, type PromptConfig } from "./config.js";
-import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
+import {
+  MODES,
+  SYSTEM_PROMPT,
+  type ModePrompt,
+  type PromptExample,
+} from "./library/index.js";
 import {
   promptContextSchema,
   type AssembledPrompt,
@@ -13,8 +18,12 @@ import {
  * The one pure entry point of modules/prompt: split the byte-stable system
  * prompt (the cacheable prefix) from the per-turn dynamic suffix. No I/O, no
  * clock, no vendor — the conductor calls it every trigger and streams the result
- * through the llm router. Code assembles; the persona/rule prose is Gustavo's
- * authored, verbatim `stablePrefix` (RULES §9).
+ * through the llm router. Code assembles; every word of prose comes from
+ * `library/` (RULES §9).
+ *
+ * The prefix is SYSTEM_PROMPT plus, for a picked mode, that one mode's block.
+ * The mode is fixed at `session.start` and never changes mid-call, so the prefix
+ * is byte-stable per session exactly as it was when there was only one of them.
  *
  * Suffix layout (transcript LAST — the prompt reasons about "the end of the
  * transcript"):
@@ -90,8 +99,9 @@ function trimUserContext(text: string, budget: number): string {
 }
 
 /**
- * Assemble the prompt for one turn. `mode` selects the authored mode body
- * (`"general"` only today). The context boundary is zod-parsed (RULES §1).
+ * Assemble the prompt for one turn. `mode` is the user's pick from the Live
+ * screen, carried on `session.start`. The context boundary is zod-parsed
+ * (RULES §1).
  */
 export function assemble(
   mode: PromptMode,
@@ -101,9 +111,9 @@ export function assemble(
   // Parse the boundary — hostile/garbled input never reaches assembly untyped.
   const ctx = promptContextSchema.parse(context);
 
-  // `mode` is typed to the authored set; the record keeps future modes honest —
-  // adding an enum member without its content file breaks the build here.
-  const stablePrefix = MODE_BODIES[mode];
+  // `mode` is typed to the wire set; the record keeps future modes honest —
+  // adding an enum member without its library block breaks the build here.
+  const stablePrefix = MODE_PREFIXES[mode];
 
   const sections: string[] = [];
 
@@ -137,11 +147,50 @@ export function assemble(
   return { stablePrefix, dynamicSuffix: sections.join("\n\n") };
 }
 
+/** One few-shot demonstration, in the same `them:`/`me:` shape as the transcript. */
+function renderExample(example: PromptExample, index: number): string {
+  return [
+    `EXAMPLE ${String(index + 1)}`,
+    example.transcript,
+    "",
+    "A good answer:",
+    example.response,
+  ].join("\n");
+}
+
 /**
- * The authored system prompt per mode. A `Record<PromptMode, string>` so a new
- * mode enum member without its content file is a compile error — exhaustiveness
- * without an unreachable switch default.
+ * One mode's block: its rules, the SHAPE of the answer, then its few-shot. The
+ * examples ship here rather than in the system prompt on purpose — a transcript
+ * sample in the always-on prefix is paid for on every call in every mode.
  */
-const MODE_BODIES: Record<PromptMode, string> = {
-  general: LIVE_SYSTEM_PROMPT_GENERAL,
+function renderMode(mode: ModePrompt): string {
+  return [
+    `MODE: ${mode.label.toUpperCase()}`,
+    mode.directive,
+    ["ANSWER STRUCTURE", mode.answerStructure].join("\n"),
+    ...mode.examples.map(renderExample),
+  ].join("\n\n");
+}
+
+/** SYSTEM_PROMPT, then this mode's block. Byte-stable for the life of a session. */
+function prefixFor(mode: ModePrompt): string {
+  return [SYSTEM_PROMPT, renderMode(mode)].join("\n\n");
+}
+
+/**
+ * The stablePrefix per mode, built ONCE at module load.
+ *
+ * A `Record<PromptMode, string>` so a new wire mode without a library block is a
+ * compile error — exhaustiveness without an unreachable switch default. Mode is
+ * locked for a session, so each of these is byte-identical across every turn of
+ * every call that picked it, which is what the vendor prompt cache keys on
+ * (adr-0004 §6): four warm prefixes rather than one.
+ */
+const MODE_PREFIXES: Record<PromptMode, string> = {
+  // "general" is the universal prompt ALONE — the deliberate absence of a domain
+  // block, not a missing one.
+  general: SYSTEM_PROMPT,
+  behavioral: prefixFor(MODES.behavioral),
+  technical: prefixFor(MODES.technical),
+  finance: prefixFor(MODES.finance),
 };

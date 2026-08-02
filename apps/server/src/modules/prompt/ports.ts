@@ -1,21 +1,27 @@
 import { z } from "zod";
+import { liveModeSchema } from "@nova/shared";
 
 /**
  * modules/prompt boundary types (Phase 7). The module is PURE: one
- * `assemble(mode, context)` that splits Gustavo's authored, byte-stable system
- * prompt (the cacheable `stablePrefix`) from the only uncached tokens (the
+ * `assemble(mode, context)` that splits the authored, byte-stable system prompt
+ * (the cacheable `stablePrefix`) from the only uncached tokens (the
  * `dynamicSuffix`: windowed transcript + RAG snippets under a hard token budget
  * + hard-guarded user context). Code assembles; code NEVER writes prose
  * (design: live-pipeline.md §modules/prompt; adr-0004 §6).
  */
 
 /**
- * The prompt mode selects the mode BODY. Only `"general"` is authored today —
- * the full co-pilot prompt in `content/system-prompt.ts`. Gustavo authors the
- * Sales-mode prompt separately (source-doc banner); it lands as its own content
- * file + enum member, never invented here.
+ * The prompt mode selects which domain block joins the always-on system prompt:
+ * `general` is the system prompt alone, the other three each add one block from
+ * `library/modes/`.
+ *
+ * It is the WIRE enum re-exported, not a twin: the value arrives on
+ * `session.start` from the phone's picker, so a second declaration here could
+ * accept a mode the client cannot send (or reject one it can). `library.test.ts`
+ * closes the loop from the other side by proving the library has a block for
+ * every wire mode except `general`.
  */
-export const promptModeSchema = z.enum(["general"]);
+export const promptModeSchema = liveModeSchema;
 export type PromptMode = z.infer<typeof promptModeSchema>;
 
 /**

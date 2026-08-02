@@ -193,13 +193,17 @@ export function maybeCreateLiveConductorFactory(
     logUsage: voyageMeteringSink(metering, app),
   });
 
-  return ({ send, userId, meetingId }) =>
+  return ({ send, userId, meetingId, mode }) =>
     createLiveConductor({
       send,
       router,
       rag,
       userId,
       meetingId,
+      // The mode the caller picked on the Live screen, parsed off `session.start`
+      // (Phase 8.6). Per-session by construction: the router and RAG service above
+      // are shared, the mode is not.
+      mode,
       logger: app.log,
       // The per-call meter (adr-0007 §2): attribution travels with the call while
       // the router's breaker/bench state stays process-global.

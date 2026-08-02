@@ -44,7 +44,17 @@ function wordSet(text: string): Set<string> {
   );
 }
 
-function similarity(a: string, b: string): number {
+/**
+ * Jaccard overlap of the two texts' word sets, 0..1.
+ *
+ * EXPORTED because "is this the same item?" must have exactly one definition here.
+ * Two callers ask it: this module, reconciling live ids onto post-call items at the
+ * hangup swap, and `item-completion.ts`, deciding whether a stored checkmark still
+ * belongs to the item now sitting at its id after a regenerate. Those are the same
+ * question about the same data, and answering it two slightly different ways is how
+ * a checkmark ends up on a task the user never finished.
+ */
+export function similarity(a: string, b: string): number {
   const sa = wordSet(a);
   const sb = wordSet(b);
   if (sa.size === 0 || sb.size === 0) return 0;

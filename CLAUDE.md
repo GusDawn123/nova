@@ -95,6 +95,39 @@ today?" stays quiet. GATES on the new models + prompt (2026-07-23): relevance **
 fabrication regression), typed-input E2E deltas=6/787 chars ~1.9s, smokes openai 881ms /
 google 845ms, notes accuracy 5/5, latency p50=800ms p95=1450ms, quiet 11/11 + 3
 filler-prefix fixtures.**
+**MODES (2026-08-01, `dev-claude-notes-ui`): the user PICKS the copilot prompt on the
+Live screen. `liveModeSchema` (`packages/shared/src/live.ts`) is the one source of
+truth — `general | behavioral | technical | finance` — re-exported by
+`modules/prompt/ports.ts` as `promptModeSchema`, drift-tested against the library's
+`MODES` keys, and rendered by `apps/mobile/src/features/live-call/mode-picker.tsx`
+(labels are a `Record<LiveMode, string>`, order from the enum). `session.start` gains
+an OPTIONAL `mode` (additive, protocol still `v: 1`; omitted = general; an unknown
+value FAILS the parse → existing `invalid_event`). It threads
+`session.ts::onSessionStart` → `ConductorFactoryArgs.mode` (required — a transport
+that forgets it does not compile) → `createLiveConductor` closure →
+`assemble(mode, ctx)`; never module state, so two concurrent calls cannot swap
+prompts. `assemble()` now composes `library/SYSTEM_PROMPT` + the picked mode's
+directive/answer-structure/few-shot; snapshot pins are per mode (4) plus an
+all-distinct assertion, and mode-LEAKAGE tests assert each mode contains its own
+directive and no other's. LEGACY + UNWIRED (kept on disk, banner-marked):
+`modules/prompt/content/system-prompt.ts` and `scripts/gen-live-prompt.mjs`.
+VOICE (2026-08-01, the reference study — commits `ed7fc08..32b9733`): the library
+now defaults to SPOKEN first-person prose. The source doc's headline+bullets card
+and the `**Objection: [Name]**` coaching label are GONE (both fought the
+teleprompter register on every answer); the default shape is a speakable paragraph
+with 1-3 bolded key terms as the glance aid (bold is never spoken), structure only
+for code/notes/explicit requests. Added: the em-dash/semicolon spoken-punctuation
+ban, the 15-30s length law, opener rotation, context stealth, speakable
+admissions, a position-pinned FINAL CHECK (recency anchor — a test asserts it
+stays last), per-mode voice anchors, and re-voiced few-shots (the model believes
+the demonstration over the instruction). Behavioral = a four-beat spoken story;
+technical splits by what the output IS (code structured, prose spoken); finance
+says the calculation inline. Live notes is inverse-leakage-tested: the spoken
+register must never appear in its prompt. Reference learning is
+techniques-only — prompt text stays Nova-authored, never transcribed (RULES §9).
+NOT DONE: the paid live gates (relevance/grounding/quiet) have NOT been re-run
+against any of the 2026-08-01 prompt text — those numbers above are the legacy
+prompt's. Field check 2026-08-01 (Gustavo, simulator): answers read natural.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by
@@ -138,9 +171,6 @@ deferred), iOS-simulator verification deferred (Expo web + Playwright instead). 
 
 ## Hard prohibitions
 
-- **NEVER read, copy, or transcribe from `~/Documents/natively-cluely-ai-assistant`.**
-  Personal-use license; legally off-limits for this commercial product (RULES §9).
-  If you need to know "how X works," derive from public patterns and docs/ specs here.
 - No secrets in the repo. No vendor keys in the mobile app, ever.
 - No unmetered paths to paid vendor APIs — **DONE and audit-enforced as of Phase 6**: the
   unified `modules/metering` is live (llm per-call meters, STT relayed-byte spans, Voyage

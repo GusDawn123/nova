@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   LIVE_PROTOCOL_VERSION,
   clientLiveEventSchema,
+  liveModeSchema,
   parseClientEvent,
   serverLiveEventSchema,
   type ServerLiveEvent,
@@ -45,6 +46,57 @@ describe("clientLiveEventSchema", () => {
       meeting_id: "not-a-uuid",
     });
     expect(result.success).toBe(false);
+  });
+
+  it("accepts session.start carrying a picked mode (Phase 8.6)", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "session.start",
+      meeting_id: MEETING_ID,
+      mode: "technical",
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.type === "session.start").toBe(true);
+    if (result.success && result.data.type === "session.start") {
+      expect(result.data.mode).toBe("technical");
+    }
+  });
+
+  it("treats an OMITTED mode as absent — an old client still starts", () => {
+    // The field is additive on `v: 1`: a client built before the mode picker
+    // sends no `mode`, and the server reads that as "general" on its side.
+    const result = parseClientEvent({
+      v: 1,
+      type: "session.start",
+      meeting_id: MEETING_ID,
+    });
+    expect(result.success).toBe(true);
+    if (result.success && result.data.type === "session.start") {
+      expect(result.data.mode).toBeUndefined();
+    }
+  });
+
+  it("rejects an unknown mode at the boundary (no silent fallback)", () => {
+    // A bad mode must FAIL the parse — the server then answers `invalid_event`
+    // rather than quietly serving general and hiding a client bug.
+    expect(
+      parseClientEvent({
+        v: 1,
+        type: "session.start",
+        meeting_id: MEETING_ID,
+        mode: "sales",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("pins the mode vocabulary — live notes is a category, never a mode", () => {
+    expect(liveModeSchema.options).toEqual([
+      "general",
+      "behavioral",
+      "technical",
+      "finance",
+    ]);
+    expect(liveModeSchema.options).not.toContain("live-notes");
   });
 
   it("accepts the audio.frame marker, session.end and ping", () => {

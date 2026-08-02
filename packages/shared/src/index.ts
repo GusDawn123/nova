@@ -7,6 +7,7 @@ export {
   clientLiveEventSchema,
   liveErrorCodeSchema,
   liveErrorSchema,
+  liveModeSchema,
   notesUpdateSchema,
   parseClientEvent,
   pingSchema,
@@ -26,9 +27,20 @@ export {
   transcriptPartialSchema,
   type ClientLiveEvent,
   type LiveErrorCode,
+  type LiveMode,
   type ServerLiveEvent,
   type TranscriptInputOrigin,
 } from "./live.js";
+export {
+  meetingListItemSchema,
+  meetingListResponseSchema,
+  meetingTranscriptResponseSchema,
+  meetingTranscriptTurnSchema,
+  type MeetingListItem,
+  type MeetingListResponse,
+  type MeetingTranscriptResponse,
+  type MeetingTranscriptTurn,
+} from "./meetings.js";
 export {
   meResponseSchema,
   roleSchema,
