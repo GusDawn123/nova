@@ -59,6 +59,16 @@ export type MeetingsState =
   | { status: 'success'; data: MeetingListResponse }
   | { status: 'error'; message: string };
 
+/**
+ * One trip to the server. `silent` is not cosmetic: it is the difference between a
+ * failure the user is owed an explanation for (the first load, a pull-to-refresh)
+ * and one they must never be shown (a poll tick, a return to the tab).
+ */
+interface Request {
+  readonly n: number;
+  readonly silent: boolean;
+}
+
 export interface UseMeetings {
   state: MeetingsState;
   /**
@@ -87,8 +97,10 @@ export interface UseMeetings {
  *   POLL — notes are written by a background job (`modules/notes`), so without a
  *     timer the WRITING NOTES → NOTES READY transition could never reach the card.
  *
- * The last two are SILENT: they update in place and never touch `refreshing`, which
- * belongs to the pull-to-refresh spinner alone.
+ * The last two are SILENT in both directions: they update in place and never touch
+ * `refreshing` (which belongs to the pull-to-refresh spinner alone), and when they
+ * FAIL they leave the last good list exactly where it was. Only a fetch the user
+ * asked for is allowed to put an error card on screen.
  */
 export function useMeetings(): UseMeetings {
   const auth = useAuth();
@@ -97,9 +109,13 @@ export function useMeetings(): UseMeetings {
 
   const [fetched, setFetched] = useState<MeetingsState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
-  // Bumped by refresh() to re-run the effect; a counter rather than a boolean so
-  // two refreshes in a row both take effect.
-  const [nonce, setNonce] = useState(0);
+  /**
+   * The request to run. `n` re-runs the effect — a counter rather than a boolean so
+   * two refreshes in a row both take effect — and `silent` says whether a HUMAN
+   * asked for it, which is what decides whether a failure is allowed on screen.
+   * Carried as one object so the two can never disagree about the same request.
+   */
+  const [request, setRequest] = useState<Request>({ n: 0, silent: false });
   // Focus is STATE, not a ref: the poll below has to start and stop with it.
   const [focused, setFocused] = useState(false);
   /**
@@ -110,14 +126,16 @@ export function useMeetings(): UseMeetings {
   const settled = useRef(false);
 
   /**
-   * Re-fetch without saying so: bumping the nonce re-runs the effect below, whose
-   * cleanup aborts whatever it superseded — so overlapping polls cannot stack.
+   * Re-fetch without saying so: bumping the request re-runs the effect below, whose
+   * cleanup aborts whatever it superseded — so overlapping polls cannot stack. A
+   * failure here is swallowed rather than rendered (see the `catch`).
+   *
    * Deliberately dependency-FREE: `useFocusEffect` re-runs its effect whenever the
    * callback identity changes, and a callback that changed per render would refetch
    * per render.
    */
   const refetch = useCallback(() => {
-    setNonce((n) => n + 1);
+    setRequest((prev) => ({ n: prev.n + 1, silent: true }));
   }, []);
 
   const refresh = useCallback(() => {
@@ -125,7 +143,7 @@ export function useMeetings(): UseMeetings {
     // so setting `refreshing` here would leave the spinner stuck on forever.
     if (accessToken === null) return;
     setRefreshing(true);
-    setNonce((n) => n + 1);
+    setRequest((prev) => ({ n: prev.n + 1, silent: false }));
   }, [accessToken]);
 
   useEffect(() => {
@@ -169,9 +187,18 @@ export function useMeetings(): UseMeetings {
         if (!cancelled) setFetched({ status: 'success', data: parsed.data });
       } catch (error) {
         if (!cancelled) {
-          setFetched({
-            status: 'error',
-            message: timedOut ? TIMEOUT_MESSAGE : failureMessage(error),
+          setFetched((previous) => {
+            // A request the user never made may not take away the list they are
+            // reading. One 500 on a poll tick, one Wi-Fi→LTE handoff on the way
+            // back to this tab, and the whole archive would otherwise be replaced
+            // by an error card nobody asked for — and, because the poll is gated
+            // on the success data, the WRITING NOTES → NOTES READY transition
+            // would die with it. Keep the last good answer; the next tick heals.
+            if (request.silent && previous.status === 'success') return previous;
+            return {
+              status: 'error',
+              message: timedOut ? TIMEOUT_MESSAGE : failureMessage(error),
+            };
           });
         }
       } finally {
@@ -189,7 +216,7 @@ export function useMeetings(): UseMeetings {
       clearTimeout(timer);
       controller.abort();
     };
-  }, [accessToken, nonce]);
+  }, [accessToken, request]);
 
   /**
    * Focus. The cleanup runs on BLUR, not on unmount — that is the whole reason this
@@ -214,6 +241,9 @@ export function useMeetings(): UseMeetings {
    * Poll, for exactly as long as there is something to poll for. A boolean, not the
    * meetings array, so the interval keeps its cadence across refetches instead of
    * being torn down and restarted by every answer that changes nothing.
+   *
+   * This reads the last GOOD list — a silent failure never overwrites it — so one
+   * bad tick cannot switch the poll off and strand the card on WRITING NOTES.
    */
   const writingNotes =
     fetched.status === 'success' &&

@@ -2,7 +2,7 @@ import type { MeetingListItem, NotesStatus } from '@nova/shared';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useMeetings } from './use-meetings';
+import { useMeetings, type MeetingsState } from './use-meetings';
 
 /**
  * Freshness — the half of `useMeetings` a screen test can never see.
@@ -126,6 +126,27 @@ function respond(payload: unknown): void {
   } as Response);
 }
 
+/** …and the two ways it can go wrong: the server answers badly, or not at all. */
+function respondWithStatus(status: number): void {
+  fetchMock.mockResolvedValue({
+    ok: false,
+    status,
+    json: () => Promise.resolve({}),
+  } as Response);
+}
+
+function respondWithNothing(): void {
+  fetchMock.mockRejectedValue(new TypeError('Network request failed'));
+}
+
+/** The meetings currently on screen — and proof the success branch survived. */
+function meetingsOnScreen(state: MeetingsState): MeetingListItem[] {
+  if (state.status !== 'success') {
+    throw new Error(`expected a rendered list, got '${state.status}'`);
+  }
+  return state.data.meetings;
+}
+
 /**
  * Run the clock forward and let every promise the hook is waiting on settle.
  * `waitFor` is unusable here — @testing-library/dom 10 only knows how to detect
@@ -218,12 +239,19 @@ describe('useMeetings — while the notes are being written', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('polls for a queued meeting too, not only a processing one', async () => {
+  it('polls for a queued meeting too, and not one millisecond early', async () => {
     respond(body('queued'));
     renderHook(() => useMeetings());
     await tick();
 
-    await tick(5000);
+    // Split deliberately. Advancing the whole 5s in one go pins the interval from
+    // ABOVE only: five 1s ticks inside one `act` batch into a single render and so
+    // land as ONE fetch, which means a poll silently dropped to 1s would still read
+    // as "called twice". The 5s cadence is a battery and a bill on a phone, so it
+    // gets an assertion on each side of the boundary.
+    await tick(4999);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await tick(1);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -273,5 +301,86 @@ describe('useMeetings — while the notes are being written', () => {
     await tick(60_000);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * The failure rule, and the whole reason `Request.silent` exists.
+ *
+ * An error card is an ANSWER — to a first load, or to a pull the user just made.
+ * The two fetches added for freshness are not questions the user asked, so a Wi-Fi
+ * handoff or a single 500 must not be allowed to take the archive off the screen
+ * and replace it with COULD NOT LOAD YOUR CALLS. Worse, the poll is gated on the
+ * success data: one bad tick that demoted the state would ALSO stop the polling,
+ * stranding the card on WRITING NOTES until the user pulled the list themselves.
+ */
+describe('useMeetings — when a request the user never made fails', () => {
+  it('keeps the list on screen, and keeps polling right through it', async () => {
+    respond(body('processing'));
+    const { result } = renderHook(() => useMeetings());
+    await tick();
+
+    respondWithStatus(500);
+    await tick(5000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(meetingsOnScreen(result.current.state)).toHaveLength(1);
+    expect(meetingsOnScreen(result.current.state)[0]?.notes_status).toBe(
+      'processing',
+    );
+
+    // The blip is over and the job has landed: the transition this feature exists
+    // for still arrives, without the user touching anything.
+    respond(body('completed'));
+    await tick(5000);
+
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(meetingsOnScreen(result.current.state)[0]?.notes_status).toBe(
+      'completed',
+    );
+  });
+
+  it('keeps the list on screen when a focus refetch cannot reach the server', async () => {
+    respond(body('completed'));
+    const { result } = renderHook(() => useMeetings());
+    await tick();
+
+    respondWithNothing();
+    act(() => {
+      focus.set(false);
+    });
+    act(() => {
+      focus.set(true);
+    });
+    await tick();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(meetingsOnScreen(result.current.state)).toHaveLength(1);
+  });
+
+  it('still says so when the user asked — the pull, and the first load', async () => {
+    respond(body('completed'));
+    const { result } = renderHook(() => useMeetings());
+    await tick();
+
+    respondWithStatus(500);
+    act(() => {
+      result.current.refresh();
+    });
+    await tick();
+
+    // A pull that answers with the same list it had would read as a frozen app.
+    if (result.current.state.status !== 'error') throw new Error('unreachable');
+    expect(result.current.state.message).toContain('500');
+
+    respondWithStatus(503);
+    const first = renderHook(() => useMeetings());
+    await tick();
+
+    // Nothing to preserve on a first load: the error card IS the screen.
+    if (first.result.current.state.status !== 'error') {
+      throw new Error('unreachable');
+    }
+    expect(first.result.current.state.message).toContain('503');
   });
 });
