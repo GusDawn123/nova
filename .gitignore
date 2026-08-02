@@ -34,6 +34,9 @@ supabase/.temp/
 # agent scratch — never committed
 .superpowers/
 
+# strip_mascot_bg.sh fallback venv (used only when uvx is unavailable)
+scripts/.venv-mascot/
+
 # OS / editor
 .DS_Store
 *.log
