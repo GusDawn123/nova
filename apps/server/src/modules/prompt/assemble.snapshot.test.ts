@@ -22,21 +22,23 @@ import type { PromptMode } from "./ports.js";
  * never something to repin because the build went red.
  */
 const PINNED: Record<PromptMode, string> = {
-  // Repinned 2026-08-01 twice, both field reports from live testing:
-  // (1) the teleprompter register — the source doc's "no pronouns" rule banned
-  //     "I", so behavioral answers came out as third-person narration;
-  // (2) SOUND HUMAN — first person but press-release ("too direct"): the live
-  //     identity anchor, spoken-rhythm mechanics, and the machine-tell word
-  //     blacklist, per the public patterns for this class of tool.
+  // Repinned 2026-08-01 (third repin of the day — the reference study): the
+  // spoken-prose default. The source doc's headline-and-bullets card and the
+  // "**Objection: [Name]**" coaching label were quietly fighting THE REGISTER;
+  // both are gone. Added: em-dash/semicolon spoken-punctuation ban, the 15-30s
+  // length law, opener rotation, context stealth, speakable admissions, and the
+  // position-pinned FINAL CHECK. Earlier same-day repins: (1) the teleprompter
+  // register (the "no pronouns" narration fix); (2) SOUND HUMAN (spoken-rhythm
+  // mechanics + machine-tell blacklist).
   // Live gates still pending on this text.
   general:
-    "075e21e589d5ccb3ff7d4a4eeb36fbfa6ce260f927db9ff2560971e125a7e020",
+    "3b5d2d7e3185f844daa620df22e7a2e4253b1aa84ac10bb7b335620781427527",
   behavioral:
-    "8f1912beb26f371b5dccfb68d3e306fee2397fe43472c76f262bc02163750384",
+    "4ce711219fb3432381c9fa2ead14ce2a3afcbefca6a64d3dc05dedd8fd0963f3",
   technical:
-    "7311c2ee7020466bc5d8e53f59304ecfe1a9471e8e86839e3641117dffdb3fa9",
+    "94453f59f673aa36281ef10f169abeca01f7a6fe87dacf281398a265112ecccd",
   finance:
-    "5449bd282e45e68b74be363adb1eda8e4b3828f993bc3fdf6848ae3def171c7e",
+    "8aaa92fe9056666335e68987825c188a967f18b08c12febc5c7c068ec8ab3a90",
 };
 
 function prefixHash(mode: PromptMode): string {

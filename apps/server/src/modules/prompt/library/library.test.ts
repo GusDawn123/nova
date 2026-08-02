@@ -47,10 +47,61 @@ describe("system prompt", () => {
     expect(SYSTEM_PROMPT.toLowerCase()).toContain("uncertainty");
   });
 
-  it("lets a picked mode's structure beat the default shape", () => {
-    // The default headline-and-bullets shape must yield when a mode defines its
-    // own structure, or behavioral answers get squeezed back into narration.
+  it("lets a picked mode's structure refine the default shape", () => {
+    // The default spoken shape must yield to a mode's own answer structure, or
+    // mode-specific shapes (a code block, a story) get squeezed back out.
     expect(SYSTEM_PROMPT.toLowerCase()).toContain("mode");
+  });
+
+  it("defaults to spoken prose, not a card (2026-08-01 reference study)", () => {
+    // The source doc's "Short headline (<=6 words) / 1-2 main bullets" card is a
+    // dashboard. A dashboard cannot be read aloud, so it fought THE REGISTER on
+    // every answer. The default shape is now first-person prose with sparing
+    // key-term bold as the scanning aid.
+    expect(SYSTEM_PROMPT).not.toContain("Short headline");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("prose");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("aloud");
+    // Bold survives as the one visual aid precisely because it is never spoken.
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("never spoken");
+  });
+
+  it("bans the em dash and semicolon in spoken lines", () => {
+    // The em dash is the loudest written-register tell in speech; a person says
+    // a comma or a full stop. Scoped to spoken lines — code/math/notes exempt.
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("em dash");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("semicolon");
+  });
+
+  it("carries a spoken length law", () => {
+    // Correct-but-unsayable is still a failure: a 150-word paragraph cannot be
+    // delivered seconds after it streams in. Default 15-30 seconds, shortest
+    // that fully answers; code and notes exempt.
+    expect(SYSTEM_PROMPT).toContain("15-30 seconds");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("shortest");
+  });
+
+  it("bans coaching labels from the output", () => {
+    // "**Objection: [Name]**" is a tag the user cannot say out loud. The label
+    // moved into speakable words (an acknowledgment opener, then the reframe).
+    expect(SYSTEM_PROMPT).not.toContain("**Objection: [Generic Objection Name]**");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("coaching tags");
+  });
+
+  it("uses context silently and admits gaps in a speakable first person", () => {
+    // Two failure modes with one root: narrating the source ("based on your
+    // notes...") and narrating the absence ("I don't have information about
+    // that"). Both break the teleprompter frame; both get speakable shapes.
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("silently");
+    expect(SYSTEM_PROMPT).toContain("based on your notes");
+  });
+
+  it("keeps the FINAL CHECK last, where it weighs the most", () => {
+    // Recency anchoring: the instruction closest to the output carries the most
+    // weight, and these checks (invented numbers, unspeakable lines) are the
+    // ones that erase an answer's value. Position is part of the design.
+    const idx = SYSTEM_PROMPT.indexOf("FINAL CHECK");
+    expect(idx).toBeGreaterThan(0);
+    expect(SYSTEM_PROMPT.length - idx).toBeLessThan(600);
   });
 
   it("is anchored in the LIVE moment, and sounds like a person", () => {
