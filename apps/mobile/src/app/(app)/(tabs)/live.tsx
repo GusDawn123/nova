@@ -21,6 +21,7 @@ import { tabBarClearance } from '@/design/tab-bar-metrics';
 import { paletteFor } from '@/design/tokens';
 import { CopilotHistory } from '@/features/live-call/copilot-history';
 import { LiveNotesPanel } from '@/features/live-call/live-notes-panel';
+import { ModePicker } from '@/features/live-call/mode-picker';
 import { TranscriptList } from '@/features/live-call/transcript-list';
 import { useLiveSession } from '@/hooks/use-live-session';
 
@@ -37,6 +38,11 @@ import { useLiveSession } from '@/hooks/use-live-session';
  * a question sends `transcript.input` and the answer streams back as a REAL
  * LLM suggestion. Every suggestion on this screen is real — the canned replay
  * was removed 2026-07-23 at Gustavo's direction. Real mic capture is Phase 8/9.
+ *
+ * The MODE PICKER above the capture strip chooses which prompt answers this call
+ * (General / Behavioral / Technical / Finance). It is a pre-call choice: the
+ * server locks the mode at `session.start`, so the row is inert while a session
+ * is connecting or live — `useLiveSession` owns both the pick and that lock.
  */
 export default function LiveScreen() {
   const scheme = useColorScheme();
@@ -83,6 +89,13 @@ export default function LiveScreen() {
               {live.status}
             </ThemedText>
           </View>
+
+          {/* Which prompt answers this call. Locked once it starts. */}
+          <ModePicker
+            mode={live.mode}
+            onSelect={live.setMode}
+            disabled={!live.canPickMode}
+          />
 
           {/* Tabbed capture strip (§5.1): Transcript | Live notes. Both panels
               stay mounted so the hidden one keeps receiving updates — the unread

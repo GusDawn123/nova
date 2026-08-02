@@ -1,6 +1,7 @@
 import {
   LIVE_PROTOCOL_VERSION,
   serverLiveEventSchema,
+  type LiveMode,
   type ServerLiveEvent,
 } from '@nova/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -63,6 +64,14 @@ export interface LiveSessionState {
   readonly suggestions: readonly LiveSuggestion[];
   /** True when the real socket is live and typed input can be sent. */
   readonly canSend: boolean;
+  /** The copilot mode the NEXT session will start with (`general` by default). */
+  readonly mode: LiveMode;
+  /**
+   * Whether the mode can still be changed. Mode is per call — the server locks it
+   * at `session.start` so the assembled prompt prefix stays byte-stable — so this
+   * goes false the moment a session is connecting or live.
+   */
+  readonly canPickMode: boolean;
   /**
    * Live notes for this call, reduced through the rev rule (§5.3). `hasUnseen`
    * drives the unread dot on the capture card's hidden tab (§5.1).
@@ -73,6 +82,8 @@ export interface LiveSessionState {
 export interface UseLiveSession extends LiveSessionState {
   /** Create a meeting + connect the real authed socket. */
   start: () => Promise<void>;
+  /** Pick the copilot mode for the next call. Ignored while one is in flight. */
+  setMode: (mode: LiveMode) => void;
   /** Send a typed utterance/question (`transcript.input`) up the live socket. */
   sendInput: (text: string) => void;
   /** End the session (closes the socket). */
@@ -101,6 +112,11 @@ export function useLiveSession(
   const [transcript, setTranscript] = useState<readonly LiveTranscriptTurn[]>([]);
   const [suggestions, setSuggestions] = useState<readonly LiveSuggestion[]>([]);
   const [liveNotes, setLiveNotes] = useState<LiveNotesState>(emptyLiveNotes);
+  const [mode, setModeState] = useState<LiveMode>('general');
+
+  // The lock is derived from status, not tracked separately: "a call is in
+  // flight" already has one source of truth and a second one would drift.
+  const canPickMode = status !== 'connecting' && status !== 'live';
 
   const notesVisibleRef = useRef(options.notesPanelVisible ?? false);
   useEffect(() => {
@@ -242,6 +258,19 @@ export function useLiveSession(
     setLiveNotes((prev) => markLiveNotesSeen(prev));
   }, []);
 
+  /**
+   * Enforced HERE and not only by disabling the pills: the screen's lock is a
+   * courtesy, this is the guarantee. A mode changed mid-call would silently
+   * disagree with the prompt the server is already committed to for this session.
+   */
+  const setMode = useCallback(
+    (next: LiveMode): void => {
+      if (!canPickMode) return;
+      setModeState(next);
+    },
+    [canPickMode],
+  );
+
   const stop = useCallback((): void => {
     const socket = socketRef.current;
     socketRef.current = null;
@@ -303,6 +332,9 @@ export function useLiveSession(
           v: LIVE_PROTOCOL_VERSION,
           type: 'session.start',
           meeting_id: meetingId,
+          // Sent even for 'general' (which the server would infer from an absent
+          // field) so a captured frame says which prompt answered the call.
+          mode,
         }),
       );
     };
@@ -348,7 +380,7 @@ export function useLiveSession(
         }
       }
     };
-  }, [auth, stop, reset, applyEvent]);
+  }, [auth, stop, reset, applyEvent, mode]);
 
   /**
    * Send what the user typed on the "Test Live" screen. That screen is a
@@ -400,7 +432,10 @@ export function useLiveSession(
     // 'live' is only ever set by session.ready on the real socket.
     canSend: status === 'live',
     liveNotes,
+    mode,
+    canPickMode,
     start,
+    setMode,
     sendInput,
     stop,
     markNotesSeen,
