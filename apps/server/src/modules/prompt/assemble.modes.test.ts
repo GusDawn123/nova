@@ -83,19 +83,20 @@ describe("modules/prompt [prompt-modes] the picked mode shapes the prefix", () =
     }
   });
 
-  it("[prompt-modes] the system prompt is byte-identical in all four modes", () => {
+  it("[prompt-modes] every mode opens with the byte-identical system prompt", () => {
     // The mode composes ON TOP of the universal rules; it never edits them. Any
     // mode-specific rewording of the system prompt would be a second source of
-    // truth for identity, format and the security rules.
+    // truth for identity, format and the security rules — and `startsWith` (not
+    // `contains`) is what pins the ORDER too: rules first, domain after.
     for (const mode of liveModeSchema.options) {
-      expect(assemble(mode, { transcript: [] }).stablePrefix).toContain(
-        SYSTEM_PROMPT,
-      );
+      const { stablePrefix } = assemble(mode, { transcript: [] });
+      expect(
+        stablePrefix.startsWith(SYSTEM_PROMPT),
+        `${mode} does not open with the system prompt`,
+      ).toBe(true);
+      // The shared opening is the same LENGTH everywhere, so nothing was
+      // trimmed or padded into it before the mode block begins.
+      expect(stablePrefix.slice(0, SYSTEM_PROMPT.length)).toBe(SYSTEM_PROMPT);
     }
-  });
-
-  it("[prompt-modes] the system prompt comes FIRST, the mode block after it", () => {
-    const { stablePrefix } = assemble("finance", { transcript: [] });
-    expect(stablePrefix.startsWith(SYSTEM_PROMPT)).toBe(true);
   });
 });
