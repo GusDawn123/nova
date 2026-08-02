@@ -28,6 +28,10 @@ export interface FollowUpPanelProps {
   readonly draft: FollowUpStored | null;
   /** Null when nothing failed — including "there simply is no draft". */
   readonly failure: FollowUpFailure | null;
+  /** The meeting read is still in flight: nothing below is known yet. */
+  readonly loading: boolean;
+  /** The meeting read's own failure. Outranks everything — see below. */
+  readonly errorMessage: string | null;
   readonly onRetry: () => void;
   readonly palette: Palette;
 }
@@ -35,9 +39,45 @@ export interface FollowUpPanelProps {
 export function FollowUpPanel({
   draft,
   failure,
+  loading,
+  errorMessage,
   onRetry,
   palette,
 }: FollowUpPanelProps): React.JSX.Element {
+  // The read's state comes FIRST, and the reason is the empty card at the bottom:
+  // it says "nothing failed — nothing was asked for", which over a read that has
+  // not answered (or has failed) is a statement about a meeting nobody has seen.
+  if (errorMessage !== null) {
+    return (
+      <StateCard
+        palette={palette}
+        testID="follow-up-error"
+        eyebrow="FOLLOW-UP"
+        message="This call wouldn't load"
+        detail={errorMessage}
+        // Unlike a failed notes pipeline, a failed READ is worth re-running: the
+        // next request can genuinely answer differently.
+        action={{
+          label: 'TRY AGAIN',
+          onPress: onRetry,
+          testID: 'follow-up-retry',
+        }}
+      />
+    );
+  }
+
+  if (loading) {
+    return (
+      <StateCard
+        palette={palette}
+        testID="follow-up-loading"
+        eyebrow="FOLLOW-UP"
+        message="Opening the call."
+        waiting
+      />
+    );
+  }
+
   if (draft !== null) {
     return (
       <ScrollView

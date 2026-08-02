@@ -1,5 +1,5 @@
-import { render, screen, waitFor } from '@testing-library/react';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette, paperPalette, type Palette } from '@/design/tokens';
 import type { MeetingTranscriptState } from '@/hooks/use-meeting-transcript';
@@ -26,8 +26,14 @@ vi.mock('@/design/motion', async (importOriginal) => ({
   useReducedMotion: () => false,
 }));
 
+const onRetry = vi.fn<() => void>();
+
 beforeAll(() => {
   installLayoutStub();
+});
+
+beforeEach(() => {
+  onRetry.mockReset();
 });
 
 const TURNS = [
@@ -39,7 +45,9 @@ function renderPanel(
   state: MeetingTranscriptState,
   palette: Palette = cobaltPalette,
 ) {
-  return render(<TranscriptPanel state={state} palette={palette} />);
+  return render(
+    <TranscriptPanel state={state} palette={palette} onRetry={onRetry} />,
+  );
 }
 
 describe('TranscriptPanel', () => {
@@ -65,6 +73,15 @@ describe('TranscriptPanel', () => {
     expect(screen.getByTestId('transcript-error')).toBeInTheDocument();
     expect(screen.getByText('server returned HTTP 500')).toBeInTheDocument();
     expect(screen.queryByTestId('transcript-empty')).toBeNull();
+  });
+
+  it('offers a way out of a failed read rather than a dead end', () => {
+    // The read is latched to the tab, so without this key one failure means the
+    // transcript is unreachable for the life of the screen.
+    renderPanel({ status: 'error', message: 'server returned HTTP 500' });
+
+    fireEvent.click(screen.getByTestId('transcript-retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('turns the ring while the record is being fetched', () => {

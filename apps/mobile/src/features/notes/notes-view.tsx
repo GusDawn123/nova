@@ -121,10 +121,12 @@ export function NotesView({
         eyebrow="NOTES"
         message="The notes didn't make it through"
         detail="The call itself is safe: the transcript tab above still has every word of it."
-        // TRY AGAIN re-READS the meeting — the only path this screen has.
-        // `POST /meetings/:id/notes/regenerate` exists server-side and nothing on
-        // the phone calls it yet, so the word is "again", not "rewrite".
-        action={{ label: 'TRY AGAIN', onPress: onRetry, testID: 'notes-retry' }}
+        // NO retry key, deliberately. The only thing this screen can re-run is the
+        // READ, and the read would return the same `failed` row and redraw this
+        // exact card — a button whose whole effect is to prove it does nothing.
+        // Re-running the PIPELINE is `POST /meetings/:id/notes/regenerate`, which
+        // exists server-side and has no hook on the phone; when it does, the key
+        // belongs here.
       />
     );
   }

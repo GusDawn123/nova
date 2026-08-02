@@ -9,7 +9,11 @@ import { FontFamily, FontSize, Space, type Palette } from '@/design/tokens';
 import { DetailTabs, type DetailTab } from '@/features/meetings/detail-tabs';
 import { formatRelativeDay, formatStartTime } from '@/features/meetings/format';
 import { StateCard } from '@/features/meetings/state-card';
-import { mapFollowUpFailure } from '@/features/notes/follow-up';
+import {
+  NO_NOTES_TO_DRAFT_FROM,
+  mapFollowUpFailure,
+  type FollowUpFailure,
+} from '@/features/notes/follow-up';
 import { FollowUpPanel } from '@/features/notes/follow-up-panel';
 import { NotesView } from '@/features/notes/notes-view';
 import { TranscriptPanel } from '@/features/notes/transcript-panel';
@@ -50,9 +54,6 @@ const TYPE_LABELS: Record<ConversationType, string> = {
   casual: 'CASUAL',
 };
 
-/** Shown when there are no notes at all — their title is the only one we have. */
-const UNTITLED = 'Untitled call';
-
 export default function MeetingDetailScreen(): React.JSX.Element {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -78,6 +79,11 @@ export default function MeetingDetailScreen(): React.JSX.Element {
   // so nothing below asks which it got.
   const notes = read === null ? null : (read.notes ?? read.live_notes);
   const isPreview = read !== null && read.notes === null && notes !== null;
+  const errorMessage = state.status === 'error' ? state.message : null;
+  const loading = state.status === 'loading';
+
+  const title = notes?.title ?? null;
+  const meta = metaLine(notes, read?.notes_generated_at ?? null, now);
 
   if (meetingId === null) {
     // Nothing was fetched, so every branch below is inert: this is the whole screen
@@ -100,14 +106,30 @@ export default function MeetingDetailScreen(): React.JSX.Element {
     <Screen palette={palette} insets={insets}>
       <BackEyebrow palette={palette} onPress={router.back} />
 
-      <View style={styles.titleBlock}>
-        <Text style={[styles.title, { color: palette.ink }]}>
-          {notes?.title ?? UNTITLED}
-        </Text>
-        <Text testID="detail-meta" style={[styles.meta, { color: palette.inkSoft }]}>
-          {metaLine(notes, read?.notes_generated_at ?? null, now)}
-        </Text>
-      </View>
+      {/* Both lines are OMITTED when unknown rather than filled in. The title lives
+          on the notes and this wire carries no other copy of it, so a call whose
+          notes failed has no title here — and "Untitled call" would be this screen
+          asserting one. The back eyebrow and the tabs already say where you are. */}
+      {title === null && meta === '' ? null : (
+        <View style={styles.titleBlock}>
+          {title === null ? null : (
+            <Text
+              testID="detail-title"
+              style={[styles.title, { color: palette.ink }]}
+            >
+              {title}
+            </Text>
+          )}
+          {meta === '' ? null : (
+            <Text
+              testID="detail-meta"
+              style={[styles.meta, { color: palette.inkSoft }]}
+            >
+              {meta}
+            </Text>
+          )}
+        </View>
+      )}
 
       <DetailTabs tab={tab} onSelect={setTab} palette={palette} />
 
@@ -118,8 +140,8 @@ export default function MeetingDetailScreen(): React.JSX.Element {
             notes={notes}
             isPreview={isPreview}
             status={read?.notes_status ?? null}
-            errorMessage={state.status === 'error' ? state.message : null}
-            loading={state.status === 'loading'}
+            errorMessage={errorMessage}
+            loading={loading}
             completedIds={completedIds}
             onToggleItem={toggleItem}
             onRetry={refresh}
@@ -127,13 +149,22 @@ export default function MeetingDetailScreen(): React.JSX.Element {
         ) : null}
 
         {tab === 'transcript' ? (
-          <TranscriptPanel state={transcript.state} palette={palette} />
+          <TranscriptPanel
+            state={transcript.state}
+            palette={palette}
+            onRetry={transcript.retry}
+          />
         ) : null}
 
         {tab === 'follow-up' ? (
           <FollowUpPanel
             draft={read?.follow_up ?? null}
             failure={followUpFailure(read?.notes_status ?? null)}
+            // The read's own state is threaded in the same way `NotesView` takes
+            // it: without it the panel's empty card would say "nothing failed"
+            // over a read that is still in flight, or one that failed outright.
+            loading={loading}
+            errorMessage={errorMessage}
             onRetry={refresh}
             palette={palette}
           />
@@ -146,14 +177,29 @@ export default function MeetingDetailScreen(): React.JSX.Element {
 /**
  * The follow-up's failure, derived from what this screen actually knows.
  *
- * Only one kind is reachable from a read: the draft is written FROM the notes, so
- * notes that have not landed are a wait rather than a failure. The rest of
- * `mapFollowUpFailure`'s vocabulary belongs to the POST this screen does not make
- * yet, and `FollowUpPanel` renders all of them.
+ * The draft is written FROM the notes, so the notes' status is the whole answer —
+ * and the two halves of it are NOT the same sentence. Notes still coming are a wait
+ * ("it will be here"); notes that failed, or a call from before Nova wrote any, are
+ * a dead end, and telling that user to sit tight is a promise nothing will keep.
+ *
+ * Switched exhaustively rather than defaulted, so a sixth `NotesStatus` is a type
+ * error here instead of quietly inheriting whichever sentence came last.
+ *
+ * `null` means the read has not produced a status — loading or errored — and those
+ * two are handled by the panel itself, ahead of this.
  */
-function followUpFailure(status: NotesStatus | null) {
-  if (status === null || status === 'completed') return null;
-  return mapFollowUpFailure(409, 'notes_not_ready');
+function followUpFailure(status: NotesStatus | null): FollowUpFailure | null {
+  switch (status) {
+    case null:
+    case 'completed':
+      return null;
+    case 'queued':
+    case 'processing':
+      return mapFollowUpFailure(409, 'notes_not_ready');
+    case 'failed':
+    case 'none':
+      return NO_NOTES_TO_DRAFT_FROM;
+  }
 }
 
 /**

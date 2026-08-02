@@ -6,7 +6,7 @@ import { cobaltPalette, paperPalette, type Palette } from '@/design/tokens';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
-import { mapFollowUpFailure } from './follow-up';
+import { NO_NOTES_TO_DRAFT_FROM, mapFollowUpFailure } from './follow-up';
 import { FollowUpPanel } from './follow-up-panel';
 
 /**
@@ -52,6 +52,8 @@ function renderPanel(
     <FollowUpPanel
       draft={null}
       failure={null}
+      loading={false}
+      errorMessage={null}
       onRetry={onRetry}
       palette={palette}
       {...props}
@@ -87,6 +89,38 @@ describe('FollowUpPanel', () => {
 
     fireEvent.click(screen.getByTestId('follow-up-retry'));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits rather than claiming nothing was asked for, while the read is in flight', () => {
+    // The empty card says "nothing failed — nothing was asked for". Said over a
+    // read that has not answered yet, that is a claim about a meeting nobody has
+    // looked at.
+    renderPanel({ loading: true });
+
+    expect(screen.getByTestId('follow-up-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('follow-up-empty')).toBeNull();
+  });
+
+  it('says the read failed instead of calling it an empty follow-up', () => {
+    renderPanel({ errorMessage: 'server returned HTTP 500' });
+
+    expect(screen.getByTestId('follow-up-error')).toBeInTheDocument();
+    expect(screen.getByText('server returned HTTP 500')).toBeInTheDocument();
+    expect(screen.queryByTestId('follow-up-empty')).toBeNull();
+
+    // Unlike a failed notes pipeline, a failed READ is worth re-running.
+    fireEvent.click(screen.getByTestId('follow-up-retry'));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not promise a draft to a call that has no notes to draft from', () => {
+    renderPanel({ failure: NO_NOTES_TO_DRAFT_FROM });
+
+    expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
+    // `notes_not_ready` copy ends "it will be here". For a failed or note-less
+    // call it never will.
+    expect(screen.queryByText(/it will be here/i)).toBeNull();
+    expect(screen.queryByTestId('follow-up-retry')).toBeNull();
   });
 
   it('is quiet when there is simply no draft yet', () => {

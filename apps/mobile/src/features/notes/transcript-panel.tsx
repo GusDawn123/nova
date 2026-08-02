@@ -27,11 +27,14 @@ import {
 export interface TranscriptPanelProps {
   readonly state: MeetingTranscriptState;
   readonly palette: Palette;
+  /** Re-runs the read. The transcript is latched to the tab — see the error card. */
+  readonly onRetry: () => void;
 }
 
 export function TranscriptPanel({
   state,
   palette,
+  onRetry,
 }: TranscriptPanelProps): React.JSX.Element {
   if (state.status === 'idle' || state.status === 'loading') {
     return (
@@ -53,6 +56,14 @@ export function TranscriptPanel({
         eyebrow="TRANSCRIPT"
         message="The transcript didn't come back"
         detail={state.message}
+        // A REAL path, unlike the notes card's: the read is latched to the tab and
+        // fires once, so without this key one failed request makes the transcript
+        // unreachable for as long as the screen is open.
+        action={{
+          label: 'TRY AGAIN',
+          onPress: onRetry,
+          testID: 'transcript-retry',
+        }}
       />
     );
   }

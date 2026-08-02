@@ -44,10 +44,12 @@ const transcriptHook = vi.hoisted(() => ({
   enabled: false,
 }));
 
+const transcriptRetry = vi.hoisted(() => vi.fn<() => void>());
+
 vi.mock('@/hooks/use-meeting-transcript', () => ({
   useMeetingTranscript: (_id: string | null, enabled: boolean) => {
     transcriptHook.enabled = enabled;
-    return { state: transcriptHook.state };
+    return { state: transcriptHook.state, retry: transcriptRetry };
   },
 }));
 
@@ -100,6 +102,7 @@ beforeEach(() => {
   notesHook.refresh.mockReset();
   transcriptHook.state = { status: 'idle' };
   transcriptHook.enabled = false;
+  transcriptRetry.mockReset();
 });
 
 function notes(overrides: Partial<MeetingNotes> = {}): MeetingNotes {
@@ -157,6 +160,22 @@ describe('MeetingDetailScreen — the frame', () => {
     expect(router.back).toHaveBeenCalledTimes(1);
   });
 
+  it('says nothing about a call whose title it does not have', () => {
+    // The title lives on the notes, and this wire has no other copy of it. An
+    // "Untitled call" heading is an assertion; silence is the truth.
+    succeed({ notes_status: 'failed', notes: null, notes_generated_at: null });
+
+    render(<MeetingDetailScreen />);
+
+    expect(screen.queryByTestId('detail-title')).toBeNull();
+    expect(screen.queryByText('Untitled call')).toBeNull();
+    // And with no type and no timestamp there is no meta line either.
+    expect(screen.queryByTestId('detail-meta')).toBeNull();
+    // The frame still says where you are and what you can open.
+    expect(screen.getByTestId('back-button')).toBeInTheDocument();
+    expect(screen.getByTestId('detail-tab-transcript')).toBeInTheDocument();
+  });
+
   it('dates the call in mono, from what it actually knows', () => {
     succeed();
 
@@ -197,6 +216,17 @@ describe('MeetingDetailScreen — the frame', () => {
 
     fireEvent.click(screen.getByTestId('detail-tab-transcript'));
     expect(transcriptHook.enabled).toBe(true);
+  });
+
+  it('lets a failed transcript read be asked again', () => {
+    succeed();
+    transcriptHook.state = { status: 'error', message: 'server returned HTTP 500' };
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('detail-tab-transcript'));
+    fireEvent.click(screen.getByTestId('transcript-retry'));
+
+    expect(transcriptRetry).toHaveBeenCalledTimes(1);
   });
 
   it('is only the apology when the link does not name a meeting', () => {
@@ -268,7 +298,7 @@ describe('MeetingDetailScreen — while the notes are still folding', () => {
 });
 
 describe('MeetingDetailScreen — when the notes never came', () => {
-  it('admits it, offers the one thing that can help, and keeps the record', () => {
+  it('admits it, points at the record, and offers no button that cannot work', () => {
     succeed({ notes_status: 'failed', notes: null, notes_generated_at: null });
     transcriptHook.state = { status: 'success', turns: TURNS };
 
@@ -278,9 +308,10 @@ describe('MeetingDetailScreen — when the notes never came', () => {
       screen.getByText("The notes didn't make it through"),
     ).toBeInTheDocument();
     expect(screen.queryByTestId('ring-orbit-rotor')).toBeNull();
-
-    fireEvent.click(screen.getByTestId('notes-retry'));
-    expect(notesHook.refresh).toHaveBeenCalledTimes(1);
+    // `refresh()` re-reads the SAME failed row: the identical card would come
+    // back. Nothing on the phone can re-run the pipeline, so nothing offers to.
+    expect(screen.queryByTestId('notes-retry')).toBeNull();
+    expect(screen.queryByText('TRY AGAIN')).toBeNull();
 
     fireEvent.click(screen.getByTestId('detail-tab-transcript'));
     expect(screen.getByText('Where should we start?')).toBeInTheDocument();
@@ -333,6 +364,52 @@ describe('MeetingDetailScreen — the follow-up', () => {
 
     expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
     expect(screen.queryByTestId('follow-up-retry')).toBeNull();
+  });
+
+  it('does not tell a failed call that a draft is on its way', () => {
+    // `notes_not_ready` copy ends "it will be here". These notes are not coming.
+    succeed({ notes_status: 'failed', notes: null, notes_generated_at: null });
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('detail-tab-follow-up'));
+
+    expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
+    expect(screen.queryByText(/it will be here/i)).toBeNull();
+    expect(screen.queryByTestId('follow-up-retry')).toBeNull();
+  });
+
+  it('says the same to an old call that never had notes', () => {
+    succeed({ notes_status: 'none', notes: null, notes_generated_at: null });
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('detail-tab-follow-up'));
+
+    expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
+    expect(screen.queryByText(/it will be here/i)).toBeNull();
+  });
+
+  it('never claims "nothing was asked for" over a read it has not had', () => {
+    notesHook.state = { status: 'loading' };
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('detail-tab-follow-up'));
+
+    expect(screen.getByTestId('follow-up-loading')).toBeInTheDocument();
+    expect(screen.queryByTestId('follow-up-empty')).toBeNull();
+  });
+
+  it('reports a failed read on this tab too, with the retry that can fix it', () => {
+    notesHook.state = { status: 'error', message: 'server returned HTTP 500' };
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('detail-tab-follow-up'));
+
+    expect(screen.getByTestId('follow-up-error')).toBeInTheDocument();
+    expect(screen.getByText('server returned HTTP 500')).toBeInTheDocument();
+    expect(screen.queryByTestId('follow-up-empty')).toBeNull();
+
+    fireEvent.click(screen.getByTestId('follow-up-retry'));
+    expect(notesHook.refresh).toHaveBeenCalledTimes(1);
   });
 });
 

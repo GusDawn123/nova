@@ -1,4 +1,4 @@
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useMeetingTranscript } from './use-meeting-transcript';
@@ -114,13 +114,70 @@ describe('useMeetingTranscript', () => {
     expect(result.current.state.message).toContain('500');
   });
 
-  it('rejects a body that is not the transcript shape', async () => {
+  it('rejects a body that is not the transcript shape, in words a person reads', async () => {
     respond({ turns: [{ speaker: 'me' }] });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const { result } = renderHook(() => useMeetingTranscript(MEETING_ID, true));
 
     await waitFor(() => {
       expect(result.current.state.status).toBe('error');
     });
+    if (result.current.state.status !== 'error') throw new Error('unreachable');
+    // A serialized ZodError is a diagnostic, not a sentence — it goes to the log,
+    // with FIELD PATHS only, and never carries a transcript line with it.
+    expect(result.current.state.message).toBe(
+      'Nova sent something this version of the app could not read.',
+    );
+    expect(result.current.state.message).not.toMatch(/invalid_type|zod|\[/i);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(warn.mock.calls[0])).not.toContain('Thanks for making');
+    warn.mockRestore();
+  });
+
+  it('gives up on a hung request instead of turning forever', async () => {
+    vi.useFakeTimers();
+    // Never settles: the failure this ceiling exists for.
+    fetchMock.mockImplementation(
+      (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          const signal = (init as RequestInit | undefined)?.signal;
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        }),
+    );
+
+    const { result } = renderHook(() => useMeetingTranscript(MEETING_ID, true));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(11_000);
+    });
+    vi.useRealTimers();
+
+    if (result.current.state.status !== 'error') throw new Error('unreachable');
+    expect(result.current.state.message).toBe(
+      'The request took too long. Check your connection and try again.',
+    );
+  });
+
+  it('can be asked again after a failure', async () => {
+    // The read is LATCHED to the tab, so without this the first failure makes the
+    // transcript unreachable for as long as the screen is open.
+    respond({}, false, 500);
+
+    const { result } = renderHook(() => useMeetingTranscript(MEETING_ID, true));
+    await waitFor(() => {
+      expect(result.current.state.status).toBe('error');
+    });
+
+    respond({ turns: TURNS });
+    act(() => {
+      result.current.retry();
+    });
+
+    await waitFor(() => {
+      expect(result.current.state.status).toBe('success');
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
