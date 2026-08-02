@@ -78,6 +78,10 @@ export default defineConfig({
     // `apps/server` or `packages/shared`, where node — not a browser — is the real
     // target, and where this ordering would silently hand tests the browser variant.
     // If that day comes, scope this properly rather than deleting the entries.
+    //
+    // That precondition is no longer only a paragraph: `apps/mobile/src/testing/
+    // web-extension.test.ts` fails the build the moment a `*.web.*` file is tracked
+    // outside `apps/mobile`.
     extensions: [
       ".web.mjs",
       ".web.js",

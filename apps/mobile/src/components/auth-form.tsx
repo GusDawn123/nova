@@ -133,6 +133,15 @@ export function AuthForm({
       contentContainerStyle={styles.scrollContent}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      // iOS only, and load-bearing there: the keyboard COVERS a scroll view rather
+      // than shrinking it, so on an SE-class screen the column below the focused
+      // field is behind the keyboard with no scroll range to reach it — scrollable
+      // in principle, immovable in practice. This adds the keyboard's height as a
+      // bottom content inset, which is what turns the range back on. The live
+      // screen solves the same problem with `KeyboardAvoidingView` because its
+      // steer bar is pinned to the bottom; here the whole column scrolls, so the
+      // inset is the smaller instrument.
+      automaticallyAdjustKeyboardInsets
     >
       <View style={styles.column}>
         <View

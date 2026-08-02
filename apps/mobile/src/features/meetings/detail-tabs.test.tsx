@@ -64,6 +64,22 @@ describe('DetailTabs', () => {
     expect(onSelect).toHaveBeenCalledWith('follow-up');
   });
 
+  it('gives each pill the platform floor, as a real box', () => {
+    // A REAL minimum rather than `hitSlop`: react-native-web ignores hitSlop, and
+    // Expo Web is this project's verification target — a slop-only target would look
+    // right by eye and be unassertable here. Same call the live mode pills make.
+    renderTabs();
+
+    for (const tab of ['notes', 'transcript', 'follow-up']) {
+      const box = Number.parseFloat(
+        getComputedStyle(screen.getByTestId(`detail-tab-${tab}`)).minHeight,
+      );
+      expect(box, `detail-tab-${tab} is under the 44pt floor`).toBeGreaterThanOrEqual(
+        44,
+      );
+    }
+  });
+
   it('paints in ink and canvas only, in either theme', async () => {
     for (const palette of [cobaltPalette, paperPalette]) {
       const { container, unmount } = renderTabs('notes', palette);
