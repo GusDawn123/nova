@@ -44,10 +44,51 @@ export default defineConfig({
       // implementations under jsdom. Exact match only: `react-native-web`,
       // `react-native-svg` etc. must NOT be caught by it.
       { find: /^react-native$/, replacement: "react-native-web" },
+      // react-native-svg declares no `exports` map, so the bare specifier resolves by
+      // `main` — the CommonJS build, which vite hands straight to Node and which
+      // reaches react-native's Flow source. Point at the ESM build instead: that one
+      // vite processes itself, which is what lets the alias above and the `.web.*`
+      // extensions below apply to everything the package imports internally.
+      {
+        find: /^react-native-svg$/,
+        replacement: "react-native-svg/lib/module/index.js",
+      },
+    ],
+    // `.web.*` FIRST — the platform-extension convention Metro and the Expo web
+    // build both use, which vite does not know about on its own. Packages that ship
+    // a browser implementation alongside the native one (react-native-svg) name it
+    // `elements.web.js` next to `elements.js` and import it extensionless, with no
+    // `exports` map to disambiguate; without this the native file wins and drags in
+    // react-native's untranspiled Flow source, which Node cannot parse. Nothing in
+    // this repo's own sources is named `*.web.*`, so this only ever changes which
+    // file a dependency of that shape resolves to.
+    extensions: [
+      ".web.mjs",
+      ".web.js",
+      ".web.mts",
+      ".web.ts",
+      ".web.jsx",
+      ".web.tsx",
+      ".mjs",
+      ".js",
+      ".mts",
+      ".ts",
+      ".jsx",
+      ".tsx",
+      ".json",
     ],
   },
   test: {
     fileParallelism: false,
+    server: {
+      deps: {
+        // react-native-svg has to go THROUGH vite rather than round Node: only then
+        // do the `react-native` alias and the `.web.*` extensions above apply to its
+        // internals. Externalised, it loads its native build and throws a syntax
+        // error before any test runs.
+        inline: ["react-native-svg"],
+      },
+    },
     // Only mobile gets a DOM. Server and shared suites stay on `node`, where
     // installing jsdom globals would be pure overhead and could mask a real
     // Node-only assumption.
