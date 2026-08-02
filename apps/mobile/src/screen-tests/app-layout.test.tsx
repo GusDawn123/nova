@@ -121,12 +121,16 @@ describe('AppLayout — how one screen becomes the next', () => {
     expect(screenOptions().animationDuration).toBe(200);
   });
 
-  it('still draws no header and no opaque backdrop', () => {
-    // Every screen paints its own canvas edge to edge; an opaque default underneath
-    // would flash the platform's own background through the fade.
+  it('still draws no header, and fades over the canvas rather than through it', () => {
+    // A transparent backdrop would let React Navigation's theme background show
+    // through at the fade's midpoint — near-black on Dark, near-white on Default.
+    // The screens paint `palette.canvas` anyway, so an opaque canvas here can never
+    // differ from what is on top of it.
     renderSignedIn();
 
     expect(screenOptions().headerShown).toBe(false);
-    expect(screenOptions().contentStyle).toEqual({ backgroundColor: 'transparent' });
+    expect(screenOptions().contentStyle).toEqual({
+      backgroundColor: cobaltPalette.canvas,
+    });
   });
 });

@@ -57,9 +57,15 @@ export default function AppLayout() {
         // answer for reduced motion besides, which is why it is not itself gated.
         animation: 'fade',
         animationDuration: TRANSITION_MS,
-        // Each screen paints its own canvas edge-to-edge; an opaque default
-        // underneath would flash the platform's own background through the fade.
-        contentStyle: { backgroundColor: 'transparent' },
+        // OPAQUE, in the same canvas the screens paint. A transparent screen is
+        // exactly what lets the container behind it show through at the fade's
+        // midpoint — and behind this stack is React Navigation's own theme, whose
+        // `colors.background` is near-black on Dark and near-white on Default. So
+        // transparent buys a push that darkens toward black in cobalt and lightens
+        // toward grey in paper. Painting `palette.canvas` here cannot go wrong the
+        // same way: every screen already paints this exact colour edge-to-edge, so
+        // the backdrop can never differ from what is on top of it.
+        contentStyle: { backgroundColor: palette.canvas },
       }}
     />
   );
