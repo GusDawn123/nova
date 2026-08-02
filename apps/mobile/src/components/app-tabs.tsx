@@ -11,7 +11,7 @@ import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { usePulse } from '@/design/motion';
-import { recordDotColor } from '@/design/tab-bar-metrics';
+import { recordDotColor, tabBarFloatOffset } from '@/design/tab-bar-metrics';
 import {
   FontFamily,
   FontSize,
@@ -139,10 +139,10 @@ function TabBar({
       accessibilityRole="tablist"
       style={[
         styles.barWrap,
-        // The design floats the bar 26px off the bottom; on a device with a home
-        // indicator it has to clear that inset too, or the bar sits on it.
-        // `tab-bar-metrics.ts` mirrors this number — change both together.
-        { bottom: Math.max(Space.xxl, insets.bottom + Space.md) },
+        // The float comes from `tab-bar-metrics.ts`, which every screen also reads
+        // through `tabBarClearance` to leave room for the bar. One value, not two
+        // literals that happen to match.
+        { bottom: tabBarFloatOffset(insets.bottom) },
       ]}
     >
       <View

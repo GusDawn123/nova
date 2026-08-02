@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 
+import { repoRoot } from './repo-root';
+
 /**
  * Expo Router owns `apps/mobile/src/app/` — every file under it is a ROUTE.
  *
@@ -19,17 +21,6 @@ import { describe, expect, it } from 'vitest';
  * invariant beside it: ask git, not the filesystem, so untracked scratch files do not
  * fail the build and `node_modules` is never walked.
  */
-
-/**
- * Asked of git rather than derived from `import.meta.url`: this file runs in the
- * jsdom environment, where `import.meta.url` is not a `file:` URL and cannot be
- * resolved to a path.
- */
-function repoRoot(): string {
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  }).trim();
-}
 
 const ROUTER_DIR = 'apps/mobile/src/app';
 

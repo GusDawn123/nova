@@ -96,6 +96,26 @@ describe('ChamferSurface', () => {
     });
   });
 
+  it('insets its content by the cut it actually drew, not the one it was asked for', async () => {
+    // On a surface too small for the full cut the polygon draws a shorter diagonal.
+    // Padding to the asked-for size would push the content past the shape painted
+    // around it — the inset has to follow the clamp, not the prop.
+    box.width = 10;
+    box.height = 10;
+
+    render(
+      <ChamferSurface cut={8} testID="tiny">
+        <Text>x</Text>
+      </ChamferSurface>,
+    );
+
+    await waitFor(() => {
+      const content = screen.getByTestId('tiny').lastElementChild;
+      if (content === null) throw new Error('expected a content view');
+      expect(getComputedStyle(content).paddingTop).toBe('5px'); // min(w, h) / 2
+    });
+  });
+
   it('draws nothing until it has a non-zero box', async () => {
     // A zero-size layout would otherwise produce a degenerate polygon — six points
     // all at the origin — which paints a stray dot at the top-left of the screen.

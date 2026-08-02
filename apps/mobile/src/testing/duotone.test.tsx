@@ -78,6 +78,16 @@ describe('expectDuotoneOnly — what it lets through', () => {
     ).not.toThrow();
   });
 
+  it('lets the palette through under its NAME as readily as its hex', () => {
+    // `white` IS `#ffffff`, which IS cobalt's ink. Canonicalising the name to a raw
+    // hex while every palette value is canonicalised to `rgb(…)` made the guard
+    // reject the duotone's own colour for its spelling.
+    expect(normaliseColor(cobaltPalette.ink)).toBe(normaliseColor('#ffffff'));
+    expect(
+      guard(<div style={{ color: 'white' }}>the same white, by name</div>),
+    ).not.toThrow();
+  });
+
   it('is not fooled by notation', () => {
     // The token file writes `rgba(255,255,255,0.10)`; the browser reports
     // `rgba(255, 255, 255, 0.1)`; a hand-written sweep might say `#fff`.
@@ -165,5 +175,23 @@ describe('expectDuotoneOnly — what it catches', () => {
   it('a colour that hides behind its name', () => {
     // `crimson` is no more allowed than `#dc143c`, and a grep for hexes would miss it.
     expect(guard(<div style={{ color: 'crimson' }}>named</div>)).toThrow(/crimson/i);
+  });
+
+  it('a colour jsdom refuses to parse into the computed view', () => {
+    // The reason `duotone.ts` reads the raw `style` ATTRIBUTE at all: jsdom drops
+    // values its CSS parser will not take, so the computed view reports nothing and
+    // every other surface in this file goes quiet. This is the only test here that
+    // fails if that scan is deleted.
+    const { container } = render(<div data-testid="probe" />);
+    const probe = container.querySelector('[data-testid="probe"]');
+    if (probe === null) throw new Error('the probe never rendered');
+    probe.setAttribute('style', `--nova-accent: ${OFF_PALETTE}; color: ${INK}`);
+
+    // Prove the premise before asserting on it: the computed view must be blind here.
+    expect(normaliseColor(getComputedStyle(probe).color)).toBe(normaliseColor(INK));
+
+    expect(() => {
+      expectDuotoneOnly(container, cobaltPalette);
+    }).toThrow(OFF_MATCH);
   });
 });

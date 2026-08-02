@@ -179,8 +179,25 @@ export function ChamferSurface({
         </View>
       ) : null}
       {/* Inset by the cut, which is exactly where the diagonal stops eating into the
-          box — content any closer to a cut corner gets clipped by the outline. */}
-      <View style={[{ padding: Math.max(0, cut) }, contentStyle]}>{children}</View>
+          box — content any closer to a cut corner gets clipped by the outline. The
+          CLAMPED cut, not the raw prop: on a surface too small to take the full cut
+          the polygon draws a shorter diagonal, and padding to the asked-for size
+          would inset the content past the shape actually painted. Before the first
+          measurement there is no box to clamp against, and nothing is drawn yet
+          either, so the raw cut stands. */}
+      <View
+        style={[
+          {
+            padding:
+              drawn === null
+                ? Math.max(0, cut)
+                : clampCut(drawn.width, drawn.height, cut),
+          },
+          contentStyle,
+        ]}
+      >
+        {children}
+      </View>
     </View>
   );
 }

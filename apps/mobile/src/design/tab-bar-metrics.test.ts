@@ -4,6 +4,7 @@ import {
   TAB_BAR_HEIGHT,
   recordDotColor,
   tabBarClearance,
+  tabBarFloatOffset,
 } from './tab-bar-metrics';
 import { cobaltPalette, paperPalette, type Palette } from './tokens';
 
@@ -35,9 +36,19 @@ describe('tabBarClearance', () => {
 
   it('leaves the bar a visible gap rather than butting content against it', () => {
     const inset = 34;
-    const barTopFromBottom = Math.max(26, inset + 10) + TAB_BAR_HEIGHT;
+    const barTopFromBottom = tabBarFloatOffset(inset) + TAB_BAR_HEIGHT;
 
     expect(tabBarClearance(inset)).toBeGreaterThan(barTopFromBottom);
+  });
+
+  it('is built on the same float the bar is positioned by', () => {
+    // `app-tabs.tsx` sets its `bottom` from `tabBarFloatOffset` too. When those were
+    // two matching literals, moving the bar left every screen's padding behind.
+    for (const inset of [0, 34]) {
+      expect(tabBarClearance(inset)).toBe(
+        tabBarFloatOffset(inset) + TAB_BAR_HEIGHT + 10,
+      );
+    }
   });
 });
 

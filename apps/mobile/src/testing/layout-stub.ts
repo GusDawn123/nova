@@ -21,17 +21,48 @@ export interface LayoutBox {
   height: number;
 }
 
+/**
+ * A whole entry, not a `{ target }` shim: a consumer that reads `contentRect.width`
+ * off it should get the same number `offsetWidth` reports rather than a crash.
+ */
+function entryFor(target: Element): ResizeObserverEntry {
+  const element = target as HTMLElement;
+  const width = element.offsetWidth;
+  const height = element.offsetHeight;
+  const rect = {
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    right: width,
+    bottom: height,
+    width,
+    height,
+  };
+  const size: ResizeObserverSize = { inlineSize: width, blockSize: height };
+
+  return {
+    target,
+    contentRect: { ...rect, toJSON: () => rect } as DOMRectReadOnly,
+    borderBoxSize: [size],
+    contentBoxSize: [size],
+    devicePixelContentBoxSize: [size],
+  };
+}
+
 class StubResizeObserver implements ResizeObserver {
   private readonly targets = new Set<Element>();
 
   constructor(private readonly callback: ResizeObserverCallback) {}
 
   observe(target: Element): void {
+    // The NEW target only, which is what a real observer reports on `observe` —
+    // re-reporting every node seen so far makes each additional surface in a screen
+    // cost a pass over all the others, and hands consumers entries for nodes that
+    // did not resize.
+    if (this.targets.has(target)) return;
     this.targets.add(target);
-    this.callback(
-      [...this.targets].map((t) => ({ target: t }) as ResizeObserverEntry),
-      this,
-    );
+    this.callback([entryFor(target)], this);
   }
 
   unobserve(target: Element): void {

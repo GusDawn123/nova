@@ -1,4 +1,4 @@
-import { Space, type Palette } from './tokens';
+import { Size, Space, type Palette } from './tokens';
 
 /**
  * The floating tab bar's pure rules (`docs/DESIGN/notes-ui.md` §7.3) — the
@@ -16,8 +16,25 @@ import { Space, type Palette } from './tokens';
  * is what stops the next screen repeating that.
  */
 
-/** The pill's height: one tab's `minHeight` plus the bar's padding, both sides. */
-export const TAB_BAR_HEIGHT = 46 + 6 * 2;
+/**
+ * The pill's height: one tab's `minHeight` plus the bar's padding, both sides.
+ *
+ * Derived from the same tokens `app-tabs.tsx` styles the bar with rather than
+ * written out as arithmetic — the whole point of this file is that the number cannot
+ * drift, and two literals matching today is not the same as one value.
+ */
+export const TAB_BAR_HEIGHT = Size.tapTarget + Space.xs2 * 2;
+
+/**
+ * How far the bar floats off the bottom of the screen — the value `app-tabs.tsx`
+ * puts on its `bottom`, so the bar and the clearance below cannot disagree.
+ *
+ * The mock's 26px float, or the home-indicator inset plus a gap where one exists:
+ * the bar has to clear the indicator, not sit on it.
+ */
+export function tabBarFloatOffset(insetBottom: number): number {
+  return Math.max(Space.xxl, insetBottom + Space.md);
+}
 
 /**
  * Vertical space a screen must leave free at the bottom so the bar never covers
@@ -28,11 +45,7 @@ export const TAB_BAR_HEIGHT = 46 + 6 * 2;
  *   by the same amount.
  */
 export function tabBarClearance(insetBottom: number): number {
-  // Mirrors the bar's own `bottom` in app-tabs.tsx: the mock's 26px float, or the
-  // inset plus a gap where a home indicator exists.
-  const floatOffset = Math.max(Space.xxl, insetBottom + Space.md);
-
-  return floatOffset + TAB_BAR_HEIGHT + Space.md;
+  return tabBarFloatOffset(insetBottom) + TAB_BAR_HEIGHT + Space.md;
 }
 
 /**

@@ -119,7 +119,13 @@ function asColor(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
 
   if (trimmed.startsWith('url(')) return null;
-  if (NAMED_COLORS.has(trimmed)) return NAMED_CANONICAL[trimmed] ?? trimmed;
+  if (NAMED_COLORS.has(trimmed)) {
+    // Through `normaliseColor`, not returned raw: the palette's own white arrives as
+    // a hex and is canonicalised to `rgb(…)`, so a raw `#ffffff` here would fail to
+    // match the very value it is a spelling of.
+    const canonical = NAMED_CANONICAL[trimmed];
+    return canonical === undefined ? trimmed : normaliseColor(canonical);
+  }
   if (INVISIBLE.has(trimmed)) return trimmed;
   if (/^#[0-9a-f]{3,8}$/.test(trimmed) || /^(?:rgba?|hsla?)\(/.test(trimmed)) {
     return normaliseColor(trimmed);
@@ -197,6 +203,10 @@ export function expectDuotoneOnly(container: HTMLElement, palette: Palette): voi
       // their colour actually lives.
       check(`${tag} stop-color`, element.getAttribute('stop-color'));
       check(`${tag} stop-color`, style.getPropertyValue('stop-color'));
+      // No computed-style pass for an SVG node: react-native-svg emits `fill` and
+      // `stroke` as ATTRIBUTES, which the three reads above already cover, and
+      // jsdom's computed view reports the CSS initial values for them on every SVG
+      // element — a black that nothing painted, and a false offender on every icon.
       continue;
     }
 

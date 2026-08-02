@@ -2,6 +2,8 @@ import { execFileSync } from 'node:child_process';
 
 import { describe, expect, it } from 'vitest';
 
+import { repoRoot } from './repo-root';
+
 /**
  * Where `*.web.*` source files are allowed to live.
  *
@@ -20,17 +22,6 @@ import { describe, expect, it } from 'vitest';
  * server would otherwise hand its tests a browser variant, silently, with no failure
  * to trace it back from.
  */
-
-/**
- * Asked of git rather than derived from `import.meta.url`: this file runs in the
- * jsdom environment, where `import.meta.url` is not a `file:` URL and cannot be
- * resolved to a path.
- */
-function repoRoot(): string {
-  return execFileSync('git', ['rev-parse', '--show-toplevel'], {
-    encoding: 'utf8',
-  }).trim();
-}
 
 /** Tracked files only — untracked scratch and `node_modules` are not the repo. */
 function trackedWebFiles(): string[] {
