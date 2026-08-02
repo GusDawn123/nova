@@ -171,7 +171,12 @@ describe('LiveScreen — before the call', () => {
     await goLive();
 
     expect(screen.queryByTestId('mode-pill-technical')).toBeNull();
-    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('GENERAL');
+    // The caps are a `textTransform`, so the rail's ACCESSIBLE text is the mode's
+    // one spelling — not nine letters read out one at a time.
+    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('General');
+    expect(
+      getComputedStyle(screen.getByTestId('hud-rail-mode')).textTransform,
+    ).toBe('uppercase');
   });
 });
 
@@ -181,7 +186,7 @@ describe('LiveScreen — the cockpit', () => {
     await goLive();
 
     expect(screen.getByText('◉ LIVE · 00:00')).toBeInTheDocument();
-    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('GENERAL');
+    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('General');
   });
 
   it('will not respond to an empty steer', async () => {
@@ -387,6 +392,33 @@ describe('LiveScreen — after the call', () => {
 
     expect(screen.queryByTestId('ended-summary')).toBeNull();
     expect(screen.getByTestId('start-session-key')).toBeInTheDocument();
+  });
+
+  it('does not put ENDED over a start that never connected', async () => {
+    // `closed` covers two different things and only `ran` tells them apart. A clean
+    // close before `session.ready` leaves the screen on the idle panel — and
+    // `◌ ENDED · 00:00` printed over "start a session" is the header announcing a
+    // call that did not happen.
+    render(<LiveScreen />);
+    await goLive();
+    fireEvent.click(screen.getByTestId('end-session-key'));
+    // A real call ran, so this one keeps its ENDED and its final clock.
+    expect(screen.getByTestId('live-hud')).toHaveTextContent('◌ ENDED');
+
+    const before = FakeLiveSocket.instances.length;
+    fireEvent.click(screen.getByTestId('start-session-key'));
+    await waitFor(() => {
+      expect(FakeLiveSocket.instances.length).toBeGreaterThan(before);
+    });
+    act(() => {
+      FakeLiveSocket.instances[before].open();
+    });
+    act(() => {
+      FakeLiveSocket.instances[before].onclose?.({ code: 1000, reason: '' });
+    });
+
+    expect(screen.getByTestId('live-hud')).toHaveTextContent('◌ STANDBY');
+    expect(screen.queryByTestId('ended-summary')).toBeNull();
   });
 });
 

@@ -95,11 +95,14 @@ export function HudRail({
   return (
     <View style={styles.rail}>
       <View style={[styles.hairline, { backgroundColor: palette.inkHairline }]} />
+      {/* Uppercased in STYLE, not in the string: the caps are the mono register, and
+          a rail that reads "B-E-H-A-V-I-O-R-A-L" to a screen reader is the register
+          leaking into the words. `MODE_LABELS` is the one spelling of each mode. */}
       <Text
         testID="hud-rail-mode"
         style={[styles.railLabel, { color: palette.inkFaint }]}
       >
-        {MODE_LABELS[mode].toUpperCase()}
+        {MODE_LABELS[mode]}
       </Text>
       <View style={[styles.hairline, { backgroundColor: palette.inkHairline }]} />
     </View>
@@ -178,6 +181,7 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono,
     fontSize: FontSize.monoXs,
     letterSpacing: 2.5,
+    textTransform: 'uppercase',
   },
   banner: {
     fontFamily: FontFamily.mono,

@@ -53,7 +53,11 @@ vi.mock('@/hooks/use-meeting-transcript', () => ({
   },
 }));
 
-const router = vi.hoisted(() => ({ back: vi.fn<() => void>() }));
+const router = vi.hoisted(() => ({
+  back: vi.fn<() => void>(),
+  replace: vi.fn<(href: string) => void>(),
+  canGoBack: vi.fn<() => boolean>(() => true),
+}));
 const params = vi.hoisted(() => ({ value: {} as Record<string, unknown> }));
 
 vi.mock('expo-router', () => ({
@@ -96,6 +100,10 @@ beforeAll(() => {
 beforeEach(() => {
   scheme.value = 'dark';
   params.value = { id: MEETING_ID };
+  router.back.mockReset();
+  router.replace.mockReset();
+  router.canGoBack.mockReset();
+  router.canGoBack.mockReturnValue(true);
   notesHook.state = { status: 'loading' };
   notesHook.completedIds = new Set();
   notesHook.toggleItem.mockReset();
@@ -158,6 +166,34 @@ describe('MeetingDetailScreen — the frame', () => {
 
     fireEvent.click(screen.getByTestId('back-button'));
     expect(router.back).toHaveBeenCalledTimes(1);
+    expect(router.replace).not.toHaveBeenCalled();
+  });
+
+  it('still goes to the list when there is no history to pop', () => {
+    // Deep link, notification tap, cold start on this route: `router.back()` alone
+    // is a dead control in every one of them, and the eyebrow says ‹ MEETINGS.
+    router.canGoBack.mockReturnValue(false);
+    succeed();
+
+    render(<MeetingDetailScreen />);
+    fireEvent.click(screen.getByTestId('back-button'));
+
+    expect(router.back).not.toHaveBeenCalled();
+    expect(router.replace).toHaveBeenCalledWith('/');
+  });
+
+  it('gives the way back the platform tap floor as a real box', () => {
+    // A whisper-sized label with a whisper-sized target is the control a user has
+    // to aim at twice. `hitSlop` is not an option — react-native-web ignores it.
+    succeed();
+
+    render(<MeetingDetailScreen />);
+
+    expect(
+      Number.parseFloat(
+        getComputedStyle(screen.getByTestId('back-button')).minHeight,
+      ),
+    ).toBeGreaterThanOrEqual(44);
   });
 
   it('says nothing about a call whose title it does not have', () => {

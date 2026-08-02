@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-import { FontFamily, FontSize, Space, type Palette } from '@/design/tokens';
+import { FontFamily, FontSize, Size, Space, type Palette } from '@/design/tokens';
 import { DetailTabs, type DetailTab } from '@/features/meetings/detail-tabs';
 import { formatRelativeDay, formatStartTime } from '@/features/meetings/format';
 import { StateCard } from '@/features/meetings/state-card';
@@ -74,6 +74,17 @@ export default function MeetingDetailScreen(): React.JSX.Element {
   // this screen has no focus event to re-read on.
   const [now] = useState(() => new Date());
 
+  /**
+   * The eyebrow says `‹ MEETINGS`, so it has to GO to the meetings list — and there
+   * is no history to pop when the screen was reached by a deep link, a notification
+   * tap, or a cold start on this route. `router.back()` alone is a dead control in
+   * every one of those cases.
+   */
+  const goBack = (): void => {
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  };
+
   const read = state.status === 'success' ? state.data : null;
   // The read model already prefers post-call `notes` and falls back to `live_notes`,
   // so nothing below asks which it got.
@@ -90,7 +101,7 @@ export default function MeetingDetailScreen(): React.JSX.Element {
     // for a link that does not name a meeting.
     return (
       <Screen palette={palette} insets={insets}>
-        <BackEyebrow palette={palette} onPress={router.back} />
+        <BackEyebrow palette={palette} onPress={goBack} />
         <StateCard
           palette={palette}
           testID="detail-unavailable"
@@ -104,7 +115,7 @@ export default function MeetingDetailScreen(): React.JSX.Element {
 
   return (
     <Screen palette={palette} insets={insets}>
-      <BackEyebrow palette={palette} onPress={router.back} />
+      <BackEyebrow palette={palette} onPress={goBack} />
 
       {/* Both lines are OMITTED when unknown rather than filled in. The title lives
           on the notes and this wire carries no other copy of it, so a call whose
@@ -288,7 +299,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Space.xl,
     gap: Space.lg,
   },
-  back: { alignSelf: 'flex-start', paddingVertical: Space.sm },
+  // A real 44pt box rather than `hitSlop`: react-native-web ignores hitSlop, and
+  // Expo Web is this project's verification target. The eyebrow stays a whisper; the
+  // target does not.
+  back: {
+    alignSelf: 'flex-start',
+    minHeight: Size.tapTarget,
+    justifyContent: 'center',
+    paddingVertical: Space.sm,
+  },
   backLabel: {
     fontFamily: FontFamily.mono,
     fontSize: FontSize.monoSm,

@@ -151,6 +151,20 @@ describe('SignInScreen — the identity block', () => {
     expect(screen.getByTestId('link-/sign-up')).toBeInTheDocument();
   });
 
+  it('gives the way to an account a real 44pt box, whisper or not', () => {
+    // The footer is deliberately quiet (spec §8), and a quiet label with a
+    // label-sized target is the control a first-time user misses. `hitSlop` cannot
+    // carry it — react-native-web ignores it, and Expo Web is the verification
+    // target — so the box is real.
+    render(<SignInScreen />);
+
+    const link = screen.getByTestId('link-/sign-up').querySelector('[role="link"]');
+    if (link === null) throw new Error('expected a pressable inside the link');
+    expect(Number.parseFloat(getComputedStyle(link).minHeight)).toBeGreaterThanOrEqual(
+      44,
+    );
+  });
+
   it('keeps the password hidden as it is typed', () => {
     render(<SignInScreen />);
 

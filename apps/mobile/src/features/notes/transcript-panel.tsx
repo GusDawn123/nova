@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { FontFamily, FontSize, Space, type Palette } from '@/design/tokens';
@@ -36,6 +37,22 @@ export function TranscriptPanel({
   palette,
   onRetry,
 }: TranscriptPanelProps): React.JSX.Element {
+  // Above every early return, because hooks cannot be conditional. Grouping a
+  // hundreds-of-turns transcript is real work, and a fresh `renderItem` on each pass
+  // costs the `FlatList` its row memoization — both would be paid on every render of
+  // a screen whose palette changes with the theme.
+  const turns = state.status === 'success' ? state.turns : null;
+  const blocks = useMemo(
+    () => (turns === null ? [] : groupTranscriptBySpeaker(turns)),
+    [turns],
+  );
+  const renderItem = useCallback(
+    ({ item }: { item: TranscriptBlock }) => (
+      <Turn block={item} palette={palette} />
+    ),
+    [palette],
+  );
+
   if (state.status === 'idle' || state.status === 'loading') {
     return (
       <StateCard
@@ -80,8 +97,6 @@ export function TranscriptPanel({
     );
   }
 
-  const blocks = groupTranscriptBySpeaker(state.turns);
-
   return (
     <FlatList
       testID="transcript-panel"
@@ -91,7 +106,7 @@ export function TranscriptPanel({
       keyExtractor={(_, index) => String(index)}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
-      renderItem={({ item }) => <Turn block={item} palette={palette} />}
+      renderItem={renderItem}
     />
   );
 }

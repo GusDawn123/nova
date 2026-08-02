@@ -84,6 +84,19 @@ function cockpitView(
   return ran ? 'ended' : 'idle';
 }
 
+/**
+ * What the HUD should SAY, which is not always what the socket's status is called.
+ *
+ * `closed` covers two different things, and `ran` is what tells them apart. A start
+ * that never connected leaves the socket `closed` while the screen shows the idle
+ * panel — and `◌ ENDED · 00:00` printed over "start a session" is the HUD announcing
+ * a call that did not happen. A call that really ran keeps ENDED, which is the one
+ * place the final duration is still readable.
+ */
+function hudStatus(status: LiveStatus, ran: boolean): LiveStatus {
+  return status === 'closed' && !ran ? 'idle' : status;
+}
+
 export default function LiveScreen(): React.JSX.Element {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -160,7 +173,7 @@ export default function LiveScreen(): React.JSX.Element {
         >
           <LiveHeader
             palette={palette}
-            status={live.status}
+            status={hudStatus(live.status, clock.ran)}
             elapsedMs={clock.elapsedMs}
             onEnd={inSession ? live.stop : null}
           />

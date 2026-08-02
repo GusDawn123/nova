@@ -206,7 +206,18 @@ export function AuthForm({
         ) : null}
 
         {error !== null ? (
-          <Text testID="auth-error" style={[styles.error, { color: palette.inkSoft }]}>
+          // ANNOUNCED, not just drawn. The failure is said in words and ink — the
+          // duotone has no alarm colour (spec §11) — and the field's own invalid
+          // state is a border weight, which a screen reader cannot see either. Both
+          // spellings: `accessibilityLiveRegion` is the native channel and `role`
+          // is what react-native-web puts in the DOM.
+          <Text
+            testID="auth-error"
+            accessibilityRole="alert"
+            accessibilityLiveRegion="assertive"
+            role="alert"
+            style={[styles.error, { color: palette.inkSoft }]}
+          >
             {error.message}
           </Text>
         ) : null}

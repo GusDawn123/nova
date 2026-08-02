@@ -25,9 +25,11 @@ import { TranscriptTurns } from './transcript-turns';
  * TABBED, which the design mock's transcript-only card is not: live notes need a
  * home during the call (`docs/DESIGN/notes-ui.md` §5.1, already built and wired
  * through `useLiveSession`), and the redesign is a re-skin of this screen, not a
- * removal of what it does. Both panels stay MOUNTED so the hidden one keeps
- * receiving updates — an unread dot is meaningless if the tab has to be open for
- * anything to arrive.
+ * removal of what it does. Only the OPEN panel is mounted — the hidden one is not
+ * kept alive to keep receiving anything, because it does not have to be: live notes
+ * arrive on the socket and land in `useLiveSession`, which is also where the unread
+ * dot comes from (`notes.hasUnseen`). This component only draws what that state
+ * already knows.
  */
 
 export type CaptureTab = 'transcript' | 'notes';

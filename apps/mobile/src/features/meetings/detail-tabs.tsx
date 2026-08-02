@@ -23,14 +23,19 @@ import {
 export type DetailTab = 'notes' | 'transcript' | 'follow-up';
 
 /**
- * Order and copy in one place. A `Record`-backed tuple, so a fourth view fails to
- * compile here rather than existing in the type and not on screen.
+ * Copy and order in one place, in the shape `capture-pane.tsx` uses.
+ *
+ * A `Record` keyed by the union, so a fourth view fails to compile here rather than
+ * existing in the type and not on screen — which a plain array of pairs cannot do:
+ * an array of three is a valid array however many members the union has.
  */
-const TABS: readonly { readonly tab: DetailTab; readonly label: string }[] = [
-  { tab: 'notes', label: 'NOTES' },
-  { tab: 'transcript', label: 'TRANSCRIPT' },
-  { tab: 'follow-up', label: 'FOLLOW-UP' },
-];
+const TAB_LABELS: Record<DetailTab, string> = {
+  notes: 'NOTES',
+  transcript: 'TRANSCRIPT',
+  'follow-up': 'FOLLOW-UP',
+};
+
+const TAB_ORDER: readonly DetailTab[] = ['notes', 'transcript', 'follow-up'];
 
 export interface DetailTabsProps {
   readonly tab: DetailTab;
@@ -47,12 +52,12 @@ export function DetailTabs({
     // `tab` is only a valid role inside a tablist: without this container the
     // selected state has nothing to be announced against.
     <View accessibilityRole="tablist" style={styles.row}>
-      {TABS.map((entry) => {
-        const selected = entry.tab === tab;
+      {TAB_ORDER.map((value) => {
+        const selected = value === tab;
         return (
           <Pressable
-            key={entry.tab}
-            testID={`detail-tab-${entry.tab}`}
+            key={value}
+            testID={`detail-tab-${value}`}
             accessibilityRole="tab"
             accessibilityState={{ selected }}
             // `aria-selected` alongside accessibilityState: react-native-web
@@ -60,7 +65,7 @@ export function DetailTabs({
             // only channel a screen reader has on the web target.
             aria-selected={selected}
             onPress={() => {
-              onSelect(entry.tab);
+              onSelect(value);
             }}
             style={({ pressed }) => [
               styles.pill,
@@ -79,7 +84,7 @@ export function DetailTabs({
                   { color: selected ? palette.onInk : palette.inkSoft },
                 ]}
               >
-                {entry.label}
+                {TAB_LABELS[value]}
               </Text>
             </ChamferSurface>
           </Pressable>

@@ -325,6 +325,10 @@ function DeleteAccount({
         testID="delete-account-cancel"
         accessibilityRole="button"
         disabled={busy}
+        // Alongside `disabled`, as the confirm key above already does: `disabled`
+        // stops the press, `aria-disabled` is the only channel that tells a screen
+        // reader the way OUT of this card is currently shut.
+        aria-disabled={busy}
         onPress={() => {
           setConfirming(false);
         }}
