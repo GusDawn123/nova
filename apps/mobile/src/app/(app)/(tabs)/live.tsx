@@ -174,7 +174,7 @@ export default function LiveScreen(): React.JSX.Element {
               />
             </>
           ) : (
-            <View style={styles.column}>
+            <View style={styles.stack}>
               {banner}
               {view === 'quota' ? <QuotaCard palette={palette} /> : null}
               {view === 'ended' ? (
@@ -212,5 +212,10 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: Space.lg,
     paddingTop: Space.lg,
+  },
+  // The inner views sit UNDER the header, which already carries the top padding.
+  stack: {
+    flex: 1,
+    gap: Space.lg,
   },
 });
