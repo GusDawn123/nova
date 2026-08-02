@@ -173,11 +173,46 @@ describe("modes", () => {
     }
     expect(MODES.behavioral.directive.toLowerCase()).toContain("first person");
   });
+
+  it("few-shots model the spoken register they ship beside — no em dashes", () => {
+    // The system prompt bans the em dash in spoken lines. An example that uses
+    // one teaches against the rule it travels with, and the model believes the
+    // demonstration over the instruction every time. Code fences are exempt
+    // (code is used, not spoken), so they are stripped before the check.
+    for (const mode of Object.values(MODES)) {
+      for (const example of mode.examples) {
+        const spoken = example.response.replace(/```[\s\S]*?```/g, " ");
+        expect(spoken).not.toContain("—"); // —
+        expect(spoken).not.toContain("–"); // –
+      }
+    }
+  });
+
+  it("gives every mode a voice anchor", () => {
+    // One line of WHO is speaking. A shape without a speaker drifts back into
+    // assistant-voice under pressure; the anchor is what it snaps back to.
+    for (const mode of Object.values(MODES)) {
+      expect(mode.directive).toContain("Voice anchor:");
+    }
+  });
 });
 
 describe("live notes", () => {
   it("is a category, not a mode", () => {
     expect(Object.keys(MODES)).not.toContain(LIVE_NOTES_CATEGORY.id);
     expect(LIVE_NOTES_CATEGORY.notAMode.length).toBeGreaterThan(0);
+  });
+
+  it("never catches the spoken voice — its output is a document", () => {
+    // The inverse of the register tests: notes are read later, not said now.
+    // If the spoken rules (first person, say-it-aloud) leak into the notes
+    // prompt, the notes start sounding like a person instead of a record. The
+    // two registers must stay separable by construction.
+    const notesText =
+      `${LIVE_NOTES_CATEGORY.directive}\n${LIVE_NOTES_CATEGORY.answerStructure}`.toLowerCase();
+    expect(notesText).not.toContain("first person");
+    expect(notesText).not.toContain("aloud");
+    expect(notesText).not.toContain("across a table");
+    expect(notesText).not.toContain("voice anchor");
   });
 });
