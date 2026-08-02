@@ -70,8 +70,13 @@ reviews:
     unit_tests:
       enabled: true
 
+  # On-demand only (Gustavo, 2026-08-02): reviews run when asked — the CLI
+  # pre-PR pass, or `@coderabbitai review` on a PR — never automatically on
+  # every push. Two full rounds on PR #10 showed the yield curve: the first
+  # pass over unreviewed code catches real defects, re-reviews of reviewed
+  # code mostly generate style opinions to triage.
   auto_review:
-    enabled: true
+    enabled: false
     drafts: false
     base_branches:
       - development
