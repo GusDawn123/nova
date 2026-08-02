@@ -21,9 +21,11 @@ import { useReducedMotion } from './motion';
  * arc orbits inside it. That is why the spinner is this shape and not a generic
  * activity indicator — the mark itself is doing the waiting.
  *
- * Under reduced motion the double ring still draws and the ROTOR is not rendered at
- * all. Not rendering it is stronger than leaving it still: there is no animation to
- * accidentally start, and the DOM/native tree says so.
+ * Under reduced motion it becomes the mark at rest: the inner arc CLOSES into a full
+ * ring — two complete circles, the brand's own double ring — and the rotor is not
+ * rendered at all. Both halves matter. Closing the arc is what keeps it from reading
+ * as a spinner someone unplugged, and not rendering the rotor is stronger than
+ * leaving it still, because there is then no animation to accidentally start.
  */
 
 /** Default diameter. Sized for an inline row; callers scale it up for a hero. */
@@ -87,9 +89,16 @@ export function RingOrbit({
   const innerRadius = Math.max(RING_STROKE, outerRadius - RING_INSET);
   const innerCircumference = 2 * Math.PI * innerRadius;
 
-  // One arc, then a gap the length of the whole circle: a dash pattern is how you
-  // draw a partial circle without computing an SVG path.
-  const arc = (
+  /**
+   * The inner ring, drawn whole or cut down to the orbiting arc.
+   *
+   * The arc is one dash followed by a gap the length of the entire circle — how you
+   * draw a partial circle without computing an SVG path. It is ONLY correct while it
+   * turns. Standing still it is a 28% stub parked at three o'clock, which reads as a
+   * stalled spinner; the resting form of this mark is a closed ring, so reduced
+   * motion gets the whole circle rather than a frozen frame of the animation.
+   */
+  const innerRing = (dashed: boolean): React.JSX.Element => (
     <Svg width={size} height={size}>
       <Circle
         cx={center}
@@ -98,9 +107,13 @@ export function RingOrbit({
         stroke={color}
         strokeWidth={RING_STROKE}
         strokeLinecap="round"
-        strokeDasharray={`${String(innerCircumference * ARC_SWEEP)} ${String(
-          innerCircumference,
-        )}`}
+        strokeDasharray={
+          dashed
+            ? `${String(innerCircumference * ARC_SWEEP)} ${String(
+                innerCircumference,
+              )}`
+            : undefined
+        }
         fill="transparent"
       />
     </Svg>
@@ -120,13 +133,13 @@ export function RingOrbit({
         />
       </Svg>
       {reduced ? (
-        <View style={StyleSheet.absoluteFill}>{arc}</View>
+        <View style={StyleSheet.absoluteFill}>{innerRing(false)}</View>
       ) : (
         <Animated.View
           style={[StyleSheet.absoluteFill, spin]}
           testID="ring-orbit-rotor"
         >
-          {arc}
+          {innerRing(true)}
         </Animated.View>
       )}
     </View>

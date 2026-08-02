@@ -183,11 +183,21 @@ describe('LightSweep', () => {
   });
 });
 
+/** The steady ring is drawn first; the inner one rides the rotor over it. */
+function innerCircle(container: HTMLElement): SVGCircleElement {
+  const circles = [...container.querySelectorAll('circle')];
+  expect(circles).toHaveLength(2);
+  const inner = circles[1];
+  if (inner === undefined) throw new Error('expected an inner ring');
+  return inner;
+}
+
 describe('RingOrbit', () => {
   it('draws the double ring and turns the inner arc', () => {
     const { container } = render(<RingOrbit color={cobaltPalette.ink} />);
 
-    expect(container.querySelectorAll('circle')).toHaveLength(2);
+    // The dash pattern IS the arc: one dash, then a gap the length of the circle.
+    expect(innerCircle(container).getAttribute('stroke-dasharray')).toBeTruthy();
     expect(screen.getByTestId('ring-orbit-rotor')).toBeInTheDocument();
     expect(animation.withRepeat).toHaveBeenCalled();
   });
@@ -203,13 +213,14 @@ describe('RingOrbit', () => {
     expect(getComputedStyle(root).height).toBe('40px');
   });
 
-  it('keeps both rings but stops turning under reduced motion', () => {
+  it('closes the arc into a full second ring under reduced motion', () => {
     reduced.value = true;
 
     const { container } = render(<RingOrbit color={cobaltPalette.ink} />);
 
-    // Still a spinner-shaped thing on screen; nothing moving inside it.
-    expect(container.querySelectorAll('circle')).toHaveLength(2);
+    // A parked 28% arc is a stalled spinner, not a resting mark. The dash pattern
+    // has to GO, not just stop moving — two whole rings is the resting form.
+    expect(innerCircle(container).hasAttribute('stroke-dasharray')).toBe(false);
     expect(screen.queryByTestId('ring-orbit-rotor')).toBeNull();
     expect(animation.withRepeat).not.toHaveBeenCalled();
   });
