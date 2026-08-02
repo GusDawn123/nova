@@ -1,15 +1,8 @@
 import type { MeetingNotes } from '@nova/shared';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
-import { GlassSurface } from '@/design/glass';
+import { ChamferSurface } from '@/design/chamfer';
 import { useCardInTransformOnly } from '@/design/motion';
 import {
   FontFamily,
@@ -21,12 +14,20 @@ import {
 } from '@/design/tokens';
 
 /**
- * The Notes tab (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.4): tl;dr, decisions with
- * their verbatim quotes, action items with working checkboxes, open questions and
- * risks side by side, then the insights placeholder.
+ * The Notes view (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5): the
+ * tl;dr, then what the call committed to, then what it left open.
  *
- * All cards enter with {@link useCardInTransformOnly} — they wrap glass, and an
- * opacity ramp from 0 would stop the glass rendering (see `design/motion.ts`).
+ * Cards are SOFT — square-ish corners, no chamfer — because they are read, not
+ * pressed (spec §3). The one control among them is the checkbox, which is therefore
+ * the one chamfered shape on the screen; the tl;dr takes the ink wash so the eye
+ * starts there without a second size or a second colour.
+ *
+ * A section with nothing in it is not drawn at all. An empty "Decisions" heading
+ * reads as a call that decided nothing, which is a claim, and not the one the
+ * pipeline made.
+ *
+ * Entrance is TRANSFORM-ONLY — see `design/motion.ts` on the opacity trap. The text
+ * IS the content here, so a ramp that never finishes must not be able to hide it.
  */
 
 export interface NotesPanelProps {
@@ -43,50 +44,22 @@ export function NotesPanel({
   onToggleItem,
 }: NotesPanelProps): React.JSX.Element {
   return (
-    <View style={styles.stack}>
-      <Card palette={palette} delay={0} raised>
-        <Eyebrow palette={palette}>tl;dr</Eyebrow>
+    <ScrollView
+      testID="notes-panel"
+      contentContainerStyle={styles.scroll}
+      showsVerticalScrollIndicator={false}
+    >
+      <Card palette={palette} eyebrow="TL;DR" delay={0} filled>
         <Text style={[styles.tldr, { color: palette.ink }]}>{notes.tldr}</Text>
       </Card>
 
-      {notes.decisions.length > 0 ? (
-        <Card palette={palette} delay={60}>
-          <Eyebrow palette={palette}>decisions</Eyebrow>
-          {notes.decisions.map((decision, i) => (
-            <View key={decision.id} style={styles.decision}>
-              {i > 0 ? (
-                <View
-                  style={[styles.divider, { backgroundColor: palette.stroke }]}
-                />
-              ) : null}
-              <Text style={[styles.body, { color: palette.ink }]}>
-                {decision.text}
-              </Text>
-              {/* A null quote means no direct evidence in the transcript. Render
-                  nothing rather than an empty rule — the absence is the signal. */}
-              {decision.quote !== null ? (
-                <Text
-                  style={[
-                    styles.quote,
-                    { color: palette.ink3, borderLeftColor: palette.inkHairline },
-                  ]}
-                >
-                  {`“${decision.quote}”`}
-                </Text>
-              ) : null}
-            </View>
-          ))}
-        </Card>
-      ) : null}
-
       {notes.actionItems.length > 0 ? (
-        <Card palette={palette} delay={120}>
-          <View style={styles.cardHead}>
-            <Eyebrow palette={palette}>action items</Eyebrow>
-            <Text style={[styles.count, { color: palette.ink3 }]}>
-              {String(notes.actionItems.length)}
-            </Text>
-          </View>
+        <Card
+          palette={palette}
+          eyebrow="ACTION ITEMS"
+          count={notes.actionItems.length}
+          delay={60}
+        >
           {notes.actionItems.map((item) => (
             <ActionItemRow
               key={item.id}
@@ -102,84 +75,58 @@ export function NotesPanel({
         </Card>
       ) : null}
 
-      {notes.openQuestions.length > 0 || notes.risks.length > 0 ? (
-        <View style={styles.pairRow}>
-          {notes.openQuestions.length > 0 ? (
-            <Card palette={palette} delay={180} style={styles.pairCard}>
-              <Eyebrow palette={palette}>open</Eyebrow>
-              {notes.openQuestions.map((q) => (
+      {notes.decisions.length > 0 ? (
+        <Card palette={palette} eyebrow="DECISIONS" delay={120}>
+          {notes.decisions.map((decision) => (
+            <View key={decision.id} style={styles.decision}>
+              <Text style={[styles.body, { color: palette.ink }]}>
+                {decision.text}
+              </Text>
+              {/* A null quote means no direct evidence in the transcript. Render
+                  nothing rather than an empty rule — the absence is the signal. */}
+              {decision.quote !== null ? (
                 <Text
-                  key={q.id}
-                  style={[styles.pairText, { color: palette.ink2 }]}
+                  style={[
+                    styles.quote,
+                    {
+                      color: palette.inkSoft,
+                      borderLeftColor: palette.inkHairline,
+                    },
+                  ]}
                 >
-                  {q.text}
+                  {`“${decision.quote}”`}
                 </Text>
-              ))}
-            </Card>
-          ) : null}
-          {notes.risks.length > 0 ? (
-            <Card palette={palette} delay={210} style={styles.pairCard}>
-              <Text style={[styles.eyebrow, { color: palette.hot }]}>risk</Text>
-              {notes.risks.map((r) => (
-                <Text
-                  key={r.id}
-                  style={[styles.pairText, { color: palette.ink2 }]}
-                >
-                  {r.text}
-                </Text>
-              ))}
-            </Card>
-          ) : null}
-        </View>
+              ) : null}
+            </View>
+          ))}
+        </Card>
       ) : null}
 
-      <InsightsPlaceholder palette={palette} kind={notes.typeInsights.kind} />
-    </View>
-  );
-}
+      {notes.openQuestions.length > 0 ? (
+        <Card palette={palette} eyebrow="OPEN" delay={180}>
+          {notes.openQuestions.map((question) => (
+            <Text
+              key={question.id}
+              style={[styles.body, { color: palette.inkSoft }]}
+            >
+              {question.text}
+            </Text>
+          ))}
+        </Card>
+      ) : null}
 
-/**
- * The insights slot, held at "coming soon" (Gustavo, 2026-07-28).
- *
- * The data behind it — objections/buying-signals for sales, questions-asked/
- * answers-to-revisit for interviews — is real and populated, but the prompts that
- * produce it are being refined, so the card holds the layout without making claims
- * yet. Turning it on later is a swap inside this component, not a layout change.
- *
- * A `casual` call has no insights arm, so it renders NOTHING rather than promising
- * something that will never arrive for it.
- */
-function InsightsPlaceholder({
-  palette,
-  kind,
-}: {
-  palette: Palette;
-  kind: MeetingNotes['typeInsights']['kind'];
-}): React.JSX.Element | null {
-  if (kind === 'casual') return null;
-
-  const label = kind === 'sales' ? 'sales signals' : 'interview signals';
-  return (
-    <Card palette={palette} delay={240}>
-      <View style={styles.cardHead}>
-        <Eyebrow palette={palette}>{label}</Eyebrow>
-        <View
-          style={[
-            styles.soonChip,
-            { backgroundColor: palette.glass, borderColor: palette.stroke },
-          ]}
-        >
-          <Text style={[styles.soonText, { color: palette.ink3 }]}>
-            coming soon
-          </Text>
-        </View>
-      </View>
-      <Text style={[styles.pairText, { color: palette.ink3 }]}>
-        {kind === 'sales'
-          ? 'Objections raised and buying signals detected will appear here.'
-          : 'Questions asked and answers worth revisiting will appear here.'}
-      </Text>
-    </Card>
+      {notes.risks.length > 0 ? (
+        // Said in words at reading strength, never in a warning colour — the
+        // palette has one ink, and risk is a sentence (spec §11).
+        <Card palette={palette} eyebrow="RISKS" delay={240}>
+          {notes.risks.map((risk) => (
+            <Text key={risk.id} style={[styles.body, { color: palette.inkSoft }]}>
+              {risk.text}
+            </Text>
+          ))}
+        </Card>
+      ) : null}
+    </ScrollView>
   );
 }
 
@@ -204,32 +151,42 @@ function ActionItemRow({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
+      // `aria-checked` as well: react-native-web renders the aria-* props as real
+      // DOM attributes, and accessibilityState alone reaches neither the DOM nor a
+      // web screen reader — the tick would be the only signal, and a tick is a
+      // picture.
+      aria-checked={checked}
       accessibilityLabel={text}
       testID={`action-item-${id}`}
       onPress={() => {
         onToggle(id, !checked);
       }}
-      style={styles.actionRow}
+      style={({ pressed }) => [
+        styles.actionRow,
+        pressed ? styles.pressed : undefined,
+      ]}
     >
-      <View
-        style={[
-          styles.checkbox,
-          { borderColor: checked ? palette.ink : palette.stroke2 },
-          checked && { backgroundColor: palette.ink },
-        ]}
+      <ChamferSurface
+        cut={CHECKBOX_CUT}
+        fill={checked ? palette.ink : 'transparent'}
+        stroke={checked ? undefined : palette.inkHairline}
+        style={styles.checkbox}
+        contentStyle={styles.checkboxContent}
       >
+        {/* Colour comes from `palette.onInk`: the glyph sits on an ink-filled box,
+            so it is the canvas colour in whichever theme is painting. */}
         {checked ? (
           <Text style={[styles.checkGlyph, { color: palette.onInk }]}>
             {'✓'}
           </Text>
         ) : null}
-      </View>
+      </ChamferSurface>
       <View style={styles.actionText}>
         <Text
           style={[
             styles.body,
-            { color: checked ? palette.ink3 : palette.ink },
-            checked && styles.struck,
+            { color: checked ? palette.inkSoft : palette.ink },
+            checked ? styles.struck : undefined,
           ]}
         >
           {text}
@@ -237,31 +194,19 @@ function ActionItemRow({
         {owner !== null || deadlineRaw !== null ? (
           <View style={styles.metaRow}>
             {owner !== null ? (
-              <View
-                style={[styles.metaChip, { backgroundColor: palette.inkFill }]}
-              >
-                <Text style={[styles.metaText, { color: palette.ink }]}>
-                  {owner}
-                </Text>
-              </View>
+              <Text style={[styles.meta, { color: palette.inkSoft }]}>
+                {owner.toUpperCase()}
+              </Text>
+            ) : null}
+            {owner !== null && deadlineRaw !== null ? (
+              <Text style={[styles.meta, { color: palette.inkFaint }]}>·</Text>
             ) : null}
             {/* The SPOKEN phrase, not the ISO date: "Thursday" is what was said and
                 what the user will recognise. */}
             {deadlineRaw !== null ? (
-              <View
-                style={[
-                  styles.metaChip,
-                  {
-                    backgroundColor: palette.glass,
-                    borderWidth: StyleSheet.hairlineWidth,
-                    borderColor: palette.stroke,
-                  },
-                ]}
-              >
-                <Text style={[styles.metaText, { color: palette.ink2 }]}>
-                  {deadlineRaw}
-                </Text>
-              </View>
+              <Text style={[styles.meta, { color: palette.inkSoft }]}>
+                {deadlineRaw}
+              </Text>
             ) : null}
           </View>
         ) : null}
@@ -270,124 +215,126 @@ function ActionItemRow({
   );
 }
 
+/**
+ * One section. `filled` takes the ink wash (the tl;dr); everything else is outlined,
+ * which is the same soft-card language the meetings list uses for a card you read.
+ */
 function Card({
   palette,
-  children,
+  eyebrow,
+  count,
   delay,
-  raised = false,
-  style,
+  filled = false,
+  children,
 }: {
   palette: Palette;
-  children: React.ReactNode;
+  eyebrow: string;
+  count?: number;
   delay: number;
-  raised?: boolean;
-  style?: StyleProp<ViewStyle>;
+  filled?: boolean;
+  children: React.ReactNode;
 }): React.JSX.Element {
   const entrance = useCardInTransformOnly(delay);
   return (
-    <Animated.View style={[entrance, style]}>
-      <GlassSurface
-        palette={palette}
-        tone={raised ? 'raised' : 'regular'}
-        radius={Radius.card}
-        elevated={raised}
-        style={styles.card}
-      >
-        {children}
-      </GlassSurface>
+    <Animated.View
+      style={[
+        entrance,
+        styles.card,
+        filled
+          ? { backgroundColor: palette.inkFill }
+          : { borderWidth: StyleSheet.hairlineWidth, borderColor: palette.inkHairline },
+      ]}
+    >
+      <View style={styles.cardHead}>
+        {/* Written uppercase rather than transformed: `textTransform` leaves the DOM
+            text mixed-case, which is a difference a screen reader hears. */}
+        <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>
+          {eyebrow}
+        </Text>
+        {count === undefined ? null : (
+          <Text style={[styles.count, { color: palette.inkFaint }]}>
+            {String(count)}
+          </Text>
+        )}
+      </View>
+      {children}
     </Animated.View>
   );
 }
 
-function Eyebrow({
-  palette,
-  children,
-}: {
-  palette: Palette;
-  children: string;
-}): React.JSX.Element {
-  return (
-    <Text style={[styles.eyebrow, { color: palette.ink3 }]}>{children}</Text>
-  );
-}
+/** The checkbox cut — tighter than `Chamfer.control`, which would eat a 13pt box. */
+const CHECKBOX_CUT = 4;
+/** Spec §5: 13px. */
+const CHECKBOX_SIZE = 13;
 
 const styles = StyleSheet.create({
-  stack: { gap: Space.lg },
-  card: { padding: Space.xl, gap: Space.md },
+  scroll: {
+    gap: Space.md,
+    paddingBottom: Space.xxl,
+  },
+  card: {
+    borderRadius: Radius.soft,
+    padding: Space.lg,
+    gap: Space.md,
+  },
   cardHead: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  eyebrow: { ...eyebrowStyle },
+  eyebrow: eyebrowStyle,
   count: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
   },
   tldr: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.tldr,
-    lineHeight: FontSize.tldr * 1.5,
-  },
-  decision: { gap: 6 },
-  divider: { height: StyleSheet.hairlineWidth, marginBottom: Space.md },
-  body: {
-    fontFamily: FontFamily.sans,
+    fontFamily: FontFamily.body,
     fontSize: FontSize.body,
-    lineHeight: FontSize.body * 1.45,
+    lineHeight: FontSize.body * 1.5,
   },
+  body: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodySm,
+    lineHeight: FontSize.bodySm * 1.45,
+  },
+  decision: { gap: Space.xs2 },
   quote: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.meta,
-    lineHeight: FontSize.meta * 1.45,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.45,
     fontStyle: 'italic',
-    paddingLeft: 11,
+    paddingLeft: Space.md,
     borderLeftWidth: 2,
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 11,
+    gap: Space.md,
     alignItems: 'flex-start',
   },
   checkbox: {
-    width: 19,
-    height: 19,
-    marginTop: 1,
-    borderRadius: Radius.check,
-    borderWidth: 1.5,
+    width: CHECKBOX_SIZE,
+    height: CHECKBOX_SIZE,
+    marginTop: 3,
+  },
+  checkboxContent: {
+    flex: 1,
+    padding: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Colour comes from `palette.onInk` at the call site: this glyph sits on an
-  // ink-filled box, so it is theme-dependent even though the box it sits in is not.
-  checkGlyph: { fontSize: 12, lineHeight: 14 },
-  actionText: { flex: 1, gap: 6 },
+  checkGlyph: { fontSize: 9, lineHeight: 11 },
+  actionText: { flex: 1, gap: Space.xs },
   struck: { textDecorationLine: 'line-through' },
-  metaRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
-  metaChip: {
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: Radius.chip,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: Space.xs2,
   },
-  metaText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
+  meta: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 0.5,
   },
-  pairRow: { flexDirection: 'row', gap: Space.md },
-  pairCard: { flex: 1 },
-  pairText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.label,
-    lineHeight: FontSize.label * 1.42,
-  },
-  soonChip: {
-    paddingVertical: 4,
-    paddingHorizontal: 9,
-    borderRadius: Radius.chip,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  soonText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
-  },
+  pressed: { opacity: 0.7 },
 });
