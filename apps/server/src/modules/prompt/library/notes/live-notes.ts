@@ -32,11 +32,12 @@ export const liveNotesCategory: CategoryPrompt = {
 
   directive: `- Write what was DECIDED, ASKED and OWED — not what was discussed
 - Every point must survive the test: could someone who missed the call act on this?
-- Specifics or nothing. Numbers, names, dates and conditions are the content; without them a point is filler
+- Specifics or nothing. Numbers, names, dates and conditions are the content; without them a point is filler — and every specific must appear in the transcript, never be reconstructed from memory of similar calls
 - Prefer the words that were actually said over a paraphrase that smooths them out
 - Never pad to reach a count. Two real points beat five hedged ones
 - Never invent a decision that was only implied. "Seems to be leaning towards" is not a decision
-- Revise rather than append: a later correction replaces the earlier point, it does not sit beside it`,
+- Revise rather than append: a later correction replaces the earlier point, it does not sit beside it
+- The failure mode to never produce (this shape, not these words): "Talked about a lot of things... you said some stuff about tools, then they replied about pricing and other topics." Zero specifics, zero actionability — worse than no notes, because it looks like notes`,
 
   answerStructure: `A short summary line, then only the sections that have real content:
 - decided — statements of record, each one a thing that is now settled
@@ -47,15 +48,16 @@ Omit an empty section entirely. A heading with nothing under it reads as a gap i
 
   examples: [
     {
-      transcript: `Recent window of a sales call covering budget, timeline and security review.`,
+      // Every specific in the recap is traceable to a transcript line — the
+      // example must model the "never reconstruct" rule it ships beside.
+      transcript: `me: so on pricing, the annual pre-pay comes to \\$38,950, against \\$47,500 if you stay monthly
+them: okay. and does the Slack integration route alerts per-channel, or is it one firehose?
+me: per-channel is on the enterprise tier, I'd have to confirm for yours
+them: mm. honestly our current vendor already covers the reporting side, so I'm not sure we'd switch for that`,
       response: `Quick recap:
-- Discussed pricing tiers including the \\$38,900 annual pre-pay against \\$47,500 monthly
-- Asked about the Slack integration, specifically whether alerts can route per-channel
-- Raised a competitor objection: current vendor already covers reporting`,
-    },
-    {
-      transcript: `The same window, written badly — this is the failure mode to avoid.`,
-      response: `Talked about a lot of things... you said some stuff about tools, then they replied about pricing and other topics.`,
+- Discussed pricing: the \\$38,950 annual pre-pay against \\$47,500 monthly
+- They asked whether Slack alerts route per-channel — confirming for their tier is owed
+- Competitor objection raised: current vendor already covers reporting`,
     },
   ],
 };

@@ -45,7 +45,10 @@ Bold the 2-3 terms that carry the story (the system, the constraint, the result)
   examples: [
     {
       transcript: `them: tell me about a time when you had to lead a team through a difficult challenge`,
-      response: `So about three weeks before a big product launch we found a technical issue in the **core flow**, and the team was starting to turn on each other under the pressure. I called an all-hands and put the whole picture on the table, then sat down with the engineering lead and broke the fix into small tasks, and paired people up across functions so nobody was stuck alone with their piece. I also went to the stakeholders and traded away two non-critical features to protect the fix. We shipped **two days early** against the revised plan, and the pairing setup worked well enough that other teams picked it up afterwards.`,
+      // No user context in this transcript, so the story stays qualitative:
+      // concrete ACTIONS, no invented quantities ("three weeks", "two days
+      // early") — the example must obey the numbers rule it ships beside.
+      response: `So shortly before a big product launch we found a technical issue in the **core flow**, and the team was starting to turn on each other under the pressure. I called an all-hands and put the whole picture on the table, then sat down with the engineering lead and broke the fix into small tasks, and paired people up across functions so nobody was stuck alone with their piece. I also went to the stakeholders and traded away two non-critical features to protect the fix. We shipped **ahead of the revised plan**, and the pairing setup worked well enough that other teams picked it up afterwards.`,
     },
     {
       // The 2026-08-01 failure case, done right. Asked exactly this, the copilot

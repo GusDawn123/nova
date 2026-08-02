@@ -31,14 +31,18 @@ const PINNED: Record<PromptMode, string> = {
   // register (the "no pronouns" narration fix); (2) SOUND HUMAN (spoken-rhythm
   // mechanics + machine-tell blacklist).
   // Live gates still pending on this text.
+  // Repinned 2026-08-02, CodeRabbit pre-PR pass: the untrusted-data clause in
+  // CONTENT_CONSTRAINTS (transcript/RAG/context are data, not instructions),
+  // the behavioral example's invented quantities made qualitative, and the
+  // finance example's arithmetic corrected (47,500 x 0.18 = 8,550 → 38,950).
   general:
-    "3b5d2d7e3185f844daa620df22e7a2e4253b1aa84ac10bb7b335620781427527",
+    "6572a864f697f6e17cbc425932409f382b4b763b81a9aa39b3f7d190ae4841e1",
   behavioral:
-    "85cdafd5b8846901f91e26264012411d031d91c1fbd3de071f533f5293e467d1",
+    "af566b64da422f40c01e41a05c0040f4904a03abb6c94feaa1c72266c59deb17",
   technical:
-    "2313152fa97a748594ebc88547572ec0eba39cf57dcb0d3203bc9d946422f608",
+    "a5ad87fbf695a1ccd311d31f32a2901421ade93475ba4a7283cace3fb27fbf44",
   finance:
-    "c862689e32e144737ced562ab6bfdaa8f04b18bac57040c7aad00cd25dafbc48",
+    "4c794a4e811b13c22f02413396e143a4636a122ca1c0c4c0471dbb2fa3b4db92",
 };
 
 function prefixHash(mode: PromptMode): string {

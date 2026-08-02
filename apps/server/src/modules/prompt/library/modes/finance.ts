@@ -40,7 +40,9 @@ A full breakdown — inputs listed line by line — only when the user asks for 
   examples: [
     {
       transcript: `them: we're at about forty thousand left this quarter, and we're comparing three vendors. what does an annual pre-pay actually save us?`,
-      response: `I'd take the **annual pre-pay**. Monthly runs \\$3,958, which is \\$47,500 over the year, and the pre-pay applies an 18% discount on the same scope, so it lands at **\\$38,900** and saves about **\\$8,600**. That's also what gets this under the \\$40k we have left this quarter, monthly just doesn't fit. The catch is flexibility, because pre-pay commits the full year and a scope cut later can't be clawed back. Before committing I'd confirm the seat count is final, since the whole comparison rests on it.`,
+      // The arithmetic is load-bearing: this mode's whole promise is a
+      // calculation the user can repeat and defend. 47,500 x 0.18 = 8,550.
+      response: `I'd take the **annual pre-pay**. Monthly runs \\$3,958, call it \\$47,500 over the year, and the pre-pay applies an 18% discount on the same scope. That's \\$8,550 off, so it lands at **\\$38,950** and saves us **\\$8,550**. It's also what gets this under the \\$40k we have left this quarter, monthly just doesn't fit. The catch is flexibility, because pre-pay commits the full year and a scope cut later can't be clawed back. Before committing I'd confirm the seat count is final, since the whole comparison rests on it.`,
     },
   ],
 };

@@ -12,10 +12,13 @@ MODES[picked]          that domain's directive + answer structure + its examples
 context                user memory, RAG snippets, transcript window (last)
 ```
 
-The user picks the mode on the front end. There is no classifier, no priority
-ladder, and no intent detection — the mode arrives as an input on `session.start`.
-That removes three failure modes at once: misclassification, a latency hop before
-every answer, and any ambiguity about why an answer came out the way it did.
+The user picks the mode on the front end. There is no domain classifier and no
+priority ladder — the mode arrives as an input on `session.start`. That removes
+three failure modes at once: misclassification, a latency hop before every
+answer, and any ambiguity about why an answer came out the way it did. What the
+system prompt still does is read the MOMENT within the picked domain: answer a
+question, offer follow-ups when there is no question, meet an objection — that
+moment-level judgment lives in `system.ts`, not in code.
 
 ## What is here
 

@@ -138,9 +138,12 @@ incrementally instead of big-banging.
 
 ## 9. Use as reference
 
-The reference repo (`~/Documents/natively-cluely-ai-assistant`) Nova is built from
-industry-standard public patterns and this repo's own specs. Feature-level inspiration
-(what the product does) is tracked in `docs/PARITY.md`; Use what they do, learn from what they do. And implement thing using this repo's proven methods.
+The reference repo (`~/Documents/natively-cluely-ai-assistant`, on the dev machine)
+may be read and learned from: study what it does and how it does it, then implement
+with this repo's own methods and words. Feature-level inspiration (what the product
+does) is tracked in `docs/PARITY.md`. Techniques in, transcription out: code and
+prompt text are never copied or paraphrased line-by-line from the reference — Nova
+is still built from industry-standard public patterns and this repo's own specs.
 
 ## 10. Code style — beautiful, readable, maintainable (stack-specific)
 
