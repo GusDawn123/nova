@@ -68,7 +68,7 @@ export function NotesPanel({
                 <Text
                   style={[
                     styles.quote,
-                    { color: palette.ink3, borderLeftColor: palette.accentSoft },
+                    { color: palette.ink3, borderLeftColor: palette.inkHairline },
                   ]}
                 >
                   {`“${decision.quote}”`}
@@ -214,12 +214,12 @@ function ActionItemRow({
       <View
         style={[
           styles.checkbox,
-          { borderColor: checked ? palette.accent : palette.stroke2 },
-          checked && { backgroundColor: palette.accent },
+          { borderColor: checked ? palette.ink : palette.stroke2 },
+          checked && { backgroundColor: palette.ink },
         ]}
       >
         {checked ? (
-          <Text style={[styles.checkGlyph, { color: palette.onAccent }]}>
+          <Text style={[styles.checkGlyph, { color: palette.onInk }]}>
             {'✓'}
           </Text>
         ) : null}
@@ -238,7 +238,7 @@ function ActionItemRow({
           <View style={styles.metaRow}>
             {owner !== null ? (
               <View
-                style={[styles.metaChip, { backgroundColor: palette.accentFill }]}
+                style={[styles.metaChip, { backgroundColor: palette.inkFill }]}
               >
                 <Text style={[styles.metaText, { color: palette.ink }]}>
                   {owner}
@@ -358,8 +358,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  // Colour comes from `palette.onAccent` at the call site: this glyph sits on the
-  // accent fill, so it is theme-dependent even though the box it sits in is not.
+  // Colour comes from `palette.onInk` at the call site: this glyph sits on an
+  // ink-filled box, so it is theme-dependent even though the box it sits in is not.
   checkGlyph: { fontSize: 12, lineHeight: 14 },
   actionText: { flex: 1, gap: 6 },
   struck: { textDecorationLine: 'line-through' },

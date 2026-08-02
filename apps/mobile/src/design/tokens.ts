@@ -1,139 +1,216 @@
 /**
- * Design tokens for the glass UI (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.1),
- * transcribed from Gustavo's `Nova Mobile glass UI design` mock.
+ * Design tokens — the duotone spine
+ * (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §9).
  *
- * The mock is CSS and this is React Native, so two things had to be converted rather
- * than copied:
+ * TWO colours exist in this app: brand blue and white. Every other value is one of
+ * them at a stated opacity, written out as a literal `rgba()` string per theme
+ * rather than computed, so the exact colour a surface paints is greppable here.
+ * A third colour — including for errors, risk and success — is a spec violation:
+ * words carry meaning, ink carries emphasis (spec §11).
  *
- *  - **oklch → sRGB hex.** React Native has no `oklch()`. Values were converted with
- *    the Ottosson oklab transform rather than eyeballed; the source oklch is kept in
- *    a comment beside each so the mock stays the source of truth. One value (the
- *    light `accent2`) is outside the sRGB gamut and is the clipped result — noted
- *    where it appears.
- *  - **`color-mix(in oklab, …)` → literal rgba.** `accentSoft` is the accent at 60%
- *    and `accentGlow` at 30%, pre-resolved per theme.
+ * The two themes are mirrors, not a light/dark pair of separate designs: cobalt is
+ * blue canvas with white ink, paper is white canvas with blue ink, and every
+ * derived band sits at the same opacity in both.
  *
- * The mock's gradients (`--stage`, `--screen`) are not tokens here: RN needs
- * `expo-linear-gradient` for those, and the screens that use them declare their own
- * stops. The flat `screenBase` below is the colour to paint under a gradient (and the
- * whole background where a gradient would be gratuitous).
+ * A LEGACY block at the bottom of {@link Palette} carries the glass-era surface
+ * names (`glass`, `stroke`, `ink2`, …) that the not-yet-redrawn screens still ask
+ * for. Their VALUES are duotone, so those screens render wrong-but-duotone rather
+ * than reintroducing a colour; each name dies with the screen that last uses it.
  */
 
-/** The palette one theme provides. Keys mirror the mock's CSS custom properties. */
+/** The two mirror themes. Cobalt is the default; `paper` is the light mirror. */
+export type ThemeName = 'cobalt' | 'paper';
+
+/** The one blue. Both themes are built from this and {@link BRAND_WHITE}. */
+export const BRAND_BLUE = '#0002DA';
+export const BRAND_WHITE = '#FFFFFF';
+
+/** What one theme provides. `canvas` and `ink` are the two poles; the rest derive. */
 export interface Palette {
-  /** oklch(0.72 0.13 268) dark · oklch(0.56 0.15 268) light */
-  accent: string;
-  /** oklch(0.74 0.12 205) dark · oklch(0.58 0.13 205) light */
-  accent2: string;
-  /** accent @ 60% — hairlines and quote rules. */
-  accentSoft: string;
-  /** accent @ 30% — glows behind the star and the primary button. */
-  accentGlow: string;
-  /** accent @ ~16-18% — the tinted chip fill ("you", "Notes ready"). */
-  accentFill: string;
+  /** The screen background — the theme's whole field. */
+  canvas: string;
+  /** Full-strength foreground: primary text, filled controls, rules that matter. */
+  ink: string;
+  /** ink @ 75% — secondary text. Stays above the ≥65% contrast floor (spec §11). */
+  inkSoft: string;
+  /** ink @ 45% — placeholders and disabled copy. */
+  inkFaint: string;
+  /** ink @ 35% — borders, dividers, hairlines. */
+  inkHairline: string;
+  /** ink @ 10% — card fills, chip fills, the thinking bars. */
+  inkFill: string;
   /**
-   * Text and glyphs drawn ON TOP of `accent` — the selected tab label, the checked
-   * checkbox's tick. Must stay legible against `accent` in BOTH themes, which is
-   * why it is a token and not each surface's own literal.
+   * Text and glyphs drawn ON an ink-filled control — the selected tab label, the
+   * submit key's word. Equals `canvas`, and is a token rather than each surface's
+   * own literal so the mirror holds in both themes.
    */
-  onAccent: string;
-  /** oklch(0.70 0.16 24) dark · oklch(0.58 0.18 24) light — the record dot, risk. */
+  onInk: string;
+
+  // ---------------------------------------------------------------------------
+  // LEGACY — the glass-era names, retained only so the screens that have not been
+  // redrawn yet compile. Duotone values, no new colours. Each retires with its
+  // screen; the block goes with the last one.
+  // ---------------------------------------------------------------------------
+  /** LEGACY → `canvas`. */
+  screenBase: string;
+  /** LEGACY → `inkSoft`. */
+  ink2: string;
+  /** LEGACY → `inkFaint`. */
+  ink3: string;
+  /** LEGACY → `inkFill`. */
+  glass: string;
+  /** LEGACY → `inkHairline`; kept distinct from `glass` so raised still reads. */
+  glassHi: string;
+  /** LEGACY → `inkHairline`. */
+  stroke: string;
+  /** LEGACY → `inkSoft` (the stronger of the two glass borders). */
+  stroke2: string;
+  /** LEGACY → `inkFill`. */
+  sheen: string;
+  /** LEGACY → `ink`. The duotone has no alarm colour; risk is said in words. */
   hot: string;
 
-  /** Flat colour under the screen gradient. */
-  screenBase: string;
-  /** Primary text. */
-  ink: string;
-  /** Secondary text (~60%). */
-  ink2: string;
-  /** Tertiary text / labels (~35%). */
-  ink3: string;
-
-  /** The standard glass fill. */
-  glass: string;
-  /** The raised glass fill (cards that sit above others). */
-  glassHi: string;
-  /** Hairline border on glass. */
-  stroke: string;
-  /** Stronger border — buttons, checkbox outlines. */
-  stroke2: string;
-  /** The inset top highlight that sells the glass edge. */
-  sheen: string;
-
-  /** Drop shadow, split into RN's separate shadow props. */
+  /** LEGACY drop shadow, split into RN's separate shadow props. */
   shadowColor: string;
   shadowOpacity: number;
   shadowRadius: number;
   shadowOffsetY: number;
-  /** Android elevation approximating the same shadow. */
+  /** LEGACY Android elevation approximating the same shadow. */
   elevation: number;
 }
 
-/** Dark is the mock's default theme. */
-export const darkPalette: Palette = {
-  accent: '#82a1f6',
-  accent2: '#26c0cf',
-  accentSoft: 'rgba(130,161,246,0.60)',
-  accentGlow: 'rgba(130,161,246,0.30)',
-  accentFill: 'rgba(130,161,246,0.18)',
-  onAccent: '#ffffff',
-  hot: '#f2716c',
+/** Blue canvas, white ink — the default theme. */
+export const cobaltPalette: Palette = {
+  canvas: BRAND_BLUE,
+  ink: BRAND_WHITE,
+  inkSoft: 'rgba(255,255,255,0.75)',
+  inkFaint: 'rgba(255,255,255,0.45)',
+  inkHairline: 'rgba(255,255,255,0.35)',
+  inkFill: 'rgba(255,255,255,0.10)',
+  onInk: BRAND_BLUE,
 
-  screenBase: '#06070d',
-  ink: '#eef1f8',
-  ink2: 'rgba(238,241,248,0.60)',
-  ink3: 'rgba(238,241,248,0.34)',
+  screenBase: BRAND_BLUE,
+  ink2: 'rgba(255,255,255,0.75)',
+  ink3: 'rgba(255,255,255,0.45)',
+  glass: 'rgba(255,255,255,0.10)',
+  glassHi: 'rgba(255,255,255,0.35)',
+  stroke: 'rgba(255,255,255,0.35)',
+  stroke2: 'rgba(255,255,255,0.75)',
+  sheen: 'rgba(255,255,255,0.10)',
+  hot: BRAND_WHITE,
 
-  glass: 'rgba(255,255,255,0.055)',
-  glassHi: 'rgba(255,255,255,0.10)',
-  stroke: 'rgba(255,255,255,0.11)',
-  stroke2: 'rgba(255,255,255,0.20)',
-  sheen: 'rgba(255,255,255,0.14)',
-
-  shadowColor: '#000000',
+  // Blue on blue: the legacy shadow all but vanishes on this theme, which is the
+  // correct duotone answer — a black shadow would be a third colour.
+  shadowColor: BRAND_BLUE,
   shadowOpacity: 0.55,
   shadowRadius: 50,
   shadowOffsetY: 22,
   elevation: 12,
 };
 
-export const lightPalette: Palette = {
-  accent: '#4f6dcc',
-  // oklch(0.58 0.13 205) falls outside sRGB; this is the clipped conversion. It
-  // reads as intended — flagged only so a future eye does not "correct" it back to
-  // a value the display cannot show anyway.
-  accent2: '#008f9f',
-  accentSoft: 'rgba(79,109,204,0.60)',
-  accentGlow: 'rgba(79,109,204,0.30)',
-  accentFill: 'rgba(79,109,204,0.16)',
-  onAccent: '#ffffff',
-  hot: '#cf4042',
+/** White canvas, blue ink — the mirror. */
+export const paperPalette: Palette = {
+  canvas: BRAND_WHITE,
+  ink: BRAND_BLUE,
+  inkSoft: 'rgba(0,2,218,0.75)',
+  inkFaint: 'rgba(0,2,218,0.45)',
+  inkHairline: 'rgba(0,2,218,0.35)',
+  inkFill: 'rgba(0,2,218,0.10)',
+  onInk: BRAND_WHITE,
 
-  screenBase: '#eceef5',
-  ink: '#0e1118',
-  ink2: 'rgba(14,17,24,0.62)',
-  ink3: 'rgba(14,17,24,0.38)',
+  screenBase: BRAND_WHITE,
+  ink2: 'rgba(0,2,218,0.75)',
+  ink3: 'rgba(0,2,218,0.45)',
+  glass: 'rgba(0,2,218,0.10)',
+  glassHi: 'rgba(0,2,218,0.35)',
+  stroke: 'rgba(0,2,218,0.35)',
+  stroke2: 'rgba(0,2,218,0.75)',
+  sheen: 'rgba(0,2,218,0.10)',
+  hot: BRAND_BLUE,
 
-  glass: 'rgba(255,255,255,0.58)',
-  glassHi: 'rgba(255,255,255,0.82)',
-  stroke: 'rgba(255,255,255,0.85)',
-  stroke2: 'rgba(14,17,24,0.10)',
-  sheen: 'rgba(255,255,255,0.95)',
-
-  shadowColor: '#0e1118',
+  shadowColor: BRAND_BLUE,
   shadowOpacity: 0.14,
   shadowRadius: 44,
   shadowOffsetY: 18,
   elevation: 8,
 };
 
-/** The screen gradient stops, for `expo-linear-gradient` (mock `--screen`). */
-export const screenGradient = {
-  dark: ['#0a0d18', '#06070d', '#08070e'] as const,
-  light: ['#f7f8fc', '#eceef5', '#e8eaf2'] as const,
+const PALETTES: Record<ThemeName, Palette> = {
+  cobalt: cobaltPalette,
+  paper: paperPalette,
 };
-/** Matching stop positions; the mock's 175deg reads as near-vertical in RN. */
-export const screenGradientLocations = [0, 0.575, 1] as const;
+
+/**
+ * The corner cut. Chamfered corners mean actionable; square means static
+ * (spec §3), so the cut size is a token rather than a per-surface number.
+ */
+export const Chamfer = {
+  /** Controls: buttons, fields, chips. */
+  control: 8,
+  /** Large keys — the submit key, the cockpit's one button. */
+  key: 10,
+} as const;
+
+/**
+ * The three voices: Orbitron for display, Inter for body, Space Mono for numerals
+ * and machine speech. Loaded by `design/fonts.ts`; an unresolved family falls back
+ * to the system face rather than failing.
+ */
+export const FontFamily = {
+  display: 'Orbitron_900Black',
+  displayMid: 'Orbitron_700Bold',
+  body: 'Inter_400Regular',
+  bodySemibold: 'Inter_600SemiBold',
+  bodyBold: 'Inter_700Bold',
+  mono: 'SpaceMono_400Regular',
+  monoBold: 'SpaceMono_700Bold',
+
+  // LEGACY — the not-yet-redrawn screens. Removed with the Spline Sans packages
+  // once the last of them is redrawn.
+  sans: 'SplineSans_400Regular',
+  sansSemibold: 'SplineSans_600SemiBold',
+} as const;
+
+/**
+ * The type scale: display 26/21/16/15, body 15/13.5/12.5, mono 11/10/8.5. Half
+ * points are deliberate — RN accepts them, and rounding them changes the density
+ * the design depends on.
+ */
+export const FontSize = {
+  displayXl: 26,
+  displayLg: 21,
+  displayMd: 16,
+  displaySm: 15,
+  body: 15,
+  bodySm: 13.5,
+  bodyXs: 12.5,
+  mono: 11,
+  monoSm: 10,
+  monoXs: 8.5,
+
+  // LEGACY — the glass-era scale, retired screen by screen.
+  screenTitle: 30,
+  detailTitle: 27,
+  cardTitle: 16.5,
+  tldr: 15,
+  label: 13.5,
+  labelSmall: 13,
+  meta: 12.5,
+  metaSmall: 12,
+  captionSmall: 11,
+} as const;
+
+/**
+ * The uppercase mono eyebrow used for every section label ("tl;dr", "decisions",
+ * "grounded in"). One object because it appears a dozen times and drifting letter
+ * spacing between them is immediately visible.
+ */
+export const eyebrowStyle = {
+  fontFamily: FontFamily.mono,
+  fontSize: FontSize.monoSm,
+  letterSpacing: 2,
+  textTransform: 'uppercase',
+} as const;
 
 /** Corner radii, named for what they wrap rather than by size. */
 export const Radius = {
@@ -153,50 +230,6 @@ export const Radius = {
   check: 7,
   /** Pills, tab bar, avatars. */
   pill: 999,
-} as const;
-
-/**
- * Type scale, transcribed from the mock. The mock uses half-points freely
- * (13.5, 14.5); those are kept — RN accepts fractional sizes and rounding them
- * visibly changes the density the design depends on.
- */
-export const FontSize = {
-  screenTitle: 30,
-  detailTitle: 27,
-  callTitle: 23,
-  suggestionHeadline: 17,
-  cardTitle: 16.5,
-  tldr: 15,
-  body: 14.5,
-  bodyTight: 14,
-  label: 13.5,
-  labelSmall: 13,
-  meta: 12.5,
-  metaSmall: 12,
-  caption: 11.5,
-  captionSmall: 11,
-  monoChip: 10.5,
-  eyebrow: 10,
-} as const;
-
-/** Font families. `system` is the fallback until `useNovaFonts` resolves. */
-export const FontFamily = {
-  sans: 'SplineSans_400Regular',
-  sansMedium: 'SplineSans_500Medium',
-  sansSemibold: 'SplineSans_600SemiBold',
-  mono: 'SplineSansMono_400Regular',
-} as const;
-
-/**
- * The uppercase mono eyebrow used for every section label ("tl;dr", "decisions",
- * "grounded in"). One object because it appears a dozen times and drifting letter
- * spacing between them is immediately visible.
- */
-export const eyebrowStyle = {
-  fontFamily: FontFamily.mono,
-  fontSize: FontSize.eyebrow,
-  letterSpacing: 1.4,
-  textTransform: 'uppercase',
 } as const;
 
 /**
@@ -232,17 +265,18 @@ export const Size = {
 /**
  * Resolve a palette from the RN colour scheme.
  *
- * Anything that is not explicitly `'light'` resolves to DARK — which covers `null`
- * (what `useColorScheme` returns before the system value arrives) and
- * `'unspecified'` (what it returns on a platform that has no preference). Dark is
- * the mock's default, so an unresolved scheme must not flash the light theme.
+ * Anything that is not explicitly `'light'` resolves to COBALT — which covers
+ * `null` (what `useColorScheme` returns before the system value arrives) and
+ * `'unspecified'` (what it returns on a platform with no preference). Cobalt is the
+ * default theme, so an unresolved scheme must not flash paper.
  *
  * The parameter is typed structurally rather than as RN's `ColorSchemeName` to keep
  * this module free of React Native imports — it is pure data, and pure data is
- * testable without a renderer.
+ * testable without a renderer. `'unspecified'` is part of the union because RN's
+ * `useColorScheme()` can return it, and every caller passes that value straight in.
  */
 export function paletteFor(
   scheme: 'light' | 'dark' | 'unspecified' | null | undefined,
 ): Palette {
-  return scheme === 'light' ? lightPalette : darkPalette;
+  return PALETTES[scheme === 'light' ? 'paper' : 'cobalt'];
 }

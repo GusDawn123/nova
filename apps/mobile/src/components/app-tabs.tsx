@@ -136,7 +136,7 @@ function TabButton({
       aria-selected={isFocused === true}
       style={[
         styles.tab,
-        isFocused === true && { backgroundColor: palette.accent },
+        isFocused === true && { backgroundColor: palette.ink },
       ]}
     >
       {showRecordDot ? (
@@ -147,7 +147,7 @@ function TabButton({
       <Text
         style={[
           styles.tabLabel,
-          { color: isFocused === true ? palette.onAccent : palette.ink2 },
+          { color: isFocused === true ? palette.onInk : palette.ink2 },
         ]}
       >
         {label}

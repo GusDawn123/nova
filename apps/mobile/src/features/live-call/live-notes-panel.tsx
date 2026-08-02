@@ -132,7 +132,7 @@ function Chip({
         styles.chip,
         {
           color: accent ? palette.ink : palette.ink2,
-          backgroundColor: accent ? palette.accentFill : palette.glass,
+          backgroundColor: accent ? palette.inkFill : palette.glass,
           borderColor: accent ? 'transparent' : palette.stroke,
         },
       ]}

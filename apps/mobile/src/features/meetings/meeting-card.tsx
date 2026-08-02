@@ -148,7 +148,7 @@ function StatusPill({
 
   const dotColor =
     pill.tone === 'accent'
-      ? palette.accent
+      ? palette.ink
       : pill.tone === 'hot'
         ? palette.hot
         : palette.ink3;
@@ -159,8 +159,8 @@ function StatusPill({
       style={[
         styles.statusPill,
         pill.tone === 'accent' && {
-          backgroundColor: palette.accentFill,
-          borderColor: palette.accentSoft,
+          backgroundColor: palette.inkFill,
+          borderColor: palette.inkHairline,
         },
       ]}
       testID={`status-${pill.tone}`}

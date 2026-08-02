@@ -3,7 +3,7 @@ import { Text } from 'react-native';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GlassPill, GlassSurface } from './glass';
-import { darkPalette, lightPalette, Radius } from './tokens';
+import { cobaltPalette, paperPalette, Radius } from './tokens';
 
 /**
  * Glass surface behaviour (Phase 8.5, §7.1).
@@ -25,7 +25,7 @@ vi.mock('expo-glass-effect', () => ({
 describe('GlassSurface', () => {
   it('renders its children', () => {
     render(
-      <GlassSurface palette={darkPalette}>
+      <GlassSurface palette={cobaltPalette}>
         <Text>notes go here</Text>
       </GlassSurface>,
     );
@@ -36,7 +36,7 @@ describe('GlassSurface', () => {
   it('paints its own fill and border when liquid glass is unavailable', () => {
     // The whole point of the fallback: without this the card is an invisible View
     // on every platform below iOS 26.
-    render(<GlassSurface palette={darkPalette} testID="surface" />);
+    render(<GlassSurface palette={cobaltPalette} testID="surface" />);
 
     const style = getComputedStyle(screen.getByTestId('surface'));
     expect(style.backgroundColor).not.toBe('');
@@ -47,8 +47,8 @@ describe('GlassSurface', () => {
   it('uses the raised fill for tone="raised"', () => {
     render(
       <>
-        <GlassSurface palette={darkPalette} testID="regular" />
-        <GlassSurface palette={darkPalette} tone="raised" testID="raised" />
+        <GlassSurface palette={cobaltPalette} testID="regular" />
+        <GlassSurface palette={cobaltPalette} tone="raised" testID="raised" />
       </>,
     );
 
@@ -60,8 +60,8 @@ describe('GlassSurface', () => {
   it('applies the requested radius, and the card radius by default', () => {
     render(
       <>
-        <GlassSurface palette={darkPalette} testID="default" />
-        <GlassSurface palette={darkPalette} radius={8} testID="custom" />
+        <GlassSurface palette={cobaltPalette} testID="default" />
+        <GlassSurface palette={cobaltPalette} radius={8} testID="custom" />
       </>,
     );
 
@@ -78,7 +78,7 @@ describe('GlassSurface', () => {
     // surface doing both on one node loses its shadow there while Android's
     // `elevation` — drawn by the platform, not the layer — keeps showing. Split or
     // it regresses on exactly one platform, silently.
-    render(<GlassSurface palette={darkPalette} elevated testID="elevated" />);
+    render(<GlassSurface palette={cobaltPalette} elevated testID="elevated" />);
 
     const clipped = screen.getByTestId('elevated');
     const shadowCaster = clipped.parentElement;
@@ -97,8 +97,8 @@ describe('GlassSurface', () => {
   it('renders differently under the two palettes', () => {
     render(
       <>
-        <GlassSurface palette={darkPalette} testID="dark" />
-        <GlassSurface palette={lightPalette} testID="light" />
+        <GlassSurface palette={cobaltPalette} testID="dark" />
+        <GlassSurface palette={paperPalette} testID="light" />
       </>,
     );
 
@@ -110,7 +110,7 @@ describe('GlassSurface', () => {
 
 describe('GlassPill', () => {
   it('is fully rounded', () => {
-    render(<GlassPill palette={darkPalette} testID="pill" />);
+    render(<GlassPill palette={cobaltPalette} testID="pill" />);
 
     const radius = parseFloat(
       getComputedStyle(screen.getByTestId('pill')).borderTopLeftRadius,

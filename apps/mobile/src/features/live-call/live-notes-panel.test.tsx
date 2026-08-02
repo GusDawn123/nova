@@ -4,7 +4,7 @@ import type { MeetingNotes } from '@nova/shared';
 
 import { LiveNotesPanel } from './live-notes-panel';
 import { emptyLiveNotes } from '@/features/notes/notes-update';
-import { darkPalette } from '@/design/tokens';
+import { cobaltPalette } from '@/design/tokens';
 
 /**
  * The in-call live-notes view (§5.1). Condensed on purpose: this is the preview a
@@ -43,7 +43,7 @@ function notes(overrides: Partial<MeetingNotes> = {}): MeetingNotes {
 
 describe('LiveNotesPanel', () => {
   it('says nothing has landed yet before the first update', () => {
-    render(<LiveNotesPanel state={emptyLiveNotes} palette={darkPalette} />);
+    render(<LiveNotesPanel state={emptyLiveNotes} palette={cobaltPalette} />);
 
     expect(screen.getByText(/notes start filling in/i)).toBeInTheDocument();
   });
@@ -52,7 +52,7 @@ describe('LiveNotesPanel', () => {
     render(
       <LiveNotesPanel
         state={{ notes: notes(), rev: 0, hasUnseen: false }}
-        palette={darkPalette}
+        palette={cobaltPalette}
       />,
     );
 
@@ -65,7 +65,7 @@ describe('LiveNotesPanel', () => {
     render(
       <LiveNotesPanel
         state={{ notes: notes(), rev: 1, hasUnseen: false }}
-        palette={darkPalette}
+        palette={cobaltPalette}
       />,
     );
 
@@ -79,7 +79,7 @@ describe('LiveNotesPanel', () => {
     render(
       <LiveNotesPanel
         state={{ notes: notes(), rev: 1, hasUnseen: false }}
-        palette={darkPalette}
+        palette={cobaltPalette}
       />,
     );
 
@@ -92,7 +92,7 @@ describe('LiveNotesPanel', () => {
     render(
       <LiveNotesPanel
         state={{ notes: notes(), rev: 3, hasUnseen: true }}
-        palette={darkPalette}
+        palette={cobaltPalette}
       />,
     );
 

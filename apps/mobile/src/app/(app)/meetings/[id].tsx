@@ -1,4 +1,3 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   Pressable,
@@ -18,8 +17,6 @@ import {
   Radius,
   Space,
   paletteFor,
-  screenGradient,
-  screenGradientLocations,
   type Palette,
 } from '@/design/tokens';
 import { statusToPill } from '@/features/meetings/format';
@@ -64,17 +61,7 @@ export default function MeetingDetailScreen(): React.JSX.Element {
     state.status === 'success' ? statusToPill(state.data.notes_status) : null;
 
   return (
-    <View style={styles.root}>
-      <LinearGradient
-        colors={
-          scheme === 'light'
-            ? [...screenGradient.light]
-            : [...screenGradient.dark]
-        }
-        locations={[...screenGradientLocations]}
-        style={StyleSheet.absoluteFill}
-      />
-
+    <View style={[styles.root, { backgroundColor: palette.canvas }]}>
       <ScrollView
         contentContainerStyle={[
           styles.scroll,
