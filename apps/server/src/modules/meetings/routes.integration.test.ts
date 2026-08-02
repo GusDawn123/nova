@@ -13,7 +13,7 @@ import {
 
 import { createMeetingsReader } from "../../db/meetings.js";
 
-import type { MeetingsLogger } from "./ports.js";
+import type { MeetingsLogger, MeetingsReader } from "./ports.js";
 import { createMeetingsRoutes } from "./routes.js";
 
 /**
@@ -143,9 +143,15 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     return id;
   }
 
+  /**
+   * Write the notes jsonb. Deliberately accepts an ARBITRARY object, not just
+   * {@link MeetingNotes}: the column is jsonb and nothing in Postgres constrains its
+   * shape, so a row matching neither the v1 nor the v2 arm is a state the reader has
+   * to survive — and the only honest way to seed it is to write it raw.
+   */
   async function setNotes(
     meetingId: string,
-    notes: MeetingNotes,
+    notes: MeetingNotes | Record<string, unknown>,
     status = "completed",
   ): Promise<void> {
     await pool.query(
@@ -186,11 +192,25 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     const instance = Fastify({ logger: false });
     void instance.register(
       createMeetingsRoutes({
-        reader: createMeetingsReader(),
+        // The reader gets the capturing logger too — the per-row degradation it
+        // performs is only observable through the line it emits.
+        reader: createMeetingsReader({ logger: log.logger }),
         logger: log.logger,
         now: () => NOW,
         ...(listLimit === undefined ? {} : { listLimit }),
       }),
+    );
+    return instance;
+  }
+
+  /** An app over an injected reader — used to drive DB failures deterministically. */
+  function buildAppWithReader(
+    reader: MeetingsReader,
+    logger: MeetingsLogger,
+  ): FastifyInstance {
+    const instance = Fastify({ logger: false });
+    void instance.register(
+      createMeetingsRoutes({ reader, logger, now: () => NOW }),
     );
     return instance;
   }
@@ -315,6 +335,52 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     expect(raw).not.toContain("overview");
     expect(raw).not.toContain("actionItems");
     expect(raw).not.toContain("decisions");
+  });
+
+  it("degrades ONE malformed notes row to null and still renders the rest", async () => {
+    // The blast-radius case. `meetings.notes` is jsonb with no shape constraint, so
+    // one document matching neither the v1 nor the v2 arm is reachable — and a
+    // page-wide `.parse()` used to throw on it and answer 500 for the caller's
+    // ENTIRE history. One bad row may cost its own summary line and nothing else.
+    await resetMeetings();
+    const good = await newMeeting(userAId, "Good", "2026-07-22T12:00:00Z");
+    await setNotes(good, notesWith("Three vendors, $40k left.", "sales", 3));
+    const bad = await newMeeting(userAId, "Bad blob", "2026-07-22T11:00:00Z");
+    await setNotes(bad, { version: 7, shape: "from the future", tldr: 42 });
+
+    const before = log.lines.filter(
+      (l) => l.msg === "meetings.list.notes_unreadable",
+    ).length;
+
+    const res = await app.inject({
+      method: "GET",
+      url: "/meetings",
+      headers: auth(tokenA),
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = meetingListResponseSchema.parse(res.json());
+    expect(body.meetings.map((m) => m.id)).toEqual([good, bad]);
+    // The good row is untouched by its neighbour's rot.
+    expect(body.meetings[0]?.tldr).toBe("Three vendors, $40k left.");
+    expect(body.meetings[0]?.action_item_count).toBe(3);
+    // The bad row is PRESENT, just summary-less — the card, the title and the
+    // timestamps all still come from columns that parsed fine.
+    expect(body.meetings[1]?.title).toBe("Bad blob");
+    expect(body.meetings[1]?.tldr).toBeNull();
+    expect(body.meetings[1]?.conversation_type).toBeNull();
+    expect(body.meetings[1]?.action_item_count).toBe(0);
+
+    // Degrading SILENTLY would hide a real data problem: the row is logged by id.
+    const emitted = log.lines.filter(
+      (l) => l.msg === "meetings.list.notes_unreadable",
+    );
+    expect(emitted).toHaveLength(before + 1);
+    const line = emitted[emitted.length - 1];
+    expect(line?.fields.meeting_id).toBe(bad);
+    expect(line?.fields.user_id).toBe(userAId);
+    // Ids only — never the document that failed to parse (RULES §10).
+    expect(JSON.stringify(line?.fields)).not.toContain("from the future");
   });
 
   it("falls back to the LIVE tldr while the pipeline is still running", async () => {
@@ -500,8 +566,14 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
   it("sorts null ts_ms last instead of ahead of every timed turn", async () => {
     await resetMeetings();
     const id = await newMeeting(userAId, "Call", "2026-07-22T10:00:00Z");
+    // The null turn goes in the MIDDLE of the insertion (created_at) sequence on
+    // purpose. With it inserted first, an implementation that ordered by
+    // `created_at` alone would produce a plausible-looking answer for the wrong
+    // reason; sandwiched between two timed turns, only the real ordering
+    // (`ts_ms` asc NULLS LAST, `created_at` as the tie-break) puts it at the end.
+    await addTurn(id, userAId, "dana", 4_000, "First timed.");
     await addTurn(id, userAId, null, null, "No timestamp.");
-    await addTurn(id, userAId, "dana", 4_000, "Timed.");
+    await addTurn(id, userAId, "dana", 19_000, "Second timed.");
 
     const res = await app.inject({
       method: "GET",
@@ -511,7 +583,8 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
 
     const body = meetingTranscriptResponseSchema.parse(res.json());
     expect(body.turns.map((t) => t.content)).toEqual([
-      "Timed.",
+      "First timed.",
+      "Second timed.",
       "No timestamp.",
     ]);
   });
@@ -589,5 +662,78 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
       url: `/meetings/${randomUUID()}/transcript`,
     });
     expect(res.statusCode).toBe(401);
+  });
+
+  // --- reader failures --------------------------------------------------------
+
+  /** A reader whose every method rejects with a DB-shaped message. */
+  const DB_DETAIL = "listMeetings failed: relation meetings does not exist";
+  function brokenReader(): MeetingsReader {
+    const fail = (): Promise<never> => Promise.reject(new Error(DB_DETAIL));
+    return {
+      listMeetings: fail,
+      countMeetingsSince: fail,
+      readTranscript: fail,
+    };
+  }
+
+  it("answers a typed 500 (no DB detail) when the LIST read fails", async () => {
+    // Left unhandled this reaches Fastify's default error handler, which puts
+    // `error.message` — a raw Postgres string — in the response body.
+    const brokenLog = capturingLogger();
+    const broken = buildAppWithReader(brokenReader(), brokenLog.logger);
+    await broken.ready();
+    try {
+      const res = await broken.inject({
+        method: "GET",
+        url: "/meetings",
+        headers: auth(tokenA),
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: "internal" });
+      // Exactly the typed shape: no `message`, no `statusCode`, no schema names.
+      expect(res.body).not.toContain("relation meetings");
+      expect(res.body).not.toContain("listMeetings");
+      // Failing silently would hide the outage — it belongs in the logs, with the
+      // ids needed to find the request.
+      const line = brokenLog.lines.find(
+        (l) => l.msg === "meetings.list.read_failed",
+      );
+      expect(line?.fields.user_id).toBe(userAId);
+      expect(line?.fields.request_id).toBeTruthy();
+      expect(line?.fields.error).toBe(DB_DETAIL);
+    } finally {
+      await broken.close();
+    }
+  });
+
+  it("answers a typed 500 (no DB detail) when the TRANSCRIPT read fails", async () => {
+    const brokenLog = capturingLogger();
+    const broken = buildAppWithReader(brokenReader(), brokenLog.logger);
+    await broken.ready();
+    const meetingId = randomUUID();
+    try {
+      const res = await broken.inject({
+        method: "GET",
+        url: `/meetings/${meetingId}/transcript`,
+        headers: auth(tokenA),
+      });
+
+      expect(res.statusCode).toBe(500);
+      expect(res.json()).toEqual({ error: "internal" });
+      expect(res.body).not.toContain("relation meetings");
+      // A read failure is NOT the uniform 404: conflating them would tell a caller
+      // their meeting is gone every time the database hiccups.
+      expect(res.body).not.toContain("not_found");
+      const line = brokenLog.lines.find(
+        (l) => l.msg === "meetings.transcript.read_failed",
+      );
+      expect(line?.fields.user_id).toBe(userAId);
+      expect(line?.fields.meeting_id).toBe(meetingId);
+      expect(line?.fields.request_id).toBeTruthy();
+    } finally {
+      await broken.close();
+    }
   });
 });

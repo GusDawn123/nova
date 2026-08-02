@@ -425,7 +425,9 @@ function maybeRegisterMeetingsRoutes(app: FastifyInstance): void {
 
   void app.register(
     createMeetingsRoutes({
-      reader: createMeetingsReader(),
+      // The reader logs the rows it had to degrade (one unreadable notes blob no
+      // longer fails the page) — ids only, never the document.
+      reader: createMeetingsReader({ logger: app.log }),
       logger: app.log,
     }),
   );
@@ -437,12 +439,14 @@ function maybeRegisterNotesRoutes(
   quota: QuotaChecker | undefined,
   killSwitch: KillSwitch | undefined,
 ): void {
-  if (
-    !isSupabaseConfigured(process.env) ||
-    !isJobStoreConfigured(process.env)
-  ) {
-    return;
-  }
+  // Gated on the supabase-js seam ALONE — the same gate the meetings routes use.
+  // why: this used to also require SUPABASE_DB_URL, so a boot with SUPABASE_URL +
+  // SERVICE_ROLE_KEY and no DB url mounted the meetings LIST but not the notes GET,
+  // and the mobile screen renders that 404 as "this meeting is no longer available"
+  // — a config gap wearing a deleted-data message. The pool-backed seams below are
+  // now optional and each degrades to its own typed 503/empty answer instead
+  // (RULES: missing env → typed degraded error, the server still boots).
+  if (!isSupabaseConfigured(process.env)) return;
 
   const providers = createProvidersFromEnv(llmProviderEnv(process.env));
   // why: metering joins the CONDITION rather than being spread in optionally, so the
@@ -464,18 +468,27 @@ function maybeRegisterNotesRoutes(
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 
-  // The pool comes back with the store: this gate already required
-  // SUPABASE_DB_URL, so the live-notes store rides the same memoised pool rather
-  // than opening a fourth one (the db/plans.ts + db/roles.ts precedent).
-  const { store, pool } = notesJobStoreFromEnv(process.env);
+  // The pool comes back with the store, so the live-notes and completion stores
+  // ride the same memoised pool rather than opening a fourth one (the db/plans.ts +
+  // db/roles.ts precedent). All three are absent together on a DB-url-less boot:
+  // regenerate then 503s `regenerate_unavailable`, the completion write 503s
+  // `completion_unavailable`, and the GET still serves notes with `live_notes: null`
+  // and `completed_item_ids: []`.
+  const pgSeams = isJobStoreConfigured(process.env)
+    ? notesJobStoreFromEnv(process.env)
+    : undefined;
   void app.register(
     createNotesRoutes({
       reader: createNotesReader(),
-      liveNotes: createLiveNotesStore(pool),
-      // Action-item completion (Phase 8.5) — same memoised pool again.
-      noteItemState: createNoteItemStateStore(pool),
       followUpWriter: createFollowUpWriter(),
-      store,
+      ...(pgSeams
+        ? {
+            store: pgSeams.store,
+            liveNotes: createLiveNotesStore(pgSeams.pool),
+            // Action-item completion (Phase 8.5) — same memoised pool again.
+            noteItemState: createNoteItemStateStore(pgSeams.pool),
+          }
+        : {}),
       followUp,
       logger: app.log,
       // Request-time llm quota gate for follow-up (typed 429 quota_exceeded).

@@ -248,7 +248,10 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     const id = await newMeeting(userAId);
     await setNotes(id, notesWithItems(["Send the comparison."]));
 
-    await check(id, "a1");
+    // Every intermediate write is asserted: a discarded status lets this case pass
+    // on a route that 503s or 404s throughout, since "never checked" and "checked
+    // then unchecked" both read as [].
+    expect(await check(id, "a1")).toBe(200);
     expect(await check(id, "a1", false)).toBe(200);
     expect(await readCompleted(id)).toEqual([]);
   });
@@ -257,8 +260,8 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     const id = await newMeeting(userAId);
     await setNotes(id, notesWithItems(["Send the comparison."]));
 
-    await check(id, "a1");
-    await check(id, "a1");
+    expect(await check(id, "a1")).toBe(200);
+    expect(await check(id, "a1")).toBe(200);
     expect(await readCompleted(id)).toEqual(["a1"]);
   });
 
@@ -436,13 +439,17 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     const id = await newMeeting(userAId);
     await setNotes(id, notesWithItems(["Send the scope comparison."]));
 
-    await app.inject({
+    const res = await app.inject({
       method: "PUT",
       url: `/meetings/${id}/notes/items/a1`,
       headers: auth(tokenA),
       // Extra keys are ignored by the body schema; assert the DB agrees.
       payload: { completed: true, item_text: "anything I like" },
     });
+    // Assert the write LANDED before reading the row back — otherwise a rejected
+    // write leaves zero rows and `row.rows[0]?.item_text` is undefined, which is
+    // not "anything I like" either, and the case passes for the wrong reason.
+    expect(res.statusCode).toBe(200);
 
     const row = await pool.query<{ item_text: string }>(
       "select item_text from note_item_state where meeting_id = $1",

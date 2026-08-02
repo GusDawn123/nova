@@ -3,11 +3,13 @@ import {
   meetingTranscriptTurnSchema,
   notesStatusSchema,
   storedNotesSchema,
+  type MeetingNotes,
   type MeetingTranscriptTurn,
 } from "@nova/shared";
 
 import type {
   MeetingListRow,
+  MeetingsLogger,
   MeetingsReader,
 } from "../modules/meetings/index.js";
 
@@ -30,13 +32,13 @@ const TRANSCRIPTS_TABLE = "transcripts";
 const LIVE_NOTES_TABLE = "live_notes";
 
 /**
- * The meeting columns the list needs.
+ * The meeting columns the list needs, MINUS the notes blob.
  *
- * `notes` parses through {@link storedNotesSchema} — the v1 ∪ v2 READ boundary — not
- * `meetingNotesSchema`, which is `version: z.literal(2)` and would throw on every row
- * written before the v2 split. This is the upcast a client reading PostgREST directly
- * could not perform, and the reason `GET /meetings` exists (adr-0006 / live-notes.md
- * §2).
+ * Everything here stays strict: an id, title, or status that does not parse is a
+ * schema/adapter bug, and swallowing it would hide the real breakage.
+ *
+ * `notes` is deliberately `z.unknown()` and parsed per row by {@link parseStoredNotes}
+ * instead — see that function for why one bad document must not take out the page.
  *
  * `follow_up` is read as a bare presence check (`z.unknown()`): the list only renders
  * a chip, and parsing a draft we are about to discard would let a malformed historical
@@ -48,21 +50,56 @@ const meetingListRowSchema = z.object({
   started_at: z.string().nullable(),
   ended_at: z.string().nullable(),
   notes_status: notesStatusSchema,
-  notes: storedNotesSchema.nullable(),
+  notes: z.unknown(),
   follow_up: z.unknown().nullable(),
 });
 
-/** The live-notes preview columns used for the tldr fallback. */
+/** The live-notes preview columns used for the tldr fallback (notes parsed per row). */
 const liveNotesRowSchema = z.object({
   meeting_id: z.string(),
-  notes: storedNotesSchema,
+  notes: z.unknown(),
 });
 
 /** One transcript turn, in the shared wire shape (parsed at the boundary). */
 const transcriptRowSchema = meetingTranscriptTurnSchema;
 
-/** Ownership + liveness probe: the id back, or nothing. */
-const meetingIdRowSchema = z.object({ id: z.string() });
+/** Logging seam for the reader — ids only, never a payload (RULES §10). */
+export interface MeetingsReaderDeps {
+  readonly logger?: MeetingsLogger;
+}
+
+/** Used when no logger is injected; the routes always inject the real one. */
+const SILENT_LOGGER: MeetingsLogger = {
+  info: () => undefined,
+  error: () => undefined,
+};
+
+/**
+ * Parse one row's stored notes through {@link storedNotesSchema} — the v1 ∪ v2 READ
+ * boundary, not `meetingNotesSchema` (`version: z.literal(2)`, which would throw on
+ * every row written before the v2 split). That upcast is the work a client reading
+ * PostgREST directly could not do, and the reason `GET /meetings` exists (adr-0006 /
+ * live-notes.md §2).
+ *
+ * why: a `.parse()` here used to run inside a page-wide `.map()`, so ONE stored
+ * document matching neither arm threw and answered 500 for the caller's entire
+ * history. A malformed blob is now scoped to its own row: that meeting renders with
+ * no summary, every other meeting is unaffected, and the row is logged by ID so the
+ * bad document is findable. The log carries no notes/transcript content (RULES §10).
+ */
+function parseStoredNotes(
+  value: unknown,
+  meetingId: string,
+  userId: string,
+  logger: MeetingsLogger,
+  event: string,
+): MeetingNotes | null {
+  if (value === null || value === undefined) return null;
+  const parsed = storedNotesSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  logger.error({ meeting_id: meetingId, user_id: userId }, event);
+  return null;
+}
 
 /**
  * Build a {@link MeetingsReader} over the env-configured service-role client.
@@ -74,7 +111,11 @@ const meetingIdRowSchema = z.object({ id: z.string() });
  * skipped entirely when every meeting already has post-call notes, and reads the way
  * the fallback rule reads.
  */
-export function createMeetingsReader(): MeetingsReader {
+export function createMeetingsReader(
+  deps: MeetingsReaderDeps = {},
+): MeetingsReader {
+  const logger = deps.logger ?? SILENT_LOGGER;
+
   return {
     async listMeetings(
       userId: string,
@@ -98,7 +139,19 @@ export function createMeetingsReader(): MeetingsReader {
 
       // No `?? []`: the error check above narrows `data` off its null arm, and a
       // dead fallback here would mask a future shape change rather than surface it.
-      const rows = res.data.map((row) => meetingListRowSchema.parse(row));
+      const rows = res.data.map((row) => {
+        const parsed = meetingListRowSchema.parse(row);
+        return {
+          ...parsed,
+          notes: parseStoredNotes(
+            parsed.notes,
+            parsed.id,
+            userId,
+            logger,
+            "meetings.list.notes_unreadable",
+          ),
+        };
+      });
 
       // Only calls with no post-call notes can use the live fallback, so the
       // second query is scoped to exactly those — usually none.
@@ -106,6 +159,7 @@ export function createMeetingsReader(): MeetingsReader {
       const liveByMeeting = await readLivePreviews(
         needsLive.map((row) => row.id),
         userId,
+        logger,
       );
 
       return rows.map((row) => ({
@@ -127,6 +181,12 @@ export function createMeetingsReader(): MeetingsReader {
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId)
         .is("deleted_at", null)
+        // why: this DELIBERATELY diverges from listMeetings, which keeps
+        // null-`started_at` meetings (a call created but never connected) and sorts
+        // them last. `.gte` drops them, and that is the intent: the port contract is
+        // "calls STARTED at or after `since`" (modules/meetings/ports.ts), so a call
+        // that never started belongs in no month's count. The list shows everything
+        // you own; the counter counts everything you actually held.
         .gte("started_at", since.toISOString());
       if (res.error) {
         throw new Error(`countMeetingsSince failed: ${res.error.message}`);
@@ -155,7 +215,6 @@ export function createMeetingsReader(): MeetingsReader {
         throw new Error(`readTranscript owner check: ${owner.error.message}`);
       }
       if (owner.data === null) return null;
-      meetingIdRowSchema.parse(owner.data);
 
       const res = await client
         .from(TRANSCRIPTS_TABLE)
@@ -168,7 +227,23 @@ export function createMeetingsReader(): MeetingsReader {
       if (res.error) {
         throw new Error(`readTranscript failed: ${res.error.message}`);
       }
-      return res.data.map((row) => transcriptRowSchema.parse(row));
+
+      // Per-TURN degradation, for the same reason the notes blob degrades per row:
+      // one unreadable turn must not blank the whole transcript. The turn is dropped
+      // and counted in the logs by meeting id — never by content (RULES §10).
+      const turns: MeetingTranscriptTurn[] = [];
+      for (const row of res.data) {
+        const parsed = transcriptRowSchema.safeParse(row);
+        if (!parsed.success) {
+          logger.error(
+            { meeting_id: meetingId, user_id: userId },
+            "meetings.transcript.turn_unreadable",
+          );
+          continue;
+        }
+        turns.push(parsed.data);
+      }
+      return turns;
     },
   };
 }
@@ -177,6 +252,7 @@ export function createMeetingsReader(): MeetingsReader {
 async function readLivePreviews(
   meetingIds: readonly string[],
   userId: string,
+  logger: MeetingsLogger,
 ): Promise<Map<string, MeetingListRow["liveNotes"]>> {
   const out = new Map<string, MeetingListRow["liveNotes"]>();
   if (meetingIds.length === 0) return out;
@@ -194,7 +270,16 @@ async function readLivePreviews(
 
   for (const row of res.data) {
     const parsed = liveNotesRowSchema.parse(row);
-    out.set(parsed.meeting_id, parsed.notes);
+    const notes = parseStoredNotes(
+      parsed.notes,
+      parsed.meeting_id,
+      userId,
+      logger,
+      "meetings.list.live_notes_unreadable",
+    );
+    // A malformed preview leaves the meeting OUT of the map — the card then falls
+    // back to no tldr, exactly as if the fold had never run for it.
+    if (notes !== null) out.set(parsed.meeting_id, notes);
   }
   return out;
 }

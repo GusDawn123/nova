@@ -4,7 +4,7 @@ One always-on system prompt, one file per mode, and categories that are not mode
 
 ## How it composes
 
-```
+```text
 SYSTEM_PROMPT          general rules — always on, whatever the user picked
         +
 MODES[picked]          that domain's directive + answer structure + its examples

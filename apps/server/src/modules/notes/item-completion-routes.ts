@@ -8,6 +8,7 @@ import { requireAuth } from "../../plugins/auth.js";
 
 import { completedItemIds } from "./item-completion.js";
 import type { NotesLogger, NotesReader } from "./ports.js";
+import { selectRenderedNotes, userIdOf } from "./route-helpers.js";
 
 /**
  * The action-item completion surface (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3),
@@ -88,9 +89,9 @@ export async function readCompletedIds(
 }
 
 /**
- * The notes a completion decision is made against: post-call when they exist, else
- * the live preview — the same choice the GET makes, so the client can only ever
- * check an item it is actually looking at.
+ * READ the notes a completion decision is made against, then pick which of them
+ * render via the shared {@link selectRenderedNotes} — the same one-line rule the
+ * notes GET applies, so the client can only ever check an item it is looking at.
  *
  * A live-notes outage here degrades to `null` (→ a 404 on the write) rather than
  * throwing. Best-effort, matching every other live-notes read.
@@ -103,24 +104,28 @@ async function renderedNotes(
 ): Promise<MeetingNotes | null> {
   const model = await deps.reader.readNotes(meetingId, userId);
   if (model === null) return null;
-  if (model.notes !== null) return model.notes;
-  if (!deps.liveNotes) return null;
 
-  try {
-    const live = await deps.liveNotes.readLiveNotes(meetingId, userId);
-    return live?.notes ?? null;
-  } catch (err: unknown) {
-    deps.logger.error(
-      {
-        request_id: requestId,
-        user_id: userId,
-        meeting_id: meetingId,
-        error: err instanceof Error ? err.message : String(err),
-      },
-      "notes.routes.item_completion_live_read_failed",
-    );
-    return null;
+  // The preview is read ONLY when there are no post-call notes: it is the selector's
+  // fallback arm, so fetching it otherwise buys a query whose answer is discarded.
+  let live: MeetingNotes | null = null;
+  if (model.notes === null && deps.liveNotes) {
+    try {
+      const read = await deps.liveNotes.readLiveNotes(meetingId, userId);
+      live = read?.notes ?? null;
+    } catch (err: unknown) {
+      deps.logger.error(
+        {
+          request_id: requestId,
+          user_id: userId,
+          meeting_id: meetingId,
+          error: err instanceof Error ? err.message : String(err),
+        },
+        "notes.routes.item_completion_live_read_failed",
+      );
+    }
   }
+
+  return selectRenderedNotes(model.notes, live);
 }
 
 /**
@@ -142,12 +147,7 @@ export function registerItemCompletionRoute(
       const params = itemParamsSchema.safeParse(request.params);
       if (!params.success) return reply.code(404).send(NOT_FOUND);
 
-      const user = request.user;
-      if (user === undefined) {
-        // Unreachable: requireAuth either populated user or already replied.
-        throw new Error("requireAuth did not populate request.user");
-      }
-      const userId = user.id;
+      const userId = userIdOf(request);
       const meetingId = params.data.id;
 
       const store = deps.noteItemState;

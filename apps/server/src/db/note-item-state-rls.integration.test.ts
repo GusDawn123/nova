@@ -166,7 +166,7 @@ describe.skipIf(!hasStack)("note_item_state RLS posture (local stack)", () => {
     expect(res.data ?? []).toHaveLength(0);
   });
 
-  it("[note-item-state-isolation] A cannot read its OWN soft-deleted row", async () => {
+  it("[note-item-state-isolation] B cannot read its OWN soft-deleted row", async () => {
     // The lesson from 20260728120000: live_notes' policy checked ownership alone,
     // so a stamped deleted_at removed the row from every application read while
     // PostgREST still served it to the owner's JWT. This policy filters

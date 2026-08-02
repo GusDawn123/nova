@@ -47,6 +47,13 @@ export const DEFAULT_LIST_LIMIT = 100;
 
 /** Uniform not-found body — identical for deleted/foreign/unknown meetings. */
 const NOT_FOUND = { error: "not_found" } as const;
+/**
+ * Uniform failure body. why: an unhandled throw reaches Fastify's default error
+ * handler, which serialises `error.message` to the client — and every message this
+ * reader throws is a DB error string ("listMeetings failed: …"). A read outage must
+ * say nothing more than that it failed; the detail belongs in the logs.
+ */
+const INTERNAL = { error: "internal" } as const;
 /** Path param: a non-uuid `:id` is a uniform 404, never a 400. */
 const paramsSchema = z.object({ id: z.string().uuid() });
 
@@ -83,10 +90,24 @@ export function createMeetingsRoutes(
       async (request, reply): Promise<FastifyReply> => {
         const userId = userIdOf(request);
 
-        const [rows, monthCount] = await Promise.all([
-          reader.listMeetings(userId, listLimit),
-          reader.countMeetingsSince(userId, startOfUtcMonth(now())),
-        ]);
+        let rows: Awaited<ReturnType<MeetingsReader["listMeetings"]>>;
+        let monthCount: number;
+        try {
+          [rows, monthCount] = await Promise.all([
+            reader.listMeetings(userId, listLimit),
+            reader.countMeetingsSince(userId, startOfUtcMonth(now())),
+          ]);
+        } catch (err: unknown) {
+          logger.error(
+            {
+              request_id: request.id,
+              user_id: userId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "meetings.list.read_failed",
+          );
+          return reply.code(500).send(INTERNAL);
+        }
 
         // A full page means there are probably more. Say so in the logs; the
         // response cannot say it until paging exists, and pretending the list is
@@ -119,7 +140,21 @@ export function createMeetingsRoutes(
         const meetingId = parsed.data.id;
         const userId = userIdOf(request);
 
-        const turns = await reader.readTranscript(meetingId, userId);
+        let turns: Awaited<ReturnType<MeetingsReader["readTranscript"]>>;
+        try {
+          turns = await reader.readTranscript(meetingId, userId);
+        } catch (err: unknown) {
+          logger.error(
+            {
+              request_id: request.id,
+              user_id: userId,
+              meeting_id: meetingId,
+              error: err instanceof Error ? err.message : String(err),
+            },
+            "meetings.transcript.read_failed",
+          );
+          return reply.code(500).send(INTERNAL);
+        }
         // null = missing/foreign/deleted. An EMPTY ARRAY is a real answer and must
         // reach the client as 200 `{turns: []}` — a call that has not spoken yet.
         if (turns === null) return reply.code(404).send(NOT_FOUND);

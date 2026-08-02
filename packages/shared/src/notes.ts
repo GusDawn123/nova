@@ -443,8 +443,12 @@ export const notesReadResponseSchema = z.object({
    * hard parse failure there would take out the entire notes screen over a
    * checkbox array. Absent reads as "nothing checked", which is both the truthful
    * answer for a server that has no completion state and the safe direction.
+   *
+   * The default is a FACTORY: `.default([])` hands the SAME array instance to every
+   * parse that omits the field, so one in-place mutation downstream would be seen by
+   * every other caller. `() => []` mints a fresh one each time.
    */
-  completed_item_ids: z.array(noteIdSchema).default([]),
+  completed_item_ids: z.array(noteIdSchema).default(() => []),
 });
 export type NotesReadResponse = z.infer<typeof notesReadResponseSchema>;
 

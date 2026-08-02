@@ -86,7 +86,7 @@ export function createNoteItemStateStore(pool: Pool): NoteItemStateStore {
       // row — "the user unchecked this" is a fact worth keeping distinct from "the
       // user never touched this", and a delete would let a stale client re-read the
       // absence as the latter.
-      await pool.query(
+      const res = await pool.query(
         `insert into note_item_state
            (meeting_id, user_id, item_id, item_text, completed_at, updated_at)
          values ($1, $2, $3, $4, $5, $6)
@@ -96,7 +96,15 @@ export function createNoteItemStateStore(pool: Pool): NoteItemStateStore {
                updated_at = excluded.updated_at,
                -- Un-delete on write: a soft-deleted row that the user acts on again
                -- is live again, not a silently ignored no-op.
-               deleted_at = null`,
+               deleted_at = null
+           -- The conflict target is the PK (meeting_id, item_id), which carries NO
+           -- user predicate — so without this WHERE the update would happily rewrite
+           -- a row owned by someone else, and this pool is service-role (RLS is
+           -- bypassed here, exactly as the file header warns). Route-level ownership
+           -- makes that unreachable today; this keeps it unreachable at the data
+           -- layer, where the guarantee cannot be refactored away upstream.
+           where note_item_state.user_id = excluded.user_id
+         returning item_id`,
         [
           meetingId,
           userId,
@@ -106,6 +114,16 @@ export function createNoteItemStateStore(pool: Pool): NoteItemStateStore {
           now.toISOString(),
         ],
       );
+
+      // Zero rows means the WHERE above rejected the update: the row at this
+      // (meeting_id, item_id) belongs to another user. Silence would let the write
+      // look successful and then vanish on the next read — the unchecks-itself bug
+      // this feature exists to prevent. Ids only in the message, never item text.
+      if (res.rowCount === 0) {
+        throw new Error(
+          `setCompleted wrote no row (meeting ${meetingId} item ${itemId}): owned by another user`,
+        );
+      }
     },
   };
 }

@@ -20,6 +20,7 @@ import {
   registerItemCompletionRoute,
 } from "./item-completion-routes.js";
 import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
+import { selectRenderedNotes, userIdOf } from "./route-helpers.js";
 
 /**
  * The authed notes REST surface (adr-0006 §REST-surface). Three routes, all behind
@@ -40,7 +41,16 @@ import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
 export interface NotesRoutesDeps {
   readonly reader: NotesReader;
   readonly followUpWriter: FollowUpWriter;
-  readonly store: NotesJobStore;
+  /**
+   * The durable job queue behind `POST /notes/regenerate`. OPTIONAL for the same
+   * partially-configured boot posture as {@link liveNotes}: the queue needs
+   * `SUPABASE_DB_URL`, while the READ surface needs only the supabase-js seam, and a
+   * boot with one but not the other must still serve the notes a user already has.
+   * Unwired means a typed 503 from regenerate — never an unmounted route, because an
+   * unmounted route 404s and the mobile screen reads a 404 as "this meeting is no
+   * longer available".
+   */
+  readonly store?: NotesJobStore;
   /** The follow-up runner (cites notes by construction — {@link FollowUpInput}). */
   readonly followUp: (input: FollowUpInput) => Promise<FollowUpResult>;
   readonly logger: NotesLogger;
@@ -81,17 +91,6 @@ const paramsSchema = z.object({ id: z.string().uuid() });
 /** POST /follow-up body — module-local (the request shape is a thin `{tone}`). */
 const followUpBodySchema = z.object({ tone: followUpToneSchema });
 
-
-/** The authenticated caller's id (requireAuth guarantees `request.user` is set). */
-function userIdOf(request: FastifyRequest): string {
-  const user = request.user;
-  if (user === undefined) {
-    // Unreachable: requireAuth either populated user or already replied.
-    throw new Error("requireAuth did not populate request.user");
-  }
-  return user.id;
-}
-
 /** Parse `:id`; reply a uniform 404 and return null when it is not a uuid. */
 async function parseMeetingId(
   request: FastifyRequest,
@@ -109,7 +108,7 @@ async function parseMeetingId(
 export function createNotesRoutes(
   deps: NotesRoutesDeps,
 ): (app: FastifyInstance) => Promise<void> {
-  const { reader, followUpWriter, store, followUp, logger } = deps;
+  const { reader, followUpWriter, followUp, logger } = deps;
   const now = deps.now ?? ((): Date => new Date());
 
   // eslint-disable-next-line @typescript-eslint/require-await -- why: Fastify's plugin signature is `(app) => Promise<void>`; registration awaits nothing.
@@ -158,7 +157,7 @@ export function createNotesRoutes(
         // carries the live item's id onto its post-call counterpart, so the stored
         // row still matches by id, and the text guard still matches by similarity
         // even though the post-call pass reworded it.
-        const rendered = model.notes ?? live?.notes ?? null;
+        const rendered = selectRenderedNotes(model.notes, live?.notes ?? null);
         const completed = await readCompletedIds(
           deps.noteItemState,
           rendered,
@@ -205,6 +204,14 @@ export function createNotesRoutes(
         // uniformly BEFORE we ever enqueue a job for it.
         const model = await reader.readNotes(meetingId, userId);
         if (model === null) return reply.code(404).send(NOT_FOUND);
+
+        // Queue unwired (the partially-configured boot posture) — a typed 503, the
+        // same shape the completion write answers. A silent success would leave the
+        // client waiting forever for a job nobody enqueued.
+        const store = deps.store;
+        if (!store) {
+          return reply.code(503).send({ error: "regenerate_unavailable" });
+        }
 
         if (await store.hasActive(meetingId)) {
           return reply.code(409).send({ error: "already_running" });
