@@ -2,6 +2,7 @@ import type { Session } from '@supabase/supabase-js';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { tabBarClearance } from '@/design/tab-bar-metrics';
 import { cobaltPalette, paperPalette } from '@/design/tokens';
 import { AppearanceProvider } from '@/hooks/use-appearance';
 import type { UseAuth } from '@/hooks/use-auth';
@@ -123,6 +124,19 @@ describe('AccountScreen — the facts', () => {
       '11111111-1111-4111-8111-111111111111',
     );
     expect(screen.getByText(/1\.2\.3/)).toBeInTheDocument();
+  });
+
+  it('leaves the floating tab bar room to float over', async () => {
+    // Account became a TAB in the last task of the redesign. The bar is absolutely
+    // positioned and reserves no layout space, so without this padding the last
+    // thing on the screen — DELETE ACCOUNT — sits underneath it, untappable.
+    renderAccount();
+    await settle();
+
+    const content = screen.getByTestId('account-scroll').querySelector('div');
+    if (content === null) throw new Error('expected a content container');
+
+    expect(getComputedStyle(content).paddingBottom).toBe(`${tabBarClearance(0)}px`);
   });
 
   it('renders nothing at all without a session', async () => {

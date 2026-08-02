@@ -180,13 +180,14 @@ describe('MeetingsScreen — the archive', () => {
     expect(getComputedStyle(content).paddingBottom).toBe(`${tabBarClearance(0)}px`);
   });
 
-  it('keeps a way through to the account', () => {
+  it('no longer carries the account key — the tab bar owns that route now', () => {
+    // The key was a bridge, parked in this header only because Account had no tab.
+    // It has one (`◌ ACCOUNT`), and two doors to the same room is one too many.
     succeed([item()]);
 
     render(<MeetingsScreen />);
-    fireEvent.click(screen.getByTestId('account-button'));
 
-    expect(router.push).toHaveBeenCalledWith('/account');
+    expect(screen.queryByTestId('account-button')).toBeNull();
   });
 });
 

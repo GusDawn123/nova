@@ -5,10 +5,10 @@ import { Space, type Palette } from './tokens';
  * measurements and colour decisions that must not drift from `app-tabs.tsx`, kept
  * here because `app-tabs.tsx` cannot be imported without a navigator.
  *
- * The mock replaced the native tab bar with a glass pill floating above the
- * content, which means `position: absolute` — and an absolutely positioned bar
- * reserves NO layout space. A native tab bar shrinks the screen for you; this one
- * does not, so every screen has to leave room for it deliberately.
+ * The design replaced the native tab bar with a bar floating above the content,
+ * which means `position: absolute` — and an absolutely positioned bar reserves NO
+ * layout space. A native tab bar shrinks the screen for you; this one does not, so
+ * every screen has to leave room for it deliberately.
  *
  * That obligation was invisible: the number lived in one screen's style block as a
  * literal, and the Live screen never got it — its "Start session" button rendered
@@ -43,8 +43,8 @@ export function tabBarClearance(insetBottom: number): number {
  * the Live tab selected, which is where the user normally is. It flips to `onInk`
  * there for the same reason the label does — `onInk` IS the canvas colour, the one
  * value guaranteed to read against a full-ink fill in both themes. On an unfocused
- * tab the surface underneath is the bar's translucent fill over canvas, where
- * `onInk` is the value that would vanish. So the rule is a flip, not a token.
+ * tab the surface underneath is the bar itself, which IS canvas — so `onInk` is
+ * exactly the value that would vanish there. So the rule is a flip, not a token.
  *
  * The duotone has no alarm colour (spec §11): what makes this a record light is its
  * pulse and its position, not a third hue.

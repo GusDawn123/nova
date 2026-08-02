@@ -1,9 +1,10 @@
 import type { Session } from '@supabase/supabase-js';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChamferSurface } from '@/design/chamfer';
+import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   Chamfer,
   FontFamily,
@@ -38,6 +39,10 @@ import { useMe } from '@/hooks/use-me';
  * an outlined key, delete is a mono whisper under it, and the confirm is a second
  * deliberate tap. There is no red in this design (spec §11).
  *
+ * A TAB since the last task of the redesign (`◌ ACCOUNT`), which is why it leaves
+ * room at the bottom for the floating bar rather than trusting a safe-area inset:
+ * the bar is absolutely positioned and reserves nothing.
+ *
  * Dumb, as before: every network call still lives in its hook.
  */
 
@@ -65,6 +70,7 @@ export default function AccountScreen() {
   const auth = useAuth();
   const palette = usePalette();
   const appearance = useAppearance();
+  const insets = useSafeAreaInsets();
 
   // The (app) layout guard guarantees a session by the time this renders;
   // narrow defensively so the screen is self-contained and fully typed.
@@ -78,8 +84,19 @@ export default function AccountScreen() {
       testID="account-screen"
       style={[styles.screen, { backgroundColor: palette.canvas }]}
     >
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+          testID="account-scroll"
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: insets.top + Space.xl,
+              // The floating tab bar is absolutely positioned and reserves no
+              // layout space of its own — this is what keeps DELETE ACCOUNT,
+              // the last thing on the screen, reachable.
+              paddingBottom: tabBarClearance(insets.bottom),
+            },
+          ]}
+        >
           <Text style={[styles.title, { color: palette.ink }]}>ACCOUNT</Text>
 
           <Card palette={palette}>
@@ -164,8 +181,7 @@ export default function AccountScreen() {
           </Pressable>
 
           <DeleteAccount session={session} palette={palette} />
-        </ScrollView>
-      </SafeAreaView>
+      </ScrollView>
     </View>
   );
 }
@@ -322,9 +338,8 @@ function DeleteAccount({
 
 const styles = StyleSheet.create({
   screen: { flex: 1 },
-  safeArea: { flex: 1 },
   content: {
-    padding: Space.xl,
+    paddingHorizontal: Space.xl,
     gap: Space.md,
   },
   title: {

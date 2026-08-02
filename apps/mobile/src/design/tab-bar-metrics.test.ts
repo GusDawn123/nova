@@ -52,9 +52,12 @@ const THEMES: { name: string; palette: Palette }[] = [
   { name: 'paper', palette: paperPalette },
 ];
 
-/** What the dot is drawn on: the ink fill when focused, the bar's fill when not. */
+/**
+ * What the dot is drawn on: the selected tab's full-ink fill when focused, and the
+ * bar's own opaque canvas slab when not (`app-tabs.tsx` — keep the two in step).
+ */
 function surfaceUnderDot(palette: Palette, isFocused: boolean): string {
-  return isFocused ? palette.ink : palette.glassHi;
+  return isFocused ? palette.ink : palette.canvas;
 }
 
 describe('recordDotColor', () => {

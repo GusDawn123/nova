@@ -89,35 +89,11 @@ export default function MeetingsScreen(): React.JSX.Element {
       >
         <View style={styles.header}>
           <Text style={[styles.title, { color: palette.ink }]}>MEETINGS</Text>
-          <View style={styles.headerRight}>
-            {state.status === 'success' ? (
-              <Text style={[styles.monthCount, { color: palette.inkSoft }]}>
-                {monthCountLabel(state.data.month_count)}
-              </Text>
-            ) : null}
-            {/* Account has no tab of its own yet (it arrives in the tab bar with
-                the last task of this redesign), and this is the only route into
-                it — so the key stays in the header until that lands. */}
-            <Pressable
-              testID="account-button"
-              accessibilityRole="button"
-              accessibilityLabel="Account"
-              onPress={() => {
-                router.push('/account');
-              }}
-              style={({ pressed }) => (pressed ? styles.pressed : undefined)}
-            >
-              <ChamferSurface
-                stroke={palette.inkHairline}
-                style={styles.accountKey}
-                contentStyle={styles.accountKeyContent}
-              >
-                <Text style={[styles.accountGlyph, { color: palette.inkSoft }]}>
-                  {'◌'}
-                </Text>
-              </ChamferSurface>
-            </Pressable>
-          </View>
+          {state.status === 'success' ? (
+            <Text style={[styles.monthCount, { color: palette.inkSoft }]}>
+              {monthCountLabel(state.data.month_count)}
+            </Text>
+          ) : null}
         </View>
 
         {state.status === 'loading' ? <LoadingList palette={palette} /> : null}
@@ -298,11 +274,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Space.md,
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
-  },
   title: {
     fontFamily: FontFamily.display,
     fontSize: FontSize.displayMd,
@@ -311,18 +282,6 @@ const styles = StyleSheet.create({
   monthCount: {
     fontFamily: FontFamily.mono,
     fontSize: FontSize.monoSm,
-  },
-  accountKey: { alignSelf: 'center' },
-  accountKeyContent: {
-    width: Size.tapTarget,
-    height: Size.tapTarget,
-    padding: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  accountGlyph: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.mono,
   },
   section: { gap: Space.md },
   eyebrow: {
