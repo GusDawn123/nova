@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette } from '@/design/tokens';
+import type { MascotStageProps } from '@/features/mascot/mascot-stage';
 import type { AuthActionResult, UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
@@ -24,11 +25,59 @@ import SignInScreen from './sign-in';
  * NOT proven here: that any of it is legible on a phone. jsdom has no layout.
  */
 
-/** She has her own suite; here she is a box, so this file tests the screen. */
-vi.mock('@/features/mascot/mascot-stage', () => ({
-  MascotStage: ({ size, testID }: { size?: number; testID?: string }) => (
-    <View testID={testID ?? 'mascot-stage'} style={{ width: size, height: size }} />
+/**
+ * She has her own suite, so she is a box here — EXCEPT in the duotone case, which
+ * flips this flag before rendering. She is the largest thing on the screen and she
+ * paints a glow gradient, scanlines and tear layers; a colour guard that runs over
+ * a stub of her is a guard over the small print. The two native modules she needs
+ * are stubbed below, exactly as `mascot-stage.test.tsx` stubs them.
+ */
+const realMascot = vi.hoisted(() => ({ value: false }));
+
+vi.mock('@/features/mascot/mascot-stage', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/mascot/mascot-stage')>();
+  return {
+    MascotStage: (props: MascotStageProps) =>
+      realMascot.value ? (
+        <actual.MascotStage {...props} />
+      ) : (
+        <View testID="mascot-stage" style={{ width: props.size, height: props.size }} />
+      ),
+  };
+});
+
+vi.mock('react-native-reanimated', async () => {
+  const { reanimatedStub } = await import('@/testing/reanimated-stub');
+  return reanimatedStub();
+});
+
+vi.mock('expo-image', () => ({
+  Image: ({
+    style,
+    tintColor,
+    testID,
+  }: {
+    style?: unknown;
+    tintColor?: string;
+    testID?: string;
+  }) => (
+    // The tint is painted as a background so the duotone guard can SEE the colour
+    // the real (native) Image would have tinted her ghosts with.
+    <View
+      testID={testID}
+      style={[
+        style as React.ComponentProps<typeof View>['style'],
+        tintColor === undefined ? null : { backgroundColor: tintColor },
+      ]}
+    />
   ),
+}));
+
+/** Her motion is stubbed, not disabled: reduced motion removes half her tree. */
+vi.mock('@/design/motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/design/motion')>()),
+  useReducedMotion: () => false,
 }));
 
 /** `Link asChild` clones its child; the stub keeps the route readable instead. */
@@ -59,6 +108,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  realMascot.value = false;
   auth.status = 'signed-out';
   auth.message = '';
   auth.signIn.mockReset();
@@ -155,6 +205,22 @@ describe('SignInScreen — submitting', () => {
   });
 });
 
+describe('SignInScreen — reachability', () => {
+  it('puts the whole column in a scroller, key and footer included', () => {
+    // Sign-up's column is ~500pt; a keyboard on a 667pt device covers the bottom
+    // ~290pt of it. In a centred flex box the key and the footer would sit under
+    // the keyboard with no way to reach them, and the overflow would CLIP rather
+    // than scroll. Whether it is comfortable is a simulator check; that it can be
+    // scrolled to at all is this one.
+    render(<SignInScreen />);
+    const scroller = screen.getByTestId('auth-scroll');
+
+    expect(['auto', 'scroll']).toContain(getComputedStyle(scroller).overflowY);
+    expect(scroller).toContainElement(screen.getByTestId('submit-button'));
+    expect(scroller).toContainElement(screen.getByTestId('link-/sign-up'));
+  });
+});
+
 describe('SignInScreen — a rejection', () => {
   it('says it in the server’s words, under the fields', async () => {
     auth.signIn.mockResolvedValue({
@@ -184,12 +250,15 @@ describe('SignInScreen — a rejection', () => {
       message: 'Invalid login credentials',
     });
 
+    // Her included — glow gradient, scanlines, tear layers and all.
+    realMascot.value = true;
     const { container } = render(<SignInScreen />);
     fillCredentials();
     await act(async () => {
       fireEvent.click(screen.getByTestId('submit-button'));
     });
 
+    expect(screen.getByTestId('mascot-base')).toBeInTheDocument();
     // The rejected fields go to FULL ink — the emphasis the spec allows — while the
     // untouched ones stay at the resting hairline.
     await waitFor(() => {

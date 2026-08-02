@@ -126,6 +126,18 @@ describe('SignUpScreen', () => {
     expectDuotoneOnly(container, cobaltPalette);
   });
 
+  it('scrolls — this is the tall column, and the one a keyboard covers', () => {
+    // Three fields plus her plus the wordmark is ~500pt before the keyboard takes
+    // its ~290pt. Everything below the fold has to be reachable, which means the
+    // column lives in a scroller rather than in a centred flex box.
+    render(<SignUpScreen />);
+    const scroller = screen.getByTestId('auth-scroll');
+
+    expect(['auto', 'scroll']).toContain(getComputedStyle(scroller).overflowY);
+    expect(scroller).toContainElement(screen.getByTestId('confirm-input'));
+    expect(scroller).toContainElement(screen.getByTestId('submit-button'));
+  });
+
   it('signs up once the two agree', async () => {
     render(<SignUpScreen />);
     fill('hunter2', 'hunter2');

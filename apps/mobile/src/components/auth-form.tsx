@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import {
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -121,7 +122,18 @@ export function AuthForm({
   }
 
   return (
-    <View style={[styles.screen, { backgroundColor: palette.canvas }]}>
+    // SCROLLABLE, not a centred flex box. Sign-up's column is ~500pt tall; on a 667pt
+    // device the keyboard takes ~290pt of that, which would leave the key and the
+    // footer under it with no way to reach them — and an overflowing centred View
+    // clips rather than scrolls. `flexGrow` + `justifyContent` on the CONTENT style
+    // keeps the short case (sign-in, no keyboard) centred exactly as before.
+    <ScrollView
+      testID="auth-scroll"
+      style={[styles.screen, { backgroundColor: palette.canvas }]}
+      contentContainerStyle={styles.scrollContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       <View style={styles.column}>
         <View
           testID="mascot-ring-outer"
@@ -212,7 +224,7 @@ export function AuthForm({
 
         <View style={styles.footer}>{footer}</View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -279,11 +291,15 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
+  screen: { flex: 1 },
+  // The centring lives on the CONTENT: `flexGrow` lets a short column sit in the
+  // middle of the viewport while a tall one grows past it and scrolls.
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Space.xl,
+    paddingVertical: Space.xxl,
   },
   column: {
     width: '100%',
