@@ -34,17 +34,52 @@ const version = z.literal(LIVE_PROTOCOL_VERSION);
 // ---------------------------------------------------------------------------
 
 /**
+ * WHICH prompt the copilot answers with for this call — picked by the user on the
+ * Live screen before they start, and then LOCKED for the session (the assembled
+ * system prefix is byte-stable per mode, which is what keeps the vendor prompt
+ * cache warm).
+ *
+ *   general     the universal system prompt alone — no domain block
+ *   behavioral  answering about the user's own experience (STAR-shaped)
+ *   technical   code, architecture, systems
+ *   finance     pricing, budgets, ROI, business cases
+ *
+ * THE SOURCE OF TRUTH for the vocabulary, in both directions: the server's
+ * `modules/prompt` re-exports this as its own `promptModeSchema` rather than
+ * declaring a twin, and the server-side prompt library is drift-tested against it
+ * (`library.test.ts`), so a mode cannot exist in one place and not the other.
+ *
+ * Live notes are deliberately NOT here. They are a category, not a mode: they run
+ * on every call whatever the user picked, and listing them would imply picking
+ * something else switches them off.
+ */
+export const liveModeSchema = z.enum([
+  "general",
+  "behavioral",
+  "technical",
+  "finance",
+]);
+export type LiveMode = z.infer<typeof liveModeSchema>;
+
+/**
  * Open a live session. `meeting_id` ties the socket to an existing meeting row.
  * `echo` is a TEST-ONLY diagnostic: when set, the server (only outside
  * production) echoes each binary audio frame's byte length back as an
  * `audio.echo` event so tests can prove binary transit without a real STT
  * vendor. Ignored in production.
+ *
+ * `mode` is the picked copilot mode (Phase 8.6). OPTIONAL and additive — the
+ * protocol stays `v: 1`, an omitted mode means `general`, and a client older than
+ * the picker keeps working unchanged. An UNKNOWN mode string fails this parse
+ * (closed set) and is answered with the existing `invalid_event` error: a client
+ * bug surfaces instead of silently degrading to general.
  */
 export const sessionStartSchema = z.object({
   v: version,
   type: z.literal("session.start"),
   meeting_id: z.string().uuid(),
   echo: z.boolean().optional(),
+  mode: liveModeSchema.optional(),
 });
 
 /**

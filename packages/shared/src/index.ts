@@ -7,6 +7,7 @@ export {
   clientLiveEventSchema,
   liveErrorCodeSchema,
   liveErrorSchema,
+  liveModeSchema,
   notesUpdateSchema,
   parseClientEvent,
   pingSchema,
@@ -26,6 +27,7 @@ export {
   transcriptPartialSchema,
   type ClientLiveEvent,
   type LiveErrorCode,
+  type LiveMode,
   type ServerLiveEvent,
   type TranscriptInputOrigin,
 } from "./live.js";
