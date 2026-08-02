@@ -1,26 +1,40 @@
+import type { ConversationType, MeetingNotes, NotesStatus } from '@nova/shared';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { z } from 'zod';
 
-import { GlassPill, GlassSurface } from '@/design/glass';
-import {
-  FontFamily,
-  FontSize,
-  Radius,
-  Space,
-  type Palette,
-} from '@/design/tokens';
-import { statusToPill } from '@/features/meetings/format';
-import { NotesPanel } from '@/features/notes/notes-panel';
+import { FontFamily, FontSize, Space, type Palette } from '@/design/tokens';
+import { DetailTabs, type DetailTab } from '@/features/meetings/detail-tabs';
+import { formatRelativeDay, formatStartTime } from '@/features/meetings/format';
+import { StateCard } from '@/features/meetings/state-card';
+import { mapFollowUpFailure } from '@/features/notes/follow-up';
+import { FollowUpPanel } from '@/features/notes/follow-up-panel';
+import { NotesView } from '@/features/notes/notes-view';
+import { TranscriptPanel } from '@/features/notes/transcript-panel';
 import { usePalette } from '@/hooks/use-appearance';
 import { useMeetingNotes } from '@/hooks/use-meeting-notes';
+import { useMeetingTranscript } from '@/hooks/use-meeting-transcript';
+
+/**
+ * The meeting detail (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5):
+ * back eyebrow, title block, three chamfered tabs, and one view at a time.
+ *
+ * The rule the states are built around is that a broken notes pipeline must not
+ * take the call with it. Notes folding, notes failed, notes never written — the
+ * transcript tab stays open in all three, because the transcript is the thing that
+ * actually happened and the notes are only what was made of it.
+ *
+ * The header is FIXED and each panel scrolls itself. That is not a style choice: the
+ * transcript is a `FlatList` (hundreds of turns is unbounded data, RULES §10) and
+ * nesting one inside a screen-level ScrollView is the virtualization bug that
+ * warning is about.
+ *
+ * Dumb, as before: `useMeetingNotes` owns the read and the optimistic checkbox
+ * write, `useMeetingTranscript` owns the lazy transcript read, and everything drawn
+ * here is a function of their state.
+ */
 
 /**
  * A route param is external input: `id` arrives as `string | string[] | undefined`,
@@ -29,18 +43,16 @@ import { useMeetingNotes } from '@/hooks/use-meeting-notes';
  */
 const meetingIdSchema = z.string().uuid();
 
-/**
- * The meeting detail screen (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.2).
- *
- * Pushed on the `(app)` stack rather than living in the tab navigator, so the tab
- * bar's two pills stay as drawn.
- *
- * The read model already prefers post-call `notes` and falls back to `live_notes`,
- * so this screen never asks which it got — that fallback is exactly what makes a
- * still-folding call openable, showing notes that fill in as the pipeline runs.
- *
- * The Follow-up and Transcript tabs are slice 8; this ships the Notes tab.
- */
+/** The meta line's type segment. A `Record`, so a fourth type fails to compile. */
+const TYPE_LABELS: Record<ConversationType, string> = {
+  sales: 'SALES',
+  interview: 'INTERVIEW',
+  casual: 'CASUAL',
+};
+
+/** Shown when there are no notes at all — their title is the only one we have. */
+const UNTITLED = 'Untitled call';
+
 export default function MeetingDetailScreen(): React.JSX.Element {
   const palette = usePalette();
   const insets = useSafeAreaInsets();
@@ -48,203 +60,205 @@ export default function MeetingDetailScreen(): React.JSX.Element {
   const { id } = useLocalSearchParams();
   const parsedId = meetingIdSchema.safeParse(id);
   const meetingId = parsedId.success ? parsedId.data : null;
+
+  const [tab, setTab] = useState<DetailTab>('notes');
   const { state, completedIds, toggleItem, refresh } =
     useMeetingNotes(meetingId);
+  // Lazy by the tab: most opens of a meeting never read the transcript, and it is
+  // the longest thing this API returns.
+  const transcript = useMeetingTranscript(meetingId, tab === 'transcript');
 
-  const notes =
-    state.status === 'success'
-      ? (state.data.notes ?? state.data.live_notes)
-      : null;
-  const pill =
-    state.status === 'success' ? statusToPill(state.data.notes_status) : null;
+  // The clock is read ONCE per open. A screen left in the foreground across
+  // midnight would otherwise keep calling yesterday "today" — and unlike the list,
+  // this screen has no focus event to re-read on.
+  const [now] = useState(() => new Date());
+
+  const read = state.status === 'success' ? state.data : null;
+  // The read model already prefers post-call `notes` and falls back to `live_notes`,
+  // so nothing below asks which it got.
+  const notes = read === null ? null : (read.notes ?? read.live_notes);
+  const isPreview = read !== null && read.notes === null && notes !== null;
+
+  if (meetingId === null) {
+    // Nothing was fetched, so every branch below is inert: this is the whole screen
+    // for a link that does not name a meeting.
+    return (
+      <Screen palette={palette} insets={insets}>
+        <BackEyebrow palette={palette} onPress={router.back} />
+        <StateCard
+          palette={palette}
+          testID="detail-unavailable"
+          eyebrow="MEETING"
+          message="This call isn't available."
+          detail="That link doesn't point to a call we can open. Go back and pick it from your list."
+        />
+      </Screen>
+    );
+  }
 
   return (
-    <View style={[styles.root, { backgroundColor: palette.canvas }]}>
-      <ScrollView
-        contentContainerStyle={[
-          styles.scroll,
-          {
-            paddingTop: insets.top + Space.md,
-            paddingBottom: insets.bottom + Space.xxl,
-          },
-        ]}
-      >
-        <View style={styles.topRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            testID="back-button"
-            onPress={() => {
-              router.back();
-            }}
-          >
-            <GlassPill palette={palette} style={styles.backButton}>
-              <Text style={[styles.backGlyph, { color: palette.ink }]}>
-                {'‹'}
-              </Text>
-            </GlassPill>
-          </Pressable>
-          {pill !== null ? (
-            <Text style={[styles.statusMeta, { color: palette.ink3 }]}>
-              {pill.label}
-            </Text>
-          ) : null}
-        </View>
+    <Screen palette={palette} insets={insets}>
+      <BackEyebrow palette={palette} onPress={router.back} />
 
-        {notes !== null ? (
-          <>
-            <View style={styles.titleBlock}>
-              <Text style={[styles.title, { color: palette.ink }]}>
-                {notes.title}
-              </Text>
-              {/* Say plainly when this is the running preview rather than the
-                  finished notes — the two look identical otherwise, and the user
-                  should know which one they are reading. */}
-              {state.status === 'success' && state.data.notes === null ? (
-                <Text style={[styles.subtitle, { color: palette.ink3 }]}>
-                  Notes are still being written — this updates as the call is
-                  processed.
-                </Text>
-              ) : null}
-            </View>
-            <NotesPanel
-              notes={notes}
-              palette={palette}
-              completedIds={completedIds}
-              onToggleItem={toggleItem}
-            />
-          </>
-        ) : null}
+      <View style={styles.titleBlock}>
+        <Text style={[styles.title, { color: palette.ink }]}>
+          {notes?.title ?? UNTITLED}
+        </Text>
+        <Text testID="detail-meta" style={[styles.meta, { color: palette.inkSoft }]}>
+          {metaLine(notes, read?.notes_generated_at ?? null, now)}
+        </Text>
+      </View>
 
-        {meetingId === null ? (
-          // Nothing was fetched, so every branch below is inert: this is the whole
-          // screen for a link that does not name a meeting.
-          <StateCard
+      <DetailTabs tab={tab} onSelect={setTab} palette={palette} />
+
+      <View style={styles.panel}>
+        {tab === 'notes' ? (
+          <NotesView
             palette={palette}
-            title="This meeting is not available"
-            body="That link does not point to a call we can open. Go back and pick the call from your list."
-          />
-        ) : state.status === 'loading' ? (
-          <Text style={[styles.message, { color: palette.ink3 }]}>
-            Loading notes…
-          </Text>
-        ) : null}
-
-        {state.status === 'error' ? (
-          <StateCard
-            palette={palette}
-            title="Could not load these notes"
-            body={state.message}
-            action={{ label: 'Try again', onPress: refresh }}
+            notes={notes}
+            isPreview={isPreview}
+            status={read?.notes_status ?? null}
+            errorMessage={state.status === 'error' ? state.message : null}
+            loading={state.status === 'loading'}
+            completedIds={completedIds}
+            onToggleItem={toggleItem}
+            onRetry={refresh}
           />
         ) : null}
 
-        {state.status === 'success' && notes === null ? (
-          <StateCard
+        {tab === 'transcript' ? (
+          <TranscriptPanel state={transcript.state} palette={palette} />
+        ) : null}
+
+        {tab === 'follow-up' ? (
+          <FollowUpPanel
+            draft={read?.follow_up ?? null}
+            failure={followUpFailure(read?.notes_status ?? null)}
+            onRetry={refresh}
             palette={palette}
-            title={
-              state.data.notes_status === 'failed'
-                ? 'Notes could not be generated'
-                : 'No notes yet'
-            }
-            body={
-              state.data.notes_status === 'failed'
-                ? 'Something went wrong while writing the notes for this call. You can ask Nova to try again.'
-                : 'Notes appear here once the call has been processed.'
-            }
           />
         ) : null}
-      </ScrollView>
-    </View>
+      </View>
+    </Screen>
   );
 }
 
-function StateCard({
+/**
+ * The follow-up's failure, derived from what this screen actually knows.
+ *
+ * Only one kind is reachable from a read: the draft is written FROM the notes, so
+ * notes that have not landed are a wait rather than a failure. The rest of
+ * `mapFollowUpFailure`'s vocabulary belongs to the POST this screen does not make
+ * yet, and `FollowUpPanel` renders all of them.
+ */
+function followUpFailure(status: NotesStatus | null) {
+  if (status === null || status === 'completed') return null;
+  return mapFollowUpFailure(409, 'notes_not_ready');
+}
+
+/**
+ * The mono line under the title.
+ *
+ * It says what the read model can PROVE. `GET /meetings/:id/notes` carries no call
+ * start, end or duration — only the moment the notes were written — so the line is
+ * labelled `NOTES` rather than printed as a bare time that a reader would take for
+ * the call's own clock. Showing the call's start and length is a wire change, not a
+ * presentation one.
+ */
+function metaLine(
+  notes: MeetingNotes | null,
+  generatedAt: string | null,
+  now: Date,
+): string {
+  const day = formatRelativeDay(generatedAt, now);
+  const time = formatStartTime(generatedAt);
+
+  return [
+    notes === null ? null : TYPE_LABELS[notes.conversationType],
+    day === null || time === null
+      ? null
+      : `NOTES ${day.toUpperCase()} ${time.toUpperCase()}`,
+  ]
+    .filter((part) => part !== null)
+    .join(' · ');
+}
+
+/** `‹ MEETINGS` — the way back, in the mono register the rest of the chrome uses. */
+function BackEyebrow({
   palette,
-  title,
-  body,
-  action,
+  onPress,
 }: {
   palette: Palette;
-  title: string;
-  body: string;
-  action?: { label: string; onPress: () => void };
+  onPress: () => void;
 }): React.JSX.Element {
   return (
-    <GlassSurface palette={palette} style={styles.stateCard} elevated>
-      <Text style={[styles.stateTitle, { color: palette.ink }]}>{title}</Text>
-      <Text style={[styles.stateBody, { color: palette.ink2 }]}>{body}</Text>
-      {action !== undefined ? (
-        <Pressable accessibilityRole="button" onPress={action.onPress}>
-          <GlassPill palette={palette} tone="raised" style={styles.retry}>
-            <Text style={[styles.retryText, { color: palette.ink }]}>
-              {action.label}
-            </Text>
-          </GlassPill>
-        </Pressable>
-      ) : null}
-    </GlassSurface>
+    <Pressable
+      testID="back-button"
+      accessibilityRole="button"
+      accessibilityLabel="Back to meetings"
+      onPress={onPress}
+      style={({ pressed }) => [styles.back, pressed ? styles.pressed : undefined]}
+    >
+      <Text style={[styles.backLabel, { color: palette.inkSoft }]}>
+        ‹ MEETINGS
+      </Text>
+    </Pressable>
+  );
+}
+
+function Screen({
+  palette,
+  insets,
+  children,
+}: {
+  palette: Palette;
+  insets: { top: number; bottom: number };
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <View style={[styles.root, { backgroundColor: palette.canvas }]}>
+      <View
+        style={[
+          styles.frame,
+          {
+            paddingTop: insets.top + Space.md,
+            paddingBottom: insets.bottom + Space.md,
+          },
+        ]}
+      >
+        {children}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  scroll: {
-    paddingHorizontal: Space.lg,
+  frame: {
+    flex: 1,
+    paddingHorizontal: Space.xl,
     gap: Space.lg,
   },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Space.md,
+  back: { alignSelf: 'flex-start', paddingVertical: Space.sm },
+  backLabel: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
   },
-  backButton: {
-    width: 38,
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backGlyph: { fontSize: 22, lineHeight: 26 },
-  statusMeta: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.meta,
-  },
-  titleBlock: { paddingHorizontal: 4, gap: 6 },
+  titleBlock: { gap: Space.xs2 },
   title: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.detailTitle,
-    letterSpacing: -0.8,
-    lineHeight: FontSize.detailTitle * 1.12,
+    fontFamily: FontFamily.bodySemibold,
+    fontSize: FontSize.displayLg,
+    letterSpacing: -0.4,
+    lineHeight: FontSize.displayLg * 1.15,
   },
-  subtitle: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.4,
+  meta: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 1,
   },
-  message: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    paddingHorizontal: 6,
-  },
-  stateCard: { padding: Space.xl, gap: Space.md },
-  stateTitle: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.cardTitle,
-    letterSpacing: -0.25,
-  },
-  stateBody: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.5,
-  },
-  retry: {
-    alignSelf: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: Radius.button,
-  },
-  retryText: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.label,
-  },
+  // The panel takes the rest of the screen and scrolls inside it, which is what
+  // keeps the header from scrolling away under a long transcript.
+  panel: { flex: 1 },
+  pressed: { opacity: 0.7 },
 });

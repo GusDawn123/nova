@@ -70,14 +70,14 @@ export const FOLLOW_UP_FAILURE_COPY: Record<
   },
   quota: {
     title: 'Out of drafts for now',
-    body: 'This month’s follow-up drafts are used up. The notes above stay yours.',
+    body: "This month's follow-up drafts are used up. The notes above stay yours.",
   },
   unavailable: {
     title: 'Nova is resting',
     body: 'Drafting is paused for the moment. The call and its notes are untouched.',
   },
   failed: {
-    title: 'The draft didn’t come out',
+    title: "The draft didn't come out",
     body: 'Something went wrong while writing the follow-up for this call.',
   },
 };

@@ -51,7 +51,7 @@ export function TranscriptPanel({
         palette={palette}
         testID="transcript-error"
         eyebrow="TRANSCRIPT"
-        message="The transcript didn’t come back"
+        message="The transcript didn't come back"
         detail={state.message}
       />
     );
