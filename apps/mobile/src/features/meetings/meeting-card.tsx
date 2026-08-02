@@ -118,11 +118,18 @@ export function MeetingCard({
 
   const saysStatus = treatment === 'sweep' || treatment === 'words';
 
+  // The card is ONE button, so its label is everything it says — a `Text` inside a
+  // labelled control is not announced, and with status now carried by words alone,
+  // a label of just the title would be a card whose status is silent to VoiceOver.
+  const spoken = [meeting.title, meta, treatment === 'silent' ? null : statusWords]
+    .filter((part) => part !== null && part !== '')
+    .join(' · ');
+
   return (
     <Animated.View style={entrance}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={meeting.title}
+        accessibilityLabel={spoken}
         onPress={() => {
           onPress(meeting.id);
         }}

@@ -115,6 +115,18 @@ describe('MeetingCard — the line', () => {
     );
   });
 
+  it('speaks the whole card, status included', () => {
+    // The card is one button, and a `Text` inside a labelled control is never
+    // announced — so a label of just the title would hide the status entirely from
+    // VoiceOver now that no colour carries it.
+    renderCard({ notes_status: 'processing' });
+
+    const spoken = screen.getByRole('button').getAttribute('aria-label');
+    expect(spoken).toContain('Northwind discovery');
+    expect(spoken).toContain('34 min');
+    expect(spoken).toContain('WRITING NOTES');
+  });
+
   it('opens the call it names', () => {
     const { onPress } = renderCard();
 
