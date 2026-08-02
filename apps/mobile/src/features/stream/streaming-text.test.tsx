@@ -325,6 +325,26 @@ describe('StreamingText — reduced motion', () => {
     expect(visible()).toBe(`${line} Say it plainly.`);
   });
 
+  it('does not flash the caret back onto an answer that already finished', () => {
+    // Switching the setting off after the answer landed hands a finished stream to a
+    // brand-new drain, which needs a tick to agree that it is finished. The caret is
+    // the ONLY completion signal, so a frame of it reappearing says she started
+    // writing again.
+    reduced.value = true;
+    const line = 'Ask for the raise.';
+    const { rerender } = render(<StreamingText text={line} done color={INK} />);
+    expect(screen.queryByTestId('stream-caret')).toBeNull();
+
+    reduced.value = false;
+    rerender(<StreamingText text={line} done color={INK} />);
+
+    expect(screen.queryByTestId('stream-caret')).toBeNull();
+    expect(visible()).toBe(line);
+    advance(1000);
+    expect(screen.queryByTestId('stream-caret')).toBeNull();
+    expect(visible()).toBe(line);
+  });
+
   it('shuts the drain down when the setting is switched on mid-stream', () => {
     const line = 'Honestly, because the problems were the same.';
     const { rerender } = render(

@@ -202,11 +202,15 @@ export function StreamingText({
       setDrained('');
       setComplete(false);
       setGeneration(generation + 1);
-    } else if (seen.reduced && drained !== seen.text) {
+    } else if (seen.reduced) {
       // Motion has just come back on. Every word delivered whole while it was off
       // stays where it is and the drain resumes from there — the alternative rewinds
       // the reader to nothing and re-writes what they have already read.
-      setDrained(seen.text);
+      if (drained !== seen.text) setDrained(seen.text);
+      // And an answer that had already finished stays finished. The fresh drain needs
+      // a tick to agree, and for that tick the caret would be back on screen saying
+      // she had started writing again.
+      if (done && !complete) setComplete(true);
     }
   }
 
