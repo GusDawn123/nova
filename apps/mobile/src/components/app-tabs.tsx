@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassPill } from '@/design/glass';
 import { usePulse } from '@/design/motion';
+import { recordDotColor } from '@/design/tab-bar-metrics';
 import {
   FontFamily,
   FontSize,
@@ -141,7 +142,12 @@ function TabButton({
     >
       {showRecordDot ? (
         <Animated.View
-          style={[styles.recordDot, { backgroundColor: palette.hot }, pulse]}
+          testID="record-dot"
+          style={[
+            styles.recordDot,
+            { backgroundColor: recordDotColor(palette, isFocused === true) },
+            pulse,
+          ]}
         />
       ) : null}
       <Text
