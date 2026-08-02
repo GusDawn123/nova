@@ -1,19 +1,17 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
 import type { MeetingNotes } from '@nova/shared';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
+
+import { cobaltPalette, paperPalette } from '@/design/tokens';
+import { emptyLiveNotes } from '@/features/notes/notes-update';
+import { expectDuotoneOnly } from '@/testing/duotone';
 
 import { LiveNotesPanel } from './live-notes-panel';
-import { emptyLiveNotes } from '@/features/notes/notes-update';
-import { cobaltPalette } from '@/design/tokens';
 
 /**
  * The in-call live-notes view (§5.1). Condensed on purpose: this is the preview a
  * user glances at mid-sentence, not the post-call document.
  */
-vi.mock('expo-glass-effect', () => ({
-  GlassView: () => null,
-  isLiquidGlassAvailable: () => false,
-}));
 
 function notes(overrides: Partial<MeetingNotes> = {}): MeetingNotes {
   return {
@@ -84,6 +82,20 @@ describe('LiveNotesPanel', () => {
     );
 
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
+  });
+
+  it('paints in ink and canvas only, in either theme', () => {
+    for (const palette of [cobaltPalette, paperPalette]) {
+      const { container, unmount } = render(
+        <LiveNotesPanel
+          state={{ notes: notes(), rev: 1, hasUnseen: false }}
+          palette={palette}
+        />,
+      );
+
+      expectDuotoneOnly(container, palette);
+      unmount();
+    }
   });
 
   it('keeps showing the last fold rather than blanking when a call ends', () => {

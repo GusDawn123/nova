@@ -20,8 +20,12 @@
  */
 
 export interface SteerPairing {
-  /** Suggestion id → the steer that shaped it. Absent = nobody steered that answer. */
-  readonly byId: Readonly<Record<string, string>>;
+  /**
+   * Suggestion id → the steer that shaped it. A `Map` rather than a record so a
+   * miss is `undefined` in the TYPE as well as at runtime — most answers are
+   * unsteered, and that lookup is on the render path of every card.
+   */
+  readonly byId: ReadonlyMap<string, string>;
   /** Steers sent whose answer has not started yet, oldest first. */
   readonly pending: readonly string[];
   /** Every suggestion id already considered — what makes re-pairing impossible. */
@@ -29,7 +33,7 @@ export interface SteerPairing {
 }
 
 export const emptySteerPairing: SteerPairing = {
-  byId: {},
+  byId: new Map<string, string>(),
   pending: [],
   known: new Set<string>(),
 };
@@ -57,13 +61,13 @@ export function pairSteerArrivals(
   if (arrived.length === 0) return pairing;
 
   const known = new Set(pairing.known);
-  const byId: Record<string, string> = { ...pairing.byId };
+  const byId = new Map(pairing.byId);
   const pending = [...pairing.pending];
 
   for (const id of arrived) {
     known.add(id);
     const steer = pending.shift();
-    if (steer !== undefined) byId[id] = steer;
+    if (steer !== undefined) byId.set(id, steer);
   }
 
   return { byId, pending, known };

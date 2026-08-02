@@ -2,6 +2,8 @@ import { LIVE_PROTOCOL_VERSION, type MeetingNotes } from '@nova/shared';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { FakeLiveSocket, installFakeWebSocket } from '@/testing/live-socket-stub';
+
 import { useLiveSession } from './use-live-session';
 
 /**
@@ -68,54 +70,13 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-/** A WebSocket that records what was sent instead of opening one. */
-class FakeSocket {
-  static instances: FakeSocket[] = [];
-  static readonly OPEN = 1;
-
-  readyState = 0;
-  readonly sent: string[] = [];
-  onopen: (() => void) | null = null;
-  onmessage: ((message: { data: string }) => void) | null = null;
-  onerror: (() => void) | null = null;
-  onclose: ((event: { code: number; reason: string }) => void) | null = null;
-
-  constructor(readonly url: string) {
-    FakeSocket.instances.push(this);
-  }
-
-  send(data: string): void {
-    this.sent.push(data);
-  }
-
-  close(): void {
-    this.readyState = 3;
-  }
-
-  /** Drive the handshake the way a real server would. */
-  open(): void {
-    this.readyState = FakeSocket.OPEN;
-    this.onopen?.();
-  }
-
-  /** Push a server frame down the wire, as JSON, exactly as the gateway does. */
-  receive(event: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(event) });
-  }
-}
-
 /** The parsed `session.start` frame this socket sent, if any. */
-function startFrame(socket: FakeSocket): Record<string, unknown> | undefined {
-  for (const raw of socket.sent) {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    if (parsed.type === 'session.start') return parsed;
-  }
-  return undefined;
+function startFrame(socket: FakeLiveSocket): Record<string, unknown> | undefined {
+  return socket.frame('session.start');
 }
 
 beforeEach(() => {
-  FakeSocket.instances = [];
-  vi.stubGlobal('WebSocket', FakeSocket);
+  installFakeWebSocket();
 });
 
 afterEach(() => {
@@ -139,11 +100,11 @@ describe('useLiveSession mode', () => {
     await act(async () => {
       await result.current.start();
     });
-    const socket = FakeSocket.instances[0];
+    const socket = FakeLiveSocket.instances[0];
     expect(socket).toBeDefined();
     act(() => socket?.open());
 
-    expect(startFrame(socket as FakeSocket)).toMatchObject({
+    expect(startFrame(socket as FakeLiveSocket)).toMatchObject({
       type: 'session.start',
       meeting_id: MEETING_ID,
       mode: 'technical',
@@ -158,11 +119,11 @@ describe('useLiveSession mode', () => {
     await act(async () => {
       await result.current.start();
     });
-    const socket = FakeSocket.instances[0];
+    const socket = FakeLiveSocket.instances[0];
     expect(socket).toBeDefined();
     act(() => socket?.open());
 
-    expect(startFrame(socket as FakeSocket)).toMatchObject({
+    expect(startFrame(socket as FakeLiveSocket)).toMatchObject({
       mode: 'general',
     });
   });
@@ -198,7 +159,7 @@ describe('useLiveSession live notes', () => {
     await act(async () => {
       await result.current.start();
     });
-    const socket = FakeSocket.instances[0];
+    const socket = FakeLiveSocket.instances[0];
     expect(socket).toBeDefined();
     act(() => socket?.open());
 
@@ -222,7 +183,7 @@ describe('useLiveSession live notes', () => {
     await act(async () => {
       await result.current.start();
     });
-    const socket = FakeSocket.instances[0];
+    const socket = FakeLiveSocket.instances[0];
     expect(socket).toBeDefined();
     act(() => socket?.open());
 

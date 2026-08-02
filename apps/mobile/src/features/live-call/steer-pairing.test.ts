@@ -22,7 +22,7 @@ describe('steer pairing', () => {
     const pairing = steerSubmitted(emptySteerPairing, 'push on the timeline');
 
     expect(pairing.pending).toEqual(['push on the timeline']);
-    expect(pairing.byId).toEqual({});
+    expect(pairing.byId.size).toBe(0);
   });
 
   it('gives the pending steer to the next answer that starts', () => {
@@ -30,14 +30,14 @@ describe('steer pairing', () => {
 
     const paired = pairSteerArrivals(submitted, ['s1']);
 
-    expect(paired.byId).toEqual({ s1: 'push on the timeline' });
+    expect(paired.byId.get('s1')).toBe('push on the timeline');
     expect(paired.pending).toEqual([]);
   });
 
   it('leaves an unsteered answer unsteered', () => {
     const paired = pairSteerArrivals(emptySteerPairing, ['s1']);
 
-    expect(paired.byId).toEqual({});
+    expect(paired.byId.size).toBe(0);
   });
 
   it('pairs two steers with two answers, in the order they were sent', () => {
@@ -47,7 +47,8 @@ describe('steer pairing', () => {
     pairing = pairSteerArrivals(pairing, ['s1']);
     pairing = pairSteerArrivals(pairing, ['s1', 's2']);
 
-    expect(pairing.byId).toEqual({ s1: 'first', s2: 'second' });
+    expect(pairing.byId.get('s1')).toBe('first');
+    expect(pairing.byId.get('s2')).toBe('second');
     expect(pairing.pending).toEqual([]);
   });
 
@@ -60,7 +61,8 @@ describe('steer pairing', () => {
 
     const again = pairSteerArrivals(pairing, ['s1']);
 
-    expect(again.byId).toEqual({ s1: 'first' });
+    expect(again.byId.get('s1')).toBe('first');
+    expect(again.byId.size).toBe(1);
     expect(again.pending).toEqual(['second']);
   });
 
@@ -80,7 +82,7 @@ describe('steer pairing', () => {
     pairing = pairSteerArrivals(pairing, []);
     pairing = pairSteerArrivals(pairing, ['s2']);
 
-    expect(pairing.byId.s2).toBeUndefined();
+    expect(pairing.byId.get('s2')).toBeUndefined();
   });
 
   it('starts empty again for a new call', () => {
@@ -88,7 +90,7 @@ describe('steer pairing', () => {
     pairing = pairSteerArrivals(pairing, ['s1']);
 
     expect(emptySteerPairing.pending).toEqual([]);
-    expect(emptySteerPairing.byId).toEqual({});
+    expect(emptySteerPairing.byId.size).toBe(0);
     expect(pairing).not.toBe(emptySteerPairing);
   });
 });

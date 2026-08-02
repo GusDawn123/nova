@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import { GlassSurface } from '@/design/glass';
 import {
   FontFamily,
   FontSize,
@@ -12,7 +11,8 @@ import {
 import type { LiveNotesState } from '@/features/notes/notes-update';
 
 /**
- * Live notes DURING the call (`docs/DESIGN/notes-ui.md` §5.1).
+ * Live notes DURING the call (`docs/DESIGN/notes-ui.md` §5.1), in the redesign's
+ * idiom (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5).
  *
  * Condensed on purpose. This is a preview someone glances at mid-sentence, so it
  * carries the tl;dr, what was decided, and what they now owe — and drops the
@@ -22,8 +22,8 @@ import type { LiveNotesState } from '@/features/notes/notes-update';
  * a checkbox here would invite a tap that the next fold could quietly move onto a
  * different item, which is worse than not offering one.
  *
- * The design prototype has no live-notes surface at all — its capture card is
- * transcript-only. This is §5.1's ruling built in the prototype's card idiom.
+ * It lives INSIDE the capture pane's ink-washed card, so its own sections are
+ * hairline-bordered rather than washed again — a fill on a fill is invisible.
  */
 export function LiveNotesPanel({
   state,
@@ -37,7 +37,7 @@ export function LiveNotesPanel({
   if (notes === null) {
     return (
       <View style={styles.empty}>
-        <Text style={[styles.emptyText, { color: palette.ink3 }]}>
+        <Text style={[styles.line, { color: palette.inkFaint }]}>
           Notes start filling in once there is something worth writing down.
         </Text>
       </View>
@@ -46,36 +46,33 @@ export function LiveNotesPanel({
 
   return (
     <View style={styles.root}>
-      <GlassSurface palette={palette} style={styles.card} elevated>
-        <Eyebrow palette={palette}>tl;dr</Eyebrow>
+      <Section palette={palette} eyebrow="TL;DR">
         <Text style={[styles.tldr, { color: palette.ink }]}>{notes.tldr}</Text>
-      </GlassSurface>
+      </Section>
 
       {notes.decisions.length > 0 ? (
-        <GlassSurface palette={palette} style={styles.card}>
-          <Eyebrow palette={palette}>decided</Eyebrow>
+        <Section palette={palette} eyebrow="DECIDED">
           {notes.decisions.map((decision) => (
             <Text
               key={decision.id}
-              style={[styles.line, { color: palette.ink2 }]}
+              style={[styles.line, { color: palette.inkSoft }]}
             >
               {decision.text}
             </Text>
           ))}
-        </GlassSurface>
+        </Section>
       ) : null}
 
       {notes.actionItems.length > 0 ? (
-        <GlassSurface palette={palette} style={styles.card}>
-          <Eyebrow palette={palette}>action items</Eyebrow>
+        <Section palette={palette} eyebrow="ACTION ITEMS">
           {notes.actionItems.map((item) => (
             <View key={item.id} style={styles.itemRow}>
-              <Text style={[styles.line, { color: palette.ink2 }]}>
+              <Text style={[styles.line, { color: palette.inkSoft }]}>
                 {item.text}
               </Text>
               <View style={styles.chips}>
                 {item.owner !== null ? (
-                  <Chip palette={palette} accent>
+                  <Chip palette={palette} filled>
                     {item.owner}
                   </Chip>
                 ) : null}
@@ -88,53 +85,60 @@ export function LiveNotesPanel({
               </View>
             </View>
           ))}
-        </GlassSurface>
+        </Section>
       ) : null}
 
       {notes.openQuestions.length > 0 ? (
-        <GlassSurface palette={palette} style={styles.card}>
-          <Eyebrow palette={palette}>open</Eyebrow>
-          {notes.openQuestions.map((q) => (
-            <Text key={q.id} style={[styles.line, { color: palette.ink2 }]}>
-              {q.text}
+        <Section palette={palette} eyebrow="OPEN">
+          {notes.openQuestions.map((question) => (
+            <Text
+              key={question.id}
+              style={[styles.line, { color: palette.inkSoft }]}
+            >
+              {question.text}
             </Text>
           ))}
-        </GlassSurface>
+        </Section>
       ) : null}
     </View>
   );
 }
 
-function Eyebrow({
+function Section({
   palette,
+  eyebrow,
   children,
 }: {
   palette: Palette;
-  children: string;
+  eyebrow: string;
+  children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <Text style={[styles.eyebrow, { color: palette.ink3 }]}>{children}</Text>
+    <View style={[styles.section, { borderColor: palette.inkHairline }]}>
+      <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>{eyebrow}</Text>
+      {children}
+    </View>
   );
 }
 
+/** An owner or a deadline. Filled marks the owner — the part that names a person. */
 function Chip({
   palette,
-  accent = false,
+  filled = false,
   children,
 }: {
   palette: Palette;
-  accent?: boolean;
+  filled?: boolean;
   children: string;
 }): React.JSX.Element {
   return (
     <Text
       style={[
         styles.chip,
-        {
-          color: accent ? palette.ink : palette.ink2,
-          backgroundColor: accent ? palette.inkFill : palette.glass,
-          borderColor: accent ? 'transparent' : palette.stroke,
-        },
+        filled
+          ? { color: palette.onInk, backgroundColor: palette.ink }
+          : { color: palette.inkSoft, borderColor: palette.inkHairline },
+        filled ? undefined : styles.chipOutline,
       ]}
     >
       {children}
@@ -143,34 +147,34 @@ function Chip({
 }
 
 const styles = StyleSheet.create({
-  root: { gap: Space.sm },
-  card: { padding: Space.md, gap: Space.sm2 },
-  empty: { paddingVertical: Space.lg, paddingHorizontal: Space.sm },
-  emptyText: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.5,
+  root: { gap: Space.sm2 },
+  section: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: Radius.soft,
+    padding: Space.md,
+    gap: Space.xs2,
   },
-  eyebrow: { ...eyebrowStyle },
+  empty: { paddingVertical: Space.lg },
+  eyebrow: eyebrowStyle,
   tldr: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.label,
-    lineHeight: FontSize.label * 1.45,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.45,
   },
   line: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.42,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.45,
   },
   itemRow: { gap: Space.xs2 },
   chips: { flexDirection: 'row', gap: Space.xs2, flexWrap: 'wrap' },
   chip: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.captionSmall,
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoXs,
     paddingVertical: Space.xs,
-    paddingHorizontal: 9,
+    paddingHorizontal: Space.sm2,
     borderRadius: Radius.chip,
-    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
+  chipOutline: { borderWidth: StyleSheet.hairlineWidth },
 });

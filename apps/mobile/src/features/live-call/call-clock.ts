@@ -71,28 +71,24 @@ export interface CallClock {
  */
 export function useCallClock(running: boolean): CallClock {
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [phase, setPhase] = useState(() => ({
-    running,
-    startedAt: running ? Date.now() : null,
-    ran: running,
-  }));
+  const [phase, setPhase] = useState({ running, ran: running });
 
   if (phase.running !== running) {
-    setPhase({
-      running,
-      // A call that ENDS keeps its start, so the frozen clock still reads the length
-      // of what just happened.
-      startedAt: running ? Date.now() : phase.startedAt,
-      ran: phase.ran || running,
-    });
+    setPhase({ running, ran: phase.ran || running });
+    // Zeroed HERE rather than in the effect below, so the first frame of a new call
+    // never shows the length of the last one. A call that ENDS keeps its number:
+    // the frozen clock is the length of what just happened.
     if (running) setElapsedMs(0);
   }
 
-  const { startedAt } = phase;
-
   useEffect(() => {
-    if (!running || startedAt === null) return;
+    if (!running) return;
 
+    // The wall is read inside the effect, not during render: `Date.now()` is impure
+    // and the render must stay idempotent (react-hooks/purity). A few milliseconds
+    // between the state flip and this line are invisible on a clock that shows
+    // seconds.
+    const startedAt = Date.now();
     const tick = setInterval(() => {
       setElapsedMs(Date.now() - startedAt);
     }, CLOCK_TICK_MS);
@@ -100,7 +96,7 @@ export function useCallClock(running: boolean): CallClock {
     return () => {
       clearInterval(tick);
     };
-  }, [running, startedAt]);
+  }, [running]);
 
   return { elapsedMs, ran: phase.ran };
 }
