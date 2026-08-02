@@ -1,74 +1,241 @@
 import type { Session } from '@supabase/supabase-js';
 import { useState } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ChamferSurface } from '@/design/chamfer';
+import {
+  Chamfer,
+  FontFamily,
+  FontSize,
+  Radius,
+  Size,
+  Space,
+  eyebrowStyle,
+  type Palette,
+} from '@/design/tokens';
+import {
+  APPEARANCE_ORDER,
+  useAppearance,
+  usePalette,
+  type AppearanceChoice,
+} from '@/hooks/use-appearance';
 import { useAuth } from '@/hooks/use-auth';
 import { useDeleteAccount } from '@/hooks/use-delete-account';
 import { useHealth } from '@/hooks/use-health';
 import { useMe } from '@/hooks/use-me';
 
-function HealthStatus() {
+/**
+ * Account — the quiet screen (spec §8).
+ *
+ * Everything here is a statement of fact about the account, so it is drawn as a
+ * list of soft cards rather than as controls: square corners, an ink-fill wash, and
+ * copy that is read once and then left alone. The only three things that ACT —
+ * appearance, sign out, delete — are the only three things that are chamfered or
+ * spelt out in mono, which is the control language doing its job (spec §3).
+ *
+ * Destructive weight is carried by words and by SIZE, never by colour: sign out is
+ * an outlined key, delete is a mono whisper under it, and the confirm is a second
+ * deliberate tap. There is no red in this design (spec §11).
+ *
+ * Dumb, as before: every network call still lives in its hook.
+ */
+
+/**
+ * Picker copy, one label per choice. A `Record` on purpose: a fourth theme added to
+ * the union fails to compile here until it has a label, so the row cannot silently
+ * offer three of four.
+ */
+const APPEARANCE_LABELS: Record<AppearanceChoice, string> = {
+  cobalt: 'COBALT',
+  paper: 'PAPER',
+  auto: 'AUTO',
+};
+
+/**
+ * The plan is NOT on the wire yet: `GET /me` carries `user_id`, `email` and `role`,
+ * while the tier lives in `profiles.plan` server-side (Phase 6 metering). The chip
+ * says what this screen can actually prove — the account is active — and the name
+ * is the product, not a tier claim it cannot back up. Wiring the real tier is a
+ * wire change, not a presentation one.
+ */
+const PLAN_NAME = 'NOVA';
+
+export default function AccountScreen() {
+  const auth = useAuth();
+  const palette = usePalette();
+  const appearance = useAppearance();
+
+  // The (app) layout guard guarantees a session by the time this renders;
+  // narrow defensively so the screen is self-contained and fully typed.
+  if (auth.status !== 'signed-in') {
+    return null;
+  }
+  const { session } = auth;
+
+  return (
+    <View
+      testID="account-screen"
+      style={[styles.screen, { backgroundColor: palette.canvas }]}
+    >
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.content}>
+          <Text style={[styles.title, { color: palette.ink }]}>ACCOUNT</Text>
+
+          <Card palette={palette}>
+            <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>
+              SIGNED IN AS
+            </Text>
+            <Text testID="signed-in-email" style={[styles.value, { color: palette.ink }]}>
+              {session.user.email ?? 'unknown'}
+            </Text>
+          </Card>
+
+          <Card palette={palette}>
+            <View style={styles.row}>
+              <View style={styles.rowText}>
+                <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>PLAN</Text>
+                <Text style={[styles.value, { color: palette.ink }]}>{PLAN_NAME}</Text>
+              </View>
+              <ChamferSurface
+                fill={palette.ink}
+                style={styles.chip}
+                contentStyle={styles.chipContent}
+              >
+                <Text testID="plan-chip" style={[styles.chipText, { color: palette.onInk }]}>
+                  ACTIVE
+                </Text>
+              </ChamferSurface>
+            </View>
+          </Card>
+
+          <Pressable
+            testID="appearance-row"
+            accessibilityRole="button"
+            accessibilityLabel={`Appearance: ${APPEARANCE_LABELS[appearance.choice]}`}
+            accessibilityHint="Switches to the next appearance"
+            onPress={appearance.cycle}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+          >
+            <Card palette={palette}>
+              <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>APPEARANCE</Text>
+              {/* All three are shown, so the choice reads as a set rather than as a
+                  mystery label that changes when tapped. */}
+              <View style={styles.choices}>
+                {APPEARANCE_ORDER.map((choice) => (
+                  <Text
+                    key={choice}
+                    testID={`appearance-${choice}`}
+                    style={[
+                      styles.choice,
+                      {
+                        color:
+                          choice === appearance.choice ? palette.ink : palette.inkFaint,
+                      },
+                    ]}
+                  >
+                    {APPEARANCE_LABELS[choice]}
+                  </Text>
+                ))}
+              </View>
+            </Card>
+          </Pressable>
+
+          <Card palette={palette}>
+            <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>CONNECTION</Text>
+            <HealthStatus palette={palette} />
+            <MeProof session={session} palette={palette} />
+          </Card>
+
+          <Pressable
+            testID="sign-out-button"
+            accessibilityRole="button"
+            onPress={() => void auth.signOut()}
+            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+          >
+            <ChamferSurface
+              cut={Chamfer.key}
+              stroke={palette.ink}
+              style={styles.key}
+              contentStyle={styles.keyContent}
+            >
+              <Text style={[styles.keyLabel, { color: palette.ink }]}>SIGN OUT</Text>
+            </ChamferSurface>
+          </Pressable>
+
+          <DeleteAccount session={session} palette={palette} />
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+/** One soft card: square corners, ink wash, nothing to press. */
+function Card({
+  palette,
+  children,
+}: {
+  palette: Palette;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <View style={[styles.card, { backgroundColor: palette.inkFill }]}>{children}</View>
+  );
+}
+
+function HealthStatus({ palette }: { palette: Palette }): React.JSX.Element {
   const health = useHealth();
 
   switch (health.status) {
     case 'loading':
       return (
-        <ThemedText type="default" themeColor="textSecondary">
+        <Text style={[styles.whisper, { color: palette.inkFaint }]}>
           checking server…
-        </ThemedText>
+        </Text>
       );
     case 'success':
       return (
-        <ThemedText type="default">
-          Server: {health.data.ok ? 'ok' : 'not ok'} · v{health.data.version}
-        </ThemedText>
+        <Text style={[styles.whisper, { color: palette.inkSoft }]}>
+          {`server ${health.data.ok ? 'ok' : 'not ok'} · v${health.data.version}`}
+        </Text>
       );
     case 'error':
       return (
-        <ThemedView type="backgroundElement" style={styles.statusCard}>
-          <ThemedText type="default">server unreachable</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {health.message}
-          </ThemedText>
-        </ThemedView>
+        <Text style={[styles.whisper, { color: palette.inkSoft }]}>
+          {`server unreachable · ${health.message}`}
+        </Text>
       );
   }
 }
 
 /** Signed-in proof: hits the protected `GET /me` with the access token. */
-function MeProof({ session }: { session: Session }) {
+function MeProof({
+  session,
+  palette,
+}: {
+  session: Session;
+  palette: Palette;
+}): React.JSX.Element {
   const me = useMe(session.access_token);
 
   switch (me.status) {
     case 'loading':
       return (
-        <ThemedText type="small" themeColor="textSecondary">
+        <Text style={[styles.whisper, { color: palette.inkFaint }]}>
           verifying identity…
-        </ThemedText>
+        </Text>
       );
     case 'success':
       return (
-        <ThemedView type="backgroundElement" style={styles.statusCard}>
-          <ThemedText type="small" themeColor="textSecondary">
-            /me verified
-          </ThemedText>
-          <ThemedText testID="me-user-id" type="small">
-            user_id: {me.data.user_id}
-          </ThemedText>
-        </ThemedView>
+        <Text testID="me-user-id" style={[styles.whisper, { color: palette.inkSoft }]}>
+          {`identity ${me.data.user_id}`}
+        </Text>
       );
     case 'error':
       return (
-        <ThemedView type="backgroundElement" style={styles.statusCard}>
-          <ThemedText type="small">/me failed</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary">
-            {me.message}
-          </ThemedText>
-        </ThemedView>
+        <Text style={[styles.whisper, { color: palette.inkSoft }]}>
+          {`/me failed · ${me.message}`}
+        </Text>
       );
   }
 }
@@ -79,7 +246,13 @@ function MeProof({ session }: { session: Session }) {
  * first press (works on web and native). The confirm toggle is trivial view
  * state; the network + sign-out logic lives in `useDeleteAccount` (screens dumb).
  */
-function DeleteAccount({ session }: { session: Session }) {
+function DeleteAccount({
+  session,
+  palette,
+}: {
+  session: Session;
+  palette: Palette;
+}): React.JSX.Element {
   const [confirming, setConfirming] = useState(false);
   const { state, deleteAccount } = useDeleteAccount(session.access_token);
   const busy = state.status === 'deleting';
@@ -89,123 +262,145 @@ function DeleteAccount({ session }: { session: Session }) {
       <Pressable
         testID="delete-account-button"
         accessibilityRole="button"
-        onPress={() => setConfirming(true)}
-        style={({ pressed }) => pressed && styles.pressed}>
-        <ThemedView type="backgroundElement" style={styles.signOut}>
-          <ThemedText type="smallBold" themeColor="textSecondary">
-            Delete account
-          </ThemedText>
-        </ThemedView>
+        onPress={() => {
+          setConfirming(true);
+        }}
+        style={({ pressed }) => [styles.whisperRow, pressed && styles.pressed]}
+      >
+        <Text style={[styles.whisperKey, { color: palette.inkFaint }]}>
+          DELETE ACCOUNT
+        </Text>
       </Pressable>
     );
   }
 
   return (
-    <ThemedView type="backgroundElement" style={styles.statusCard}>
-      <ThemedText type="small" themeColor="textSecondary">
+    <Card palette={palette}>
+      <Text style={[styles.body, { color: palette.inkSoft }]}>
         This permanently deletes your account and all data.
-      </ThemedText>
+      </Text>
       {state.status === 'error' && (
-        <ThemedText testID="delete-account-error" type="small">
-          Delete failed: {state.message}
-        </ThemedText>
+        <Text
+          testID="delete-account-error"
+          style={[styles.body, { color: palette.inkSoft }]}
+        >
+          {`Delete failed: ${state.message}`}
+        </Text>
       )}
       <Pressable
         testID="delete-account-confirm"
         accessibilityRole="button"
         disabled={busy}
+        aria-disabled={busy}
         onPress={() => void deleteAccount()}
-        style={({ pressed }) => pressed && styles.pressed}>
-        <ThemedView type="backgroundSelected" style={styles.signOut}>
-          <ThemedText type="smallBold">
-            {busy ? 'Deleting…' : 'Confirm delete'}
-          </ThemedText>
-        </ThemedView>
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+      >
+        <ChamferSurface
+          fill={palette.ink}
+          style={styles.key}
+          contentStyle={styles.keyContent}
+        >
+          <Text style={[styles.keyLabel, { color: palette.onInk }]}>
+            {busy ? 'DELETING…' : 'CONFIRM DELETE'}
+          </Text>
+        </ChamferSurface>
       </Pressable>
       <Pressable
         testID="delete-account-cancel"
         accessibilityRole="button"
         disabled={busy}
-        onPress={() => setConfirming(false)}
-        style={({ pressed }) => pressed && styles.pressed}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          Cancel
-        </ThemedText>
+        onPress={() => {
+          setConfirming(false);
+        }}
+        style={({ pressed }) => [styles.whisperRow, pressed && styles.pressed]}
+      >
+        <Text style={[styles.whisperKey, { color: palette.inkFaint }]}>KEEP ACCOUNT</Text>
       </Pressable>
-    </ThemedView>
-  );
-}
-
-export default function AccountScreen() {
-  const auth = useAuth();
-
-  // The (app) layout guard guarantees a session by the time this renders;
-  // narrow defensively so the screen is self-contained and fully typed.
-  if (auth.status !== 'signed-in') {
-    return null;
-  }
-  const { session } = auth;
-
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedText type="title" style={styles.title}>
-          Nova
-        </ThemedText>
-
-        <ThemedText testID="signed-in-email" type="default">
-          Signed in as {session.user.email ?? 'unknown'}
-        </ThemedText>
-
-        <HealthStatus />
-        <MeProof session={session} />
-
-        <Pressable
-          testID="sign-out-button"
-          accessibilityRole="button"
-          onPress={() => void auth.signOut()}
-          style={({ pressed }) => pressed && styles.pressed}>
-          <ThemedView type="backgroundSelected" style={styles.signOut}>
-            <ThemedText type="smallBold">Sign out</ThemedText>
-          </ThemedView>
-        </Pressable>
-
-        <DeleteAccount session={session} />
-      </SafeAreaView>
-    </ThemedView>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingHorizontal: Spacing.four,
-    maxWidth: MaxContentWidth,
+  screen: { flex: 1 },
+  safeArea: { flex: 1 },
+  content: {
+    padding: Space.xl,
+    gap: Space.md,
   },
   title: {
-    textAlign: 'center',
+    fontFamily: FontFamily.display,
+    fontSize: FontSize.displayMd,
+    letterSpacing: 4,
+    marginBottom: Space.sm,
   },
-  statusCard: {
+  card: {
+    borderRadius: Radius.soft,
+    padding: Space.lg,
+    gap: Space.xs2,
+  },
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    justifyContent: 'space-between',
   },
-  signOut: {
-    paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
+  rowText: { gap: Space.xs2 },
+  eyebrow: eyebrowStyle,
+  value: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.body,
   },
-  pressed: {
-    opacity: 0.7,
+  body: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.4,
   },
+  choices: {
+    flexDirection: 'row',
+    gap: Space.lg,
+    marginTop: Space.xs,
+  },
+  choice: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
+  },
+  chip: { alignSelf: 'center' },
+  chipContent: {
+    paddingHorizontal: Space.md,
+    paddingVertical: Space.xs2,
+  },
+  chipText: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 2,
+  },
+  whisper: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+  },
+  whisperRow: {
+    minHeight: Size.tapTarget,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  whisperKey: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
+  },
+  key: {
+    minHeight: Size.tapTarget,
+    justifyContent: 'center',
+    marginTop: Space.sm,
+  },
+  keyContent: {
+    paddingVertical: Space.lg,
+    alignItems: 'center',
+  },
+  keyLabel: {
+    fontFamily: FontFamily.display,
+    fontSize: FontSize.displaySm,
+    letterSpacing: 2,
+  },
+  pressed: { opacity: 0.7 },
 });

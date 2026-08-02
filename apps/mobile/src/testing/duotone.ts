@@ -19,14 +19,35 @@ import type { Palette } from '@/design/tokens';
  * palette, whatever it is called.
  */
 
-/** `rgb(0, 2, 218)` / `rgba(0,2,218,0.35)` / `#0002DA` all compare equal. */
-function normalise(value: string): string {
+/**
+ * One spelling per colour: `#0002DA`, `rgb(0, 2, 218)` and `rgb(0,2,218)` all come
+ * out the same, and so do `rgba(255,255,255,0.10)` and `rgba(255, 255, 255, 0.1)` —
+ * the token file writes the first spelling and the browser reports the second.
+ */
+export function normaliseColor(value: string): string {
   const trimmed = value.trim().toLowerCase();
-  const hex = /^#([0-9a-f]{6})$/.exec(trimmed);
-  if (hex === null) return trimmed.replace(/\s+/g, '');
 
-  const int = parseInt(hex[1], 16);
-  return `rgb(${String((int >> 16) & 255)},${String((int >> 8) & 255)},${String(int & 255)})`;
+  const hex = /^#([0-9a-f]{6})$/.exec(trimmed);
+  if (hex !== null) {
+    const int = parseInt(hex[1], 16);
+    return `rgb(${[(int >> 16) & 255, (int >> 8) & 255, int & 255].join(',')})`;
+  }
+
+  const fn = /^rgba?\(([^)]+)\)$/.exec(trimmed);
+  if (fn !== null) {
+    const parts = fn[1]
+      .split(/[,\s/]+/)
+      .filter((part) => part !== '')
+      .map((part) => String(Number(part)));
+    // A fully opaque rgba IS an rgb; comparing them as different strings would fail
+    // on nothing but notation.
+    const opaque = parts.length === 4 && Number(parts[3]) === 1;
+    return parts.length === 4 && !opaque
+      ? `rgba(${parts.join(',')})`
+      : `rgb(${parts.slice(0, 3).join(',')})`;
+  }
+
+  return trimmed.replace(/\s+/g, '');
 }
 
 /** Values that paint nothing, and so cannot introduce a colour. */
@@ -36,7 +57,7 @@ function allowedValues(palette: Palette): Set<string> {
   return new Set(
     Object.values(palette)
       .filter((value): value is string => typeof value === 'string')
-      .map(normalise),
+      .map(normaliseColor),
   );
 }
 
@@ -53,7 +74,7 @@ export function expectDuotoneOnly(container: HTMLElement, palette: Palette): voi
 
   const check = (where: string, value: string | null): void => {
     if (value === null) return;
-    const normalised = normalise(value);
+    const normalised = normaliseColor(value);
     if (INVISIBLE.has(normalised) || allowed.has(normalised)) return;
     offenders.push(`${where}: ${value}`);
   };

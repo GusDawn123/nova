@@ -220,6 +220,8 @@ export const Radius = {
   cardSmall: 22,
   /** Search bar, inline panels (mock 18). */
   panel: 18,
+  /** The quiet Account cards (spec §8) — square enough to read as static. */
+  soft: 14,
   /** Buttons (mock 16). */
   button: 16,
   /** Tone segmented control (mock 11-14). */

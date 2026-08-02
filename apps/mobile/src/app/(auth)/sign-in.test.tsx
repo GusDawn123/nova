@@ -4,7 +4,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette } from '@/design/tokens';
 import type { AuthActionResult, UseAuth } from '@/hooks/use-auth';
-import { expectDuotoneOnly } from '@/testing/duotone';
+import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 
 import SignInScreen from './sign-in';
@@ -172,8 +172,8 @@ describe('SignInScreen — a rejection', () => {
     const error = screen.getByTestId('auth-error');
     expect(error).toHaveTextContent('Invalid login credentials');
     // Plain copy in secondary ink — the message carries the meaning, not a colour.
-    expect(getComputedStyle(error).color.replace(/\s+/g, '')).toBe(
-      cobaltPalette.inkSoft.replace(/\s+/g, ''),
+    expect(normaliseColor(getComputedStyle(error).color)).toBe(
+      normaliseColor(cobaltPalette.inkSoft),
     );
   });
 
