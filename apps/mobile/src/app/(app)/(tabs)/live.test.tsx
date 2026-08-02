@@ -1,0 +1,329 @@
+import { LIVE_PROTOCOL_VERSION } from '@nova/shared';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { cobaltPalette, paperPalette } from '@/design/tokens';
+import { expectDuotoneOnly } from '@/testing/duotone';
+import { installLayoutStub } from '@/testing/layout-stub';
+import { FakeLiveSocket, installFakeWebSocket } from '@/testing/live-socket-stub';
+
+import LiveScreen from './live';
+
+/**
+ * The cockpit (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §4).
+ *
+ * Driven through the REAL `useLiveSession` over a fake socket rather than a mocked
+ * hook: this screen IS the socket conversation, and the assertions worth making —
+ * the steer goes up the existing wire, the chip lands on the answer it shaped, a
+ * spent quota takes the whole screen — are all about what happens between a press
+ * and a frame. A mocked hook would let every one of those wires be cut silently.
+ */
+
+const MEETING_ID = '11111111-1111-4111-8111-111111111111';
+const SESSION_ID = '22222222-2222-4222-8222-222222222222';
+const SUGGESTION_ID = '33333333-3333-4333-8333-333333333333';
+
+vi.mock('@/hooks/use-auth', () => ({
+  useAuth: () => ({
+    status: 'signed-in',
+    session: { user: { id: 'user-1' }, access_token: 'token-1' },
+  }),
+}));
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: () => ({
+      insert: () => ({
+        select: () => ({
+          single: () => Promise.resolve({ data: { id: MEETING_ID }, error: null }),
+        }),
+      }),
+    }),
+  },
+}));
+
+const router = vi.hoisted(() => ({ push: vi.fn<(href: string) => void>() }));
+
+vi.mock('expo-router', () => ({ useRouter: () => router }));
+
+vi.mock('react-native-safe-area-context', async () => {
+  const { safeAreaStub } = await import('@/testing/safe-area-stub');
+  return safeAreaStub();
+});
+
+vi.mock('react-native-reanimated', async () => {
+  const { reanimatedStub } = await import('@/testing/reanimated-stub');
+  return reanimatedStub();
+});
+
+/**
+ * Reduced motion is ON for most of this suite, and that is a testability choice
+ * rather than a coverage gap: with it on, `StreamingText` shows the whole
+ * accumulated answer immediately instead of draining it at ~60 chars/sec, so an
+ * assertion about the WORDS does not become an assertion about the clock. The
+ * caret, the thinking bars and the handoff all still render — their timing is
+ * pinned in `features/live-call/answer-card.test.tsx`, where it belongs.
+ */
+const reduced = vi.hoisted(() => ({ value: true }));
+
+vi.mock('@/design/motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/design/motion')>()),
+  useReducedMotion: () => reduced.value,
+}));
+
+/** No provider is mounted, so `usePalette` reads the OS — flipped per test. */
+const scheme = vi.hoisted(() => ({ value: 'dark' as 'dark' | 'light' }));
+
+vi.mock('react-native', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('react-native')>()),
+  useColorScheme: () => scheme.value,
+}));
+
+beforeAll(() => {
+  installLayoutStub();
+});
+
+beforeEach(() => {
+  scheme.value = 'dark';
+  reduced.value = true;
+  router.push.mockReset();
+  installFakeWebSocket();
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+/** Press START and drive the handshake to a live session. */
+async function goLive(): Promise<FakeLiveSocket> {
+  const before = FakeLiveSocket.instances.length;
+  fireEvent.click(screen.getByTestId('start-session-key'));
+  await waitFor(() => {
+    expect(FakeLiveSocket.instances.length).toBeGreaterThan(before);
+  });
+  const socket = FakeLiveSocket.instances[before];
+  act(() => {
+    socket.open();
+  });
+  act(() => {
+    socket.receive({
+      v: LIVE_PROTOCOL_VERSION,
+      type: 'session.ready',
+      session_id: SESSION_ID,
+    });
+  });
+  return socket;
+}
+
+/** Type a steer and press the key. */
+function respond(steer: string): void {
+  fireEvent.change(screen.getByTestId('steer-field'), {
+    target: { value: steer },
+  });
+  fireEvent.click(screen.getByTestId('respond-key'));
+}
+
+function suggestionStart(): unknown {
+  return {
+    v: LIVE_PROTOCOL_VERSION,
+    type: 'suggestion.start',
+    suggestion_id: SUGGESTION_ID,
+    kind: 'answer',
+  };
+}
+
+function suggestionDelta(text: string): unknown {
+  return {
+    v: LIVE_PROTOCOL_VERSION,
+    type: 'suggestion.delta',
+    suggestion_id: SUGGESTION_ID,
+    text,
+  };
+}
+
+describe('LiveScreen — before the call', () => {
+  it('offers the four modes and one key', () => {
+    render(<LiveScreen />);
+
+    expect(screen.getByTestId('mode-pill-general')).toBeInTheDocument();
+    expect(screen.getByTestId('mode-pill-finance')).toBeInTheDocument();
+    expect(screen.getByTestId('start-session-key')).toBeInTheDocument();
+    // The bottom bar belongs to a call in progress; there is nothing to steer yet.
+    expect(screen.queryByTestId('steer-field')).toBeNull();
+  });
+
+  it('takes the picker away once the mode is locked, and names it on the rail', async () => {
+    // The lock is structural: the server fixes the mode at `session.start`, so the
+    // control that could change it is GONE for the length of the call and the rail
+    // says which prompt is answering instead.
+    render(<LiveScreen />);
+    await goLive();
+
+    expect(screen.queryByTestId('mode-pill-technical')).toBeNull();
+    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('GENERAL');
+  });
+});
+
+describe('LiveScreen — the cockpit', () => {
+  it('flies the HUD clock and names the mode on the rail', async () => {
+    render(<LiveScreen />);
+    await goLive();
+
+    expect(screen.getByText('◉ LIVE · 00:00')).toBeInTheDocument();
+    expect(screen.getByTestId('hud-rail-mode')).toHaveTextContent('GENERAL');
+  });
+
+  it('will not respond to an empty steer', async () => {
+    render(<LiveScreen />);
+    await goLive();
+
+    expect(screen.getByTestId('respond-key')).toHaveAttribute(
+      'aria-disabled',
+      'true',
+    );
+  });
+
+  it('sends the steer up the existing wire and chips it above the answer', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+
+    respond('push on the timeline');
+
+    expect(socket.frame('transcript.input')).toMatchObject({
+      type: 'transcript.input',
+      text: 'push on the timeline',
+      origin: 'utterance',
+    });
+    expect(screen.getByTestId('steer-chip')).toHaveTextContent(
+      'push on the timeline',
+    );
+    // She is thinking before a single token has landed.
+    expect(screen.getByTestId('answer-thinking')).toBeInTheDocument();
+  });
+
+  it('streams the answer into the card the steer belongs to', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+    respond('push on the timeline');
+
+    act(() => {
+      socket.receive(suggestionStart());
+    });
+    act(() => {
+      socket.receive(suggestionDelta('Ask them what changed.'));
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stream-text')).toHaveTextContent(
+        'Ask them what changed.',
+      );
+    });
+    const card = screen.getByTestId('steer-chip').closest('[data-testid="answer-card"]');
+    expect(card).not.toBeNull();
+    expect(card).toHaveTextContent('Ask them what changed.');
+    // The caret is the only completion signal there is (spec §6).
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
+  });
+
+  it('keeps the record of what was said', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+
+    act(() => {
+      socket.receive({
+        v: LIVE_PROTOCOL_VERSION,
+        type: 'transcript.final',
+        text: 'We are still comparing three vendors.',
+        speaker: 'them',
+        ts_ms: 1200,
+        is_final: true,
+      });
+    });
+
+    expect(
+      screen.getByText('We are still comparing three vendors.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('THEM')).toBeInTheDocument();
+  });
+});
+
+describe('LiveScreen — when it goes wrong', () => {
+  it('takes the whole screen for a spent quota, with nothing to press', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+
+    act(() => {
+      socket.receive({
+        v: LIVE_PROTOCOL_VERSION,
+        type: 'error',
+        code: 'quota_exceeded',
+        message: 'stt quota exhausted for the current period',
+      });
+    });
+
+    expect(screen.getByTestId('quota-card')).toBeInTheDocument();
+    // No dead retry: nothing a press here can do mints more quota.
+    expect(screen.queryByTestId('respond-key')).toBeNull();
+    expect(screen.queryByText(/retry|try again/i)).toBeNull();
+  });
+
+  it('says a lesser failure in one line and carries on', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+
+    act(() => {
+      socket.receive({
+        v: LIVE_PROTOCOL_VERSION,
+        type: 'error',
+        code: 'internal',
+        message: 'the conductor fell over',
+      });
+    });
+
+    expect(screen.getByTestId('session-banner')).toHaveTextContent(
+      'the conductor fell over',
+    );
+    expect(screen.getByTestId('steer-field')).toBeInTheDocument();
+  });
+});
+
+describe('LiveScreen — after the call', () => {
+  it('hands off to the notes and back to the archive', async () => {
+    render(<LiveScreen />);
+    await goLive();
+
+    fireEvent.click(screen.getByTestId('end-session-key'));
+
+    expect(screen.getByTestId('ended-summary')).toHaveTextContent('WRITING NOTES');
+    // And the next call is one press away — the picker is back, and unlocked
+    // (react-native-web omits `aria-disabled` entirely on an enabled control).
+    expect(screen.getByTestId('mode-pill-technical')).not.toHaveAttribute(
+      'aria-disabled',
+    );
+
+    fireEvent.click(screen.getByTestId('see-calls-key'));
+    expect(router.push).toHaveBeenCalledWith('/');
+  });
+});
+
+describe('LiveScreen — the duotone', () => {
+  it('paints the live cockpit in ink and canvas only, in either theme', async () => {
+    reduced.value = false;
+
+    for (const palette of [cobaltPalette, paperPalette]) {
+      scheme.value = palette === cobaltPalette ? 'dark' : 'light';
+      const { container, unmount } = render(<LiveScreen />);
+      const socket = await goLive();
+      respond('push on the timeline');
+      act(() => {
+        socket.receive(suggestionStart());
+      });
+      await waitFor(() => {
+        expect(container.querySelector('svg')).not.toBeNull();
+      });
+
+      expectDuotoneOnly(container, palette);
+      unmount();
+    }
+  });
+});

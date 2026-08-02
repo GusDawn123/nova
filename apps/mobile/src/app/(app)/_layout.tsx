@@ -1,10 +1,9 @@
 import { Redirect, Stack } from 'expo-router';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { FontFamily, FontSize, Space } from '@/design/tokens';
+import { usePalette } from '@/hooks/use-appearance';
 import { useAuth } from '@/hooks/use-auth';
 
 /**
@@ -22,16 +21,19 @@ import { useAuth } from '@/hooks/use-auth';
  */
 export default function AppLayout() {
   const auth = useAuth();
+  const palette = usePalette();
 
   if (auth.status === 'loading') {
+    // In brand from the first frame: this is the app's opening moment, and the
+    // legacy themed pair it used to draw painted a grey that is in no palette.
     return (
-      <ThemedView style={styles.center}>
+      <View style={[styles.center, { backgroundColor: palette.canvas }]}>
         <SafeAreaView style={styles.center}>
-          <ThemedText type="default" themeColor="textSecondary">
-            loading…
-          </ThemedText>
+          <Text style={[styles.waiting, { color: palette.inkFaint }]}>
+            ◌ ONE MOMENT
+          </Text>
         </SafeAreaView>
-      </ThemedView>
+      </View>
     );
   }
 
@@ -56,6 +58,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: Spacing.three,
+    gap: Space.lg,
+  },
+  waiting: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
   },
 });
