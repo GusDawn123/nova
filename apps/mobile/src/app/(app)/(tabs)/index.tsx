@@ -7,33 +7,45 @@ import {
   StyleSheet,
   Text,
   View,
+  type DimensionValue,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { GlassPill, GlassSurface } from '@/design/glass';
+import { ChamferSurface } from '@/design/chamfer';
+import { useReducedMotion, useShimmer } from '@/design/motion';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
+  Chamfer,
   FontFamily,
   FontSize,
   Radius,
+  Size,
   Space,
   eyebrowStyle,
   type Palette,
 } from '@/design/tokens';
-import { groupMeetingsByRecency } from '@/features/meetings/format';
+import { MascotStage } from '@/features/mascot/mascot-stage';
+import { type RecencyGroup, groupMeetingsByRecency } from '@/features/meetings/format';
 import { MeetingCard } from '@/features/meetings/meeting-card';
 import { usePalette } from '@/hooks/use-appearance';
 import { useMeetings } from '@/hooks/use-meetings';
 
 /**
- * The Meetings list — the app's home screen (Phase 8.5,
- * `docs/DESIGN/notes-ui.md` §7.2).
+ * Meetings — the archive (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §5).
  *
- * Dumb: `useMeetings` owns the fetch and its state, and everything rendered is
+ * The app's home screen, and the one that has to look right at every size of
+ * history: none, three, four hundred. So it is a plain column — wordmark, the
+ * month's count, recency eyebrows, soft cards — with no chrome that a long list
+ * would have to fight.
+ *
+ * Dumb: `useMeetings` owns the fetch and its four states, and everything drawn is
  * derived by the pure helpers in `features/meetings/format.ts` (RULES §10).
  *
- * Account lives behind the button in this header rather than in the tab bar, which
- * keeps the bar at the two pills the mock draws (Gustavo, 2026-07-28).
+ * Each of the four states is DRAWN, not skipped: three skeleton cards while the list
+ * loads, the mascot moment when there is nothing yet, a soft card with a chamfered
+ * RETRY when the fetch fails, and — deliberately without a retry — a copy card when
+ * there is no session (nothing this screen can re-run mints one).
  */
 export default function MeetingsScreen(): React.JSX.Element {
   const palette = usePalette();
@@ -59,10 +71,13 @@ export default function MeetingsScreen(): React.JSX.Element {
   return (
     <View style={[styles.root, { backgroundColor: palette.canvas }]}>
       <ScrollView
+        testID="meetings-scroll"
         contentContainerStyle={[
           styles.scroll,
           {
-            paddingTop: insets.top + Space.md,
+            paddingTop: insets.top + Space.xl,
+            // The floating tab bar is absolutely positioned and reserves no layout
+            // space of its own — this is what keeps the last card reachable.
             paddingBottom: tabBarClearance(insets.bottom),
           },
         ]}
@@ -70,45 +85,44 @@ export default function MeetingsScreen(): React.JSX.Element {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor={palette.ink3}
+            tintColor={palette.inkFaint}
           />
         }
       >
         <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={[styles.screenTitle, { color: palette.ink }]}>
-              Meetings
-            </Text>
+          <Text style={[styles.title, { color: palette.ink }]}>MEETINGS</Text>
+          <View style={styles.headerRight}>
             {state.status === 'success' ? (
-              <Text style={[styles.monthCount, { color: palette.ink3 }]}>
+              <Text style={[styles.monthCount, { color: palette.inkSoft }]}>
                 {monthCountLabel(state.data.month_count)}
               </Text>
             ) : null}
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Account"
-            onPress={() => {
-              router.push('/account');
-            }}
-          >
-            <GlassPill
-              palette={palette}
-              style={styles.avatar}
+            {/* Account has no tab of its own yet (it arrives in the tab bar with
+                the last task of this redesign), and this is the only route into
+                it — so the key stays in the header until that lands. */}
+            <Pressable
               testID="account-button"
+              accessibilityRole="button"
+              accessibilityLabel="Account"
+              onPress={() => {
+                router.push('/account');
+              }}
+              style={({ pressed }) => (pressed ? styles.pressed : undefined)}
             >
-              <Text style={[styles.avatarGlyph, { color: palette.ink2 }]}>
-                {'⚙'}
-              </Text>
-            </GlassPill>
-          </Pressable>
+              <ChamferSurface
+                stroke={palette.inkHairline}
+                style={styles.accountKey}
+                contentStyle={styles.accountKeyContent}
+              >
+                <Text style={[styles.accountGlyph, { color: palette.inkSoft }]}>
+                  {'◌'}
+                </Text>
+              </ChamferSurface>
+            </Pressable>
+          </View>
         </View>
 
-        {state.status === 'loading' ? (
-          <Text style={[styles.message, { color: palette.ink3 }]}>
-            Loading your calls…
-          </Text>
-        ) : null}
+        {state.status === 'loading' ? <LoadingList palette={palette} /> : null}
 
         {state.status === 'signed-out' ? (
           <SignedOutCard palette={palette} />
@@ -123,13 +137,18 @@ export default function MeetingsScreen(): React.JSX.Element {
         ) : null}
 
         {state.status === 'success' && sections.length === 0 ? (
-          <EmptyState palette={palette} />
+          <EmptyState
+            palette={palette}
+            onStart={() => {
+              router.push('/live');
+            }}
+          />
         ) : null}
 
-        {sections.map((section, sectionIndex) => (
+        {sections.map((section) => (
           <View key={section.group} style={styles.section}>
-            <Text style={[styles.eyebrow, { color: palette.ink3 }]}>
-              {section.group}
+            <Text style={[styles.eyebrow, { color: palette.inkFaint }]}>
+              {GROUP_LABELS[section.group]}
             </Text>
             {section.meetings.map((meeting, i) => (
               <MeetingCard
@@ -137,8 +156,7 @@ export default function MeetingsScreen(): React.JSX.Element {
                 meeting={meeting}
                 palette={palette}
                 index={i}
-                // The mock raises only the newest call.
-                featured={sectionIndex === 0 && i === 0}
+                today={section.group === 'today'}
                 onPress={(id) => {
                   router.push(`/meetings/${id}`);
                 }}
@@ -151,6 +169,17 @@ export default function MeetingsScreen(): React.JSX.Element {
   );
 }
 
+/**
+ * The section headings. A `Record`, so a fourth recency group fails to compile here
+ * rather than rendering a raw bucket name; the dashes are the mock's, and
+ * `eyebrowStyle` uppercases them on screen without shouting at a screen reader.
+ */
+const GROUP_LABELS: Record<RecencyGroup, string> = {
+  today: '— Today —',
+  'this week': '— This week —',
+  earlier: '— Earlier —',
+};
+
 /** "18 this month" — singular-safe, and never "0 this month". */
 function monthCountLabel(count: number): string {
   if (count === 0) return 'No calls yet this month';
@@ -158,22 +187,124 @@ function monthCountLabel(count: number): string {
 }
 
 /**
- * First-run state. Says what Nova does and where calls come from: an empty list
- * with no explanation reads as broken rather than new.
+ * First run. She is the whole screen here, because there is nothing else true to
+ * put on it — and an empty list with no explanation reads as broken rather than new.
  */
-function EmptyState({ palette }: { palette: Palette }): React.JSX.Element {
+function EmptyState({
+  palette,
+  onStart,
+}: {
+  palette: Palette;
+  onStart: () => void;
+}): React.JSX.Element {
   return (
-    <GlassSurface palette={palette} style={styles.stateCard} elevated>
-      <Text style={[styles.stateTitle, { color: palette.ink }]}>
-        No calls yet
+    <View style={styles.empty}>
+      <MascotStage size={220} color={palette.ink} />
+      <Text style={[styles.emptyTitle, { color: palette.ink }]}>
+        NO CALLS YET
       </Text>
-      <Text style={[styles.stateBody, { color: palette.ink2 }]}>
-        Nova listens on speakerphone, suggests what to say while you talk, and
-        writes the notes afterwards. Your finished calls show up here.
+      <Text style={[styles.emptyBody, { color: palette.inkSoft }]}>
+        {"Your first call becomes your first memory. I'll keep the notes."}
       </Text>
-    </GlassSurface>
+      <Pressable
+        testID="start-session-key"
+        accessibilityRole="button"
+        onPress={onStart}
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+      >
+        <ChamferSurface
+          cut={Chamfer.key}
+          fill={palette.ink}
+          style={styles.key}
+          contentStyle={styles.keyContent}
+        >
+          <Text style={[styles.keyLabel, { color: palette.onInk }]}>
+            ◉ START A SESSION
+          </Text>
+        </ChamferSurface>
+      </Pressable>
+    </View>
   );
 }
+
+/** The bars a skeleton card stands in for: a title, then its meta line. */
+const SKELETON_BARS: { width: DimensionValue; height: number }[] = [
+  { width: '64%', height: 13 },
+  { width: '38%', height: 9 },
+];
+
+/** Three of them — enough to read as "a list is coming", few enough to stay quiet. */
+const SKELETON_COUNT = 3;
+
+function LoadingList({ palette }: { palette: Palette }): React.JSX.Element {
+  return (
+    <View style={styles.section}>
+      {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+        <View
+          key={index}
+          testID={`skeleton-card-${String(index)}`}
+          style={[styles.card, { borderColor: palette.inkHairline }]}
+        >
+          {SKELETON_BARS.map((bar) => (
+            <SkeletonBar
+              key={String(bar.width)}
+              palette={palette}
+              width={bar.width}
+              height={bar.height}
+            />
+          ))}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * One shimmering bar. Its own component because each bar needs its own hook — a
+ * Reanimated style belongs to a single view.
+ *
+ * Reduced motion REMOVES the sheen rather than parking it, exactly as `LightSweep`
+ * drops its band: a highlight stopped halfway along a bar reads as a rendering
+ * artefact, and the bars alone already say "a list is coming". The loop is gated on
+ * the same flag that removes it, so nothing repeats behind a view nobody renders.
+ */
+function SkeletonBar({
+  palette,
+  width,
+  height,
+}: {
+  palette: Palette;
+  width: DimensionValue;
+  height: number;
+}): React.JSX.Element {
+  const reduced = useReducedMotion();
+  const shimmer = useShimmer(SHIMMER_TRAVEL, !reduced);
+
+  return (
+    <View
+      style={[
+        styles.skeletonBar,
+        { width, height, backgroundColor: palette.inkFill },
+      ]}
+    >
+      {/* Ink fill over ink fill: the sheen is the same wash again, so the highlight
+          is the two stacking rather than a brighter colour from somewhere else. */}
+      {reduced ? null : (
+        <Animated.View
+          testID="skeleton-sheen"
+          style={[
+            styles.skeletonSheen,
+            { backgroundColor: palette.inkFill },
+            shimmer,
+          ]}
+        />
+      )}
+    </View>
+  );
+}
+
+/** Travel for the skeleton sheen, in points — roughly a card's width. */
+const SHIMMER_TRAVEL = 90;
 
 /**
  * No session. Deliberately WITHOUT a retry: nothing this screen can re-run produces
@@ -183,17 +314,21 @@ function EmptyState({ palette }: { palette: Palette }): React.JSX.Element {
  */
 function SignedOutCard({ palette }: { palette: Palette }): React.JSX.Element {
   return (
-    <GlassSurface palette={palette} style={styles.stateCard} elevated>
+    <View
+      testID="signed-out-card"
+      style={[styles.stateCard, { backgroundColor: palette.inkFill }]}
+    >
       <Text style={[styles.stateTitle, { color: palette.ink }]}>
-        You are signed out
+        SIGNED OUT
       </Text>
-      <Text style={[styles.stateBody, { color: palette.ink2 }]}>
+      <Text style={[styles.stateBody, { color: palette.inkSoft }]}>
         Sign in to see your calls and the notes Nova wrote for them.
       </Text>
-    </GlassSurface>
+    </View>
   );
 }
 
+/** A failure, in the server's own words, with the one thing that can help it. */
 function ErrorCard({
   palette,
   message,
@@ -204,84 +339,151 @@ function ErrorCard({
   onRetry: () => void;
 }): React.JSX.Element {
   return (
-    <GlassSurface palette={palette} style={styles.stateCard} elevated>
+    <View
+      testID="error-card"
+      style={[styles.stateCard, { backgroundColor: palette.inkFill }]}
+    >
       <Text style={[styles.stateTitle, { color: palette.ink }]}>
-        Could not load your meetings
+        COULD NOT LOAD YOUR CALLS
       </Text>
-      <Text style={[styles.stateBody, { color: palette.ink2 }]}>{message}</Text>
-      <Pressable accessibilityRole="button" onPress={onRetry}>
-        <GlassPill palette={palette} tone="raised" style={styles.retry}>
-          <Text style={[styles.retryText, { color: palette.ink }]}>
-            Try again
-          </Text>
-        </GlassPill>
+      <Text style={[styles.stateBody, { color: palette.inkSoft }]}>
+        {message}
+      </Text>
+      <Pressable
+        testID="retry-button"
+        accessibilityRole="button"
+        onPress={onRetry}
+        style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+      >
+        <ChamferSurface
+          stroke={palette.ink}
+          style={styles.retry}
+          contentStyle={styles.retryContent}
+        >
+          <Text style={[styles.retryLabel, { color: palette.ink }]}>RETRY</Text>
+        </ChamferSurface>
       </Pressable>
-    </GlassSurface>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
   scroll: {
-    paddingHorizontal: Space.lg,
-    gap: Space.lg,
+    paddingHorizontal: Space.xl,
+    gap: Space.xl,
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    gap: Space.md,
   },
-  headerText: { gap: 2 },
-  screenTitle: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.screenTitle,
-    letterSpacing: -0.9,
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Space.md,
+  },
+  title: {
+    fontFamily: FontFamily.display,
+    fontSize: FontSize.displayMd,
+    letterSpacing: 4,
   },
   monthCount: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.metaSmall,
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoSm,
   },
-  avatar: {
-    width: 38,
-    height: 38,
+  accountKey: { alignSelf: 'center' },
+  accountKeyContent: {
+    width: Size.tapTarget,
+    height: Size.tapTarget,
+    padding: 0,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarGlyph: { fontSize: 16 },
+  accountGlyph: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.mono,
+  },
   section: { gap: Space.md },
   eyebrow: {
     ...eyebrowStyle,
-    paddingHorizontal: 6,
+    textAlign: 'center',
     paddingTop: Space.xs,
   },
-  message: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    paddingHorizontal: 6,
+  card: {
+    borderRadius: Radius.soft,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Space.lg,
+    gap: Space.md,
+  },
+  skeletonBar: {
+    borderRadius: Radius.chip,
+    overflow: 'hidden',
+  },
+  skeletonSheen: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: SHIMMER_TRAVEL / 2,
+  },
+  empty: {
+    alignItems: 'center',
+    gap: Space.md,
+    paddingTop: Space.xl,
+  },
+  emptyTitle: {
+    fontFamily: FontFamily.display,
+    fontSize: FontSize.displayMd,
+    letterSpacing: 3,
+  },
+  emptyBody: {
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.5,
+    textAlign: 'center',
+    paddingHorizontal: Space.xxl,
+  },
+  key: {
+    minHeight: Size.tapTarget,
+    justifyContent: 'center',
+    marginTop: Space.md,
+  },
+  keyContent: {
+    paddingVertical: Space.lg,
+    paddingHorizontal: Space.xxl,
+    alignItems: 'center',
+  },
+  keyLabel: {
+    fontFamily: FontFamily.display,
+    fontSize: FontSize.displaySm,
+    letterSpacing: 2,
   },
   stateCard: {
+    borderRadius: Radius.soft,
     padding: Space.xl,
     gap: Space.md,
   },
   stateTitle: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.cardTitle,
-    letterSpacing: -0.25,
+    fontFamily: FontFamily.displayMid,
+    fontSize: FontSize.displaySm,
+    letterSpacing: 2,
   },
   stateBody: {
-    fontFamily: FontFamily.sans,
-    fontSize: FontSize.labelSmall,
-    lineHeight: FontSize.labelSmall * 1.5,
+    fontFamily: FontFamily.body,
+    fontSize: FontSize.bodyXs,
+    lineHeight: FontSize.bodyXs * 1.5,
   },
-  retry: {
-    alignSelf: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: Radius.button,
+  retry: { alignSelf: 'flex-start' },
+  retryContent: {
+    minHeight: Size.tapTarget,
+    paddingHorizontal: Space.xl,
+    justifyContent: 'center',
   },
-  retryText: {
-    fontFamily: FontFamily.sansSemibold,
-    fontSize: FontSize.label,
+  retryLabel: {
+    fontFamily: FontFamily.monoBold,
+    fontSize: FontSize.monoSm,
+    letterSpacing: 2,
   },
+  pressed: { opacity: 0.7 },
 });
