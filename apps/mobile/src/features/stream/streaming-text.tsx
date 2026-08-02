@@ -188,29 +188,41 @@ export function StreamingText({
   // an external system with a lifetime.
   if (seen.text !== text || seen.reduced !== reduced) {
     setSeen({ text, reduced });
-    if (reduced) {
-      // The reduced render shows `text` whole, so the drained bookkeeping catches up
-      // to it: switching the setting back mid-stream must not rewind the screen to a
-      // half-drained prefix of what has already been read.
-      if (drained !== text) setDrained(text);
-    } else if (!text.startsWith(seen.text)) {
+    if (!text.startsWith(seen.text)) {
       // CONSTRAINT — a `text` that no longer EXTENDS the last one is a NEW stream
       // reusing the component (the next suggestion, a reconnect, a mode switch), not
       // an edit of the old one. It resets: the old line goes at once and the new one
       // writes itself from the first character. Diffing instead would overwrite a
       // longer line in place, which reads as corruption rather than as a new answer.
-      setDrained('');
+      //
+      // This is tested FIRST, before reduced motion, because a stream change is a
+      // stream change whether or not anything is animating. Behind the reduced branch
+      // it was unreachable while the setting was on, and a completion from the
+      // previous answer would survive into the new one — which then renders from
+      // start to finish with no caret, permanently.
+      setDrained(reduced ? text : '');
       setComplete(false);
       setGeneration(generation + 1);
+    } else if (reduced) {
+      // The reduced render shows `text` whole, so the drained bookkeeping catches up
+      // to it: switching the setting back mid-stream must not rewind the screen to a
+      // half-drained prefix of what has already been read.
+      if (drained !== text) setDrained(text);
     } else if (seen.reduced) {
       // Motion has just come back on. Every word delivered whole while it was off
       // stays where it is and the drain resumes from there — the alternative rewinds
       // the reader to nothing and re-writes what they have already read.
       if (drained !== seen.text) setDrained(seen.text);
-      // And an answer that had already finished stays finished. The fresh drain needs
-      // a tick to agree, and for that tick the caret would be back on screen saying
-      // she had started writing again.
-      if (done && !complete) setComplete(true);
+      // An answer that had already finished stays finished: the fresh drain needs a
+      // tick to agree, and for that tick the caret would be back on screen saying she
+      // had started writing again.
+      //
+      // ONLY when the reduced render was showing all of it (`text === seen.text`).
+      // If the same commit that switched motion back on also grew the text, those new
+      // characters have not been delivered to anyone — completing here would drop the
+      // caret and stream the rest of the sentence with no write-head, which is the
+      // same lie in the other direction.
+      if (done && !complete && text === seen.text) setComplete(true);
     }
   }
 

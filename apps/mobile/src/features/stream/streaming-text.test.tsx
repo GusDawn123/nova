@@ -316,13 +316,47 @@ describe('StreamingText — reduced motion', () => {
     rerender(<StreamingText text={`${line} Say it plainly.`} done color={INK} />);
 
     expect(visible()).toBe(line);
+    // `done` arrived in that same commit, but sixteen characters have NOT. Carrying
+    // the completion over on `done` alone drops the caret here and streams the rest
+    // of the sentence with no write-head at all.
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
     // Mid-flight, not just at the end: the new drain has to pick up FROM the words
     // already on screen. A drain that starts at zero also finishes with the whole
     // line, having rewound the reader to nothing on the way.
     advance(50);
     expect(visible().startsWith(line)).toBe(true);
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
     advance(3000);
     expect(visible()).toBe(`${line} Say it plainly.`);
+    expect(screen.queryByTestId('stream-caret')).toBeNull();
+  });
+
+  it('does not carry a finished stream over onto the one that replaced it', () => {
+    // The stale-completion path. An answer finishes, the setting goes on, and a NEW
+    // answer arrives while it is on — so the divergence that should have reset the
+    // completion never gets tested, because the reduced branch answered first. Switch
+    // the setting off and the new stream renders start to finish with no caret,
+    // permanently, with nothing left to correct it.
+    const first = 'Ask for the raise.';
+    const { rerender } = render(<StreamingText text={first} done color={INK} />);
+    advance(2000);
+    expect(screen.queryByTestId('stream-caret')).toBeNull();
+
+    reduced.value = true;
+    rerender(<StreamingText text={first} done color={INK} />);
+
+    const second = 'Different answer entirely.';
+    rerender(<StreamingText text={second} done={false} color={INK} />);
+    expect(visible()).toBe(second);
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
+
+    reduced.value = false;
+    rerender(<StreamingText text={second} done={false} color={INK} />);
+
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
+    advance(2000);
+    expect(visible()).toBe(second);
+    expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
   });
 
   it('does not flash the caret back onto an answer that already finished', () => {
