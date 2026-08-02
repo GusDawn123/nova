@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapFollowUpFailure } from './follow-up';
+import { FOLLOW_UP_FAILURE_COPY, mapFollowUpFailure } from './follow-up';
 
 /**
  * The follow-up failure map (§8). Every row of that table is a different thing to
@@ -70,5 +70,30 @@ describe('mapFollowUpFailure', () => {
 
     expect(state.kind).toBe('failed');
     expect(state.tonesDisabled).toBe(false);
+  });
+});
+
+describe('FOLLOW_UP_FAILURE_COPY', () => {
+  it('has a sentence for every kind the mapping can produce', () => {
+    const kinds = [
+      mapFollowUpFailure(409, 'notes_not_ready'),
+      mapFollowUpFailure(404, undefined),
+      mapFollowUpFailure(429, undefined),
+      mapFollowUpFailure(503, undefined),
+      mapFollowUpFailure(500, undefined),
+    ].map((failure) => failure.kind);
+
+    for (const kind of kinds) {
+      expect(FOLLOW_UP_FAILURE_COPY[kind].title.length).toBeGreaterThan(0);
+      expect(FOLLOW_UP_FAILURE_COPY[kind].body.length).toBeGreaterThan(0);
+    }
+  });
+
+  it('never words a state as the control that sits under it', () => {
+    // The panel draws its own TRY AGAIN key when `canRetry` says so; copy that
+    // also says "try again" reads as two buttons to a screen reader.
+    for (const copy of Object.values(FOLLOW_UP_FAILURE_COPY)) {
+      expect(copy.title).not.toMatch(/try again|retry/i);
+    }
   });
 });

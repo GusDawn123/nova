@@ -27,8 +27,12 @@ export function statusToPill(status: NotesStatus): StatusPill {
     case 'queued':
       return { label: 'Queued', tone: 'shimmer' };
     case 'failed':
-      // Named as an action rather than a state: this pill is the retry affordance.
-      return { label: 'Retry notes', tone: 'hot' };
+      // A STATE, not an instruction. These words are spoken now — they are read
+      // out inside the meeting card's accessibility label and printed in the
+      // detail screen's meta line — and "retry notes" heard in that position is a
+      // control the user is being told to press, not the status of their call.
+      // The retry affordance is a drawn key that says TRY AGAIN next to it.
+      return { label: 'Notes failed', tone: 'hot' };
     case 'none':
       return { label: 'No notes', tone: 'muted' };
   }
@@ -83,14 +87,37 @@ export function formatStartTime(
 }
 
 /** Weekday for the "earlier this week" rows, e.g. "Wed". */
-export function formatWeekday(
-  startedAt: string | null,
+function formatWeekday(startedAt: string, locale?: string): string {
+  return new Date(startedAt).toLocaleDateString(locale, { weekday: 'short' });
+}
+
+/**
+ * How far back a moment is, in the words a person would use: "Today", then the
+ * weekday for the rest of the week, then a date.
+ *
+ * The ladder matters more than the format. Inside a week a weekday is the fastest
+ * thing to place ("Mon" needs no arithmetic); past that a weekday is ambiguous
+ * — WHICH Monday — so it becomes a date. The boundaries are LOCAL midnight and the
+ * same rolling seven days {@link groupMeetingsByRecency} uses, so the detail screen
+ * and the list section a call was tapped from cannot disagree about what "today" is.
+ */
+export function formatRelativeDay(
+  isoTime: string | null,
+  now: Date,
   locale?: string,
 ): string | null {
-  if (startedAt === null) return null;
-  const date = new Date(startedAt);
+  if (isoTime === null) return null;
+  const date = new Date(isoTime);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString(locale, { weekday: 'short' });
+
+  const day = startOfLocalDay(date);
+  const today = startOfLocalDay(now);
+  if (day === today) return 'Today';
+
+  const weekStart = today - 6 * 24 * 60 * 60 * 1000;
+  if (day >= weekStart && day < today) return formatWeekday(isoTime, locale);
+
+  return date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
 }
 
 /** The mock's section headings. */
@@ -157,16 +184,4 @@ export function groupMeetingsByRecency(
   return order
     .filter((group) => buckets[group].length > 0)
     .map((group) => ({ group, meetings: buckets[group] }));
-}
-
-/** The tag chips under a card's summary line. */
-export function cardChips(meeting: MeetingListItem): string[] {
-  const chips: string[] = [];
-  if (meeting.conversation_type !== null) chips.push(meeting.conversation_type);
-  if (meeting.action_item_count > 0) {
-    const n = meeting.action_item_count;
-    chips.push(`${String(n)} action item${n === 1 ? '' : 's'}`);
-  }
-  if (meeting.has_follow_up) chips.push('follow-up drafted');
-  return chips;
 }

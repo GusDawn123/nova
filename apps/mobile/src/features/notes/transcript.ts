@@ -36,6 +36,20 @@ export function formatCallClock(tsMs: number | null): string | null {
 }
 
 /**
+ * The mono tag drawn against a block — `ME`, `THEM`, or the diarizer's own label.
+ *
+ * `me` is the live pipeline's word for the user (the server's `isUserSpeaker` is the
+ * same one-word test), so those two labels get the spec's `me`/`them` tags. Anything
+ * else is a DIARIZER label: `spk_0` names a voice, not a person, and rendering it as
+ * THEM would assert the user is not that speaker — a claim nothing in the pipeline
+ * made. So an unrecognised label is shown as given, and an unlabelled turn gets no
+ * tag rather than a borrowed one.
+ */
+export function speakerTag(speaker: string | null): string | null {
+  return speaker === null ? null : speaker.toUpperCase();
+}
+
+/**
  * Collapse consecutive turns from one speaker into a single block.
  *
  * An unlabelled turn NEVER merges with the one before it. Merging two nulls would

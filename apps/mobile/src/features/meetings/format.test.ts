@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { MeetingListItem, NotesStatus } from '@nova/shared';
 
 import {
-  cardChips,
   formatDuration,
+  formatRelativeDay,
   formatStartTime,
   groupMeetingsByRecency,
   statusToPill,
@@ -35,7 +35,7 @@ describe('statusToPill', () => {
     ['completed', 'Notes ready'],
     ['processing', 'Writing notes'],
     ['queued', 'Queued'],
-    ['failed', 'Retry notes'],
+    ['failed', 'Notes failed'],
     ['none', 'No notes'],
   ];
 
@@ -50,9 +50,42 @@ describe('statusToPill', () => {
     expect(statusToPill('none').tone).toBe('muted');
   });
 
-  it('presents a failure as a retry action, not a dead end', () => {
+  it('states the failure rather than commanding a retry', () => {
+    // These words are now SPOKEN — they land inside the card's accessibility
+    // label and in the detail screen's meta line, where "retry notes" is heard
+    // as a control the user is being told to operate rather than as the status
+    // of the call they are looking at.
     expect(statusToPill('failed').tone).toBe('hot');
-    expect(statusToPill('failed').label).toMatch(/retry/i);
+    expect(statusToPill('failed').label).not.toMatch(/retry/i);
+  });
+});
+
+describe('formatRelativeDay', () => {
+  const now = new Date(2026, 6, 22, 15, 0);
+
+  it('names today as today', () => {
+    expect(formatRelativeDay(new Date(2026, 6, 22, 9).toISOString(), now)).toBe(
+      'Today',
+    );
+  });
+
+  it('names a day inside the last week by its weekday', () => {
+    // 'en-US' pinned: the runner's default locale is not the user's, and an
+    // unpinned assertion would pass or fail on the machine rather than the code.
+    expect(
+      formatRelativeDay(new Date(2026, 6, 20, 9).toISOString(), now, 'en-US'),
+    ).toBe('Mon');
+  });
+
+  it('falls back to a date for anything older', () => {
+    expect(
+      formatRelativeDay(new Date(2026, 5, 2, 9).toISOString(), now, 'en-US'),
+    ).toBe('Jun 2');
+  });
+
+  it('has nothing to say about a missing or unparseable moment', () => {
+    expect(formatRelativeDay(null, now)).toBeNull();
+    expect(formatRelativeDay('not a date', now)).toBeNull();
   });
 });
 
@@ -206,31 +239,5 @@ describe('groupMeetingsByRecency', () => {
 
   it('returns nothing for an empty list', () => {
     expect(groupMeetingsByRecency([], now)).toEqual([]);
-  });
-});
-
-describe('cardChips', () => {
-  it('builds type, count and follow-up chips', () => {
-    expect(cardChips(item())).toEqual([
-      'sales',
-      '3 action items',
-      'follow-up drafted',
-    ]);
-  });
-
-  it('singularises one action item', () => {
-    expect(cardChips(item({ action_item_count: 1 }))).toContain('1 action item');
-  });
-
-  it('omits every chip it has no data for', () => {
-    expect(
-      cardChips(
-        item({
-          conversation_type: null,
-          action_item_count: 0,
-          has_follow_up: false,
-        }),
-      ),
-    ).toEqual([]);
   });
 });

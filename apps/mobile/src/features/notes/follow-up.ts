@@ -47,3 +47,37 @@ export function mapFollowUpFailure(
 
   return { kind: 'failed', canRetry: true, tonesDisabled: false };
 }
+
+/**
+ * What each kind SAYS. A `Record` keyed by the union, so a sixth failure kind fails
+ * to compile here rather than reaching a user as a blank card.
+ *
+ * The titles state a condition and never name an action: the panel draws its own
+ * TRY AGAIN key when {@link FollowUpFailure.canRetry} allows one, and a title that
+ * also said "try again" would be announced as a second control that is not there.
+ */
+export const FOLLOW_UP_FAILURE_COPY: Record<
+  FollowUpFailure['kind'],
+  { readonly title: string; readonly body: string }
+> = {
+  notes_not_ready: {
+    title: 'The notes come first',
+    body: 'A follow-up is written from the notes, so it waits until they land. Nothing to do — it will be here.',
+  },
+  gone: {
+    title: 'This call is gone',
+    body: 'The call this draft belonged to is no longer in your archive, so there is nothing left to write from.',
+  },
+  quota: {
+    title: 'Out of drafts for now',
+    body: 'This month’s follow-up drafts are used up. The notes above stay yours.',
+  },
+  unavailable: {
+    title: 'Nova is resting',
+    body: 'Drafting is paused for the moment. The call and its notes are untouched.',
+  },
+  failed: {
+    title: 'The draft didn’t come out',
+    body: 'Something went wrong while writing the follow-up for this call.',
+  },
+};

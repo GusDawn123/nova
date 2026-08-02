@@ -166,7 +166,10 @@ describe('MeetingCard — status without colour', () => {
   it('admits a failure in plain words, with nothing pretending to work', async () => {
     const { container } = renderCard({ notes_status: 'failed' });
 
-    expect(meta()).toHaveTextContent('RETRY NOTES');
+    // A STATE, not an instruction: this string is also read out inside the card's
+    // accessibility label, where an imperative is heard as a control that is not
+    // there (the retry key lives on the detail screen).
+    expect(meta()).toHaveTextContent('NOTES FAILED');
     expect(screen.queryByTestId(`meeting-chip-${ID}`)).toBeNull();
     expect(screen.queryByTestId('light-sweep-band')).toBeNull();
     // The failure is the classic place a third colour arrives (spec §11).
