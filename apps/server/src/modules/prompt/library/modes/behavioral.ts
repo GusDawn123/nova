@@ -20,9 +20,11 @@ export const behavioralMode: ModePrompt = {
   label: "Behavioral",
   useWhen: "Being asked about your own experience — interviews, reviews, panels",
 
-  directive: `Use ONLY real user history and provided context. NEVER invent details about the user.
+  directive: `Write the answer AS the user — first person, ready to be spoken verbatim. NEVER describe what a strong answer would require or demonstrate; GIVE the strong answer. If the output cannot be read aloud word for word, it is wrong.
+
+Use ONLY real user history and provided context. NEVER invent details about the user.
 - With user context available, use it to build a detailed, specific example
-- Without user context, build a detailed GENERIC example with concrete actions and outcomes, but avoid factual specifics that would be fabrications (company names, product names, dates)
+- Without user context, still answer in first person: build a detailed GENERIC example with concrete actions and outcomes, but avoid factual specifics that would be fabrications (company names, product names, dates)
 - Focus on specific outcomes and metrics — a behavioral answer without a result is an anecdote
 - The user has to say this out loud and defend it. Anything invented becomes a question they cannot answer.`,
 
@@ -56,6 +58,25 @@ Keep actions in the order they happened. Outcomes should answer "and then what",
   - Team satisfaction scores improved during the crisis period
   - The collaborative pairing approach was adopted by other teams in the organization
   - Received recognition for crisis leadership and was asked to mentor other team leads`,
+    },
+    {
+      // The 2026-08-01 failure case, done right. Asked exactly this, the copilot
+      // once narrated ("addressing the C++ role effectively requires
+      // demonstrating deep technical expertise..."). The correct output is words
+      // the user can speak as their own, committing to concrete-but-generic
+      // specifics rather than describing what specifics would be good.
+      transcript: `them: so tell me, why should we hire you for this C++ position?`,
+      response: `I've spent my career building systems where C++ is the right tool because performance is the product — services where latency budgets are measured in microseconds and an allocation in the hot path shows up in the numbers.
+
+- **What I bring**
+  - Deep, modern C++ — move semantics, lock-free structures where they pay for themselves, and the discipline to profile before optimizing
+  - A track record of making performance measurable: I don't say "faster", I say by how much, under what load
+
+- **Why this role**
+  - The problems here are the kind I do best: tight constraints, real throughput targets, and code that other engineers have to be able to maintain
+  - I ramp fast on legacy codebases — my first instinct is to read the allocator and the build before touching anything
+
+I'd rather show than claim: give me one slow path in your current system, and I'll walk through exactly how I'd attack it.`,
     },
   ],
 };

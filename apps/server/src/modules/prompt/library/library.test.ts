@@ -33,6 +33,25 @@ describe("system prompt", () => {
     // always-on prefix is paid for on every call in every mode.
     expect(SYSTEM_PROMPT).not.toContain("<transcript_sample>");
   });
+
+  it("speaks in the user's voice — the teleprompter register", () => {
+    // The C++ failure (2026-08-01): asked "why should we hire you", the copilot
+    // produced narration ABOUT the answer ("Addressing the C++ role effectively
+    // requires demonstrating...") instead of words Gustavo could say. Two causes,
+    // both here: the source doc's "No pronouns" rule forbade "I", and nothing
+    // said the output is meant to be READ ALOUD.
+    expect(SYSTEM_PROMPT).not.toMatch(/no pronouns/i);
+    expect(SYSTEM_PROMPT).toContain("meta-phrases");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("first person");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("unsolicited advice");
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("uncertainty");
+  });
+
+  it("lets a picked mode's structure beat the default shape", () => {
+    // The default headline-and-bullets shape must yield when a mode defines its
+    // own structure, or behavioral answers get squeezed back into narration.
+    expect(SYSTEM_PROMPT.toLowerCase()).toContain("mode");
+  });
 });
 
 describe("modes", () => {
@@ -78,6 +97,17 @@ describe("modes", () => {
       expect(mode.label.length).toBeGreaterThan(0);
       expect(mode.useWhen.length).toBeGreaterThan(0);
     }
+  });
+
+  it("behavioral answers ARE the answer — first person, speakable", () => {
+    // Every behavioral example must be words the user can read aloud as their
+    // own. An example that talks ABOUT the answer would teach the narration
+    // failure right back into the mode.
+    for (const example of MODES.behavioral.examples) {
+      expect(example.response.slice(0, 200)).toMatch(/\bI\b/);
+      expect(example.response).not.toMatch(/requires demonstrating/i);
+    }
+    expect(MODES.behavioral.directive.toLowerCase()).toContain("first person");
   });
 });
 

@@ -22,14 +22,19 @@ import type { PromptMode } from "./ports.js";
  * never something to repin because the build went red.
  */
 const PINNED: Record<PromptMode, string> = {
+  // Repinned 2026-08-01 (the teleprompter register): the source doc's "no
+  // pronouns" rule banned "I", so behavioral answers came out as third-person
+  // narration ("addressing the C++ role effectively requires...") instead of
+  // speakable words. The register section replaces it; behavioral also gained
+  // the C++ case as a worked example. Live gates still pending on this text.
   general:
-    "c6baae8bf4bbc349accd43e140af2aa5251dbdf197405abbc5f5ad394b1f4c81",
+    "8494080c663dddca0a3a7914f37a129f070f4364a6b6931e4150655f395552a7",
   behavioral:
-    "bc132d87fe89d11b83bad236a4741e2d1daf8d3955beb46f5b9325a62fda5aae",
+    "7f2e74a69096b5fd83fa11f2f9fa061d2d1d293fa5c3aa023dfdd43ea5239cb8",
   technical:
-    "c649bcfbc3c3989add5919df41108d0eb1cb648f726124d342f0ed40bbfd1cc6",
+    "7a50e663d2f0cfab2607b4a5716604e4dd4cab4f6a3b257b847d9ae62db16d4b",
   finance:
-    "fc8d6c53fa623968419b36d47e0d9472b5c256d28be8fd6e1a5f534a8ff1b868",
+    "3867db049f463766cf98c960efa371221136eb551a0bc4e3a2e756695494c737",
 };
 
 function prefixHash(mode: PromptMode): string {
