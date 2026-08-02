@@ -91,8 +91,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: Space.sm2,
   },
-  pill: { flex: 1 },
-  surface: { minHeight: Size.tapTarget - Space.md },
+  // The full 44pt floor as a REAL box rather than `hitSlop`: react-native-web ignores
+  // hitSlop, and Expo Web is this project's verification target, so a slop-only
+  // target would pass by eye and be untestable. Same call on the capture tabs and
+  // the END key.
+  pill: { flex: 1, minHeight: Size.tapTarget },
+  surface: { flex: 1 },
   surfaceContent: {
     flex: 1,
     paddingVertical: Space.md,

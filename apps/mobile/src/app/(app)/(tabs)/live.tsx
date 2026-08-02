@@ -67,6 +67,11 @@ type CockpitView = 'idle' | 'cockpit' | 'ended' | 'quota';
  *
  * `ran` is what separates the two meanings of `closed`: a call that finished has a
  * handoff worth showing, and a start that never connected has nothing to hand off.
+ *
+ * The quota answer outranks the status because the server has already closed the
+ * call by the time it arrives — but it is a VIEW, not a mode the screen gets stuck
+ * in: the idle panel renders under that card, and the next start clears the error
+ * that put it there.
  */
 function cockpitView(
   status: LiveStatus,
@@ -88,7 +93,12 @@ export default function LiveScreen(): React.JSX.Element {
   // home during the call, and the design prototype's card is transcript-only.
   const [captureTab, setCaptureTab] = useState<CaptureTab>('transcript');
   const live = useLiveSession({ notesPanelVisible: captureTab === 'notes' });
-  const clock = useCallClock(live.status === 'live');
+  // Which press we are on. The clock needs it because this screen is a TAB and never
+  // unmounts: without it, a start that fails would inherit the previous call's
+  // summary. Every start path bumps it, including the ones that fail before the hook
+  // ever reaches `connecting`.
+  const [attempt, setAttempt] = useState(0);
+  const clock = useCallClock(live.status === 'live', attempt);
 
   const [pairing, setPairing] = useState(emptySteerPairing);
   // Prop-derived state, adjusted DURING RENDER — the same shape `StreamingText`
@@ -108,6 +118,10 @@ export default function LiveScreen(): React.JSX.Element {
     // A new call starts with no chips: the steers of the last one belong to answers
     // that are already gone.
     setPairing(emptySteerPairing);
+    setAttempt((previous) => previous + 1);
+    // `start()` clears the hook's `errorMessage`, which is what lets a refused call —
+    // a spent quota included — be tried again rather than leaving the screen parked
+    // on the card that reported it. The server re-gates the attempt.
     void live.start();
   };
 
@@ -185,15 +199,18 @@ export default function LiveScreen(): React.JSX.Element {
                   }}
                 />
               ) : null}
-              {view === 'idle' || view === 'ended' ? (
-                <IdlePanel
-                  palette={palette}
-                  mode={live.mode}
-                  onSelectMode={live.setMode}
-                  canPickMode={live.canPickMode}
-                  onStart={start}
-                />
-              ) : null}
+              {/* Under the quota card too. Spec §4's "no dead retry" is about the
+                  REFUSED call — nothing here re-runs it — and not about locking the
+                  user out of the screen: this one stays mounted for the life of the
+                  app, so a card with no way off it would outlive the quota that
+                  raised it. Starting again is a new session the server re-gates. */}
+              <IdlePanel
+                palette={palette}
+                mode={live.mode}
+                onSelectMode={live.setMode}
+                canPickMode={live.canPickMode}
+                onStart={start}
+              />
             </View>
           )}
         </KeyboardAvoidingView>

@@ -61,14 +61,20 @@ describe('hudLabel', () => {
   });
 });
 
+/** What the screen hands the clock: is it live, and which press are we on. */
+interface Attempt {
+  running: boolean;
+  attempt: number;
+}
+
 describe('useCallClock', () => {
   it('counts while the call is live', () => {
     const { result, rerender } = renderHook(
-      ({ running }: { running: boolean }) => useCallClock(running),
-      { initialProps: { running: false } },
+      ({ running, attempt }: Attempt) => useCallClock(running, attempt),
+      { initialProps: { running: false, attempt: 0 } },
     );
 
-    rerender({ running: true });
+    rerender({ running: true, attempt: 1 });
     act(() => {
       vi.advanceTimersByTime(65_000);
     });
@@ -79,15 +85,15 @@ describe('useCallClock', () => {
 
   it('holds the final length when the call ends', () => {
     const { result, rerender } = renderHook(
-      ({ running }: { running: boolean }) => useCallClock(running),
-      { initialProps: { running: false } },
+      ({ running, attempt }: Attempt) => useCallClock(running, attempt),
+      { initialProps: { running: false, attempt: 0 } },
     );
 
-    rerender({ running: true });
+    rerender({ running: true, attempt: 1 });
     act(() => {
       vi.advanceTimersByTime(30_000);
     });
-    rerender({ running: false });
+    rerender({ running: false, attempt: 1 });
     act(() => {
       vi.advanceTimersByTime(60_000);
     });
@@ -98,22 +104,45 @@ describe('useCallClock', () => {
 
   it('zeroes for the next call rather than resuming the last one', () => {
     const { result, rerender } = renderHook(
-      ({ running }: { running: boolean }) => useCallClock(running),
-      { initialProps: { running: false } },
+      ({ running, attempt }: Attempt) => useCallClock(running, attempt),
+      { initialProps: { running: false, attempt: 0 } },
     );
 
-    rerender({ running: true });
+    rerender({ running: true, attempt: 1 });
     act(() => {
       vi.advanceTimersByTime(30_000);
     });
-    rerender({ running: false });
-    rerender({ running: true });
+    rerender({ running: false, attempt: 1 });
+    rerender({ running: true, attempt: 2 });
 
     expect(result.current.elapsedMs).toBe(0);
   });
 
   it('has not run before the first call', () => {
-    const { result } = renderHook(() => useCallClock(false));
+    const { result } = renderHook(() => useCallClock(false, 0));
+
+    expect(result.current.ran).toBe(false);
+    expect(result.current.elapsedMs).toBe(0);
+  });
+
+  it('does not lend a finished call’s history to the next attempt', () => {
+    // The failure this pins: the screen is a TAB and stays mounted, so a start that
+    // never connects, pressed after a call that did, would otherwise still report a
+    // call worth summarising.
+    const { result, rerender } = renderHook(
+      ({ running, attempt }: Attempt) => useCallClock(running, attempt),
+      { initialProps: { running: false, attempt: 0 } },
+    );
+
+    rerender({ running: true, attempt: 1 });
+    act(() => {
+      vi.advanceTimersByTime(30_000);
+    });
+    rerender({ running: false, attempt: 1 });
+    expect(result.current.ran).toBe(true);
+
+    // Pressed again; this one never goes live.
+    rerender({ running: false, attempt: 2 });
 
     expect(result.current.ran).toBe(false);
     expect(result.current.elapsedMs).toBe(0);

@@ -21,7 +21,9 @@ describe('steer pairing', () => {
   it('holds a steer that has no answer yet', () => {
     const pairing = steerSubmitted(emptySteerPairing, 'push on the timeline');
 
-    expect(pairing.pending).toEqual(['push on the timeline']);
+    expect(pairing.pending.map((steer) => steer.text)).toEqual([
+      'push on the timeline',
+    ]);
     expect(pairing.byId.size).toBe(0);
   });
 
@@ -30,7 +32,7 @@ describe('steer pairing', () => {
 
     const paired = pairSteerArrivals(submitted, ['s1']);
 
-    expect(paired.byId.get('s1')).toBe('push on the timeline');
+    expect(paired.byId.get('s1')?.text).toBe('push on the timeline');
     expect(paired.pending).toEqual([]);
   });
 
@@ -47,8 +49,8 @@ describe('steer pairing', () => {
     pairing = pairSteerArrivals(pairing, ['s1']);
     pairing = pairSteerArrivals(pairing, ['s1', 's2']);
 
-    expect(pairing.byId.get('s1')).toBe('first');
-    expect(pairing.byId.get('s2')).toBe('second');
+    expect(pairing.byId.get('s1')?.text).toBe('first');
+    expect(pairing.byId.get('s2')?.text).toBe('second');
     expect(pairing.pending).toEqual([]);
   });
 
@@ -61,9 +63,9 @@ describe('steer pairing', () => {
 
     const again = pairSteerArrivals(pairing, ['s1']);
 
-    expect(again.byId.get('s1')).toBe('first');
+    expect(again.byId.get('s1')?.text).toBe('first');
     expect(again.byId.size).toBe(1);
-    expect(again.pending).toEqual(['second']);
+    expect(again.pending.map((steer) => steer.text)).toEqual(['second']);
   });
 
   it('returns the same object when nothing changed', () => {
@@ -83,6 +85,20 @@ describe('steer pairing', () => {
     pairing = pairSteerArrivals(pairing, ['s2']);
 
     expect(pairing.byId.get('s2')).toBeUndefined();
+  });
+
+  it('gives every steer its own key, and never renumbers one', () => {
+    // The key IS the card's identity — it exists before the server names the answer,
+    // and it must survive that naming. Two steers sharing one would swap cards.
+    let pairing = steerSubmitted(emptySteerPairing, 'first');
+    pairing = steerSubmitted(pairing, 'second');
+    const [first, second] = pairing.pending;
+
+    pairing = pairSteerArrivals(pairing, ['s1']);
+
+    expect(first.key).not.toBe(second.key);
+    expect(pairing.byId.get('s1')?.key).toBe(first.key);
+    expect(pairing.pending[0].key).toBe(second.key);
   });
 
   it('starts empty again for a new call', () => {

@@ -54,31 +54,50 @@ export interface CallClock {
   /** Milliseconds since this call went live; frozen once it ends. */
   readonly elapsedMs: number;
   /**
-   * Whether a call has run in this mount. `closed` covers both "the call ended" and
-   * "start was pressed and nothing ever connected", and only the first of those has
-   * a summary worth showing.
+   * Whether THIS attempt ever went live. `closed` and `error` each cover two
+   * different things — a call that ended, and a start that never connected — and
+   * only the first has a summary worth showing.
+   *
+   * Per ATTEMPT, not per mount: a failed start that follows a successful call must
+   * not inherit the finished call's summary, and this screen stays mounted for the
+   * life of the tab.
    */
   readonly ran: boolean;
 }
 
 /**
- * The running call clock. `running` is the screen's `status === 'live'`.
+ * The running call clock.
  *
- * The reset lives in a render-phase adjustment rather than an effect (React's
- * "state that has to change when a prop changes", and the shape `StreamingText`
- * uses): this repo lints `set-state-in-effect` as an error, and doing it in an
- * effect would also paint one frame of the PREVIOUS call's duration on the new one.
+ * @param running the screen's `status === 'live'`.
+ * @param attempt bumped by the screen every time START is pressed. It is what makes
+ *   `ran` mean "this attempt went live" rather than "some call ran since this screen
+ *   mounted" — a tab screen stays mounted for the life of the app, so without it a
+ *   start that fails AFTER a good call would inherit that call's summary. A counter
+ *   rather than a derived status transition, because a start can fail before it ever
+ *   reaches `connecting` (no session, no meeting row) and every one of those paths
+ *   has to clear the same state.
+ *
+ * The resets live in a render-phase adjustment rather than an effect (React's "state
+ * that has to change when a prop changes", and the shape `StreamingText` uses): this
+ * repo lints `set-state-in-effect` as an error, and doing it in an effect would also
+ * paint one frame of the PREVIOUS call's duration on the new one.
  */
-export function useCallClock(running: boolean): CallClock {
+export function useCallClock(running: boolean, attempt: number): CallClock {
   const [elapsedMs, setElapsedMs] = useState(0);
-  const [phase, setPhase] = useState({ running, ran: running });
+  const [phase, setPhase] = useState({ attempt, running, ran: running });
 
-  if (phase.running !== running) {
-    setPhase({ running, ran: phase.ran || running });
+  if (phase.attempt !== attempt || phase.running !== running) {
+    const fresh = phase.attempt !== attempt;
+    setPhase({
+      attempt,
+      running,
+      // A new attempt starts from nothing; within one attempt, a call that ENDS
+      // keeps its `ran` — that is what the ended summary is for.
+      ran: fresh ? running : phase.ran || running,
+    });
     // Zeroed HERE rather than in the effect below, so the first frame of a new call
-    // never shows the length of the last one. A call that ENDS keeps its number:
-    // the frozen clock is the length of what just happened.
-    if (running) setElapsedMs(0);
+    // never shows the length of the last one.
+    if (fresh || running) setElapsedMs(0);
   }
 
   useEffect(() => {
@@ -96,7 +115,7 @@ export function useCallClock(running: boolean): CallClock {
     return () => {
       clearInterval(tick);
     };
-  }, [running]);
+  }, [running, attempt]);
 
   return { elapsedMs, ran: phase.ran };
 }

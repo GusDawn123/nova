@@ -2,7 +2,8 @@ import { LIVE_PROTOCOL_VERSION } from '@nova/shared';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { cobaltPalette, paperPalette } from '@/design/tokens';
+import { Size, cobaltPalette, paperPalette } from '@/design/tokens';
+import { THINKING_BEAT_MS, thinkingWordAt } from '@/features/stream/thinking';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
 import { FakeLiveSocket, installFakeWebSocket } from '@/testing/live-socket-stub';
@@ -225,6 +226,32 @@ describe('LiveScreen — the cockpit', () => {
     expect(screen.getByTestId('stream-caret')).toBeInTheDocument();
   });
 
+  it('does not restart her wait when the answer starts', async () => {
+    // The card is drawn on the press and re-keyed nowhere: `suggestion.start` names
+    // the answer, it does not introduce a new card. A key change here would remount
+    // the thinking indicator and snap the word back to LISTENING mid-wait.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      render(<LiveScreen />);
+      const socket = await goLive();
+      respond('push on the timeline');
+
+      act(() => {
+        vi.advanceTimersByTime(THINKING_BEAT_MS * 2 + 40);
+      });
+      const midWait = screen.getByTestId('thinking-word').textContent;
+      expect(midWait).not.toBe(thinkingWordAt(0));
+
+      act(() => {
+        socket.receive(suggestionStart());
+      });
+
+      expect(screen.getByTestId('thinking-word').textContent).toBe(midWait);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('keeps the record of what was said', async () => {
     render(<LiveScreen />);
     const socket = await goLive();
@@ -262,9 +289,31 @@ describe('LiveScreen — when it goes wrong', () => {
     });
 
     expect(screen.getByTestId('quota-card')).toBeInTheDocument();
-    // No dead retry: nothing a press here can do mints more quota.
+    // No dead retry: nothing a press here re-runs the call the server refused.
     expect(screen.queryByTestId('respond-key')).toBeNull();
     expect(screen.queryByText(/retry|try again/i)).toBeNull();
+    // But the screen is not a dead end either — it is a TAB, it never unmounts, and
+    // the quota it is reporting will roll over.
+    expect(screen.getByTestId('start-session-key')).toBeInTheDocument();
+  });
+
+  it('lets the next attempt clear the quota card', async () => {
+    render(<LiveScreen />);
+    const socket = await goLive();
+    act(() => {
+      socket.receive({
+        v: LIVE_PROTOCOL_VERSION,
+        type: 'error',
+        code: 'quota_exceeded',
+        message: 'stt quota exhausted for the current period',
+      });
+    });
+    expect(screen.getByTestId('quota-card')).toBeInTheDocument();
+
+    await goLive();
+
+    expect(screen.queryByTestId('quota-card')).toBeNull();
+    expect(screen.getByTestId('steer-field')).toBeInTheDocument();
   });
 
   it('says a lesser failure in one line and carries on', async () => {
@@ -303,6 +352,51 @@ describe('LiveScreen — after the call', () => {
 
     fireEvent.click(screen.getByTestId('see-calls-key'));
     expect(router.push).toHaveBeenCalledWith('/');
+  });
+
+  it('does not call a failed attempt a finished call', async () => {
+    // This screen is a TAB and never unmounts, so "a call ran" has to mean THIS
+    // attempt — otherwise a start that dies before it connects inherits the summary
+    // of the last call that worked.
+    render(<LiveScreen />);
+    await goLive();
+    fireEvent.click(screen.getByTestId('end-session-key'));
+    expect(screen.getByTestId('ended-summary')).toBeInTheDocument();
+
+    const before = FakeLiveSocket.instances.length;
+    fireEvent.click(screen.getByTestId('start-session-key'));
+    await waitFor(() => {
+      expect(FakeLiveSocket.instances.length).toBeGreaterThan(before);
+    });
+    act(() => {
+      FakeLiveSocket.instances[before].onclose?.({
+        code: 4401,
+        reason: 'unauthorized',
+      });
+    });
+
+    expect(screen.queryByTestId('ended-summary')).toBeNull();
+    expect(screen.getByTestId('start-session-key')).toBeInTheDocument();
+  });
+});
+
+describe('LiveScreen — the targets', () => {
+  it('gives every control the platform floor, as a real box', async () => {
+    // A REAL minimum rather than `hitSlop`: react-native-web ignores hitSlop, and
+    // Expo Web is this project's verification target — a slop-only target would look
+    // right by eye and be unassertable here.
+    render(<LiveScreen />);
+    expect(
+      getComputedStyle(screen.getByTestId('mode-pill-general')).minHeight,
+    ).toBe(`${String(Size.tapTarget)}px`);
+
+    await goLive();
+
+    for (const testID of ['end-session-key', 'capture-tab-notes', 'respond-key']) {
+      const control = screen.getByTestId(testID);
+      const box = Number.parseFloat(getComputedStyle(control).minHeight);
+      expect(box, `${testID} is under the 44pt floor`).toBeGreaterThanOrEqual(44);
+    }
   });
 });
 

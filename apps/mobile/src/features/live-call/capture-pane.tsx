@@ -113,7 +113,9 @@ export function CapturePane({
 
 const styles = StyleSheet.create({
   card: {
-    height: 156,
+    // Tall enough that the tabs can carry a real 44pt target without the transcript
+    // losing a line to them.
+    height: 174,
     borderRadius: Radius.soft,
     paddingHorizontal: Space.lg,
     paddingBottom: Space.sm2,
@@ -123,11 +125,13 @@ const styles = StyleSheet.create({
     gap: Space.lg,
     alignItems: 'center',
   },
+  // A real 44pt box, not `hitSlop` — react-native-web ignores hitSlop and Expo Web is
+  // this project's verification target. The label stays small; the target is not.
   tab: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Space.xs2,
-    minHeight: Size.tapTarget - Space.xl,
+    minHeight: Size.tapTarget,
     justifyContent: 'center',
   },
   tabLabel: {

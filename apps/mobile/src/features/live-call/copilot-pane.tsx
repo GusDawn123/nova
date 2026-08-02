@@ -54,21 +54,31 @@ export interface CopilotEntry {
  * Those waiting cards are the reason this is a function and not a `.map` at the call
  * site. A press has to have a visible consequence immediately — the wait is part of
  * the answer (spec §6) — and `suggestion.start` is a round trip away.
+ *
+ * A steered card KEEPS THE STEER'S KEY once the server names its answer. The card is
+ * the same card either side of `suggestion.start` — same position, same thinking
+ * indicator, mid-wait — and taking the suggestion id as the key there would unmount
+ * and remount it, restarting the word cycle and the bar sweeps a second into the
+ * wait. Only an unsteered answer, which has no card before its id exists, is keyed
+ * by the id.
  */
 export function copilotEntries(
   suggestions: readonly LiveSuggestion[],
   pairing: SteerPairing,
 ): CopilotEntry[] {
   return [
-    ...suggestions.map((suggestion) => ({
-      key: suggestion.id,
-      steer: pairing.byId.get(suggestion.id) ?? null,
-      text: suggestion.text,
-      streaming: suggestion.streaming,
-    })),
-    ...pairing.pending.map((steer, index) => ({
-      key: `pending-${String(index)}`,
-      steer,
+    ...suggestions.map((suggestion) => {
+      const steer = pairing.byId.get(suggestion.id);
+      return {
+        key: steer?.key ?? suggestion.id,
+        steer: steer?.text ?? null,
+        text: suggestion.text,
+        streaming: suggestion.streaming,
+      };
+    }),
+    ...pairing.pending.map((steer) => ({
+      key: steer.key,
+      steer: steer.text,
       text: '',
       streaming: true,
     })),

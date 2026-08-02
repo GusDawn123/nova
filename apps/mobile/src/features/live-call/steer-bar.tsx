@@ -105,7 +105,10 @@ export function SteerBar({
         accessibilityLabel="Respond"
         disabled={!armed}
         onPress={respond}
-        style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+        style={({ pressed }) => [
+          styles.keyPress,
+          pressed ? styles.pressed : undefined,
+        ]}
       >
         <ChamferSurface
           cut={Chamfer.key}
@@ -146,7 +149,10 @@ const styles = StyleSheet.create({
     fontFamily: FontFamily.mono,
     fontSize: FontSize.mono,
   },
-  key: { minHeight: Size.tapTarget },
+  // The floor lives on the PRESSABLE, not only on the surface inside it: the box that
+  // takes the touch is the one that has to clear 44pt.
+  keyPress: { minHeight: Size.tapTarget },
+  key: { flex: 1, minHeight: Size.tapTarget },
   keyContent: {
     flex: 1,
     paddingVertical: Space.md,

@@ -155,7 +155,8 @@ export function QuotaCard({
       </Text>
       <Text style={[styles.note, { color: palette.inkSoft }]}>
         Nothing else changed — every call you have already had, and the notes she
-        wrote for them, are still here.
+        wrote for them, are still here. You can start another call below, and the
+        server will refuse it until your plan renews.
       </Text>
     </View>
   );

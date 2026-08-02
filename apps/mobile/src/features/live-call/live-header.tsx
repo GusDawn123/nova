@@ -58,7 +58,10 @@ export function LiveHeader({
             testID="end-session-key"
             accessibilityRole="button"
             onPress={onEnd}
-            style={({ pressed }) => (pressed ? styles.pressed : undefined)}
+            style={({ pressed }) => [
+              styles.endPress,
+              pressed ? styles.pressed : undefined,
+            ]}
           >
             <ChamferSurface
               stroke={palette.inkHairline}
@@ -148,9 +151,14 @@ const styles = StyleSheet.create({
     fontSize: FontSize.monoSm,
     letterSpacing: 1,
   },
-  endKey: { alignSelf: 'center' },
+  // The way OUT of a live call gets the full 44pt floor as a real box, not `hitSlop`
+  // (react-native-web ignores hitSlop, and Expo Web is this project's verification
+  // target). Of everything on this screen, this is the control that must not need a
+  // second attempt.
+  endPress: { minHeight: Size.tapTarget, justifyContent: 'center' },
+  endKey: { alignSelf: 'stretch' },
   endKeyContent: {
-    minHeight: Size.tapTarget - Space.md,
+    minHeight: Size.tapTarget,
     paddingHorizontal: Space.lg,
     paddingVertical: 0,
     justifyContent: 'center',

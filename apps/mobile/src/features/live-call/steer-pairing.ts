@@ -15,9 +15,23 @@
  * true thing available, and it is confined here rather than smeared through the
  * screen.
  *
+ * Every steer carries a KEY from the moment it is sent. That key — not the server's
+ * suggestion id — is the card's identity, because the card exists before the id
+ * does: it is drawn the instant RESPOND is pressed, holding the thinking indicator,
+ * and `suggestion.start` arriving must not change who it is. Keyed by the id, React
+ * would unmount and remount that card at exactly the wrong moment, snapping the
+ * cycling word back to its first beat a second into the wait.
+ *
  * Pure and immutable, because the screen adjusts state off it DURING render: an
  * unchanged pairing must compare identical or that render loops forever.
  */
+
+/** A steer, with the identity its card keeps for as long as the card exists. */
+export interface Steer {
+  /** Stable, unique for the life of the screen. Never reused, never renumbered. */
+  readonly key: string;
+  readonly text: string;
+}
 
 export interface SteerPairing {
   /**
@@ -25,25 +39,34 @@ export interface SteerPairing {
    * miss is `undefined` in the TYPE as well as at runtime — most answers are
    * unsteered, and that lookup is on the render path of every card.
    */
-  readonly byId: ReadonlyMap<string, string>;
+  readonly byId: ReadonlyMap<string, Steer>;
   /** Steers sent whose answer has not started yet, oldest first. */
-  readonly pending: readonly string[];
+  readonly pending: readonly Steer[];
   /** Every suggestion id already considered — what makes re-pairing impossible. */
   readonly known: ReadonlySet<string>;
+  /** Monotonic; only ever increments, so two steers cannot share a key. */
+  readonly issued: number;
 }
 
 export const emptySteerPairing: SteerPairing = {
-  byId: new Map<string, string>(),
+  byId: new Map<string, Steer>(),
   pending: [],
   known: new Set<string>(),
+  issued: 0,
 };
 
 /** Record a steer the user just sent. It waits here until an answer starts. */
 export function steerSubmitted(
   pairing: SteerPairing,
-  steer: string,
+  text: string,
 ): SteerPairing {
-  return { ...pairing, pending: [...pairing.pending, steer] };
+  const issued = pairing.issued + 1;
+
+  return {
+    ...pairing,
+    issued,
+    pending: [...pairing.pending, { key: `steer-${String(issued)}`, text }],
+  };
 }
 
 /**
@@ -70,5 +93,5 @@ export function pairSteerArrivals(
     if (steer !== undefined) byId.set(id, steer);
   }
 
-  return { byId, pending, known };
+  return { ...pairing, byId, pending, known };
 }
