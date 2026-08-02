@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { liveModeSchema } from "@nova/shared";
 
 import { LIVE_NOTES_CATEGORY, MODES, SYSTEM_PROMPT } from "./index.js";
 
@@ -61,6 +62,15 @@ describe("modes", () => {
     for (const [key, mode] of Object.entries(MODES)) {
       expect(mode.id).toBe(key);
     }
+  });
+
+  it("cannot drift from the wire enum the picker sends", () => {
+    // The two halves of one contract: the phone sends a `liveModeSchema` value on
+    // `session.start`, and this library is what answers with. "general" is the
+    // system prompt ALONE — a mode on the wire with deliberately no block here —
+    // so it is the one value that must not have a library entry.
+    const wireModes = liveModeSchema.options.filter((m) => m !== "general");
+    expect(Object.keys(MODES).sort()).toEqual([...wireModes].sort());
   });
 
   it("gives every mode picker text", () => {
