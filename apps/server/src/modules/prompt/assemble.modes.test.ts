@@ -39,7 +39,7 @@ const MARKERS = {
   },
   finance: {
     directive: "Structure the thinking with an established framework",
-    example: "Pre-pay clears the ceiling",
+    example: "the whole comparison rests on it",
   },
 } as const;
 

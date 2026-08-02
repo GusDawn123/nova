@@ -38,7 +38,7 @@ const PINNED: Record<PromptMode, string> = {
   technical:
     "2313152fa97a748594ebc88547572ec0eba39cf57dcb0d3203bc9d946422f608",
   finance:
-    "8aaa92fe9056666335e68987825c188a967f18b08c12febc5c7c068ec8ab3a90",
+    "c862689e32e144737ced562ab6bfdaa8f04b18bac57040c7aad00cd25dafbc48",
 };
 
 function prefixHash(mode: PromptMode): string {
