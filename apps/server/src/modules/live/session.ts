@@ -5,6 +5,7 @@ import {
   parseClientEvent,
   type ClientLiveEvent,
   type LiveErrorCode,
+  type LiveMode,
   type ServerLiveEvent,
   type TranscriptInputOrigin,
 } from "@nova/shared";
@@ -238,7 +239,14 @@ export class LiveSession {
       case "session.start":
         // `onSessionStart` is async (it awaits the ownership guard when a persister
         // is wired). It catches its own DB errors and never rejects; `void` is safe.
-        void this.onSessionStart(event.meeting_id, event.echo ?? false);
+        // An absent `mode` is the old-client case and means general; an INVALID one
+        // never reaches here — it failed `parseClientEvent` above and was answered
+        // with `invalid_event`.
+        void this.onSessionStart(
+          event.meeting_id,
+          event.echo ?? false,
+          event.mode ?? "general",
+        );
         return;
       case "session.end":
         this.close();
@@ -314,6 +322,7 @@ export class LiveSession {
   private async onSessionStart(
     meetingId: string,
     echo: boolean,
+    mode: LiveMode,
   ): Promise<void> {
     if (this.started) {
       // One live session per socket; a second start is a client protocol bug.
@@ -491,6 +500,9 @@ export class LiveSession {
         send: this.send,
         userId: this.userId,
         meetingId,
+        // The picked mode travels as an ARGUMENT and is never stored anywhere
+        // process-wide: one build per session is the only thing that knows it.
+        mode,
       });
       this.conductor = conductor;
       this.registerConsumer(conductor);
