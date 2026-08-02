@@ -1,12 +1,8 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
 import { useNovaFonts } from '@/design/fonts';
 import { AppearanceProvider, useAppearance } from '@/hooks/use-appearance';
 import { AuthProvider } from '@/hooks/use-auth';
-
-SplashScreen.preventAutoHideAsync();
 
 /**
  * Root layout. `AuthProvider` wraps the whole tree so every route can read the
@@ -33,13 +29,20 @@ export default function RootLayout() {
  * appearance can only be read from INSIDE the provider, and navigation's own theme
  * (which paints the gaps between screens during a transition) has to agree with the
  * one the screens paint — otherwise a push flashes the other theme's canvas.
+ *
+ * NOTHING sits between the native splash and this navigator. The Expo template's
+ * `AnimatedSplashOverlay` used to — a full-screen template-blue slab holding the Expo
+ * logo, which made a third colour the app's literal first frame on every cold start
+ * (spec §11: one blue, one white, nothing else). It is deleted, along with the
+ * `preventAutoHideAsync` it existed to undo, so `expo-splash-screen` auto-hides on
+ * the first commit and hands straight off to `(app)/_layout`'s in-brand waiting
+ * frame. `app.json` paints the native launch screen `#0002DA` for the same reason.
  */
 function ThemedStack() {
   const { theme } = useAppearance();
 
   return (
     <ThemeProvider value={theme === 'paper' ? DefaultTheme : DarkTheme}>
-      <AnimatedSplashOverlay />
       <Stack screenOptions={{ headerShown: false }} />
     </ThemeProvider>
   );

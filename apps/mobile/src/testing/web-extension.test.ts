@@ -57,8 +57,9 @@ describe('platform-extension resolution', () => {
   });
 
   it('is actually watching something', () => {
-    // A guard that greps nothing passes forever. The two known files are the web
-    // colour-scheme hook and the animated splash icon.
+    // A guard that greps nothing passes forever. The one known file is the web
+    // colour-scheme hook (the animated splash icon's web variant went with the Expo
+    // template splash overlay).
     expect(trackedWebFiles().length).toBeGreaterThan(0);
   });
 });
