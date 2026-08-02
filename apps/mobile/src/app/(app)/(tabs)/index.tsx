@@ -54,6 +54,10 @@ export default function MeetingsScreen(): React.JSX.Element {
   // The section headings are a function of the current LOCAL day, so an app left
   // foregrounded across midnight would keep calling yesterday "today". Re-read the
   // clock whenever the screen is focused rather than running a timer for it.
+  //
+  // The CLOCK only. Data freshness on focus — and the poll that runs while notes are
+  // still being written — belongs to `useMeetings`, which watches focus itself; a
+  // `refresh()` added here would be a second, competing request.
   const [now, setNow] = useState(() => new Date());
   useFocusEffect(
     useCallback(() => {

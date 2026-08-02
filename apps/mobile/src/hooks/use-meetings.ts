@@ -1,5 +1,10 @@
-import { meetingListResponseSchema, type MeetingListResponse } from '@nova/shared';
-import { useCallback, useEffect, useState } from 'react';
+import {
+  meetingListResponseSchema,
+  type MeetingListResponse,
+  type NotesStatus,
+} from '@nova/shared';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { API_BASE_URL } from '@/constants/health';
 import { useAuth } from '@/hooks/use-auth';
@@ -11,6 +16,28 @@ const MEETINGS_URL = `${API_BASE_URL}/meetings`;
  * never settles, so `refreshing` never clears and the spinner turns forever.
  */
 const REQUEST_TIMEOUT_MS = 10_000;
+
+/**
+ * How often the list re-reads itself while the notes pipeline is still writing.
+ * Slow enough to be invisible on a bill, quick enough that WRITING NOTES → NOTES
+ * READY lands while the user is still looking at the card.
+ */
+const POLL_INTERVAL_MS = 5_000;
+
+/**
+ * Which `notes_status` values mean "a job is still working on this". A `Record`
+ * rather than a list so a sixth status has to be classified HERE to compile,
+ * instead of quietly defaulting to "settled" and never being polled for.
+ *
+ * `failed` is settled on purpose: the retry is a button, not a timer.
+ */
+const NOTES_STILL_WRITING: Record<NotesStatus, boolean> = {
+  none: false,
+  queued: true,
+  processing: true,
+  completed: false,
+  failed: false,
+};
 
 const TIMEOUT_MESSAGE =
   'The request took too long. Check your connection and try again.';
@@ -45,11 +72,23 @@ export interface UseMeetings {
 
 /**
  * Smart hook: `GET /meetings` with the caller's access token, zod-parsed against the
- * shared schema. Screens stay dumb (RULES §10).
+ * shared schema. Screens stay dumb (RULES §10) — including about FRESHNESS, which
+ * this hook owns end to end.
  *
  * Re-runs when the token changes (a silent refresh mints a new one), which also
  * means the list reloads after re-auth rather than showing a stale page behind a
  * dead token.
+ *
+ * Three things make a request, and only one of them is the user:
+ *
+ *   MOUNT — once, for the screen's first paint.
+ *   FOCUS — a tab screen is never unmounted, so returning from a call would
+ *     otherwise show the list as it looked before the call happened.
+ *   POLL — notes are written by a background job (`modules/notes`), so without a
+ *     timer the WRITING NOTES → NOTES READY transition could never reach the card.
+ *
+ * The last two are SILENT: they update in place and never touch `refreshing`, which
+ * belongs to the pull-to-refresh spinner alone.
  */
 export function useMeetings(): UseMeetings {
   const auth = useAuth();
@@ -61,6 +100,25 @@ export function useMeetings(): UseMeetings {
   // Bumped by refresh() to re-run the effect; a counter rather than a boolean so
   // two refreshes in a row both take effect.
   const [nonce, setNonce] = useState(0);
+  // Focus is STATE, not a ref: the poll below has to start and stop with it.
+  const [focused, setFocused] = useState(false);
+  /**
+   * Whether a fetch has ever landed. The focus that arrives in the same commit as
+   * the mount is the same event as the mount, and firing both would double every
+   * cold open of the screen.
+   */
+  const settled = useRef(false);
+
+  /**
+   * Re-fetch without saying so: bumping the nonce re-runs the effect below, whose
+   * cleanup aborts whatever it superseded — so overlapping polls cannot stack.
+   * Deliberately dependency-FREE: `useFocusEffect` re-runs its effect whenever the
+   * callback identity changes, and a callback that changed per render would refetch
+   * per render.
+   */
+  const refetch = useCallback(() => {
+    setNonce((n) => n + 1);
+  }, []);
 
   const refresh = useCallback(() => {
     // Signed out there is nothing to fetch and the effect below early-returns,
@@ -118,7 +176,10 @@ export function useMeetings(): UseMeetings {
         }
       } finally {
         clearTimeout(timer);
-        if (!cancelled) setRefreshing(false);
+        if (!cancelled) {
+          settled.current = true;
+          setRefreshing(false);
+        }
       }
     }
 
@@ -129,6 +190,46 @@ export function useMeetings(): UseMeetings {
       controller.abort();
     };
   }, [accessToken, nonce]);
+
+  /**
+   * Focus. The cleanup runs on BLUR, not on unmount — that is the whole reason this
+   * is `useFocusEffect` and not `useEffect`, and it is what stops the poll below for
+   * a screen the user has navigated away from.
+   *
+   * The refetch is skipped while the first load is still in flight: that focus IS
+   * the mount. An error left by an earlier attempt is retried by it, which is the
+   * behaviour we want — a failed list heals by being looked at again.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      setFocused(true);
+      if (settled.current) refetch();
+      return () => {
+        setFocused(false);
+      };
+    }, [refetch]),
+  );
+
+  /**
+   * Poll, for exactly as long as there is something to poll for. A boolean, not the
+   * meetings array, so the interval keeps its cadence across refetches instead of
+   * being torn down and restarted by every answer that changes nothing.
+   */
+  const writingNotes =
+    fetched.status === 'success' &&
+    fetched.data.meetings.some((meeting) => NOTES_STILL_WRITING[meeting.notes_status]);
+
+  useEffect(() => {
+    // Unfocused, signed out, or nothing being written: no timer exists at all. A
+    // poll that outlives its reason is a request the user never sees and pays for.
+    if (!focused || accessToken === null || !writingNotes) return;
+    const ticker = setInterval(() => {
+      refetch();
+    }, POLL_INTERVAL_MS);
+    return () => {
+      clearInterval(ticker);
+    };
+  }, [focused, accessToken, writingNotes, refetch]);
 
   // Signed-out is derived, not stored: it is a pure function of the session, and a
   // stored copy could disagree with it for a render.
