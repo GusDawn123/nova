@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette, paperPalette } from '@/design/tokens';
+import { FOLLOW_UP_FAILURE_COPY } from '@/features/notes/follow-up';
 import type { MeetingNotesState } from '@/hooks/use-meeting-notes';
 import type { MeetingTranscriptState } from '@/hooks/use-meeting-transcript';
 import { expectDuotoneOnly } from '@/testing/duotone';
@@ -399,6 +400,12 @@ describe('MeetingDetailScreen — the follow-up', () => {
     fireEvent.click(screen.getByTestId('detail-tab-follow-up'));
 
     expect(screen.getByTestId('follow-up-state')).toBeInTheDocument();
+    // The exact `notes_not_ready` copy, not just "some card rendered". All three of
+    // processing, failed and none draw the same card with no retry on it, so without
+    // the WORDS this test passes on any of them — including the one that promises
+    // a draft is coming for notes that are never going to land.
+    expect(screen.getByText(FOLLOW_UP_FAILURE_COPY.notes_not_ready.title)).toBeInTheDocument();
+    expect(screen.getByText(FOLLOW_UP_FAILURE_COPY.notes_not_ready.body)).toBeInTheDocument();
     expect(screen.queryByTestId('follow-up-retry')).toBeNull();
   });
 

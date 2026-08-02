@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cobaltPalette } from '@/design/tokens';
+import type { MascotStageProps } from '@/features/mascot/mascot-stage';
 import type { AuthActionResult, UseAuth } from '@/hooks/use-auth';
 import { expectDuotoneOnly } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
@@ -16,10 +17,58 @@ import SignUpScreen from '../app/(auth)/sign-up';
  * other error on this screen is said — plain copy and ink.
  */
 
-vi.mock('@/features/mascot/mascot-stage', () => ({
-  MascotStage: ({ size, testID }: { size?: number; testID?: string }) => (
-    <View testID={testID ?? 'mascot-stage'} style={{ width: size, height: size }} />
+/**
+ * She is a box here — EXCEPT in the duotone case, which flips this flag before
+ * rendering. She is the largest thing on the screen and she paints a glow gradient,
+ * scanlines and tear layers; a colour guard run over a STUB of her is a guard over
+ * the small print. Same arrangement as `sign-in.test.tsx`.
+ */
+const realMascot = vi.hoisted(() => ({ value: false }));
+
+vi.mock('@/features/mascot/mascot-stage', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@/features/mascot/mascot-stage')>();
+  return {
+    MascotStage: (props: MascotStageProps) =>
+      realMascot.value ? (
+        <actual.MascotStage {...props} />
+      ) : (
+        <View testID="mascot-stage" style={{ width: props.size, height: props.size }} />
+      ),
+  };
+});
+
+vi.mock('react-native-reanimated', async () => {
+  const { reanimatedStub } = await import('@/testing/reanimated-stub');
+  return reanimatedStub();
+});
+
+vi.mock('expo-image', () => ({
+  Image: ({
+    style,
+    tintColor,
+    testID,
+  }: {
+    style?: unknown;
+    tintColor?: string;
+    testID?: string;
+  }) => (
+    // The tint is painted as a background so the duotone guard can SEE the colour
+    // the real (native) Image would have tinted her ghosts with.
+    <View
+      testID={testID}
+      style={[
+        style as React.ComponentProps<typeof View>['style'],
+        tintColor === undefined ? null : { backgroundColor: tintColor },
+      ]}
+    />
   ),
+}));
+
+/** Her motion is stubbed, not disabled: reduced motion removes half her tree. */
+vi.mock('@/design/motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/design/motion')>()),
+  useReducedMotion: () => false,
 }));
 
 vi.mock('expo-router', () => ({
@@ -48,6 +97,7 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  realMascot.value = false;
   auth.status = 'signed-out';
   auth.signUp.mockReset();
   auth.signUp.mockResolvedValue({ ok: true });
@@ -108,6 +158,10 @@ describe('SignUpScreen', () => {
   });
 
   it('marks the confirm field in ink, and nothing else changes colour', async () => {
+    // The real mascot, not the box: she is the largest thing on this screen and the
+    // only part of it that paints gradients, so a guard over her stub proves nothing
+    // about the surface a user actually looks at.
+    realMascot.value = true;
     const { container } = render(<SignUpScreen />);
     fill('hunter2', 'hunter3');
     await act(async () => {

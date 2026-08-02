@@ -1,5 +1,5 @@
 import type { MeetingListItem } from '@nova/shared';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { View } from 'react-native';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -43,13 +43,21 @@ const router = vi.hoisted(() => ({ push: vi.fn<(href: string) => void>() }));
  * re-reads the clock on focus so an app left open across midnight does not keep
  * calling yesterday "today", and a no-op mock would let that wiring be deleted
  * without a single test noticing.
+ *
+ * The callback is also HELD, so a test can fire a second focus. Mount alone proves
+ * the effect exists; only a re-focus proves it re-reads anything.
  */
+const focus = vi.hoisted(() => ({ run: null as (() => void) | null }));
+
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
     useRouter: () => router,
     useFocusEffect: (callback: () => void) => {
-      useEffect(callback, [callback]);
+      useEffect(() => {
+        focus.run = callback;
+        callback();
+      }, [callback]);
     },
   };
 });
@@ -118,6 +126,7 @@ beforeEach(() => {
   meetings.refreshing = false;
   meetings.refresh.mockReset();
   router.push.mockReset();
+  focus.run = null;
 });
 
 const HOUR_MS = 60 * 60 * 1000;
@@ -166,6 +175,33 @@ describe('MeetingsScreen — the archive', () => {
     expect(screen.getByText('— Today —')).toBeInTheDocument();
     expect(screen.getByText('— Earlier —')).toBeInTheDocument();
     expect(screen.queryByText('— This week —')).toBeNull();
+  });
+
+  it('re-reads the clock when the tab comes back, so yesterday stops being today', () => {
+    // This screen is a TAB and never unmounts. Without the focus read, a phone left
+    // on the archive overnight keeps filing last night's call under "Today" — and a
+    // test that only ever mounts once cannot tell that wiring from a `useState`
+    // initialiser that runs the same way and then never again.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 6, 22, 15, 0));
+      const started = new Date(2026, 6, 22, 9, 0).toISOString();
+      succeed([item({ started_at: started, ended_at: started })]);
+
+      render(<MeetingsScreen />);
+      expect(screen.getByText('— Today —')).toBeInTheDocument();
+
+      // Two days pass with the app in the background, then the tab is opened again.
+      vi.setSystemTime(new Date(2026, 6, 24, 9, 0));
+      act(() => {
+        focus.run?.();
+      });
+
+      expect(screen.queryByText('— Today —')).toBeNull();
+      expect(screen.getByText('— This week —')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves the floating tab bar room to float over', () => {

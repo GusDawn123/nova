@@ -42,7 +42,7 @@ apps/mobile/src/features/mascot/
   blink-clock.ts       (NEW: pure randomized blink/glitch scheduler)
   mascot-stage.tsx     (NEW: her — float, sparkles, scanlines, blink, glitch)
 apps/mobile/src/app/(auth)/sign-in.tsx, sign-up.tsx   (rebuilt presentation)
-apps/mobile/src/app/(app)/account.tsx                  (rebuilt presentation)
+apps/mobile/src/app/(app)/(tabs)/account.tsx           (rebuilt presentation)
 apps/mobile/src/app/(app)/(tabs)/index.tsx             (rebuilt presentation)
 apps/mobile/src/app/(app)/meetings/[id].tsx            (rebuilt presentation)
 apps/mobile/src/app/(app)/(tabs)/live.tsx              (rebuilt presentation)
@@ -407,7 +407,7 @@ export function MascotStage(props: { size?: number; sparkles?: boolean }): React
 ### Task 10: Sign-in, sign-up, account
 
 **Files:**
-- Modify: `apps/mobile/src/app/(auth)/sign-in.tsx`, `sign-up.tsx`, `apps/mobile/src/app/(app)/account.tsx`
+- Modify: `apps/mobile/src/app/(auth)/sign-in.tsx`, `sign-up.tsx`, `apps/mobile/src/app/(app)/(tabs)/account.tsx`
 - Test: co-located `.test.tsx` for each (extend existing where present)
 
 **Interfaces:**

@@ -101,12 +101,34 @@ describe('RootLayout', () => {
     });
   });
 
-  it('repaints that backing when the theme changes under it', async () => {
+  it('brings a stored pick back to the navigator, not just to the screens', async () => {
     // Both halves of the same claim: the navigation theme and the backdrop have to
     // move TOGETHER, or the gap between screens is the other theme's canvas.
     storage.value = 'paper';
 
     render(<RootLayout />);
+
+    await waitFor(() => {
+      expect(screenOptions().contentStyle).toEqual({
+        backgroundColor: paperPalette.canvas,
+      });
+    });
+    expect(navigationTheme.value).toEqual({ name: 'DefaultTheme' });
+  });
+
+  it('repaints that backing when the theme changes UNDER it', async () => {
+    // A restore is one initial value; this is the transition. On `auto` the OS is
+    // the authority, so the phone switching to light mid-session has to carry both
+    // the backdrop and the navigation theme across with it — the failure otherwise
+    // is a cobalt flash in the gap between two paper screens.
+    const { rerender } = render(<RootLayout />);
+    expect(screenOptions().contentStyle).toEqual({
+      backgroundColor: cobaltPalette.canvas,
+    });
+    expect(navigationTheme.value).toEqual({ name: 'DarkTheme' });
+
+    os.value = 'light';
+    rerender(<RootLayout />);
 
     await waitFor(() => {
       expect(screenOptions().contentStyle).toEqual({

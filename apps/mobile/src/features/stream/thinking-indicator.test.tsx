@@ -153,12 +153,30 @@ describe('ThinkingIndicator — the silhouette', () => {
     expect(reanimatedSpies.withRepeat).toHaveBeenCalledTimes(3);
   });
 
-  it('gives every bar its own sweep period', () => {
+  it('gives every bar its own sweep period, and lands it on the animation', async () => {
     // Three bands crossing together read as one bar cut into three pieces rather
     // than as three things working. Distinct periods drift them apart and keep them
     // apart, where a shared period with a one-off offset re-synchronises.
+    //
+    // The constants being distinct is half the claim; the other half is that each
+    // one REACHES its sweep. A hardcoded duration in place of `bar.sweepMs` leaves
+    // the table below untouched and renders identically — this is the assertion that
+    // notices.
     const periods = THINKING_BARS.map((bar) => bar.sweepMs);
     expect(new Set(periods).size).toBe(THINKING_BARS.length);
+
+    reanimatedSpies.withTiming.mockClear();
+    renderIndicator();
+    await waitFor(() => {
+      expect(screen.getAllByTestId('light-sweep-band')).toHaveLength(3);
+    });
+
+    const durations = reanimatedSpies.withTiming.mock.calls.map(
+      ([, config]) => config?.duration,
+    );
+    for (const period of periods) {
+      expect(durations, `no sweep ran for ${String(period)}ms`).toContain(period);
+    }
   });
 });
 

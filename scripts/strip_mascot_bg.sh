@@ -18,7 +18,7 @@
 # Usage:
 #   ./scripts/strip_mascot_bg.sh                     # all PNGs in the default raw dir
 #   ./scripts/strip_mascot_bg.sh a.png some/dir      # explicit files and/or dirs
-#   ./scripts/strip_mascot_bg.sh --chroma '#2733E6'  # duotone flood-fill fallback
+#   ./scripts/strip_mascot_bg.sh --chroma '#0002DA'  # duotone flood-fill fallback
 #
 set -euo pipefail
 
@@ -47,7 +47,9 @@ strip_mascot_bg.sh — make mascot PNGs transparent, ready for React Native.
   input        PNG file or directory of PNGs (non-recursive).
                Default: apps/mobile/assets/mascot/raw/
   --chroma C   Use ImageMagick edge-connected flood fill of color C
-               (e.g. '#2733E6') instead of rembg. Best for strict duotone art.
+               (e.g. '#0002DA', the brand blue the raw art is painted on — the
+               file's own pixels sit a shade off it, which CHROMA_FUZZ covers)
+               instead of rembg. Best for strict duotone art.
   -h, --help   This message.
 
 Output: apps/mobile/assets/mascot/<same-basename>.png (RGBA). Inputs are never
@@ -68,7 +70,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     -h | --help) usage; exit 0 ;;
     --chroma)
-      [ $# -ge 2 ] || die "--chroma needs a color, e.g. --chroma '#2733E6'"
+      [ $# -ge 2 ] || die "--chroma needs a color, e.g. --chroma '#0002DA'"
       CHROMA="$2"; shift 2 ;;
     --chroma=*) CHROMA="${1#*=}"; shift ;;
     -*) die "unknown option: $1 (try --help)" ;;

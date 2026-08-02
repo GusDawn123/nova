@@ -46,15 +46,25 @@ vi.mock('expo-image', async () => {
     Image: ({
       source,
       style,
+      tintColor,
+      contentFit,
       testID,
     }: {
       source?: unknown;
       style?: React.ComponentProps<typeof View>['style'];
+      tintColor?: string;
+      contentFit?: string;
       testID?: string;
     }) => (
+      // `tintColor` and `contentFit` are forwarded as data attributes rather than
+      // dropped: the tint is the only thing that makes an echo a DUOTONE echo, and
+      // `fill` vs `contain` on the eye patch is the difference between a registered
+      // blink and a letterboxed rectangle over her face. Neither is visible in
+      // jsdom, and neither may be silently deletable.
       <View
         testID={testID}
         style={style}
+        dataSet={{ tint: tintColor ?? '', fit: contentFit ?? '' }}
         accessibilityLabel={typeof source === 'string' ? source : ''}
       />
     ),
@@ -183,6 +193,9 @@ describe('MascotStage — the figure', () => {
     expect(percent(patch, 'top')).toBeCloseTo(CONTRACT.top, 3);
     expect(percent(patch, 'width')).toBeCloseTo(CONTRACT.width, 3);
     expect(percent(patch, 'height')).toBeCloseTo(CONTRACT.height, 3);
+    // And STRETCHED back into that box, not fitted inside it: `contain` would
+    // letterbox the crop and hang a misregistered rectangle over her eyes.
+    expect(screen.getByTestId('mascot-patch-art')).toHaveAttribute('data-fit', 'fill');
   });
 
   it('keeps the patch invisible between blinks', () => {
@@ -231,9 +244,19 @@ describe('MascotStage — the tear', () => {
     render(<MascotStage color={INK} />);
 
     for (const id of ['mascot-ghost-a', 'mascot-ghost-b']) {
-      const label = screen.getByTestId(id).querySelector('[aria-label]');
-      expect(label?.getAttribute('aria-label')).toContain('eyes-open.png');
+      for (const layer of screen.getByTestId(id).querySelectorAll('[aria-label]')) {
+        expect(layer.getAttribute('aria-label')).toContain('eyes-open.png');
+      }
     }
+
+    // The hot echo carries a TINT, and that tint is the ink it was handed — the one
+    // place in her tree where a colour is applied rather than drawn, and the one the
+    // first-image-only check above used to walk straight past.
+    const tinted = screen
+      .getByTestId('mascot-ghost-a')
+      .querySelectorAll('[data-tint]:not([data-tint=""])');
+    expect(tinted).toHaveLength(1);
+    expect(tinted[0].getAttribute('data-tint')).toBe(INK);
   });
 
   it('breathes on a loop', () => {

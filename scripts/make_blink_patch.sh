@@ -170,11 +170,14 @@ print(
     f"    LAYOUT left {100 * L / W:.3f}%  top {100 * T / H:.3f}%  "
     f"width {100 * (R - L) / W:.3f}%  height {100 * (B - T) / H:.3f}%  of the base frame"
 )
+# B and R are EXCLUSIVE (PIL's crop box), so the patch's own last row is B - 1 and
+# its last column is R - 1. Reading B or R walked one pixel outside the patch — and
+# straight off the image whenever the box reached its full width or height.
 for name, pts in (
     ("top", [(x, T) for x in range(L, R)]),
-    ("bottom", [(x, B) for x in range(L, R)]),
+    ("bottom", [(x, B - 1) for x in range(L, R)]),
     ("left", [(L, y) for y in range(T, B)]),
-    ("right", [(R, y) for y in range(T, B)]),
+    ("right", [(R - 1, y) for y in range(T, B)]),
 ):
     v = [delta[x, y] for x, y in pts]
     print(f"    SEAM {name:<6} {sum(1 for i in v if i > 40):>4}/{len(v)} px differ, max delta {max(v)}")

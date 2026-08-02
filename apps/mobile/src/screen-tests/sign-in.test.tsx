@@ -311,11 +311,25 @@ describe('SignInScreen — a rejection', () => {
     });
     expect(screen.getByTestId('auth-error')).toBeInTheDocument();
 
-    auth.signIn.mockResolvedValue({ ok: true });
+    // Hold the next attempt OPEN. The claim is that the stale rejection goes at the
+    // START of the next try — a message that only clears once the retry SUCCEEDS is
+    // a different, weaker behaviour, and resolving immediately cannot tell them
+    // apart.
+    let settle: (result: AuthActionResult) => void = () => undefined;
+    auth.signIn.mockReturnValue(
+      new Promise<AuthActionResult>((resolve) => {
+        settle = resolve;
+      }),
+    );
     await act(async () => {
       fireEvent.click(screen.getByTestId('submit-button'));
     });
 
+    expect(screen.queryByTestId('auth-error')).toBeNull();
+
+    await act(async () => {
+      settle({ ok: true });
+    });
     expect(screen.queryByTestId('auth-error')).toBeNull();
   });
 });

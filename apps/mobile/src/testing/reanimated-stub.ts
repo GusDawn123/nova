@@ -54,10 +54,18 @@ import { vi } from 'vitest';
  * loop spy cannot see — the thinking word's 220ms flick on each swap is a sequence,
  * not a repeat, and reduced motion has to suppress it while the word underneath
  * keeps advancing.
+ *
+ * `withTiming` is here for its CONFIG. The value it animates to survives into the
+ * style (the stub returns it), but the duration does not — so without a spy, three
+ * bars given three sweep periods and three bars given one shared period render
+ * identically, and the difference between them is untestable.
  */
 export const reanimatedSpies = {
   withRepeat: vi.fn((value: unknown) => value),
   withSequence: vi.fn((...steps: unknown[]) => steps[steps.length - 1]),
+  withTiming: vi.fn(
+    (toValue: number, _config?: { duration?: number }) => toValue,
+  ),
 };
 
 /** Easing curves are irrelevant without a running clock — every one is identity. */
@@ -80,7 +88,7 @@ export function reanimatedStub(): Record<string, unknown> {
     // is caught here rather than on a device.
     useAnimatedStyle: (updater: () => unknown) => updater(),
     withRepeat: reanimatedSpies.withRepeat,
-    withTiming: (toValue: number) => toValue,
+    withTiming: reanimatedSpies.withTiming,
     withDelay: (_delayMs: number, animated: unknown) => animated,
     withSequence: reanimatedSpies.withSequence,
   };
