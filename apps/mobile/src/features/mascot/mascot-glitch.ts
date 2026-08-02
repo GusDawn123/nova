@@ -25,16 +25,28 @@
  * ---------------------------------------------------------------------------
  * A double is not a second timeline — it is the SAME burst re-entered
  * {@link DOUBLE_OFFSET_MS} later. {@link burstTime} does the whole of it: before the
- * offset you are in burst one, after it you are at the same place in burst two. That
- * offset is shorter than a burst, so the first tear is cut off mid-way by the second
- * starting — which is exactly the stutter the demo shows.
+ * offset you are in burst one, after it you are at the same place in burst two. The
+ * offset is longer than a burst, so the first tear finishes and the figure is
+ * genuinely still for a beat before the second one starts — two blinks, not one long
+ * one. What that beat costs is the whole of {@link DOUBLE_OFFSET_MS}'s reasoning below.
  */
 
 /** One blink-plus-tear burst. Spec §7: "~200ms". */
 export const BURST_MS = 200;
 
-/** A double blink's second close starts this long after the first. */
-export const DOUBLE_OFFSET_MS = 180;
+/**
+ * A double blink's second close starts this long after the first — measured
+ * start-to-start, so the eyes are open for `240 − 164 = 76ms` in between.
+ *
+ * That open window is the number that matters, and it is the whole reason this is 240
+ * rather than the 180 the plan named. At 180 the eyes reopen for 16ms — ONE FRAME at
+ * 60Hz — which no one perceives as a second blink; it reads as a single close that
+ * stuttered. 76ms is about five frames: unmistakably two.
+ *
+ * Taken from `mascot-alive-v2.html`, the ratified demo, whose double window is ~243ms
+ * start-to-start. The demo is the design authority here, not the plan's constant.
+ */
+export const DOUBLE_OFFSET_MS = 240;
 
 /** The cross-fade in and out of the closed patch. Fast enough to read as a snap. */
 const PATCH_FADE_MS = 24;

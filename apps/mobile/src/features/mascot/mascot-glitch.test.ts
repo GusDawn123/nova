@@ -27,6 +27,13 @@ import {
 /** Where the eyes are fully shut — the middle of the close, in either burst. */
 const SHUT_MS = 80;
 
+/**
+ * The floor on how long a double blink's eyes stay open between its two closes.
+ * Three frames at 60Hz — below that the reopening is not a thing anyone sees, and the
+ * double stops being a double.
+ */
+const MIN_OPEN_MS = 50;
+
 describe('the blink/glitch timeline', () => {
   it('is completely at rest at both ends of a burst', () => {
     for (const t of [0, BURST_MS]) {
@@ -75,6 +82,22 @@ describe('the blink/glitch timeline', () => {
 
     // A single blink at the same instant is long over — this is the whole difference.
     expect(patchOpacityAt(DOUBLE_OFFSET_MS + SHUT_MS, false)).toBe(0);
+  });
+
+  it('holds the eyes open between the closes long enough to be SEEN', () => {
+    // The bug the plan's 180ms offset had, and the reason this assertion exists at all:
+    // the gap was arithmetically real (16ms) and perceptually absent — one frame at
+    // 60Hz. A double has to read as two blinks, not as one close that stuttered, so
+    // the number worth pinning is the open window rather than the offset.
+    const everyMs = Array.from({ length: eventDurationMs(true) + 1 }, (_, t) => t);
+    const shut = everyMs.filter((t) => patchOpacityAt(t, true) > 0);
+    const first = shut[0] ?? 0;
+    const last = shut.at(-1) ?? 0;
+    const openMs = everyMs.filter(
+      (t) => t > first && t < last && patchOpacityAt(t, true) === 0,
+    ).length;
+
+    expect(openMs).toBeGreaterThanOrEqual(MIN_OPEN_MS);
   });
 
   it('tears while the eyes are shut — one clock, not two', () => {
@@ -145,6 +168,16 @@ describe('the blink/glitch timeline', () => {
     expect(glitchFrameAt(DOUBLE_OFFSET_MS + SHUT_MS, true)).not.toEqual(
       glitchFrameAt(DOUBLE_OFFSET_MS + SHUT_MS, false),
     );
+  });
+
+  it('reads identically at zero whatever `double` says', () => {
+    // This is the property `mascot-stage.tsx` leans on when it starts an event: it
+    // zeroes the clock BEFORE flipping the flag, because zero is the one instant where
+    // the two cannot disagree. If that ever stopped being true, the write order there
+    // would go from load-bearing to insufficient — and nothing in the component could
+    // tell you.
+    expect(glitchFrameAt(0, true)).toEqual(glitchFrameAt(0, false));
+    expect(patchOpacityAt(0, true)).toBe(patchOpacityAt(0, false));
   });
 
   it('clamps outside the event rather than extrapolating', () => {

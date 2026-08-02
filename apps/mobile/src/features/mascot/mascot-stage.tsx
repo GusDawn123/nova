@@ -162,10 +162,17 @@ export function MascotStage({
       const event = clock.next();
       timer = setTimeout(() => {
         const duration = eventDurationMs(event.double);
-        doubling.value = event.double;
-        // Reset first: a blink arriving while one is still running restarts the
-        // timeline rather than layering a second animation over it.
+        // ORDER IS LOAD-BEARING. `elapsed` goes to zero FIRST, because zero is the one
+        // instant where the timeline reads the same whatever `doubling` says — so the
+        // flag can be changed there without ever being observed against a stale clock.
+        // Written the other way round, a double arriving after a single leaves the
+        // pair momentarily inconsistent: `elapsed` is still parked at 200 while
+        // `doubling` has already flipped, which the timeline reads as 20ms into the
+        // second burst — a three-quarters-shut eye with the ghosts split. Only
+        // Reanimated's same-tick batching stops that reaching the screen, and that is
+        // the renderer's guarantee to withdraw, not ours to lean on.
         elapsed.value = 0;
+        doubling.value = event.double;
         elapsed.value = withTiming(duration, { duration, easing: Easing.linear });
         arm();
       }, event.delayMs);
