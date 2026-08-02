@@ -11,23 +11,19 @@ import {
   SpaceMono_400Regular,
   SpaceMono_700Bold,
 } from '@expo-google-fonts/space-mono';
-import {
-  SplineSans_400Regular,
-  SplineSans_500Medium,
-  SplineSans_600SemiBold,
-  useFonts,
-} from '@expo-google-fonts/spline-sans';
-import { SplineSansMono_400Regular } from '@expo-google-fonts/spline-sans-mono';
+import { useFonts } from 'expo-font';
 
 /**
- * The Nova typefaces.
+ * The Nova typefaces: Orbitron for display, Inter for body, Space Mono for numerals
+ * and machine-voice text (spec §2). One trio, and only this trio — Spline Sans rode
+ * along through the redesign so the not-yet-redrawn screens would not fall back to
+ * SF Pro mid-flight, and retired with the last of them.
  *
- * Two sets live here on purpose, for exactly as long as the redesign takes. The
- * trio — Orbitron for display, Inter for body, Space Mono for numerals and
- * machine-voice text — is what the new screens are drawn in. Spline Sans is what
- * the screens that have NOT been redrawn yet still name in `tokens.ts`; dropping
- * it now would fall those screens back to SF Pro mid-redesign. It retires in the
- * task that retires the last screen using it.
+ * `useFonts` comes from `expo-font` rather than from one of the font packages. The
+ * `@expo-google-fonts/*` packages all re-export the same hook, so importing it from
+ * one of them works — right up until that package is the one being uninstalled, at
+ * which point the app loses its font loading along with a face nothing was using.
+ * Naming the real owner makes the packages what they are: face data, nothing else.
  *
  * Loaded at RUNTIME via `useFonts` rather than embedded through the `expo-font`
  * config plugin. The plugin produces a smaller, faster result, but it requires a
@@ -49,11 +45,6 @@ export function useNovaFonts(): boolean {
     Inter_700Bold,
     SpaceMono_400Regular,
     SpaceMono_700Bold,
-    // Legacy — see the note above. Removed with the last Spline Sans screen.
-    SplineSans_400Regular,
-    SplineSans_500Medium,
-    SplineSans_600SemiBold,
-    SplineSansMono_400Regular,
   });
   return loaded;
 }
