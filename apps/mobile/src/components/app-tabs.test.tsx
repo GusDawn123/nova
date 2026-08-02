@@ -2,7 +2,6 @@ import { render, screen } from '@testing-library/react';
 import { cloneElement, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { recordDotColor } from '@/design/tab-bar-metrics';
 import { cobaltPalette, paperPalette } from '@/design/tokens';
 import { expectDuotoneOnly, normaliseColor } from '@/testing/duotone';
 import { installLayoutStub } from '@/testing/layout-stub';
@@ -225,19 +224,24 @@ describe('AppTabs — the record dot', () => {
   });
 
   it('flips colour with focus, so it never vanishes into what it sits on', () => {
+    // Against the TOKEN and against the surface actually rendered, not against
+    // `recordDotColor` — reading the oracle out of the function under test makes the
+    // pair agree with each other whatever either of them says.
     focusedTab.name = 'live';
     render(<AppTabs />);
 
-    expect(normaliseColor(styleOf('record-dot').backgroundColor)).toBe(
-      normaliseColor(recordDotColor(cobaltPalette, true)),
-    );
+    const dot = normaliseColor(styleOf('record-dot').backgroundColor);
+    // The focused pill is filled with ink; the dot must not be that ink.
+    expect(dot).not.toBe(normaliseColor(styleOf('tab-live').backgroundColor));
+    expect(dot).toBe(normaliseColor(cobaltPalette.onInk));
   });
 
   it('takes full ink on the unfocused tab, against the bar canvas', () => {
     render(<AppTabs />);
 
-    expect(normaliseColor(styleOf('record-dot').backgroundColor)).toBe(
-      normaliseColor(recordDotColor(cobaltPalette, false)),
-    );
+    const dot = normaliseColor(styleOf('record-dot').backgroundColor);
+    // The unfocused pill has no fill, so the surface is the bar's own slab.
+    expect(dot).not.toBe(normaliseColor(styleOf('tab-bar').backgroundColor));
+    expect(dot).toBe(normaliseColor(cobaltPalette.ink));
   });
 });

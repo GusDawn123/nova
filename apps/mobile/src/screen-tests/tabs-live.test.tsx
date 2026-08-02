@@ -205,7 +205,12 @@ describe('LiveScreen — the cockpit', () => {
 
     respond('push on the timeline');
 
+    // Everything `transcriptInputSchema` carries (`packages/shared/src/live.ts`):
+    // the protocol version, the type, the text and the origin. There is no
+    // `session_id` on this frame — the socket IS the session — so asserting one
+    // would pin a field the server would reject.
     expect(socket.frame('transcript.input')).toMatchObject({
+      v: LIVE_PROTOCOL_VERSION,
       type: 'transcript.input',
       text: 'push on the timeline',
       origin: 'utterance',
@@ -245,10 +250,15 @@ describe('LiveScreen — the cockpit', () => {
     // The card is drawn on the press and re-keyed nowhere: `suggestion.start` names
     // the answer, it does not introduce a new card. A key change here would remount
     // the thinking indicator and snap the word back to LISTENING mid-wait.
-    vi.useFakeTimers({ shouldAdvanceTime: true });
+    render(<LiveScreen />);
+    const socket = await goLive();
+
+    // Real time for the handshake above only. The wait below runs on a clock this
+    // test OWNS: under `shouldAdvanceTime` the cycle keeps turning between reading
+    // `midWait` and the assertion after it, and the pass would depend on how fast
+    // the machine got there.
+    vi.useFakeTimers();
     try {
-      render(<LiveScreen />);
-      const socket = await goLive();
       respond('push on the timeline');
 
       act(() => {
@@ -422,23 +432,39 @@ describe('LiveScreen — after the call', () => {
   });
 });
 
+/** The platform minimum, written out once so no assertion compares a token to itself. */
+const TAP_FLOOR_PT = 44;
+
 describe('LiveScreen — the targets', () => {
   it('gives every control the platform floor, as a real box', async () => {
     // A REAL minimum rather than `hitSlop`: react-native-web ignores hitSlop, and
     // Expo Web is this project's verification target — a slop-only target would look
     // right by eye and be unassertable here.
+    expect(Size.tapTarget).toBeGreaterThanOrEqual(TAP_FLOOR_PT);
+
     render(<LiveScreen />);
+    // Measured before the handshake: the picker is gone once the mode is locked.
     expect(
-      getComputedStyle(screen.getByTestId('mode-pill-general')).minHeight,
-    ).toBe(`${String(Size.tapTarget)}px`);
+      Number.parseFloat(
+        getComputedStyle(screen.getByTestId('mode-pill-general')).minHeight,
+      ),
+      'mode-pill-general is under the floor',
+    ).toBeGreaterThanOrEqual(TAP_FLOOR_PT);
 
     await goLive();
 
     for (const testID of ['end-session-key', 'capture-tab-notes', 'respond-key']) {
       const control = screen.getByTestId(testID);
       const box = Number.parseFloat(getComputedStyle(control).minHeight);
-      expect(box, `${testID} is under the 44pt floor`).toBeGreaterThanOrEqual(44);
+      expect(box, `${testID} is under the 44pt floor`).toBeGreaterThanOrEqual(
+        TAP_FLOOR_PT,
+      );
     }
+    // WIDTH is not measurable here and is not asserted rather than asserted
+    // vacuously: jsdom has no layout engine, and `installLayoutStub` answers one
+    // fixed `offsetWidth` for every node in the tree — so a width check would pass
+    // for a control 4pt wide. Three of these four stretch to the width of their row;
+    // that they do is a simulator check (spec §11, and this suite's own header).
   });
 });
 

@@ -3,6 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createStreamDrain, type StreamDrain } from './drain';
 
 describe('createStreamDrain', () => {
+  // Here rather than at the end of each test body: a failed assertion skips the
+  // lines after it, and fake timers left installed leak into every test that follows.
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('drains a burst at a steady character rate, not all at once', () => {
     vi.useFakeTimers();
     const out: string[] = [];
@@ -352,19 +358,26 @@ describe('createStreamDrain lifecycle', () => {
     // splits every emoji and puts a `�` on screen for a frame.
     vi.useFakeTimers();
     const text = 'Ask for the raise 👍 — worth 🎯 it.';
-    let drained = '';
+    // COLLECT, then assert. An `expect` inside the callback throws into the drain's
+    // own timer, where the failure is swallowed and the test reports whatever the
+    // final string happens to be.
+    const chunks: string[] = [];
     const d = createStreamDrain({
-      onText: (c) => {
-        expect(hasLoneSurrogate(c)).toBe(false);
-        drained += c;
-        expect(hasLoneSurrogate(drained)).toBe(false);
-      },
+      onText: (c) => chunks.push(c),
       onDone: () => {},
     });
 
     d.push(text);
     vi.advanceTimersByTime(5000);
 
+    // The premise: the text really was split, so the guard had something to guard.
+    expect(chunks.length).toBeGreaterThan(1);
+    let drained = '';
+    for (const chunk of chunks) {
+      expect(hasLoneSurrogate(chunk)).toBe(false);
+      drained += chunk;
+      expect(hasLoneSurrogate(drained)).toBe(false);
+    }
     expect(drained).toBe(text);
     d.dispose();
   });

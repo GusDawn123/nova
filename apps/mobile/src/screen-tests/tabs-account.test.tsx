@@ -60,15 +60,33 @@ vi.mock('@/hooks/use-auth', () => ({
   useAuth: () => auth,
 }));
 
+/**
+ * The CONNECTION card's two reads, held as mutable test state rather than pinned to
+ * success. Both of them fail in the field — an unreachable server, an expired token
+ * — and a mock that can only succeed makes the card's other two branches unreachable
+ * from here, which is where a redesign quietly drops them.
+ */
+const USER_ID = vi.hoisted(() => '11111111-1111-4111-8111-111111111111');
+
+const connection = vi.hoisted(() => ({
+  health: { status: 'success', message: '', data: { ok: true, version: '1.2.3' } } as {
+    status: string;
+    message: string;
+    data?: { ok: boolean; version: string };
+  },
+  me: { status: 'success', message: '', data: { user_id: USER_ID } } as {
+    status: string;
+    message: string;
+    data?: { user_id: string };
+  },
+}));
+
 vi.mock('@/hooks/use-health', () => ({
-  useHealth: () => ({ status: 'success', data: { ok: true, version: '1.2.3' } }),
+  useHealth: () => connection.health,
 }));
 
 vi.mock('@/hooks/use-me', () => ({
-  useMe: () => ({
-    status: 'success',
-    data: { user_id: '11111111-1111-4111-8111-111111111111' },
-  }),
+  useMe: () => connection.me,
 }));
 
 beforeAll(() => {
@@ -84,6 +102,12 @@ beforeEach(() => {
   storage.getItem.mockResolvedValue(null);
   storage.setItem.mockReset();
   storage.setItem.mockResolvedValue(undefined);
+  connection.health = {
+    status: 'success',
+    message: '',
+    data: { ok: true, version: '1.2.3' },
+  };
+  connection.me = { status: 'success', message: '', data: { user_id: USER_ID } };
 });
 
 function renderAccount(): ReturnType<typeof render> {
@@ -108,11 +132,15 @@ function colorOf(testID: string): string {
 const INK = normaliseColor(cobaltPalette.ink);
 
 describe('AccountScreen — the facts', () => {
-  it('says who is signed in, on what plan', async () => {
+  it('says who is signed in — and shows a plan chip that is still a placeholder', async () => {
     renderAccount();
     await settle();
 
     expect(screen.getByTestId('signed-in-email')).toHaveTextContent('ada@nova.test');
+    // NOT billing coverage. `/me` carries no plan tier yet (CLAUDE.md, spec §10's
+    // wire workstream), so ACTIVE is a fixed string this screen can prove nothing
+    // about. This pins the current SHAPE; when the tier lands on the wire, the
+    // assertion has to be driven from the hook or it becomes a lie about a lie.
     expect(screen.getByTestId('plan-chip')).toHaveTextContent('ACTIVE');
   });
 
@@ -120,10 +148,38 @@ describe('AccountScreen — the facts', () => {
     renderAccount();
     await settle();
 
-    expect(screen.getByTestId('me-user-id')).toHaveTextContent(
-      '11111111-1111-4111-8111-111111111111',
-    );
+    expect(screen.getByTestId('me-user-id')).toHaveTextContent(USER_ID);
     expect(screen.getByText(/1\.2\.3/)).toBeInTheDocument();
+  });
+
+  it('says a failed connection out loud instead of leaving a blank card', async () => {
+    // Both reads fail in the field, and neither may render as nothing: an empty
+    // CONNECTION card is indistinguishable from one that is still loading.
+    connection.health = { status: 'error', message: 'network request failed' };
+    connection.me = { status: 'error', message: 'token expired' };
+
+    renderAccount();
+    await settle();
+
+    expect(screen.getByText(/server unreachable/)).toBeInTheDocument();
+    expect(screen.getByText(/network request failed/)).toBeInTheDocument();
+    expect(screen.getByText(/\/me failed/)).toBeInTheDocument();
+    expect(screen.getByText(/token expired/)).toBeInTheDocument();
+    // And the rest of the screen is untouched: a failed proof is not a failed
+    // account, so signing out and deleting must both still be reachable.
+    expect(screen.getByTestId('sign-out-button')).toBeInTheDocument();
+    expect(screen.getByTestId('delete-account-button')).toBeInTheDocument();
+  });
+
+  it('says it is still asking, rather than saying nothing', async () => {
+    connection.health = { status: 'loading', message: '' };
+    connection.me = { status: 'loading', message: '' };
+
+    renderAccount();
+    await settle();
+
+    expect(screen.getByText('checking server…')).toBeInTheDocument();
+    expect(screen.getByText('verifying identity…')).toBeInTheDocument();
   });
 
   it('leaves the floating tab bar room to float over', async () => {
@@ -173,6 +229,28 @@ describe('AccountScreen — appearance', () => {
 
     expect(colorOf('appearance-cobalt')).toBe(INK);
     expect(storage.setItem).toHaveBeenCalledWith('nova.appearance', 'cobalt');
+  });
+
+  it('brings the pick back through a restart, whatever it wrote down', async () => {
+    // The ROUND TRIP, not two independent literals: whatever the writer emitted is
+    // exactly what the next cold start is handed. Seeding the reader by hand would
+    // let the two halves of the preference drift apart and both tests stay green.
+    const first = renderAccount();
+    await settle();
+    act(() => {
+      fireEvent.click(screen.getByTestId('appearance-row'));
+    });
+
+    const [key, written] = storage.setItem.mock.calls.at(-1) ?? [];
+    expect(key).toBe('nova.appearance');
+    first.unmount();
+
+    storage.getItem.mockResolvedValue(written ?? null);
+    renderAccount();
+
+    await waitFor(() => {
+      expect(colorOf('appearance-cobalt')).toBe(INK);
+    });
   });
 
   it('repaints the screen the moment the theme changes', async () => {
