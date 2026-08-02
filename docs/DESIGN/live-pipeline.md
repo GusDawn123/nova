@@ -41,10 +41,17 @@ mic (16kHz PCM, 40–80ms frames)
   `docs/prompts/nova-prompts-source.md` (Gustavo's text; never paraphrased) — plus his
   separately authored Sales prompts. Code assembles, code never writes prose.
 - One pure `assemble(mode, context) → { stablePrefix, dynamicSuffix }`.
-  - **stablePrefix**: the full monolithic system prompt (identity, security,
-    decision hierarchy, transcript rules, format rules, question-type handling,
-    mode body). Byte-stable across turns — **enforced by a snapshot test** so the
-    vendor prompt cache can't silently churn.
+  - **stablePrefix**: `library/system.ts` (identity, transcript rules, format
+    rules, advancement, objections, content constraints) plus — for a picked mode
+    — that mode's block from `library/modes/` (directive, answer structure, its
+    few-shot). Byte-stable across turns — **enforced by a snapshot test, one pin
+    per mode** — so the vendor prompt cache can't silently churn.
+  - **mode** is `general | behavioral | technical | finance`, picked by the user
+    on the Live screen and carried on `session.start` (`liveModeSchema`, Phase
+    8.6). It is LOCKED for the session: there is no classifier and no mid-call
+    switch, so each mode keeps its own warm prefix. The flattened
+    `content/system-prompt.ts` + `scripts/gen-live-prompt.mjs` are legacy and
+    unwired.
   - **dynamicSuffix**: the only uncached tokens — windowed transcript slice,
     RAG snippets under a hard token budget, user-provided context (hard-guarded:
     can never override identity/safety).

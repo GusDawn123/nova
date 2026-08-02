@@ -95,6 +95,24 @@ today?" stays quiet. GATES on the new models + prompt (2026-07-23): relevance **
 fabrication regression), typed-input E2E deltas=6/787 chars ~1.9s, smokes openai 881ms /
 google 845ms, notes accuracy 5/5, latency p50=800ms p95=1450ms, quiet 11/11 + 3
 filler-prefix fixtures.**
+**MODES (2026-08-01, `dev-claude-notes-ui`): the user PICKS the copilot prompt on the
+Live screen. `liveModeSchema` (`packages/shared/src/live.ts`) is the one source of
+truth — `general | behavioral | technical | finance` — re-exported by
+`modules/prompt/ports.ts` as `promptModeSchema`, drift-tested against the library's
+`MODES` keys, and rendered by `apps/mobile/src/features/live-call/mode-picker.tsx`
+(labels are a `Record<LiveMode, string>`, order from the enum). `session.start` gains
+an OPTIONAL `mode` (additive, protocol still `v: 1`; omitted = general; an unknown
+value FAILS the parse → existing `invalid_event`). It threads
+`session.ts::onSessionStart` → `ConductorFactoryArgs.mode` (required — a transport
+that forgets it does not compile) → `createLiveConductor` closure →
+`assemble(mode, ctx)`; never module state, so two concurrent calls cannot swap
+prompts. `assemble()` now composes `library/SYSTEM_PROMPT` + the picked mode's
+directive/answer-structure/few-shot; snapshot pins are per mode (4) plus an
+all-distinct assertion, and mode-LEAKAGE tests assert each mode contains its own
+directive and no other's. LEGACY + UNWIRED (kept on disk, banner-marked):
+`modules/prompt/content/system-prompt.ts` and `scripts/gen-live-prompt.mjs`.
+NOT DONE: the paid live gates (relevance/grounding/quiet) have NOT been re-run
+against the new prompt text — those numbers above are the legacy prompt's.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

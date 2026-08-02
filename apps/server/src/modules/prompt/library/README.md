@@ -59,8 +59,19 @@ on every call in every mode.
 
 ## Status
 
-**Not wired into the live path.** `assemble()` still uses the flattened
-`content/system-prompt.ts`, which is generated from `docs/prompts/nova-prompts-source.md`
-by `scripts/gen-live-prompt.mjs`. Wiring this library in is a separate change, so
-the text can be reviewed and the live relevance/grounding gates re-run against it
-deliberately — rather than a prompt rewrite shipping as a side effect of a refactor.
+**Wired** (2026-08-01). `assemble(mode, context)` builds every live `stablePrefix`
+from here: `SYSTEM_PROMPT` always, plus the picked mode's block. The mode arrives
+on `session.start` as a `liveModeSchema` value — `general | behavioral | technical
+| finance`, where `general` is the system prompt alone — and is locked for the
+session, so each mode keeps its own byte-stable prefix and its own warm vendor
+cache. `library.test.ts` proves the keys here match that enum minus `general`, so
+a mode cannot exist on one side and not the other.
+
+The flattened `content/system-prompt.ts` and its generator `scripts/gen-live-prompt.mjs`
+are **legacy and unwired**. Both stay on disk, banner-marked, as the reference for
+what the single monolithic prompt said; nothing on the live path imports them.
+
+**The live gates have not been re-run against this text.** The relevance,
+grounding and quiet gates that are green in `CLAUDE.md` were measured on the
+legacy prompt. Re-running them is a key-gated, paid job and the next thing to do
+with this library.
