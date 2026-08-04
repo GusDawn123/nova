@@ -130,7 +130,7 @@ against any of the 2026-08-01 prompt text — those numbers above are the legacy
 prompt's. Field check 2026-08-01 (Gustavo, simulator): answers read natural.**
 **UI REDESIGN (2026-08-02, `dev-claude-ui-design`): the mobile app is redrawn
 ground-up against `docs/superpowers/specs/2026-08-02-nova-ui-design.md` (ratified
-mockup by mockup; the HTML in `.superpowers/brainstorm/21792-1785648574/content/` is
+mockup by mockup; the HTML in `docs/superpowers/mockups/2026-08-02-nova-ui/` is
 the visual source of truth). STRICT DUOTONE — one blue `#0002DA`, one white, two
 mirror themes (cobalt/paper, picked in Account); every other value is an opacity of
 the theme's ink, and `apps/mobile/src/design/tokens.ts` is the whole vocabulary:
@@ -186,6 +186,34 @@ boots without them and the affected path degrades to a typed error. Phase 1 carr
 Apple/Google sign-in deferred (needs Gustavo's dev accounts), Supabase **local-only** (cloud project
 deferred), iOS-simulator verification deferred (Expo web + Playwright instead). Phases 6+ of
 `docs/LOOP_PLAYBOOK.md` build the rest of the product on top.
+**HANDOFF (2026-08-03, `dev-nova-handoff`): the laptop-only knowledge moved into the
+repo. NEW: `docs/BUSINESS/unit-economics.md` (pricing $60 Premium / $120 Ultra, weekly
+caps 7/35 hrs from the $40-profit-floor formula, the $0.40/streamed-hr worst-case
+constant, prepaid-hour-pack overage architecture, concurrency/capacity playbook),
+`docs/DESIGN/audio-capture.md` (Phase 9 pre-spec: acoustic speakerphone capture, both
+voices via one mic + vendor diarization, AudioRecord/AVAudioEngine mechanics behind one
+AudioCapture port), `docs/DESIGN/staging-and-distribution.md` (ratified: Railway +
+Supabase cloud + EAS APK sideload on Android = staging; store checklists), `art/`
+(brand source art incl. the original logo), `docs/superpowers/mockups/2026-08-02-nova-ui/`
+(the ratified mockup HTMLs — moved out of the gitignored brainstorm dir), and
+`docs/superpowers/journal/2026-08-02-ui-redesign/` (the build ledger with the
+next-branch work list, final review, CodeRabbit reports).**
+
+## Working agreements (Gustavo)
+
+- Nova is **Gustavo's personal proprietary product**. TC Interactive Group is his
+  employer, NOT the owner — never present it as Nova's company. No entity yet
+  (planned later; store accounts are INDIVIDUAL until then).
+- Orchestrate, don't solo-implement: delegate implementation to subagents (ONE
+  implementer at a time, never parallel), review each task's diff before moving on.
+- Never drive the simulator/device — tell Gustavo where to tap and what a pass
+  looks like; on-device verification is his.
+- Commit in small increments as pieces go green; expressive single-line messages.
+- MVP interaction model: **no auto-responses** — one RESPOND key; optional typed
+  steer shapes the answer on its own prompt path (never a fake "them" turn).
+- Branch names carry no "claude" (`dev-nova-<topic>`).
+- Explain analogy-first, then the technical bridge with file refs, then rationale.
+- Price and cap for the worst-case user (see `docs/BUSINESS/unit-economics.md`).
 
 ## Read before doing ANYTHING
 
