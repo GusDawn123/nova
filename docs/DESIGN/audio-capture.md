@@ -28,6 +28,45 @@ listening. **Same-phone capture:** iOS blocks app mic access during cellular
 calls — hard no; Android is OEM-dependent on speakerphone — test-and-see on real
 hardware, never promised.
 
+## Audio routing: the headphones problem (added 2026-08-04)
+
+The capture model has one load-bearing assumption: **the caller's voice exists in
+the air**. Headphones — wired, Bluetooth, earbuds — break exactly that link: the
+far voice moves from the loudspeaker into the user's ear and never reaches any
+microphone, phone or BT. The side that vanishes is "them", the side the copilot
+exists to answer. No mic choice fixes this; it is a routing problem, not a
+sensitivity problem.
+
+And capturing the call's audio stream instead remains a hard no (see above — no
+API exists on either OS; Android's accessibility-service workaround is
+store-rejection roulette and is off the table).
+
+**Ratified strategy (Gustavo, 2026-08-04) — two tiers now, one held:**
+
+1. **Route detection + guided degradation (MVP).** The `AudioCapture` port
+   watches the audio route (`AVAudioSession` route / `AudioDeviceInfo`) at
+   session start AND on route-change mid-call — AirPods connecting mid-call must
+   trigger the same handling. On a headphone/BT route the cockpit says it in
+   words, guide-style: *"I can only hear your side on headphones — swap to
+   speaker for the full copilot."* Declining is a supported degraded mode, not an
+   error: the user's side still transcribes, and the already-shipped typed-input
+   path (`transcript.input`) carries "them". Route changes are typed events on
+   the port, same discipline as mic interruptions.
+2. **Capture policy under Bluetooth (Phase 9 test matrix).** Even on
+   speakerphone, an active BT route threatens capture two ways: OS
+   voice-processing is trained to delete exactly the speaker-leak we depend on
+   (the `.measurement` / `VOICE_RECOGNITION` configs above exist for this), and a
+   BT SCO mic is narrowband — poison for STT accuracy. Policy: **prefer the
+   phone's own mic array for capture even when BT carries the call**, and the
+   Phase 3 accuracy gates re-run per-route (speaker / speaker+BT-call / wired)
+   on real hardware.
+3. **HELD — server-side bridge (post-MVP).** Nova joining the call as an audio
+   leg (conference bridge / VoIP dialer) is the real fix — routing-immune, works
+   with any headset — but it adds per-minute telephony cost (a new constant for
+   `docs/BUSINESS/unit-economics.md`) and collides with the "no bots joining
+   calls" positioning. Product decision, not a technical one; revisit when real
+   usage shows headphone-blocked sessions.
+
 ## Platform mechanics (the two implementations)
 
 There are exactly two OSes; every phone brand is one of them. Both
