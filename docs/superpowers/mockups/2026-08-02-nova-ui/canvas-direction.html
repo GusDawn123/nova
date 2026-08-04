@@ -1,0 +1,131 @@
+<h2>The canvas — where does the cobalt live?</h2>
+<p class="subtitle">Same Live copilot screen, three treatments. Your instinct is A — cobalt as the canvas, exactly like the logo. Look at all three at glance-speed: imagine reading the streaming answer aloud two seconds after it appears, mid-call. Click the one that feels right (your pick wins, this is a gut-check with alternatives).</p>
+
+<style>
+  .nv-row { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .nv-phone {
+    width: 300px; height: 560px; border-radius: 34px; overflow: hidden;
+    box-shadow: 0 18px 50px rgba(0,0,0,0.35); display: flex; flex-direction: column;
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+    flex-shrink: 0;
+  }
+  .nv-status { display: flex; justify-content: space-between; padding: 12px 18px 4px; font-size: 11px; letter-spacing: 0.4px; }
+  .nv-brand { text-align: center; font-size: 13px; letter-spacing: 7px; font-weight: 700; padding: 8px 0 2px; font-family: "Avenir Next", "Futura", "Century Gothic", sans-serif; }
+  .nv-sub { text-align: center; font-size: 9px; letter-spacing: 2.5px; opacity: 0.65; padding-bottom: 10px; text-transform: uppercase; }
+  .nv-pills { display: flex; gap: 6px; padding: 0 14px 12px; justify-content: center; }
+  .nv-pill { font-size: 10px; letter-spacing: 1px; padding: 5px 11px; border-radius: 999px; text-transform: uppercase; }
+  .nv-transcript { margin: 0 14px 10px; border-radius: 12px; padding: 9px 12px; font-size: 11px; line-height: 1.5; }
+  .nv-tlabel { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.6; margin-bottom: 3px; }
+  .nv-answer { margin: 0 14px; border-radius: 16px; padding: 14px 15px; font-size: 14.5px; line-height: 1.6; flex: 1; }
+  .nv-alabel { font-size: 8px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.7; margin-bottom: 7px; display: flex; align-items: center; gap: 5px; }
+  .nv-dot { width: 5px; height: 5px; border-radius: 50%; display: inline-block; }
+  .nv-input { margin: 12px 14px 18px; border-radius: 999px; padding: 10px 16px; font-size: 11.5px; display: flex; justify-content: space-between; align-items: center; }
+  .nv-spark { position: absolute; font-size: 10px; opacity: 0.8; }
+</style>
+
+<div class="cards nv-row">
+
+  <!-- A. COBALT CANVAS -->
+  <div class="card" data-choice="cobalt-canvas" onclick="toggleSelect(this)" style="max-width: 340px;">
+    <div class="card-image" style="background: none; padding: 16px 0;">
+      <div class="nv-phone" style="background: #2733E6; color: #ffffff; position: relative;">
+        <span class="nv-spark" style="top: 84px; left: 22px;">✦</span>
+        <span class="nv-spark" style="top: 128px; right: 26px; font-size: 7px;">✦</span>
+        <div class="nv-status"><span>9:41</span><span>●●●</span></div>
+        <div class="nv-brand">N O V A</div>
+        <div class="nv-sub">— Live · Behavioral —</div>
+        <div class="nv-pills">
+          <span class="nv-pill" style="background: #ffffff; color: #2733E6; font-weight: 700;">Behavioral</span>
+          <span class="nv-pill" style="border: 1px solid rgba(255,255,255,0.45); color: rgba(255,255,255,0.8);">Technical</span>
+          <span class="nv-pill" style="border: 1px solid rgba(255,255,255,0.45); color: rgba(255,255,255,0.8);">Finance</span>
+        </div>
+        <div class="nv-transcript" style="border: 1px solid rgba(255,255,255,0.35);">
+          <div class="nv-tlabel">Them · just now</div>
+          <span style="opacity: 0.92;">…so tell me, why should we hire you for this role?</span>
+        </div>
+        <div class="nv-answer" style="background: rgba(255,255,255,0.10); border: 1.5px solid #ffffff;">
+          <div class="nv-alabel"><span class="nv-dot" style="background: #ffffff;"></span> Nova · say this</div>
+          Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>, and under what load.
+        </div>
+        <div class="nv-input" style="border: 1px solid rgba(255,255,255,0.4); color: rgba(255,255,255,0.65);">
+          Ask Nova anything… <span style="font-size: 14px;">➤</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Cobalt canvas — the logo IS the app</h3>
+      <p>Flat brand blue everywhere, white ink on top. Unmistakable, zero ambiguity about whose app this is. The risk to check: a full-brightness blue screen glowing on your face in a dim call.</p>
+    </div>
+  </div>
+
+  <!-- B. MIDNIGHT CANVAS -->
+  <div class="card" data-choice="midnight-canvas" onclick="toggleSelect(this)" style="max-width: 340px;">
+    <div class="card-image" style="background: none; padding: 16px 0;">
+      <div class="nv-phone" style="background: #05071F; color: #ffffff; position: relative;">
+        <span class="nv-spark" style="top: 84px; left: 22px; color: #4a58ff;">✦</span>
+        <span class="nv-spark" style="top: 128px; right: 26px; font-size: 7px; color: #4a58ff;">✦</span>
+        <div class="nv-status" style="color: rgba(255,255,255,0.7);"><span>9:41</span><span>●●●</span></div>
+        <div class="nv-brand" style="color: #5865ff;">N O V A</div>
+        <div class="nv-sub" style="color: #5865ff;">— Live · Behavioral —</div>
+        <div class="nv-pills">
+          <span class="nv-pill" style="background: #2733E6; color: #ffffff; font-weight: 700;">Behavioral</span>
+          <span class="nv-pill" style="border: 1px solid rgba(88,101,255,0.5); color: rgba(255,255,255,0.75);">Technical</span>
+          <span class="nv-pill" style="border: 1px solid rgba(88,101,255,0.5); color: rgba(255,255,255,0.75);">Finance</span>
+        </div>
+        <div class="nv-transcript" style="border: 1px solid rgba(88,101,255,0.35); background: rgba(39,51,230,0.10);">
+          <div class="nv-tlabel" style="color: #8892ff;">Them · just now</div>
+          <span style="opacity: 0.9;">…so tell me, why should we hire you for this role?</span>
+        </div>
+        <div class="nv-answer" style="background: rgba(39,51,230,0.16); border: 1.5px solid #2733E6; box-shadow: 0 0 24px rgba(39,51,230,0.35);">
+          <div class="nv-alabel" style="color: #8892ff;"><span class="nv-dot" style="background: #5865ff;"></span> Nova · say this</div>
+          Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>, and under what load.
+        </div>
+        <div class="nv-input" style="border: 1px solid rgba(88,101,255,0.4); color: rgba(255,255,255,0.55);">
+          Ask Nova anything… <span style="font-size: 14px; color: #5865ff;">➤</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Midnight canvas — cobalt as light</h3>
+      <p>Near-black indigo night; the brand blue becomes the light source — glowing cards, electric accents. Classic futuristic, easiest on the eyes in a dim room, and the answer card literally glows when it arrives. Less literally "the logo" than A.</p>
+    </div>
+  </div>
+
+  <!-- C. PAPER INVERSE -->
+  <div class="card" data-choice="paper-inverse" onclick="toggleSelect(this)" style="max-width: 340px;">
+    <div class="card-image" style="background: none; padding: 16px 0;">
+      <div class="nv-phone" style="background: #ffffff; color: #2733E6; position: relative; border: 1px solid #e3e6ff;">
+        <span class="nv-spark" style="top: 84px; left: 22px; color: #2733E6;">✦</span>
+        <span class="nv-spark" style="top: 128px; right: 26px; font-size: 7px; color: #2733E6;">✦</span>
+        <div class="nv-status" style="color: #2733E6;"><span>9:41</span><span>●●●</span></div>
+        <div class="nv-brand" style="color: #2733E6;">N O V A</div>
+        <div class="nv-sub" style="color: #2733E6; opacity: 0.55;">— Live · Behavioral —</div>
+        <div class="nv-pills">
+          <span class="nv-pill" style="background: #2733E6; color: #ffffff; font-weight: 700;">Behavioral</span>
+          <span class="nv-pill" style="border: 1px solid rgba(39,51,230,0.4); color: #2733E6;">Technical</span>
+          <span class="nv-pill" style="border: 1px solid rgba(39,51,230,0.4); color: #2733E6;">Finance</span>
+        </div>
+        <div class="nv-transcript" style="border: 1px solid rgba(39,51,230,0.3); background: rgba(39,51,230,0.04);">
+          <div class="nv-tlabel" style="color: #2733E6;">Them · just now</div>
+          <span style="color: #1b23a8;">…so tell me, why should we hire you for this role?</span>
+        </div>
+        <div class="nv-answer" style="background: rgba(39,51,230,0.06); border: 1.5px solid #2733E6; color: #141b8f;">
+          <div class="nv-alabel" style="color: #2733E6;"><span class="nv-dot" style="background: #2733E6;"></span> Nova · say this</div>
+          Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>, and under what load.
+        </div>
+        <div class="nv-input" style="border: 1px solid rgba(39,51,230,0.35); color: rgba(39,51,230,0.6);">
+          Ask Nova anything… <span style="font-size: 14px;">➤</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Paper inverse — blueprint ink</h3>
+      <p>The logo inverted: white paper, cobalt ink. Crisp and print-like, great in daylight, but the least "futuristic AI at night" of the three — and a bright white screen is the harshest thing to glance at in a dim call.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">Note: the blue here is my eyeball-match of the logo (#2733E6) — we'll tune the exact hex from your logo file once a direction is locked. Also worth saying: these aren't mutually exclusive forever. Apps ship light/dark themes; the question is which one IS Nova — the default the brand lives in.</p>
+</div>

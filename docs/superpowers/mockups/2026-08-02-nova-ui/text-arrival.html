@@ -1,0 +1,111 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>How the words arrive</h2>
+<p class="subtitle">The most-watched animation in Nova: an answer streaming onto the teleprompter. Three treatments, looping every ~7 seconds on the true cobalt. Judge one thing above all — can you START READING ALOUD before it finishes arriving? That's the whole product.</p>
+
+<style>
+  .ta-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .ta-card-outer { width: 300px; }
+  .ta-stage { background: #0002DA; border-radius: 16px; padding: 16px; color: #fff; min-height: 190px; }
+  .ta-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; margin-bottom: 8px; }
+  .ta-answer { background: rgba(255,255,255,0.10); border: 1.5px solid #fff; border-radius: 14px; padding: 13px 14px; font-family: 'Inter'; font-size: 13.5px; line-height: 1.62; }
+
+  /* shared chunk timing: visible from N% through 78%, gone until cycle restarts */
+  .c1 { animation: a1 7s infinite; } .c2 { animation: a2 7s infinite; } .c3 { animation: a3 7s infinite; }
+  .c4 { animation: a4 7s infinite; } .c5 { animation: a5 7s infinite; } .c6 { animation: a6 7s infinite; }
+  .c7 { animation: a7 7s infinite; } .c8 { animation: a8 7s infinite; }
+  .fade span { display: inline-block; opacity: 0; }
+  @keyframes a1 { 0%,2% {opacity:0; transform:translateY(4px);} 5%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a2 { 0%,7% {opacity:0; transform:translateY(4px);} 10%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a3 { 0%,12% {opacity:0; transform:translateY(4px);} 15%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a4 { 0%,17% {opacity:0; transform:translateY(4px);} 20%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a5 { 0%,22% {opacity:0; transform:translateY(4px);} 25%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a6 { 0%,27% {opacity:0; transform:translateY(4px);} 30%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a7 { 0%,32% {opacity:0; transform:translateY(4px);} 35%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+  @keyframes a8 { 0%,37% {opacity:0; transform:translateY(4px);} 40%,78% {opacity:1; transform:translateY(0);} 79%,100% {opacity:0;} }
+
+  /* typewriter: same chunks but hard steps, no motion, plus caret */
+  .type span { opacity: 0; }
+  .type .c1 { animation: t1 7s steps(1,end) infinite; } .type .c2 { animation: t2 7s steps(1,end) infinite; }
+  .type .c3 { animation: t3 7s steps(1,end) infinite; } .type .c4 { animation: t4 7s steps(1,end) infinite; }
+  .type .c5 { animation: t5 7s steps(1,end) infinite; } .type .c6 { animation: t6 7s steps(1,end) infinite; }
+  .type .c7 { animation: t7 7s steps(1,end) infinite; } .type .c8 { animation: t8 7s steps(1,end) infinite; }
+  @keyframes t1 { 0%,3% {opacity:0;} 4%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t2 { 0%,8% {opacity:0;} 9%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t3 { 0%,13% {opacity:0;} 14%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t4 { 0%,18% {opacity:0;} 19%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t5 { 0%,23% {opacity:0;} 24%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t6 { 0%,28% {opacity:0;} 29%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t7 { 0%,33% {opacity:0;} 34%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes t8 { 0%,38% {opacity:0;} 39%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  .caret { display: inline-block; width: 7px; height: 14px; background: #fff; vertical-align: text-bottom; animation: caretBlink 0.8s steps(1,end) infinite; }
+  @keyframes caretBlink { 0%,49% {opacity:1;} 50%,100% {opacity:0;} }
+
+  /* line sweep: lines revealed behind a passing light */
+  .lsweep .line { position: relative; overflow: hidden; }
+  .lsweep .line > i { font-style: normal; opacity: 0; display: inline-block; }
+  .lsweep .l1 > i { animation: lv1 7s infinite; } .lsweep .l2 > i { animation: lv2 7s infinite; } .lsweep .l3 > i { animation: lv3 7s infinite; }
+  @keyframes lv1 { 0%,4% {opacity:0;} 8%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes lv2 { 0%,15% {opacity:0;} 19%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  @keyframes lv3 { 0%,26% {opacity:0;} 30%,78% {opacity:1;} 79%,100% {opacity:0;} }
+  .lsweep .line::after { content: ""; position: absolute; top: 0; bottom: 0; width: 30%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent); opacity: 0; }
+  .lsweep .l1::after { animation: ls1 7s infinite; } .lsweep .l2::after { animation: ls2 7s infinite; } .lsweep .l3::after { animation: ls3 7s infinite; }
+  @keyframes ls1 { 0%,3% {left:-30%; opacity:0;} 4% {opacity:1;} 9% {left:105%; opacity:1;} 10%,100% {opacity:0;} }
+  @keyframes ls2 { 0%,14% {left:-30%; opacity:0;} 15% {opacity:1;} 20% {left:105%; opacity:1;} 21%,100% {opacity:0;} }
+  @keyframes ls3 { 0%,25% {left:-30%; opacity:0;} 26% {opacity:1;} 31% {left:105%; opacity:1;} 32%,100% {opacity:0;} }
+</style>
+
+<div class="cards ta-row">
+
+  <div class="card" data-choice="chunk-fade" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="ta-card-outer"><div class="ta-stage">
+        <div class="ta-label">◆ Nova · say this</div>
+        <div class="ta-answer fade">
+          <span class="c1">Honestly, because&nbsp;</span><span class="c2">the problems you're hiring for&nbsp;</span><span class="c3">are the ones I've spent my career on.&nbsp;</span><span class="c4">I build systems where&nbsp;</span><span class="c5"><b>performance is the product</b>,&nbsp;</span><span class="c6">and when I say something got faster&nbsp;</span><span class="c7">I say <b>by how much</b>,&nbsp;</span><span class="c8">and under what load.</span>
+        </div>
+      </div></div>
+    </div>
+    <div class="card-body">
+      <h3>1 · Phrase rise</h3>
+      <p>Phrases surface in reading-sized groups, each with a 4px lift as it lands. Calm, readable mid-arrival, matches how the LLM actually streams. The industry's best-practice feel, done in brand.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="typewriter" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="ta-card-outer"><div class="ta-stage">
+        <div class="ta-label">◆ Nova · say this</div>
+        <div class="ta-answer type">
+          <span class="c1">Honestly, because&nbsp;</span><span class="c2">the problems you're hiring for&nbsp;</span><span class="c3">are the ones I've spent my career on.&nbsp;</span><span class="c4">I build systems where&nbsp;</span><span class="c5"><b>performance is the product</b>,&nbsp;</span><span class="c6">and when I say something got faster&nbsp;</span><span class="c7">I say <b>by how much</b>,&nbsp;</span><span class="c8">and under what load.</span><span class="caret"></span>
+        </div>
+      </div></div>
+    </div>
+    <div class="card-body">
+      <h3>2 · Terminal type</h3>
+      <p>Hard cuts, no motion, a blinking block caret chasing the text — the retro-terminal cousin of your hologram glitch. Most futuristic feel; slightly twitchier to read while it's still arriving.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="line-sweep" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="ta-card-outer"><div class="ta-stage">
+        <div class="ta-label">◆ Nova · say this</div>
+        <div class="ta-answer lsweep">
+          <div class="line l1"><i>Honestly, because the problems you're hiring for</i></div>
+          <div class="line l2"><i>are the ones I've spent my career on. I build systems</i></div>
+          <div class="line l3"><i>where <b>performance is the product</b>, and I say <b>by how much</b>.</i></div>
+        </div>
+      </div></div>
+    </div>
+    <div class="card-body">
+      <h3>3 · Light sweep</h3>
+      <p>Whole lines materialize behind a passing band of light — the same sweep as your processing state, so the system rhymes. Most cinematic; text arrives in bigger jumps, so mid-arrival reading is chunkier.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">My recommendation: 1 as the streaming default (it's the one you can read aloud WHILE it arrives — the product promise), with 3's sweep reserved for non-teleprompter reveals (notes sections appearing, cards entering). 2's caret could survive as a tiny detail: the block caret sits at the stream's tail even in option 1. Click your pick — this is the last fork before I assemble the whole design.</p>
+</div>

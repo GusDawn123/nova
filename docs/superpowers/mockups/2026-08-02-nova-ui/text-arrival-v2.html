@@ -1,0 +1,110 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>The stream, done right</h2>
+<p class="subtitle">Character-level streaming with the caret riding the write-head, top to bottom, exactly like a live terminal. Both cards drain at a steady rate with tiny natural bursts (that's how the real one behaves: socket tokens land in a buffer, the UI drains it smoothly). The difference is the head: A lands characters crisply; B gives each character an ~80ms soft fade as it arrives. Read both aloud mid-stream and feel the difference.</p>
+
+<style>
+  .tv-row { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .tv-stage { background: #0002DA; border-radius: 16px; padding: 16px; color: #fff; width: 300px; min-height: 210px; }
+  .tv-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; margin-bottom: 8px; }
+  .tv-answer { background: rgba(255,255,255,0.10); border: 1.5px solid #fff; border-radius: 14px; padding: 13px 14px; font-family: 'Inter'; font-size: 13.5px; line-height: 1.62; min-height: 150px; }
+  .tv-caret { display: inline-block; width: 7px; height: 14px; background: #fff; vertical-align: -2px; margin-left: 1px; animation: caretBlink 0.9s steps(1,end) infinite; }
+  .tv-caret.glow { box-shadow: 0 0 8px rgba(255,255,255,0.9); }
+  @keyframes caretBlink { 0%,55% {opacity:1;} 56%,100% {opacity:0;} }
+  .soft-ch { opacity: 0; transition: opacity 90ms linear; }
+  .soft-ch.on { opacity: 1; }
+  .tv-answer b { font-weight: 700; }
+</style>
+
+<div class="cards tv-row">
+  <div class="card" data-choice="crisp-terminal" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="tv-stage">
+        <div class="tv-label">◆ Nova · say this</div>
+        <div class="tv-answer"><span id="streamA"></span><span class="tv-caret" id="caretA"></span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Crisp terminal</h3>
+      <p>Characters land sharp at the drain rate, the block caret always at the head. Pure terminal honesty.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="soft-head" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="tv-stage">
+        <div class="tv-label">◆ Nova · say this</div>
+        <div class="tv-answer"><span id="streamB"></span><span class="tv-caret glow" id="caretB"></span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Soft head</h3>
+      <p>Same stream, but each character fades in over ~80ms — a comet tail at the write-head — and the caret carries a faint glow. Smoother on the eye at speed.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">Both loop forever: stream (~5s) → hold (~2.5s) → clear and restart. In production the drain rate sits around 55-70 characters/second with catch-up acceleration when the socket buffer backs up, and the caret disappears the moment the answer completes — the stream ending IS the "done" signal. Click the head treatment that feels right.</p>
+</div>
+
+<script>
+(function () {
+  var TEXT = "Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where *performance is the product*, and when I say something got faster I say *by how much*, and under what load.";
+
+  // Parse *bold* markers into [{ch, bold}] once.
+  var chars = [];
+  var bold = false;
+  for (var i = 0; i < TEXT.length; i++) {
+    var c = TEXT[i];
+    if (c === "*") { bold = !bold; continue; }
+    chars.push({ ch: c, bold: bold });
+  }
+
+  // Steady drain with tiny bursts: 1 char per tick, tick ~16ms, occasionally 2.
+  function makeStreamer(targetId, caretId, soft) {
+    var target = document.getElementById(targetId);
+    var caret = document.getElementById(caretId);
+    var idx = 0, boldSpan = null;
+
+    function emit(entry) {
+      var node;
+      if (soft) {
+        node = document.createElement("span");
+        node.className = "soft-ch";
+        node.textContent = entry.ch;
+        requestAnimationFrame(function () { requestAnimationFrame(function () { node.classList.add("on"); }); });
+      } else {
+        node = document.createTextNode(entry.ch);
+      }
+      if (entry.bold) {
+        if (!boldSpan) { boldSpan = document.createElement("b"); target.appendChild(boldSpan); }
+        boldSpan.appendChild(node);
+      } else {
+        boldSpan = null;
+        target.appendChild(node);
+      }
+    }
+
+    function tick() {
+      if (idx >= chars.length) {
+        caret.style.display = "none"; // stream end IS the done signal
+        setTimeout(function () {
+          target.textContent = ""; boldSpan = null; idx = 0;
+          caret.style.display = "inline-block";
+          setTimeout(tick, 400);
+        }, 2500);
+        return;
+      }
+      var burst = Math.random() < 0.18 ? 2 : 1; // gentle burstiness
+      for (var n = 0; n < burst && idx < chars.length; n++) emit(chars[idx++]);
+      var jitter = Math.random() < 0.06 ? 90 : 0; // rare micro-pause, like a token boundary
+      setTimeout(tick, 24 + jitter);
+    }
+    tick();
+  }
+
+  makeStreamer("streamA", "caretA", false);
+  makeStreamer("streamB", "caretB", true);
+})();
+</script>

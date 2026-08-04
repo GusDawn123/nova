@@ -1,0 +1,156 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>Before the words — three thinking states</h2>
+<p class="subtitle">The second between tapping ◉ RESPOND and the first character. Each card loops the full sequence: thinking (~2s) → the crisp stream takes over. Judge the handoff — the moment thinking dissolves into text is the seam that must feel designed.</p>
+
+<style>
+  .th-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+  .th-stage { background: #0002DA; border-radius: 16px; padding: 16px; color: #fff; width: 290px; min-height: 200px; }
+  .th-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .th-answer { background: rgba(255,255,255,0.10); border: 1.5px solid #fff; border-radius: 14px; padding: 13px 14px; font-family: 'Inter'; font-size: 13px; line-height: 1.6; min-height: 130px; position: relative; overflow: hidden; }
+  .th-caret { display: inline-block; width: 7px; height: 14px; background: #fff; vertical-align: -2px; margin-left: 1px; animation: cb 0.9s steps(1,end) infinite; }
+  @keyframes cb { 0%,55% {opacity:1;} 56%,100% {opacity:0;} }
+
+  /* 1 · GLASS LINES */
+  .glass-lines { display: flex; flex-direction: column; gap: 9px; padding-top: 4px; }
+  .gline { height: 11px; border-radius: 6px; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18); position: relative; overflow: hidden; }
+  .gline::after { content: ""; position: absolute; top: 0; bottom: 0; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: gsweep 1.4s ease-in-out infinite; }
+  .gline:nth-child(2)::after { animation-delay: 0.18s; }
+  .gline:nth-child(3)::after { animation-delay: 0.36s; }
+  @keyframes gsweep { from { left: -50%; } to { left: 105%; } }
+  .gline.g1 { width: 92%; } .gline.g2 { width: 78%; } .gline.g3 { width: 45%; }
+
+  /* 2 · WORD CYCLE (flicker swap) */
+  .cycle-word { font-family: 'Space Mono'; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0.9; }
+  .cycle-word.flick { animation: flick 0.22s linear; }
+  @keyframes flick { 0% { opacity: 0.2; transform: translateX(1px); } 40% { opacity: 1; transform: translateX(-1px); } 70% { opacity: 0.4; transform: translateX(0.5px); } 100% { opacity: 0.9; transform: translateX(0); } }
+
+  /* 3 · RING ORBIT */
+  .orbit-wrap { display: flex; align-items: center; justify-content: center; min-height: 110px; }
+  .orbit { position: relative; width: 58px; height: 58px; }
+  .orbit .outer { position: absolute; inset: 0; border: 1.5px solid rgba(255,255,255,0.5); border-radius: 50%; }
+  .orbit .inner { position: absolute; inset: 7px; border: 2px solid transparent; border-top-color: #fff; border-right-color: rgba(255,255,255,0.6); border-radius: 50%; animation: spin 1.1s linear infinite; }
+  .orbit .spark { position: absolute; top: -3px; left: 50%; margin-left: -4px; font-size: 9px; animation: spin 1.1s linear infinite; transform-origin: 4px 32px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
+<div class="cards th-row">
+
+  <div class="card" data-choice="glass-lines" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="th-stage">
+        <div class="th-label">◆ NOVA · <span id="lab1">COMPOSING</span></div>
+        <div class="th-answer">
+          <div class="glass-lines" id="think1">
+            <div class="gline g1"></div><div class="gline g2"></div><div class="gline g3"></div>
+          </div>
+          <span id="stream1" style="display:none;"></span><span class="th-caret" id="caret1" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>1 · Glass lines</h3>
+      <p>The answer's silhouette forms before the words exist — translucent bars with light sweeping through, then the bars dissolve and the stream writes over where they stood.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="word-cycle" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="th-stage">
+        <div class="th-label">◆ NOVA</div>
+        <div class="th-answer">
+          <div id="think2" style="padding-top: 2px;"><span class="cycle-word" id="cycword">LISTENING</span></div>
+          <span id="stream2" style="display:none;"></span><span class="th-caret" id="caret2" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>2 · Word cycle</h3>
+      <p>Her status flickers through LISTENING → READING THE MOMENT → COMPOSING with a tiny hologram flick on each swap — the same glitch language as her blink. The words tell you what she's doing.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="ring-orbit" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="th-stage">
+        <div class="th-label">◆ NOVA · THINKING</div>
+        <div class="th-answer">
+          <div class="orbit-wrap" id="think3">
+            <div class="orbit">
+              <div class="outer"></div>
+              <div class="inner"></div>
+            </div>
+          </div>
+          <span id="stream3" style="display:none;"></span><span class="th-caret" id="caret3" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>3 · Ring orbit</h3>
+      <p>Your logo's double ring as the thinking engine: outer ring steady, inner arc spinning. The brand mark literally doing the work. Calm, iconic, wordless.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">All three share one rule: the block caret appears the INSTANT thinking ends, at the exact spot the first character lands — the handoff is caret-first, so the terminal feel never breaks. These can also compose: glass lines with the cycling word above them is a legitimate pairing. Click your favorite (or name a combo).</p>
+</div>
+
+<script>
+(function () {
+  var TEXT = "Honestly, because the problems you're hiring for are the ones I've spent my career on. I build";
+  var WORDS = ["LISTENING", "READING THE MOMENT", "COMPOSING"];
+
+  function run(thinkId, streamId, caretId, opts) {
+    var think = document.getElementById(thinkId);
+    var stream = document.getElementById(streamId);
+    var caret = document.getElementById(caretId);
+    var wordEl = opts && opts.wordEl ? document.getElementById(opts.wordEl) : null;
+    var labEl = opts && opts.labEl ? document.getElementById(opts.labEl) : null;
+    var wi = 0, cycleTimer = null;
+
+    function thinkPhase() {
+      think.style.display = "";
+      stream.style.display = "none"; caret.style.display = "none";
+      stream.textContent = "";
+      if (labEl) labEl.textContent = "COMPOSING";
+      if (wordEl) {
+        wi = 0; wordEl.textContent = WORDS[0];
+        cycleTimer = setInterval(function () {
+          wi = (wi + 1) % WORDS.length;
+          wordEl.textContent = WORDS[wi];
+          wordEl.classList.remove("flick");
+          void wordEl.offsetWidth;
+          wordEl.classList.add("flick");
+        }, 820);
+      }
+      setTimeout(streamPhase, 2300);
+    }
+
+    function streamPhase() {
+      if (cycleTimer) { clearInterval(cycleTimer); cycleTimer = null; }
+      think.style.display = "none";
+      stream.style.display = ""; caret.style.display = "inline-block";
+      if (labEl) labEl.textContent = "SAY THIS";
+      var idx = 0;
+      (function tick() {
+        if (idx >= TEXT.length) {
+          caret.style.display = "none";
+          setTimeout(thinkPhase, 1800);
+          return;
+        }
+        var burst = Math.random() < 0.18 ? 2 : 1;
+        stream.textContent += TEXT.substr(idx, burst); idx += burst;
+        setTimeout(tick, 24 + (Math.random() < 0.06 ? 90 : 0));
+      })();
+    }
+
+    thinkPhase();
+  }
+
+  run("think1", "stream1", "caret1", { labEl: "lab1" });
+  run("think2", "stream2", "caret2", { wordEl: "cycword" });
+  run("think3", "stream3", "caret3", {});
+})();
+</script>

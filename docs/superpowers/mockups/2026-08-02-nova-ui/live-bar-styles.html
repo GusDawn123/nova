@@ -1,0 +1,89 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>The control cluster — three Nova treatments</h2>
+<p class="subtitle">Zoomed to the bottom bar on the cobalt canvas. Same anatomy every time — optional steer input + the RESPOND key — but three different design languages. Look for: does it feel like an instrument, and could you hit RESPOND without looking?</p>
+
+<style>
+  .bs-stage { background: #2733E6; border-radius: 18px; padding: 26px 20px 22px; margin-top: 6px; }
+  .bs-micro { font-family: 'Space Mono'; font-size: 8.5px; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.65); margin-bottom: 6px; }
+
+  /* A — HUD CHAMFER */
+  .chamfer { clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px); }
+  .bsA-row { display: flex; gap: 10px; align-items: stretch; }
+  .bsA-field { position: relative; flex: 1; border: 1px solid rgba(255,255,255,0.55); padding: 13px 14px; font-family: 'Space Mono'; font-size: 11px; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.05); }
+  .bsA-corner { position: absolute; width: 8px; height: 8px; border-color: #fff; border-style: solid; }
+  .bsA-tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .bsA-br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+  .bsA-btn { background: #fff; color: #2733E6; font-family: 'Orbitron'; font-weight: 900; font-size: 12px; letter-spacing: 2px; padding: 0 22px; display: flex; align-items: center; gap: 8px; box-shadow: 0 0 26px rgba(255,255,255,0.5); }
+
+  /* B — RING KEY */
+  .bsB-row { display: flex; gap: 16px; align-items: flex-end; }
+  .bsB-field { flex: 1; padding: 8px 2px 10px; font-family: 'Inter'; font-size: 12.5px; color: rgba(255,255,255,0.7); border-bottom: 1px solid rgba(255,255,255,0.5); position: relative; }
+  .bsB-field::after { content: ""; position: absolute; bottom: -1px; left: 0; width: 34px; height: 2px; background: #fff; }
+  .bsB-key { width: 74px; height: 74px; border-radius: 50%; background: #fff; color: #2733E6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-family: 'Orbitron'; font-weight: 900; font-size: 8.5px; letter-spacing: 1.5px; position: relative; box-shadow: 0 0 30px rgba(255,255,255,0.55); }
+  .bsB-key::before { content: ""; position: absolute; inset: -7px; border: 1.5px solid rgba(255,255,255,0.8); border-radius: 50%; }
+  .bsB-key::after { content: ""; position: absolute; inset: -13px; border: 1px solid rgba(255,255,255,0.35); border-radius: 50%; }
+
+  /* C — COMMAND DECK */
+  .bsC-field { border: 1px solid rgba(255,255,255,0.4); border-bottom: none; padding: 11px 14px; font-family: 'Space Mono'; font-size: 10.5px; color: rgba(255,255,255,0.6); background: rgba(255,255,255,0.04); border-radius: 10px 10px 0 0; }
+  .bsC-btn { border-radius: 0 0 10px 10px; background: #fff; color: #2733E6; font-family: 'Orbitron'; font-weight: 900; font-size: 13px; letter-spacing: 4px; padding: 15px 0; text-align: center; position: relative; box-shadow: 0 8px 30px rgba(255,255,255,0.35); }
+  .bsC-btn::before { content: "⌜"; position: absolute; left: 12px; top: 50%; transform: translateY(-58%); font-size: 15px; }
+  .bsC-btn::after { content: "⌟"; position: absolute; right: 12px; top: 50%; transform: translateY(-42%); font-size: 15px; }
+</style>
+
+<div class="cards" style="display: flex; flex-direction: column; gap: 18px; max-width: 560px; margin: 0 auto;">
+
+  <div class="card" data-choice="hud-chamfer" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 10px 14px;">
+      <div class="bs-stage">
+        <div class="bs-micro">Steer // optional</div>
+        <div class="bsA-row">
+          <div class="bsA-field chamfer">
+            talk about the CLI features you know<span style="opacity:1; color:#fff;">▊</span>
+            <span class="bsA-corner bsA-tl"></span><span class="bsA-corner bsA-br"></span>
+          </div>
+          <div class="bsA-btn chamfer">◉ RESPOND</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · HUD chamfer</h3>
+      <p>Clipped 45° corners instead of pills — the sci-fi console cut. Focus brackets on the field, mono input text like a command line, the key glowing white. Sharp, technical, fast to parse.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="ring-key" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 10px 14px;">
+      <div class="bs-stage" style="padding-bottom: 30px;">
+        <div class="bs-micro">Steer // optional</div>
+        <div class="bsB-row">
+          <div class="bsB-field">talk about the CLI features you know…</div>
+          <div class="bsB-key"><span style="font-size: 20px; line-height: 1;">◉</span>RESPOND</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Ring key</h3>
+      <p>The RESPOND key is a circle wearing your logo's double ring — the badge become a button. The steer field disappears into a bare underline so the key owns the corner. Most iconic, most thumb-friendly (big round target), closest to "push to talk."</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="command-deck" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 10px 14px;">
+      <div class="bs-stage">
+        <div class="bs-micro">Steer // optional</div>
+        <div class="bsC-field">talk about the CLI features you know<span style="color:#fff;">▊</span></div>
+        <div class="bsC-btn">◉ R E S P O N D</div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Command deck</h3>
+      <p>Stacked: the steer strip docks on top of a full-width RESPOND bar with corner ticks — one console unit, reads like a launch control. Biggest tap target of all three, most "mission critical," costs the most vertical space.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">My lean: B — the double-ring key is your logo doing work, and a round key by the thumb is ergonomically the best "answer now" control in a live call. A is the sharpest looking; C the most dramatic. Click one, or tell me to cross-breed (e.g. "B's key with A's chamfered field").</p>
+</div>

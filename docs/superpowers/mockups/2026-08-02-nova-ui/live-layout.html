@@ -1,0 +1,132 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>The Live screen — three ways to build a teleprompter</h2>
+<p class="subtitle">Same session, same moment: mid-call, behavioral mode, an answer just streamed in, an older one above it. The question each layout answers differently: when you glance down with someone waiting, what deserves the pixels — the conversation, the balance of both, or ONLY the words you're about to say?</p>
+
+<style>
+  .lv-row { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .lv-phone {
+    width: 290px; height: 590px; border-radius: 32px; overflow: hidden; background: #2733E6;
+    color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,0.35); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0;
+  }
+  .lv-status { display: flex; justify-content: space-between; padding: 11px 16px 2px; font-size: 10px; opacity: 0.85; }
+  .lv-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 16px 8px; }
+  .lv-word { font-family: 'Orbitron'; font-weight: 900; font-size: 15px; letter-spacing: 3px; }
+  .lv-hud { font-family: 'Space Mono'; font-size: 8.5px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.8; }
+  .lv-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; }
+  .lv-card { margin: 0 12px 10px; border-radius: 14px; padding: 12px 13px; }
+  .lv-new { background: rgba(255,255,255,0.11); border: 1.5px solid #fff; }
+  .lv-old { border: 1px solid rgba(255,255,255,0.35); opacity: 0.72; }
+  .lv-input { margin: 8px 12px 16px; border: 1px solid rgba(255,255,255,0.45); border-radius: 999px; padding: 9px 14px; font-size: 11px; color: rgba(255,255,255,0.65); display: flex; justify-content: space-between; align-items: center; }
+  .lv-body { font-size: 13.5px; line-height: 1.58; }
+  .lv-ticker { font-size: 10.5px; line-height: 1.4; opacity: 0.85; }
+  .lv-turn { font-size: 11px; line-height: 1.45; margin-bottom: 6px; }
+  .lv-end { position: absolute; top: 11px; right: 14px; font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1px; border: 1px solid rgba(255,255,255,0.5); border-radius: 999px; padding: 3px 8px; }
+</style>
+
+<div class="cards lv-row">
+
+  <!-- 1. PROMPTER DECK -->
+  <div class="card" data-choice="prompter-deck" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="lv-phone">
+        <div class="lv-status"><span>9:41</span><span>●●●</span></div>
+        <div class="lv-head">
+          <span class="lv-word">NOVA</span>
+          <span class="lv-hud">BEHAVIORAL · 12:04 · <span style="opacity:1;">◉ LIVE</span></span>
+        </div>
+        <div class="lv-card" style="border: 1px dashed rgba(255,255,255,0.4); padding: 8px 12px;">
+          <div class="lv-label">Them · now</div>
+          <div class="lv-ticker">…so tell me, why should we hire you for this C++ position?</div>
+        </div>
+        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+          <div class="lv-card lv-old">
+            <div class="lv-label">◆ 11:38</div>
+            <div class="lv-body" style="font-size: 12px;">Yeah, so the way I think about template metaprogramming is…</div>
+          </div>
+          <div class="lv-card lv-new">
+            <div class="lv-label">◆ Nova · say this</div>
+            <div class="lv-body">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>.</div>
+          </div>
+        </div>
+        <div class="lv-input">Ask Nova anything… <span style="font-size: 13px;">➤</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>1 · Prompter deck</h3>
+      <p>The answer stream owns the screen; the conversation is one thin "them · now" ticker. Newest answer sits at the bottom, nearest your thumb and your eye-line. History scrolls up and away. Closest to what exists today, refined.</p>
+    </div>
+  </div>
+
+  <!-- 2. SPLIT COCKPIT -->
+  <div class="card" data-choice="split-cockpit" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="lv-phone">
+        <div class="lv-status"><span>9:41</span><span>●●●</span></div>
+        <div class="lv-head">
+          <span class="lv-word">NOVA</span>
+          <span class="lv-hud">◉ LIVE</span>
+        </div>
+        <div style="margin: 0 12px; border: 1px solid rgba(255,255,255,0.3); border-radius: 14px; padding: 10px 12px;">
+          <div class="lv-label" style="margin-bottom: 6px;">Transcript</div>
+          <div class="lv-turn" style="opacity: 0.65;"><b>me</b> — …I led the migration off the legacy allocator last year.</div>
+          <div class="lv-turn" style="opacity: 0.8;"><b>them</b> — nice, and how did you measure the win?</div>
+          <div class="lv-turn"><b>them</b> — so tell me, why should we hire you for this C++ position?</div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; margin: 8px 16px;">
+          <div style="flex:1; height: 1px; background: rgba(255,255,255,0.35);"></div>
+          <span class="lv-hud">BEHAVIORAL · 12:04</span>
+          <div style="flex:1; height: 1px; background: rgba(255,255,255,0.35);"></div>
+        </div>
+        <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+          <div class="lv-card lv-new">
+            <div class="lv-label">◆ Nova · say this</div>
+            <div class="lv-body" style="font-size: 12.5px;">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>.</div>
+          </div>
+        </div>
+        <div class="lv-input">Ask Nova anything… <span style="font-size: 13px;">➤</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>2 · Split cockpit</h3>
+      <p>Conversation and copilot get permanent halves, divided by a HUD rail. You always see who said what — reassuring, information-dense, and the most "mission control." The cost: the answer you read aloud gets half the room, so smaller type.</p>
+    </div>
+  </div>
+
+  <!-- 3. STAGE -->
+  <div class="card" data-choice="stage" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 12px;">
+      <div class="lv-phone">
+        <div class="lv-status"><span>9:41</span><span>●●●</span></div>
+        <div style="text-align: center; padding: 4px 0 2px;">
+          <div style="width: 34px; height: 3px; background: rgba(255,255,255,0.5); border-radius: 2px; margin: 0 auto 6px;"></div>
+          <div class="lv-label">↓ pull for transcript</div>
+        </div>
+        <div class="lv-head" style="justify-content: center; gap: 10px;">
+          <span class="lv-word">NOVA</span>
+          <span class="lv-hud">BEHAVIORAL · ◉ LIVE</span>
+        </div>
+        <div class="lv-card" style="border: 1px solid rgba(255,255,255,0.3); opacity: 0.6; padding: 7px 12px;">
+          <div class="lv-ticker" style="font-size: 9.5px;">◆ previous — “Yeah, so the way I think about template metaprogramming…”</div>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; justify-content: center;">
+          <div class="lv-card lv-new" style="padding: 18px 16px;">
+            <div class="lv-label" style="margin-bottom: 9px;">◆ Nova · say this</div>
+            <div class="lv-body" style="font-size: 16.5px; line-height: 1.65;">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>, and under what load.</div>
+          </div>
+        </div>
+        <div class="lv-input">Ask Nova anything… <span style="font-size: 13px;">➤</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>3 · Stage</h3>
+      <p>A true teleprompter: the current answer takes center stage in large type — biggest, fastest read of the three. History shrinks to a one-line "previous" chip; the transcript hides behind a pull-down. Maximum glanceability, minimum context.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">These aren't all-or-nothing — a real contender is 1 with 3's trick: the deck layout, but the newest card renders at Stage-size type until the next one arrives. Click a favorite and tell me what to steal from the others.</p>
+</div>

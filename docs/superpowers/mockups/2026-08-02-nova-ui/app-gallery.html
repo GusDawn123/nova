@@ -1,0 +1,202 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>Nova, end to end — the remaining screens</h2>
+<p class="subtitle">The locked identity (cobalt canvas · Orbitron/Inter/Space Mono · chamfered controls, soft content cards) rolled across the app. Dark mode shown; light is the exact mirror. Mascot placeholders are marked — they use your badge art. This is a presentation, not a quiz: react to anything, section by section.</p>
+
+<style>
+  .g-phone {
+    width: 270px; height: 560px; border-radius: 30px; overflow: hidden; background: #2733E6;
+    color: #fff; box-shadow: 0 16px 44px rgba(0,0,0,0.35); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0; text-align: left;
+  }
+  .g-row { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; margin-bottom: 8px; }
+  .g-status { display: flex; justify-content: space-between; padding: 10px 15px 2px; font-size: 9.5px; opacity: 0.85; }
+  .g-word { font-family: 'Orbitron'; font-weight: 900; letter-spacing: 3px; }
+  .g-mono { font-family: 'Space Mono'; letter-spacing: 1.5px; text-transform: uppercase; }
+  .g-label { font-family: 'Space Mono'; font-size: 7.5px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; }
+  .chamfer { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .g-card { margin: 0 12px 9px; border-radius: 13px; padding: 11px 12px; border: 1px solid rgba(255,255,255,0.35); }
+  .g-caption { text-align: center; margin-top: 8px; font-size: 12px; color: inherit; opacity: 0.75; }
+  .g-sec { margin: 26px 0 10px; }
+  .g-spark { position: absolute; opacity: 0.7; font-size: 9px; }
+  .g-ring { width: 92px; height: 92px; border-radius: 50%; border: 2px solid #fff; margin: 0 auto; display: flex; align-items: center; justify-content: center; position: relative; }
+  .g-ring::before { content: ""; position: absolute; inset: 6px; border: 1px solid rgba(255,255,255,0.6); border-radius: 50%; }
+  .g-btn { background: #fff; color: #2733E6; font-family: 'Orbitron'; font-weight: 900; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 22px rgba(255,255,255,0.4); }
+  .g-field { border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.05); font-family: 'Space Mono'; color: rgba(255,255,255,0.65); position: relative; }
+  .g-corner { position: absolute; width: 7px; height: 7px; border-color: #fff; border-style: solid; }
+  .g-tl { top: -1px; left: -1px; border-width: 2px 0 0 2px; }
+  .g-br { bottom: -1px; right: -1px; border-width: 0 2px 2px 0; }
+</style>
+
+<!-- ============ MEETINGS LIST ============ -->
+<div class="g-sec">
+  <h3>1 · Meetings — the archive</h3>
+  <div class="g-row">
+    <div>
+      <div class="g-phone">
+        <div class="g-status"><span>9:41</span><span>●●●</span></div>
+        <div style="padding: 8px 15px 4px; display: flex; justify-content: space-between; align-items: baseline;">
+          <span class="g-word" style="font-size: 16px;">MEETINGS</span>
+          <span class="g-mono" style="font-size: 8px; opacity: 0.7;">14 this month</span>
+        </div>
+        <div class="g-label" style="margin: 8px 15px 5px;">— Today —</div>
+        <div class="g-card" style="background: rgba(255,255,255,0.08);">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <b style="font-size: 12.5px;">Acme pricing call</b>
+            <span class="g-mono chamfer" style="font-size: 7px; background: #fff; color: #2733E6; padding: 3px 7px; font-weight: 700;">NOTES READY</span>
+          </div>
+          <div class="g-label" style="margin-top: 5px;">2:14 PM · 32 min · Finance</div>
+          <div style="font-size: 10.5px; opacity: 0.8; margin-top: 5px;">Pre-pay lands at \$38,950 vs \$47,500 monthly…</div>
+        </div>
+        <div class="g-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <b style="font-size: 12.5px;">C++ interview · round 2</b>
+            <span class="g-mono" style="font-size: 7px; border: 1px solid rgba(255,255,255,0.6); padding: 3px 7px;">PROCESSING ▚</span>
+          </div>
+          <div class="g-label" style="margin-top: 5px;">11:00 AM · 48 min · Behavioral</div>
+        </div>
+        <div class="g-label" style="margin: 8px 15px 5px;">— This week —</div>
+        <div class="g-card" style="opacity: 0.85;">
+          <b style="font-size: 12.5px;">Standup w/ platform team</b>
+          <div class="g-label" style="margin-top: 5px;">Tue · 18 min · General</div>
+        </div>
+        <div style="flex: 1;"></div>
+        <div style="display: flex; justify-content: space-around; padding: 12px 0 18px; border-top: 1px solid rgba(255,255,255,0.3);">
+          <span class="g-mono" style="font-size: 8px; font-weight: 700;">▤ MEETINGS</span>
+          <span class="g-mono" style="font-size: 8px; opacity: 0.55;">◉ LIVE</span>
+          <span class="g-mono" style="font-size: 8px; opacity: 0.55;">◌ ACCOUNT</span>
+        </div>
+      </div>
+      <div class="g-caption">Happy path — recency groups, status chips in the control language.</div>
+    </div>
+    <div>
+      <div class="g-phone" style="align-items: center; justify-content: center;">
+        <span class="g-spark" style="top: 120px; left: 40px;">✦</span>
+        <span class="g-spark" style="top: 180px; right: 48px; font-size: 6px;">✦</span>
+        <span class="g-spark" style="bottom: 170px; left: 60px; font-size: 6px;">✦</span>
+        <div class="g-ring"><span style="font-size: 30px;">✦</span></div>
+        <div class="g-label" style="margin-top: 10px;">[ mascot badge art here ]</div>
+        <div class="g-word" style="font-size: 13px; margin-top: 14px; letter-spacing: 2px;">NO CALLS YET</div>
+        <div style="font-size: 11.5px; opacity: 0.8; margin: 8px 34px 0; text-align: center; line-height: 1.55;">Your first call becomes your first memory. Nova keeps the notes.</div>
+        <div class="g-btn chamfer" style="font-size: 10px; padding: 11px 26px; margin-top: 18px;">◉ START A SESSION</div>
+      </div>
+      <div class="g-caption">Empty state — a mascot moment: badge, sparkles, one action.</div>
+    </div>
+  </div>
+  <p class="subtitle">Also designed (described, not drawn): loading = three skeleton cards with a slow white shimmer; error = chamfered panel with plain copy + RETRY key; signed-out = badge + SIGN IN key, no dead retry.</p>
+</div>
+
+<!-- ============ MEETING DETAIL ============ -->
+<div class="g-sec">
+  <h3>2 · Meeting detail — notes & transcript</h3>
+  <div class="g-row">
+    <div>
+      <div class="g-phone">
+        <div class="g-status"><span>9:41</span><span>●●●</span></div>
+        <div style="padding: 8px 15px 2px;">
+          <div class="g-label">‹ Meetings</div>
+          <b style="font-size: 14px;">Acme pricing call</b>
+          <div class="g-label" style="margin-top: 3px;">Today · 2:14 PM · 32 min · Finance</div>
+        </div>
+        <div style="display: flex; gap: 6px; margin: 10px 15px;">
+          <span class="g-mono chamfer" style="font-size: 8px; background: #fff; color: #2733E6; padding: 5px 12px; font-weight: 700;">NOTES</span>
+          <span class="g-mono chamfer" style="font-size: 8px; border: 1px solid rgba(255,255,255,0.5); padding: 5px 12px;">TRANSCRIPT</span>
+          <span class="g-mono chamfer" style="font-size: 8px; border: 1px solid rgba(255,255,255,0.5); padding: 5px 12px;">FOLLOW-UP</span>
+        </div>
+        <div class="g-card" style="background: rgba(255,255,255,0.08);">
+          <div class="g-label" style="margin-bottom: 5px;">TL;DR</div>
+          <div style="font-size: 11.5px; line-height: 1.55;">They're at \$40k this quarter. Annual pre-pay (<b>\$38,950</b>) fits; monthly doesn't. Seat count must be confirmed.</div>
+        </div>
+        <div class="g-card">
+          <div class="g-label" style="margin-bottom: 6px;">Action items</div>
+          <div style="display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px;">
+            <span class="chamfer" style="width: 13px; height: 13px; background: #fff; color: #2733E6; font-size: 9px; text-align: center; line-height: 13px; font-weight: 700;">✓</span>
+            <span style="font-size: 11px; opacity: 0.75; text-decoration: line-through;">Send the scope comparison</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: flex-start;">
+            <span class="chamfer" style="width: 13px; height: 13px; border: 1.5px solid #fff;"></span>
+            <span style="font-size: 11px;">Confirm final seat count before contract</span>
+          </div>
+        </div>
+        <div class="g-card">
+          <div class="g-label" style="margin-bottom: 5px;">Open</div>
+          <div style="font-size: 11px; line-height: 1.5;">Can Slack alerts route per-channel on their tier?</div>
+        </div>
+      </div>
+      <div class="g-caption">Notes ready — chamfered checkboxes, the one interactive element.</div>
+    </div>
+    <div>
+      <div class="g-phone" style="align-items: center; justify-content: center;">
+        <div class="g-ring" style="animation: none;"><span class="g-mono" style="font-size: 9px;">▚▞</span></div>
+        <div class="g-word" style="font-size: 12px; margin-top: 16px; letter-spacing: 2px;">WRITING YOUR NOTES</div>
+        <div style="font-size: 11px; opacity: 0.8; margin: 8px 40px 0; text-align: center; line-height: 1.5;">She's re-reading the call. A minute, maybe two.</div>
+        <div class="g-mono" style="font-size: 8px; opacity: 0.6; margin-top: 14px;">TRANSCRIPT AVAILABLE BELOW ↓</div>
+      </div>
+      <div class="g-caption">Processing — the ring becomes a working indicator; transcript never blocked.</div>
+    </div>
+  </div>
+  <p class="subtitle">Failed state: plain admission ("The notes didn't make it through") + chamfered TRY AGAIN key + transcript still readable. No dead ends.</p>
+</div>
+
+<!-- ============ SIGN IN ============ -->
+<div class="g-sec">
+  <h3>3 · Sign in — the front door</h3>
+  <div class="g-row">
+    <div>
+      <div class="g-phone" style="justify-content: center;">
+        <span class="g-spark" style="top: 90px; left: 36px;">✦</span>
+        <span class="g-spark" style="top: 150px; right: 40px; font-size: 6px;">✦</span>
+        <div style="text-align: center; margin-bottom: 26px;">
+          <div class="g-ring" style="width: 74px; height: 74px;"><span style="font-size: 24px;">✦</span></div>
+          <div class="g-label" style="margin-top: 8px;">[ badge art ]</div>
+          <div class="g-word" style="font-size: 26px; letter-spacing: 8px; margin-top: 12px;">NOVA</div>
+          <div class="g-mono" style="font-size: 8px; opacity: 0.7; margin-top: 4px;">YOUR LIVE-CALL COPILOT</div>
+        </div>
+        <div class="g-field chamfer" style="margin: 0 26px 10px; padding: 12px 13px; font-size: 10.5px;">
+          you@work.com<span class="g-corner g-tl"></span><span class="g-corner g-br"></span>
+        </div>
+        <div class="g-field chamfer" style="margin: 0 26px 16px; padding: 12px 13px; font-size: 10.5px;">
+          ••••••••••
+        </div>
+        <div class="g-btn chamfer" style="margin: 0 26px; padding: 13px 0; font-size: 11px;">SIGN IN</div>
+        <div class="g-mono" style="font-size: 8px; opacity: 0.7; text-align: center; margin-top: 14px;">NO ACCOUNT? CREATE ONE</div>
+      </div>
+      <div class="g-caption">The badge, the wordmark, two chamfered fields, one key. Nothing else.</div>
+    </div>
+    <div>
+      <div class="g-phone">
+        <div class="g-status"><span>9:41</span><span>●●●</span></div>
+        <div style="padding: 8px 15px 2px;">
+          <span class="g-word" style="font-size: 16px;">ACCOUNT</span>
+        </div>
+        <div class="g-card" style="margin-top: 10px;">
+          <div class="g-label" style="margin-bottom: 4px;">Signed in as</div>
+          <div style="font-size: 12px;">dev@nova.test</div>
+        </div>
+        <div class="g-card" style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div class="g-label" style="margin-bottom: 4px;">Plan</div>
+            <div style="font-size: 12px;"><b>Pro</b></div>
+          </div>
+          <span class="g-mono chamfer" style="font-size: 7px; background: #fff; color: #2733E6; padding: 3px 8px; font-weight: 700;">ACTIVE</span>
+        </div>
+        <div class="g-card" style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 12px;">Appearance</span>
+          <span class="g-mono" style="font-size: 8px; opacity: 0.8;">COBALT / PAPER / AUTO</span>
+        </div>
+        <div style="flex: 1;"></div>
+        <div class="g-card chamfer" style="border: 1px solid rgba(255,255,255,0.6); text-align: center;">
+          <span class="g-mono" style="font-size: 9px;">SIGN OUT</span>
+        </div>
+        <div style="text-align: center; padding-bottom: 16px;">
+          <span class="g-mono" style="font-size: 7.5px; opacity: 0.55;">DELETE ACCOUNT</span>
+        </div>
+      </div>
+      <div class="g-caption">Account — quiet screen, the theme toggle lives here (Cobalt / Paper / Auto).</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">That's the app, end to end, in one language: cobalt canvas, Orbitron display, chamfered controls, soft reading cards, the badge working in every empty and loading moment. React to anything — then I'll assemble the full design summary (including motion: how text arrives, the live pulse, transitions), write the spec, and we plan the build.</p>
+</div>

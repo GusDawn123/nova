@@ -1,0 +1,104 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>Cockpit v3 — the one-button copilot</h2>
+<p class="subtitle">No auto mode. Nova speaks only when you press RESPOND. Left: the plain tap — she answers the interviewer's question directly. Right: you typed a steer first ("talk about the CLI features…"), so the SAME button produces an answer shaped by it, with your steer riding above the card as a white chip. One lane, one hero control.</p>
+
+<style>
+  .c3-row { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; }
+  .c3-phone {
+    width: 300px; height: 620px; border-radius: 32px; overflow: hidden; background: #2733E6;
+    color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,0.35); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0; text-align: left;
+  }
+  .c3-status { display: flex; justify-content: space-between; padding: 11px 16px 2px; font-size: 10px; opacity: 0.85; }
+  .c3-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px 8px; }
+  .c3-word { font-family: 'Orbitron'; font-weight: 900; font-size: 15px; letter-spacing: 3px; }
+  .c3-hud { font-family: 'Space Mono'; font-size: 8.5px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.85; }
+  .c3-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; }
+  .c3-transcript { margin: 0 12px; border: 1px solid rgba(255,255,255,0.3); border-radius: 14px; padding: 10px 12px; }
+  .c3-turn { font-size: 11px; line-height: 1.45; margin-bottom: 6px; }
+  .c3-rail { display: flex; align-items: center; gap: 8px; margin: 8px 14px; }
+  .c3-rail-line { flex: 1; height: 1px; background: rgba(255,255,255,0.35); }
+  .c3-card { margin: 0 12px 10px; border-radius: 14px; padding: 12px 13px; }
+  .c3-new { background: rgba(255,255,255,0.11); border: 1.5px solid #fff; }
+  .c3-body { font-size: 13px; line-height: 1.6; }
+  .c3-steer { align-self: flex-end; margin: 0 12px 6px; max-width: 78%; background: #fff; color: #2733E6; border-radius: 14px 14px 3px 14px; padding: 8px 12px; font-size: 11px; font-weight: 600; }
+  .c3-bottom { display: flex; gap: 8px; margin: 8px 12px 16px; align-items: stretch; }
+  .c3-steer-input { flex: 1; border: 1px solid rgba(255,255,255,0.45); border-radius: 999px; padding: 10px 14px; font-size: 10.5px; color: rgba(255,255,255,0.6); display: flex; align-items: center; }
+  .c3-respond { background: #fff; color: #2733E6; border-radius: 999px; padding: 0 18px; display: flex; align-items: center; gap: 6px; font-family: 'Orbitron'; font-weight: 900; font-size: 11px; letter-spacing: 1.5px; box-shadow: 0 0 22px rgba(255,255,255,0.45); }
+</style>
+
+<div class="c3-row">
+
+  <!-- LEFT: plain RESPOND -->
+  <div style="text-align: center;">
+    <div class="c3-phone">
+      <div class="c3-status"><span>9:41</span><span>●●●</span></div>
+      <div class="c3-head">
+        <span class="c3-word">NOVA</span>
+        <span class="c3-hud">◉ LIVE · 12:04</span>
+      </div>
+      <div class="c3-transcript">
+        <div class="c3-label" style="margin-bottom: 6px;">Transcript</div>
+        <div class="c3-turn" style="opacity: 0.6;"><b>me</b> — …mostly agentic workflows, honestly.</div>
+        <div class="c3-turn" style="opacity: 0.78;"><b>them</b> — interesting, okay.</div>
+        <div class="c3-turn"><b>them</b> — what do you know about working with Claude Code?</div>
+      </div>
+      <div class="c3-rail">
+        <div class="c3-rail-line"></div>
+        <span class="c3-hud">TECHNICAL</span>
+        <div class="c3-rail-line"></div>
+      </div>
+      <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+        <div class="c3-card c3-new">
+          <div class="c3-label">◆ Nova · say this</div>
+          <div class="c3-body">I use it daily, it's basically a senior pair that lives in my terminal. I've built real features with it end to end, and the part I lean on most is how it handles a whole <b>repo-wide change</b>, tests included, not just single-file edits.</div>
+        </div>
+      </div>
+      <div class="c3-bottom">
+        <div class="c3-steer-input">Steer the answer (optional)…</div>
+        <div class="c3-respond">◉ RESPOND</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">Tap — she answers the question on the table.</p>
+  </div>
+
+  <!-- RIGHT: steered RESPOND -->
+  <div style="text-align: center;">
+    <div class="c3-phone">
+      <div class="c3-status"><span>9:41</span><span>●●●</span></div>
+      <div class="c3-head">
+        <span class="c3-word">NOVA</span>
+        <span class="c3-hud">◉ LIVE · 12:05</span>
+      </div>
+      <div class="c3-transcript">
+        <div class="c3-label" style="margin-bottom: 6px;">Transcript</div>
+        <div class="c3-turn" style="opacity: 0.6;"><b>me</b> — …mostly agentic workflows, honestly.</div>
+        <div class="c3-turn" style="opacity: 0.78;"><b>them</b> — interesting, okay.</div>
+        <div class="c3-turn"><b>them</b> — what do you know about working with Claude Code?</div>
+      </div>
+      <div class="c3-rail">
+        <div class="c3-rail-line"></div>
+        <span class="c3-hud">TECHNICAL</span>
+        <div class="c3-rail-line"></div>
+      </div>
+      <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+        <div class="c3-steer">talk about the CLI features you know</div>
+        <div class="c3-card c3-new">
+          <div class="c3-label">◆ Nova · say this</div>
+          <div class="c3-body">Day to day I live in the CLI. Slash commands for the workflows I repeat, <b>hooks</b> to gate what it's allowed to run, custom subagents for the long tasks, and headless mode wired into CI. It's less a chatbot and more a <b>scriptable teammate</b>.</div>
+        </div>
+      </div>
+      <div class="c3-bottom">
+        <div class="c3-steer-input" style="color: #fff;">talk about the CLI features you know</div>
+        <div class="c3-respond">◉ RESPOND</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">Type first, then tap — same button, steered answer.<br>Your steer stays visible above the card.</p>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">What this simplification buys: every card in the history is something YOU summoned (no surprise scrolling mid-call), the RESPOND button earns its glow as the app's hero control, and the provenance system collapses to one label plus an optional steer chip. Confirm this is the model, and I'll take the identity across the other four screens and their states.</p>
+</div>
