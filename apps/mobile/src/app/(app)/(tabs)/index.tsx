@@ -227,6 +227,14 @@ function EmptyState({
 }
 
 /**
+ * Caret block: 5pt wide, one monoXs line tall — sized to its line the way stream's
+ * caret is sized to body (`features/stream/streaming-text.tsx` CARET_WIDTH/HEIGHT),
+ * scaled down because the readout whispers where the teleprompter speaks.
+ */
+const READOUT_CARET_WIDTH = 5;
+const READOUT_CARET_HEIGHT = FontSize.monoXs;
+
+/**
  * The readout's write-head. An inline View inside Text is the app's caret idiom —
  * `features/stream/streaming-text.tsx` established it: the block rides the line's
  * baseline instead of falling after the paragraph box. Its blink is the shared
@@ -335,12 +343,11 @@ const styles = StyleSheet.create({
     paddingTop: Space.xl,
   },
   readout: { alignItems: 'center', gap: Space.xs },
-  readoutLine: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.monoXs,
-    letterSpacing: 2,
-  },
-  readoutCaret: { width: 5, height: FontSize.monoXs },
+  // The eyebrow voice a size down: the readout is the same mono label register as
+  // the recency headings, just quieter. The uppercase transform is inert here —
+  // the lines are already uppercase, and katakana has no case.
+  readoutLine: { ...eyebrowStyle, fontSize: FontSize.monoXs },
+  readoutCaret: { width: READOUT_CARET_WIDTH, height: READOUT_CARET_HEIGHT },
   emptyTitle: {
     fontFamily: FontFamily.display,
     fontSize: FontSize.displayMd,
