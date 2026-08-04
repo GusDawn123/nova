@@ -1,0 +1,111 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>She's alive — and the blue got truer</h2>
+<p class="subtitle">Left: the empty state with the real her — transparent art from the pipeline, breathing and blinking (watch a few seconds; the blink is on an uneven rhythm, sometimes double). Right: the processing treatment that replaces the boxed chip. Everything sits on <b>#0002DA</b> — the exact hex sampled from your logo file, deeper than the blue I'd been eyeballing. Check whether it still feels right.</p>
+
+<style>
+  .ma-row { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .ma-phone {
+    width: 300px; height: 620px; border-radius: 32px; overflow: hidden; background: #0002DA;
+    color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,0.4); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0; text-align: left;
+  }
+  .ma-status { display: flex; justify-content: space-between; padding: 11px 16px 2px; font-size: 10px; opacity: 0.85; }
+  .ma-word { font-family: 'Orbitron'; font-weight: 900; letter-spacing: 3px; }
+  .ma-mono { font-family: 'Space Mono'; letter-spacing: 1.5px; text-transform: uppercase; }
+  .ma-label { font-family: 'Space Mono'; font-size: 7.5px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; }
+  .chamfer { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .ma-btn { background: #fff; color: #0002DA; font-family: 'Orbitron'; font-weight: 900; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(255,255,255,0.45); }
+
+  /* the living figure */
+  .nova-figure { position: relative; width: 250px; height: 250px; margin: 0 auto; animation: novaFloat 6.5s ease-in-out infinite alternate; }
+  .nova-figure::before { content: ""; position: absolute; inset: 12%; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 68%); }
+  .nova-figure img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .nova-eyes-closed { opacity: 0; animation: novaBlink 9s linear infinite; }
+  @keyframes novaFloat { from { transform: translateY(-5px); } to { transform: translateY(6px); } }
+  @keyframes novaBlink {
+    0%, 35.2%, 37.0%, 76.6%, 78.1%, 79.3%, 80.8%, 100% { opacity: 0; }
+    35.7%, 36.5% { opacity: 1; }
+    77.1%, 77.6% { opacity: 1; }
+    79.8%, 80.3% { opacity: 1; }
+  }
+  .tw { position: absolute; color: #fff; animation: twinkle 3.2s ease-in-out infinite; }
+  @keyframes twinkle { 0%, 100% { opacity: 0.15; transform: scale(0.8); } 50% { opacity: 0.9; transform: scale(1.15); } }
+
+  /* processing sweep */
+  .sweep { position: relative; height: 2px; margin-top: 7px; background: rgba(255,255,255,0.18); overflow: hidden; border-radius: 2px; }
+  .sweep::after { content: ""; position: absolute; top: 0; bottom: 0; width: 38%; background: linear-gradient(90deg, transparent, #fff, transparent); animation: sweepMove 1.8s ease-in-out infinite; }
+  @keyframes sweepMove { from { left: -40%; } to { left: 102%; } }
+  .ma-card { margin: 0 12px 9px; border-radius: 13px; padding: 11px 12px; border: 1px solid rgba(255,255,255,0.35); }
+</style>
+
+<div class="ma-row">
+
+  <!-- EMPTY STATE, ALIVE -->
+  <div style="text-align: center;">
+    <div class="ma-phone" style="justify-content: center;">
+      <span class="tw" style="top: 70px; left: 34px; font-size: 11px;">✦</span>
+      <span class="tw" style="top: 120px; right: 40px; font-size: 7px; animation-delay: 1.1s;">✦</span>
+      <span class="tw" style="top: 200px; left: 52px; font-size: 6px; animation-delay: 2.2s;">✦</span>
+      <span class="tw" style="bottom: 200px; right: 56px; font-size: 9px; animation-delay: 0.6s;">✦</span>
+      <span class="tw" style="bottom: 150px; left: 40px; font-size: 6px; animation-delay: 1.7s;">✦</span>
+      <div class="nova-figure">
+        <img src="/files/eyes-open-demo.png" alt="">
+        <img class="nova-eyes-closed" src="/files/eyes-closed-demo.png" alt="">
+      </div>
+      <div style="text-align: center; margin-top: 6px;">
+        <div class="ma-word" style="font-size: 14px; letter-spacing: 2.5px;">NO CALLS YET</div>
+        <div style="font-size: 11.5px; opacity: 0.85; margin: 8px 36px 0; line-height: 1.55;">Your first call becomes your first memory. I'll keep the notes.</div>
+        <div class="ma-btn chamfer" style="font-size: 10px; padding: 12px 26px; margin: 18px auto 0; width: fit-content;">◉ START A SESSION</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">Empty state — she breathes, blinks, the stars twinkle.<br>Copy is now HER voice: "I'll keep the notes."</p>
+  </div>
+
+  <!-- PROCESSING REDESIGN + HEX -->
+  <div style="text-align: center;">
+    <div class="ma-phone" style="height: 400px;">
+      <div class="ma-status"><span>9:41</span><span>●●●</span></div>
+      <div style="padding: 8px 15px 4px; display: flex; justify-content: space-between; align-items: baseline;">
+        <span class="ma-word" style="font-size: 16px;">MEETINGS</span>
+        <span class="ma-mono" style="font-size: 8px; opacity: 0.7;">14 this month</span>
+      </div>
+      <div class="ma-label" style="margin: 8px 15px 5px;">— Today —</div>
+      <div class="ma-card" style="background: rgba(255,255,255,0.08);">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <b style="font-size: 12.5px;">Acme pricing call</b>
+          <span class="ma-mono chamfer" style="font-size: 7px; background: #fff; color: #0002DA; padding: 3px 7px; font-weight: 700;">NOTES READY</span>
+        </div>
+        <div class="ma-label" style="margin-top: 5px;">2:14 PM · 32 min · Finance</div>
+      </div>
+      <div class="ma-card">
+        <b style="font-size: 12.5px;">C++ interview · round 2</b>
+        <div class="sweep"></div>
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 5px;">
+          <span class="ma-label">11:00 AM · 48 min · Behavioral</span>
+          <span class="ma-mono" style="font-size: 7px; opacity: 0.75;">WRITING NOTES</span>
+        </div>
+      </div>
+      <div style="flex: 1;"></div>
+      <div style="padding: 0 15px 14px;">
+        <div class="ma-label" style="margin-bottom: 6px;">The hex correction</div>
+        <div style="display: flex; gap: 8px;">
+          <div style="flex: 1; text-align: center;">
+            <div style="height: 40px; background: #2733E6; border: 1px solid rgba(255,255,255,0.5); border-radius: 8px;"></div>
+            <div class="ma-mono" style="font-size: 7px; margin-top: 4px; opacity: 0.7;">OLD GUESS #2733E6</div>
+          </div>
+          <div style="flex: 1; text-align: center;">
+            <div style="height: 40px; background: #0002DA; border: 1.5px solid #fff; border-radius: 8px;"></div>
+            <div class="ma-mono" style="font-size: 7px; margin-top: 4px;">TRUE #0002DA ✓</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">The boxed chip is gone — a thin light sweep under the title<br>does the "working on it," with WRITING NOTES whispered in mono.</p>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">Production notes: in the app the blink uses the eye-region patch (not full-frame swap) driven by Reanimated on a randomized clock, and she renders from the pipeline's transparent PNGs. The rembg pass removed the badge's circle frame and stars — so the ring stays a UI element we draw, and the sparkles are code (which is why they can twinkle). If the deeper true blue reads right to you, #0002DA becomes the design system's core hex everywhere.</p>
+</div>

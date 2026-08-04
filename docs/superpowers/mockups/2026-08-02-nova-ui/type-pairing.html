@@ -1,0 +1,92 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Space+Mono:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+<h2>The voice in letters — pick Nova's type</h2>
+<p class="subtitle">Three pairings, each shown as the dark (cobalt) answer card plus a light-mode strip. Every pairing is a trio: a DISPLAY face (wordmark, screen titles, mode pills — where "futuristic" lives), a BODY face (the streamed answer — where readability is non-negotiable), and a MONO (tiny labels like "NOVA · SAY THIS", timestamps — the technical whisper). Read each answer card at glance speed before you choose.</p>
+
+<style>
+  .tp-row { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+  .tp-card-inner { width: 320px; }
+  .tp-dark { background: #2733E6; border-radius: 18px; padding: 18px; color: #fff; }
+  .tp-light { background: #ffffff; border: 1px solid rgba(39,51,230,0.25); border-radius: 12px; padding: 12px 16px; margin-top: 10px; color: #2733E6; }
+  .tp-word { letter-spacing: 6px; font-size: 21px; margin-bottom: 2px; }
+  .tp-tag { font-size: 9px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0.7; margin-bottom: 14px; }
+  .tp-pill { display: inline-block; font-size: 10.5px; letter-spacing: 1.2px; text-transform: uppercase; background: #fff; color: #2733E6; border-radius: 999px; padding: 4px 12px; font-weight: 700; margin-bottom: 12px; }
+  .tp-label { font-size: 9px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.75; margin-bottom: 7px; }
+  .tp-body { font-size: 15px; line-height: 1.62; }
+  .tp-light .tp-label { opacity: 0.6; }
+  .tp-light .tp-body { font-size: 13px; color: #1b23a8; }
+</style>
+
+<div class="cards tp-row">
+
+  <div class="card" data-choice="circuit" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 14px;">
+      <div class="tp-card-inner">
+        <div class="tp-dark">
+          <div class="tp-word" style="font-family: 'Orbitron'; font-weight: 900;">NOVA</div>
+          <div class="tp-tag" style="font-family: 'Space Mono';">Live · Behavioral</div>
+          <div><span class="tp-pill" style="font-family: 'Orbitron'; font-weight: 700;">Behavioral</span></div>
+          <div class="tp-label" style="font-family: 'Space Mono';">◆ Nova · say this</div>
+          <div class="tp-body" style="font-family: 'Inter';">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>.</div>
+        </div>
+        <div class="tp-light">
+          <div class="tp-label" style="font-family: 'Space Mono';">◆ Light mode</div>
+          <div class="tp-body" style="font-family: 'Inter';">The same answer in paper-inverse, cobalt ink on white.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>1 · Circuit — Orbitron + Inter + Space Mono</h3>
+      <p>The full sci-fi commit. Orbitron is unmistakably "computer from the future" — huge presence in the wordmark, borderline costume if overused. Kept strictly to display, it's a statement.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="signal" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 14px;">
+      <div class="tp-card-inner">
+        <div class="tp-dark">
+          <div class="tp-word" style="font-family: 'Space Grotesk'; font-weight: 700;">NOVA</div>
+          <div class="tp-tag" style="font-family: 'JetBrains Mono';">Live · Behavioral</div>
+          <div><span class="tp-pill" style="font-family: 'Space Grotesk'; font-weight: 700;">Behavioral</span></div>
+          <div class="tp-label" style="font-family: 'JetBrains Mono';">◆ Nova · say this</div>
+          <div class="tp-body" style="font-family: 'Inter';">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>.</div>
+        </div>
+        <div class="tp-light">
+          <div class="tp-label" style="font-family: 'JetBrains Mono';">◆ Light mode</div>
+          <div class="tp-body" style="font-family: 'Inter';">The same answer in paper-inverse, cobalt ink on white.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>2 · Signal — Space Grotesk + Inter + JetBrains Mono</h3>
+      <p>Modern-futuristic without the costume: Space Grotesk has that engineered, slightly alien curve but stays elegant at every size. The pairing tech companies wish they'd picked. Ages the best of the three.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="arcade" onclick="toggleSelect(this)">
+    <div class="card-image" style="background: none; padding: 14px;">
+      <div class="tp-card-inner">
+        <div class="tp-dark">
+          <div class="tp-word" style="font-family: 'Chakra Petch'; font-weight: 700;">NOVA</div>
+          <div class="tp-tag" style="font-family: 'IBM Plex Mono', monospace;">Live · Behavioral</div>
+          <div><span class="tp-pill" style="font-family: 'Chakra Petch'; font-weight: 600;">Behavioral</span></div>
+          <div class="tp-label" style="font-family: 'IBM Plex Mono', monospace;">◆ Nova · say this</div>
+          <div class="tp-body" style="font-family: 'IBM Plex Sans';">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>.</div>
+        </div>
+        <div class="tp-light">
+          <div class="tp-label" style="font-family: 'IBM Plex Mono', monospace;">◆ Light mode</div>
+          <div class="tp-body" style="font-family: 'IBM Plex Sans';">The same answer in paper-inverse, cobalt ink on white.</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>3 · Arcade — Chakra Petch + IBM Plex Sans + IBM Plex Mono</h3>
+      <p>Squared, techno, anime-adjacent — Chakra Petch has exactly the mecha-cockpit energy of your logo's world. Slightly more character than Signal, slightly less timeless.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">All three load cleanly in Expo via @expo-google-fonts. The body face is the teleprompter — that's why it stays a workhorse (Inter / IBM Plex) in every option while the display face carries the futurism. Click your pick, or tell me to remix (e.g. "Chakra display with Inter body").</p>
+</div>

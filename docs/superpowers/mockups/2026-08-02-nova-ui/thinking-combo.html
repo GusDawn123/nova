@@ -1,0 +1,92 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Inter:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>The thinking state — final form</h2>
+<p class="subtitle">Glass lines + word cycle, merged: she narrates what she's doing while the answer's silhouette forms beneath. Then the caret-first handoff into the crisp stream. This loops the full RESPOND sequence exactly as the app will play it.</p>
+
+<style>
+  .fc-stage { background: #0002DA; border-radius: 18px; padding: 20px; color: #fff; width: 340px; margin: 0 auto; }
+  .fc-label { font-family: 'Space Mono'; font-size: 8.5px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; margin-bottom: 9px; }
+  .fc-answer { background: rgba(255,255,255,0.10); border: 1.5px solid #fff; border-radius: 14px; padding: 14px 15px; font-family: 'Inter'; font-size: 13.5px; line-height: 1.62; min-height: 150px; }
+  .fc-caret { display: inline-block; width: 7px; height: 15px; background: #fff; vertical-align: -2px; margin-left: 1px; animation: cb 0.9s steps(1,end) infinite; }
+  @keyframes cb { 0%,55% {opacity:1;} 56%,100% {opacity:0;} }
+
+  .cycle-word { font-family: 'Space Mono'; font-size: 10px; letter-spacing: 2.5px; text-transform: uppercase; opacity: 0.9; display: block; margin-bottom: 12px; }
+  .cycle-word.flick { animation: flick 0.22s linear; }
+  @keyframes flick { 0% { opacity: 0.2; transform: translateX(1px); } 40% { opacity: 1; transform: translateX(-1px); } 70% { opacity: 0.4; transform: translateX(0.5px); } 100% { opacity: 0.9; transform: translateX(0); } }
+
+  .glass-lines { display: flex; flex-direction: column; gap: 9px; }
+  .gline { height: 11px; border-radius: 6px; background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18); position: relative; overflow: hidden; }
+  .gline::after { content: ""; position: absolute; top: 0; bottom: 0; width: 45%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.35), transparent); animation: gsweep 1.4s ease-in-out infinite; }
+  .gline:nth-child(2)::after { animation-delay: 0.18s; }
+  .gline:nth-child(3)::after { animation-delay: 0.36s; }
+  @keyframes gsweep { from { left: -50%; } to { left: 105%; } }
+  .g1 { width: 92%; } .g2 { width: 78%; } .g3 { width: 45%; }
+  .fading { transition: opacity 240ms linear; }
+</style>
+
+<div class="fc-stage">
+  <div class="fc-label">◆ NOVA · <span id="lab">COMPOSING</span></div>
+  <div class="fc-answer">
+    <div id="think">
+      <span class="cycle-word" id="cycword">LISTENING</span>
+      <div class="glass-lines fading" id="glines">
+        <div class="gline g1"></div><div class="gline g2"></div><div class="gline g3"></div>
+      </div>
+    </div>
+    <span id="stream" style="display:none;"></span><span class="fc-caret" id="caret" style="display:none;"></span>
+  </div>
+</div>
+
+<div class="section" style="text-align: center;">
+  <p class="subtitle">Sequence: tap ◉ RESPOND → LISTENING / READING THE MOMENT / COMPOSING flicker above the forming glass lines → lines fade, caret lands, characters stream crisp → caret vanishes on completion. One motion story, four beats, all in brand.</p>
+</div>
+
+<script>
+(function () {
+  var TEXT = "Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where performance is the product, and when I say something got faster I say by how much.";
+  var WORDS = ["LISTENING", "READING THE MOMENT", "COMPOSING"];
+  var think = document.getElementById("think");
+  var glines = document.getElementById("glines");
+  var stream = document.getElementById("stream");
+  var caret = document.getElementById("caret");
+  var lab = document.getElementById("lab");
+  var word = document.getElementById("cycword");
+  var wi = 0, cyc = null;
+
+  function thinkPhase() {
+    think.style.display = ""; glines.style.opacity = "1";
+    stream.style.display = "none"; caret.style.display = "none";
+    stream.textContent = ""; lab.textContent = "COMPOSING";
+    wi = 0; word.textContent = WORDS[0];
+    cyc = setInterval(function () {
+      wi = (wi + 1) % WORDS.length;
+      word.textContent = WORDS[wi];
+      word.classList.remove("flick"); void word.offsetWidth; word.classList.add("flick");
+    }, 820);
+    setTimeout(function () {
+      glines.style.opacity = "0"; // the silhouette dissolves…
+      setTimeout(streamPhase, 260); // …and the caret lands where text begins
+    }, 2400);
+  }
+
+  function streamPhase() {
+    clearInterval(cyc);
+    think.style.display = "none";
+    stream.style.display = ""; caret.style.display = "inline-block";
+    lab.textContent = "SAY THIS";
+    var idx = 0;
+    (function tick() {
+      if (idx >= TEXT.length) {
+        caret.style.display = "none";
+        setTimeout(thinkPhase, 2200);
+        return;
+      }
+      var burst = Math.random() < 0.18 ? 2 : 1;
+      stream.textContent += TEXT.substr(idx, burst); idx += burst;
+      setTimeout(tick, 24 + (Math.random() < 0.06 ? 90 : 0));
+    })();
+  }
+
+  thinkPhase();
+})();
+</script>

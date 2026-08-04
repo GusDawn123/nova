@@ -1,0 +1,109 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>Split cockpit, v2 — now with your three lanes</h2>
+<p class="subtitle">The cockpit you picked, refined to carry the interaction model you just described. Left: mid-call with an AUTO answer. Right: the ASK NOVA lane in action — you typed a question, she answered <em>to you</em>, still in words you can speak. Note the bottom bar: chat pill and RESPOND are deliberately two different controls, because typing means "help me" and tapping means "answer them for me."</p>
+
+<style>
+  .cv-row { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; }
+  .cv-phone {
+    width: 300px; height: 620px; border-radius: 32px; overflow: hidden; background: #2733E6;
+    color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,0.35); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0;
+  }
+  .cv-status { display: flex; justify-content: space-between; padding: 11px 16px 2px; font-size: 10px; opacity: 0.85; }
+  .cv-head { display: flex; align-items: center; justify-content: space-between; padding: 6px 14px 8px; }
+  .cv-word { font-family: 'Orbitron'; font-weight: 900; font-size: 15px; letter-spacing: 3px; }
+  .cv-hud { font-family: 'Space Mono'; font-size: 8.5px; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.85; }
+  .cv-label { font-family: 'Space Mono'; font-size: 8px; letter-spacing: 1.8px; text-transform: uppercase; opacity: 0.7; }
+  .cv-transcript { margin: 0 12px; border: 1px solid rgba(255,255,255,0.3); border-radius: 14px; padding: 10px 12px; }
+  .cv-turn { font-size: 11px; line-height: 1.45; margin-bottom: 6px; }
+  .cv-rail { display: flex; align-items: center; gap: 8px; margin: 8px 14px; }
+  .cv-rail-line { flex: 1; height: 1px; background: rgba(255,255,255,0.35); }
+  .cv-card { margin: 0 12px 10px; border-radius: 14px; padding: 12px 13px; }
+  .cv-new { background: rgba(255,255,255,0.11); border: 1.5px solid #fff; }
+  .cv-old { border: 1px solid rgba(255,255,255,0.35); opacity: 0.72; }
+  .cv-body { font-size: 12.5px; line-height: 1.58; }
+  .cv-askchip { align-self: flex-end; margin: 0 12px 6px; max-width: 75%; background: #fff; color: #2733E6; border-radius: 14px 14px 3px 14px; padding: 8px 12px; font-size: 11px; font-weight: 600; }
+  .cv-bottom { display: flex; gap: 8px; margin: 8px 12px 16px; align-items: stretch; }
+  .cv-ask { flex: 1; border: 1px solid rgba(255,255,255,0.45); border-radius: 999px; padding: 10px 14px; font-size: 11px; color: rgba(255,255,255,0.65); display: flex; align-items: center; }
+  .cv-respond { background: #fff; color: #2733E6; border-radius: 999px; padding: 0 16px; display: flex; align-items: center; gap: 6px; font-family: 'Orbitron'; font-weight: 700; font-size: 10px; letter-spacing: 1.5px; }
+</style>
+
+<div class="cv-row">
+
+  <!-- LEFT: AUTO lane -->
+  <div style="text-align: center;">
+    <div class="cv-phone">
+      <div class="cv-status"><span>9:41</span><span>●●●</span></div>
+      <div class="cv-head">
+        <span class="cv-word">NOVA</span>
+        <span class="cv-hud">◉ LIVE · 12:04</span>
+      </div>
+      <div class="cv-transcript">
+        <div class="cv-label" style="margin-bottom: 6px;">Transcript</div>
+        <div class="cv-turn" style="opacity: 0.6;"><b>me</b> — …I led the migration off the legacy allocator last year.</div>
+        <div class="cv-turn" style="opacity: 0.78;"><b>them</b> — nice, and how did you measure the win?</div>
+        <div class="cv-turn"><b>them</b> — so tell me, why should we hire you for this C++ position?</div>
+      </div>
+      <div class="cv-rail">
+        <div class="cv-rail-line"></div>
+        <span class="cv-hud">BEHAVIORAL</span>
+        <div class="cv-rail-line"></div>
+      </div>
+      <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+        <div class="cv-card cv-old">
+          <div class="cv-label">◆ 11:38</div>
+          <div class="cv-body" style="font-size: 11.5px;">Yeah, so the way I think about template metaprogramming is…</div>
+        </div>
+        <div class="cv-card cv-new">
+          <div class="cv-label">◆ Nova · say this</div>
+          <div class="cv-body">Honestly, because the problems you're hiring for are the ones I've spent my career on. I build systems where <b>performance is the product</b>, and when I say something got faster I say <b>by how much</b>.</div>
+        </div>
+      </div>
+      <div class="cv-bottom">
+        <div class="cv-ask">Ask Nova…</div>
+        <div class="cv-respond">◉ RESPOND</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">AUTO — she answered on her own.<br>RESPOND would force this same lane on demand.</p>
+  </div>
+
+  <!-- RIGHT: ASK lane -->
+  <div style="text-align: center;">
+    <div class="cv-phone">
+      <div class="cv-status"><span>9:41</span><span>●●●</span></div>
+      <div class="cv-head">
+        <span class="cv-word">NOVA</span>
+        <span class="cv-hud">◉ LIVE · 18:32</span>
+      </div>
+      <div class="cv-transcript">
+        <div class="cv-label" style="margin-bottom: 6px;">Transcript</div>
+        <div class="cv-turn" style="opacity: 0.6;"><b>them</b> — our budget's honestly closer to twenty a year.</div>
+        <div class="cv-turn" style="opacity: 0.78;"><b>me</b> — okay, let me think about what that changes.</div>
+        <div class="cv-turn"><b>them</b> — and your current customers, they pay full rate?</div>
+      </div>
+      <div class="cv-rail">
+        <div class="cv-rail-line"></div>
+        <span class="cv-hud">FINANCE</span>
+        <div class="cv-rail-line"></div>
+      </div>
+      <div style="flex: 1; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end;">
+        <div class="cv-askchip">what's a good counter to their \$20k without dropping price?</div>
+        <div class="cv-card cv-new">
+          <div class="cv-label">◇ Nova · for you</div>
+          <div class="cv-body">Anchor on scope, not price: "At \$20k we can absolutely start, with the <b>core tier</b> and quarterly check-ins, and grow into the full scope when the team does." You keep the rate, they keep the door open.</div>
+        </div>
+      </div>
+      <div class="cv-bottom">
+        <div class="cv-ask" style="color: #fff;">what's a good counter to…</div>
+        <div class="cv-respond">◉ RESPOND</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">ASK NOVA — you asked, she answered YOU.<br>Your question rides as a white chip; her reply is "for you," still speakable.</p>
+  </div>
+
+</div>
+
+<div class="section">
+  <p class="subtitle">The provenance system: filled-diamond ◆ labels for the answer-them lane (auto + respond look identical — same intent), hollow-diamond ◇ "for you" for the ask lane, your questions as white chips. One history, three lanes, always distinguishable at a glance. Does this match the idea in your head? Anything to adjust before I take this identity across the other four screens?</p>
+</div>

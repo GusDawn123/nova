@@ -1,0 +1,134 @@
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Inter:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+<h2>Hologram mode — glitch on blink</h2>
+<p class="subtitle">Same empty state, now with the projection layer: faint scanlines ride on her constantly, and each blink fires a ~200ms hologram tear — ghost echoes split sideways, a slice of her displaces, a tracking line snaps through. Watch two full cycles (~18s); the second blink is a double, so its glitch stutters twice. All of it stays white-and-blue.</p>
+
+<style>
+  .ma-row { display: flex; gap: 26px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .ma-phone {
+    width: 300px; height: 620px; border-radius: 32px; overflow: hidden; background: #0002DA;
+    color: #fff; box-shadow: 0 18px 50px rgba(0,0,0,0.4); display: flex; flex-direction: column;
+    font-family: 'Inter', sans-serif; position: relative; flex-shrink: 0; text-align: left;
+  }
+  .ma-word { font-family: 'Orbitron'; font-weight: 900; letter-spacing: 3px; }
+  .ma-mono { font-family: 'Space Mono'; letter-spacing: 1.5px; text-transform: uppercase; }
+  .chamfer { clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px); }
+  .ma-btn { background: #fff; color: #0002DA; font-family: 'Orbitron'; font-weight: 900; letter-spacing: 2px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px rgba(255,255,255,0.45); }
+
+  .nova-figure { position: relative; width: 250px; height: 250px; margin: 0 auto; animation: novaFloat 6.5s ease-in-out infinite alternate; }
+  .nova-figure::before { content: ""; position: absolute; inset: 12%; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,0.16), transparent 68%); }
+  .nova-jitter { position: absolute; inset: 0; animation: novaJitter 9s linear infinite; }
+  .nova-jitter img { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .nova-eyes-closed { opacity: 0; animation: novaBlink 9s linear infinite; }
+
+  /* ghost echoes — visible only in the glitch windows */
+  .ghost { opacity: 0; }
+  .ghost-a { animation: ghostA 9s linear infinite; filter: brightness(1.6); }
+  .ghost-b { animation: ghostB 9s linear infinite; filter: brightness(0.65) saturate(3); }
+
+  /* a displaced horizontal slice of her */
+  .slice { opacity: 0; animation: sliceCut 9s linear infinite; }
+
+  /* scanlines: always faintly on, boosted during glitch */
+  .scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(255,255,255,0.055) 0 1px, transparent 1px 4px); animation: scanBoost 9s linear infinite; pointer-events: none; }
+
+  /* tracking line: snaps through during glitch */
+  .track { position: absolute; left: 4%; right: 4%; height: 2px; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.95), transparent); opacity: 0; animation: trackSnap 9s linear infinite; pointer-events: none; }
+
+  @keyframes novaFloat { from { transform: translateY(-5px); } to { transform: translateY(6px); } }
+
+  @keyframes novaBlink {
+    0%, 35.2%, 37.0%, 76.6%, 78.1%, 79.3%, 80.8%, 100% { opacity: 0; }
+    35.7%, 36.5% { opacity: 1; }
+    77.1%, 77.6% { opacity: 1; }
+    79.8%, 80.3% { opacity: 1; }
+  }
+
+  /* window 1: 34.9–37.4 · window 2 (double): 76.3–81.2 */
+  @keyframes ghostA {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { opacity: 0; transform: translateX(0); }
+    35.3%, 36.2% { opacity: 0.55; transform: translateX(4px); }
+    36.8% { opacity: 0.3; transform: translateX(-2px); }
+    76.8%, 77.7% { opacity: 0.5; transform: translateX(5px); }
+    78.6% { opacity: 0.15; transform: translateX(-1px); }
+    79.6%, 80.5% { opacity: 0.55; transform: translateX(3px); }
+  }
+  @keyframes ghostB {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { opacity: 0; transform: translateX(0); }
+    35.3%, 36.2% { opacity: 0.5; transform: translateX(-4px); }
+    36.8% { opacity: 0.25; transform: translateX(2px); }
+    76.8%, 77.7% { opacity: 0.45; transform: translateX(-5px); }
+    78.6% { opacity: 0.1; transform: translateX(1px); }
+    79.6%, 80.5% { opacity: 0.5; transform: translateX(-3px); }
+  }
+  @keyframes sliceCut {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { opacity: 0; clip-path: inset(42% 0 50% 0); transform: translateX(0); }
+    35.3% { opacity: 0.9; clip-path: inset(24% 0 68% 0); transform: translateX(-7px); }
+    36.0% { opacity: 0.9; clip-path: inset(58% 0 30% 0); transform: translateX(6px); }
+    36.9% { opacity: 0.9; clip-path: inset(38% 0 54% 0); transform: translateX(-4px); }
+    77.0% { opacity: 0.9; clip-path: inset(30% 0 60% 0); transform: translateX(7px); }
+    78.0% { opacity: 0.9; clip-path: inset(66% 0 22% 0); transform: translateX(-6px); }
+    79.9% { opacity: 0.9; clip-path: inset(46% 0 44% 0); transform: translateX(5px); }
+    80.7% { opacity: 0.9; clip-path: inset(20% 0 72% 0); transform: translateX(-3px); }
+  }
+  @keyframes scanBoost {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { opacity: 0.5; }
+    35.6%, 36.7% { opacity: 1; }
+    77.0%, 80.4% { opacity: 1; }
+  }
+  @keyframes trackSnap {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { opacity: 0; top: 8%; }
+    35.2% { opacity: 0.85; top: 14%; }
+    36.1% { opacity: 0.7; top: 58%; }
+    37.0% { opacity: 0; top: 88%; }
+    76.7% { opacity: 0.8; top: 10%; }
+    78.2% { opacity: 0.6; top: 46%; }
+    80.0% { opacity: 0.75; top: 70%; }
+    80.9% { opacity: 0; top: 92%; }
+  }
+  @keyframes novaJitter {
+    0%, 34.9%, 37.4%, 76.3%, 81.2%, 100% { transform: translateX(0); }
+    35.4% { transform: translateX(1.5px); }
+    36.3% { transform: translateX(-1.5px); }
+    77.2% { transform: translateX(2px); }
+    78.8% { transform: translateX(-1px); }
+    80.2% { transform: translateX(1.5px); }
+  }
+
+  .tw { position: absolute; color: #fff; animation: twinkle 3.2s ease-in-out infinite; }
+  @keyframes twinkle { 0%, 100% { opacity: 0.15; transform: scale(0.8); } 50% { opacity: 0.9; transform: scale(1.15); } }
+</style>
+
+<div class="ma-row">
+  <div style="text-align: center;">
+    <div class="ma-phone" style="justify-content: center;">
+      <span class="tw" style="top: 70px; left: 34px; font-size: 11px;">✦</span>
+      <span class="tw" style="top: 120px; right: 40px; font-size: 7px; animation-delay: 1.1s;">✦</span>
+      <span class="tw" style="top: 200px; left: 52px; font-size: 6px; animation-delay: 2.2s;">✦</span>
+      <span class="tw" style="bottom: 200px; right: 56px; font-size: 9px; animation-delay: 0.6s;">✦</span>
+      <span class="tw" style="bottom: 150px; left: 40px; font-size: 6px; animation-delay: 1.7s;">✦</span>
+      <div class="nova-figure">
+        <div class="nova-jitter">
+          <img class="ghost ghost-a" src="/files/eyes-open-demo.png" alt="">
+          <img class="ghost ghost-b" src="/files/eyes-open-demo.png" alt="">
+          <img src="/files/eyes-open-demo.png" alt="">
+          <img class="slice" src="/files/eyes-open-demo.png" alt="">
+          <img class="nova-eyes-closed" src="/files/eyes-closed-demo.png" alt="">
+          <div class="scan"></div>
+          <div class="track"></div>
+        </div>
+      </div>
+      <div style="text-align: center; margin-top: 6px;">
+        <div class="ma-word" style="font-size: 14px; letter-spacing: 2.5px;">NO CALLS YET</div>
+        <div style="font-size: 11.5px; opacity: 0.85; margin: 8px 36px 0; line-height: 1.55;">Your first call becomes your first memory. I'll keep the notes.</div>
+        <div class="ma-btn chamfer" style="font-size: 10px; padding: 12px 26px; margin: 18px auto 0; width: fit-content;">◉ START A SESSION</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 10px;">The projection: scanlines always whisper across her;<br>each blink tears the hologram for a fifth of a second.</p>
+  </div>
+</div>
+
+<div class="section">
+  <p class="subtitle">Anatomy of the glitch (for the spec): two ghost echoes split ±4-5px (one hot-white, one deep-blue), one horizontal slice of her displaces through 2-3 positions, the tracking line snaps down the figure, scanlines double in strength, and the whole figure micro-jitters ±2px — all inside the ~200ms blink window, then perfectly still again. In the app this is one Reanimated timeline triggered by the same randomized clock as the blink, so they can never drift apart. If the intensity feels right, this becomes her signature everywhere she appears — and a subtler 1-slice variant becomes the loading shimmer.</p>
+</div>
