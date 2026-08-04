@@ -8,9 +8,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChamferSurface } from '@/design/chamfer';
+import { decorative } from '@/design/decorative';
+import { useCaret } from '@/design/motion';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   Chamfer,
@@ -178,6 +181,21 @@ function EmptyState({
   return (
     <View style={styles.empty}>
       <MascotStage size={220} color={palette.ink} />
+      {/*
+        The readout — the ratified retro-anime addition. She is an AI, and the HUD
+        speaks under her in terminal register; it says nothing the caption below
+        does not, so the whole container ships out of the reading order
+        (`design/decorative.ts`). The caret is `design/motion`'s square-wave blink —
+        deliberately not a fade, and deliberately this hook's first consumer.
+      */}
+      <View {...decorative} style={styles.readout} testID="mascot-readout">
+        <Text style={[styles.readoutLine, { color: palette.inkFaint }]}>
+          ノヴァ // NOVA.AI · STANDBY
+        </Text>
+        <Text style={[styles.readoutLine, { color: palette.inkSoft }]}>
+          AWAITING FIRST CALL <ReadoutCaret color={palette.inkSoft} />
+        </Text>
+      </View>
       <Text style={[styles.emptyTitle, { color: palette.ink }]}>
         NO CALLS YET
       </Text>
@@ -205,6 +223,21 @@ function EmptyState({
         </ChamferSurface>
       </Pressable>
     </View>
+  );
+}
+
+/**
+ * The readout's write-head. An inline View inside Text is the app's caret idiom —
+ * `features/stream/streaming-text.tsx` established it: the block rides the line's
+ * baseline instead of falling after the paragraph box. Its blink is the shared
+ * square-wave, so it keeps time with every other caret in the app.
+ */
+function ReadoutCaret({ color }: { color: string }): React.JSX.Element {
+  const blink = useCaret();
+  return (
+    <Animated.View
+      style={[styles.readoutCaret, { backgroundColor: color }, blink]}
+    />
   );
 }
 
@@ -301,6 +334,13 @@ const styles = StyleSheet.create({
     gap: Space.md,
     paddingTop: Space.xl,
   },
+  readout: { alignItems: 'center', gap: Space.xs },
+  readoutLine: {
+    fontFamily: FontFamily.mono,
+    fontSize: FontSize.monoXs,
+    letterSpacing: 2,
+  },
+  readoutCaret: { width: 5, height: FontSize.monoXs },
   emptyTitle: {
     fontFamily: FontFamily.display,
     fontSize: FontSize.displayMd,
