@@ -139,7 +139,7 @@ describe("identifyNotes", () => {
   it("stamps version 2 and the caller's source", () => {
     expect(validNotes.version).toBe(2);
     expect(validNotes.source).toBe("generated");
-    expect(identifyNotes(validContent, "live").source).toBe("live");
+    expect(identifyNotes(validContent, "fallback").source).toBe("fallback");
   });
 });
 
@@ -169,12 +169,12 @@ describe("meetingNotesSchema (v2, the stored + wire shape)", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts 'live' as a source (the streaming preview marker)", () => {
+  it("rejects 'live' as a source (removed 2026-08-04 with the live-notes fold)", () => {
     const result = meetingNotesSchema.safeParse({
       ...validNotes,
       source: "live",
     });
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
   });
 
   it("accepts the interview and casual typeInsights arms", () => {
@@ -305,36 +305,16 @@ describe("buildFallbackNotes", () => {
 });
 
 describe("notesReadResponseSchema (the GET read model)", () => {
-  /** The shape a meeting with no notes and no live preview answers with. */
+  /** The shape a meeting with no notes answers with. */
   const emptyModel = {
     notes_status: "none",
     notes: null,
     follow_up: null,
     notes_generated_at: null,
-    live_notes: null,
-    live_notes_rev: null,
   };
 
-  it("accepts a model with no notes and no live preview", () => {
+  it("accepts a model with no notes", () => {
     expect(notesReadResponseSchema.safeParse(emptyModel).success).toBe(true);
-  });
-
-  it("accepts a live preview with its rev (Phase 8 §7)", () => {
-    const result = notesReadResponseSchema.safeParse({
-      ...emptyModel,
-      live_notes: { ...validNotes, source: "live" },
-      live_notes_rev: 7,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("requires the live-notes fields to be present (null, not absent)", () => {
-    // They are part of the contract, not optional extras — an adapter that
-    // forgets to project them must fail loudly here, not ship `undefined`.
-    const { live_notes, live_notes_rev, ...withoutLive } = emptyModel;
-    void live_notes;
-    void live_notes_rev;
-    expect(notesReadResponseSchema.safeParse(withoutLive).success).toBe(false);
   });
 
   it("defaults completed_item_ids to empty when the server omits it", () => {
@@ -362,24 +342,6 @@ describe("notesReadResponseSchema (the GET read model)", () => {
     const result = notesReadResponseSchema.safeParse({
       ...emptyModel,
       completed_item_ids: ["not-an-id"],
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it.each([-1, 2.5])("rejects a live_notes_rev of %s", (rev) => {
-    const result = notesReadResponseSchema.safeParse({
-      ...emptyModel,
-      live_notes: { ...validNotes, source: "live" },
-      live_notes_rev: rev,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a v1 object in live_notes (the table is v2-only)", () => {
-    const result = notesReadResponseSchema.safeParse({
-      ...emptyModel,
-      live_notes: { ...validNotes, version: 1 },
-      live_notes_rev: 1,
     });
     expect(result.success).toBe(false);
   });

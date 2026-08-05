@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { liveModeSchema } from "@nova/shared";
 
-import { LIVE_NOTES_CATEGORY, MODES, SYSTEM_PROMPT } from "./index.js";
+import { MODES, SYSTEM_PROMPT } from "./index.js";
 
 /**
  * Structural guarantees for the prompt library.
@@ -194,25 +194,5 @@ describe("modes", () => {
     for (const mode of Object.values(MODES)) {
       expect(mode.directive).toContain("Voice anchor:");
     }
-  });
-});
-
-describe("live notes", () => {
-  it("is a category, not a mode", () => {
-    expect(Object.keys(MODES)).not.toContain(LIVE_NOTES_CATEGORY.id);
-    expect(LIVE_NOTES_CATEGORY.notAMode.length).toBeGreaterThan(0);
-  });
-
-  it("never catches the spoken voice — its output is a document", () => {
-    // The inverse of the register tests: notes are read later, not said now.
-    // If the spoken rules (first person, say-it-aloud) leak into the notes
-    // prompt, the notes start sounding like a person instead of a record. The
-    // two registers must stay separable by construction.
-    const notesText =
-      `${LIVE_NOTES_CATEGORY.directive}\n${LIVE_NOTES_CATEGORY.answerStructure}`.toLowerCase();
-    expect(notesText).not.toContain("first person");
-    expect(notesText).not.toContain("aloud");
-    expect(notesText).not.toContain("across a table");
-    expect(notesText).not.toContain("voice anchor");
   });
 });

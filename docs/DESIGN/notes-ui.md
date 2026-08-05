@@ -1,5 +1,8 @@
 # Notes UI — the glass mobile surface (Phase 8.5, mobile)
 
+> **2026-08-04:** the live-notes tab this spec describes was removed with the
+> live-notes feature (see `docs/DESIGN/live-notes.md`'s banner). Body unchanged.
+
 > **STATUS: SPEC / awaiting Gustavo's review.** Written 2026-07-28 from Gustavo's
 > `Nova Mobile glass UI design` mock (three screens, both themes, animation timings
 > specified) after a code-grounded audit of what the server actually exposes.

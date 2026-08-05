@@ -10,7 +10,6 @@ import { isNotesWorkerEnabled } from "../../env.js";
 import {
   maybeCreateLiveConductorFactory,
   maybeCreateLiveMetering,
-  maybeCreateLiveNotesConductorFactory,
 } from "../../metering-wiring.js";
 import { authenticateToken, extractBearerToken } from "../../plugins/auth.js";
 import { meteringConfig } from "../metering/index.js";
@@ -104,12 +103,6 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // RAG service), threading the metering seam; undefined when no LLM key is
   // present (transcription still runs, just no suggestions).
   const createConductor = maybeCreateLiveConductorFactory(app);
-
-  // Running-notes conductor factory (Phase 8). Also built ONCE, sharing the same
-  // memoised pool; undefined without an LLM key OR without the DB (the store and
-  // the entitlement's plan reader both need it), which is the fail-closed posture:
-  // no factory, no conductor, no `notes.update`, no spend.
-  const createNotesConductor = maybeCreateLiveNotesConductorFactory(app);
 
   // Durable transcript memory. Wired only when the DB is configured; otherwise the
   // session still streams to the phone, just without persistence (same keyless
@@ -234,10 +227,6 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
           registry,
           // Live copilot: stream suggestions down this socket (Phase 7).
           ...(createConductor !== undefined ? { createConductor } : {}),
-          // Running notes: stream notes.update down this socket (Phase 8).
-          ...(createNotesConductor !== undefined
-            ? { createNotesConductor }
-            : {}),
           ...(initialSttVendor !== undefined ? { initialSttVendor } : {}),
           logger: app.log,
         });

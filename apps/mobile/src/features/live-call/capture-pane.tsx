@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import {
   FontFamily,
@@ -8,10 +8,8 @@ import {
   Space,
   type Palette,
 } from '@/design/tokens';
-import type { LiveNotesState } from '@/features/notes/notes-update';
 import type { LiveTranscriptTurn } from '@/hooks/use-live-session';
 
-import { LiveNotesPanel } from './live-notes-panel';
 import { TranscriptTurns } from './transcript-turns';
 
 /**
@@ -22,39 +20,19 @@ import { TranscriptTurns } from './transcript-turns';
  * rather than the star of the screen — the copilot pane below it is what the user
  * is actually looking at — so it shows the last few turns and gets out of the way.
  *
- * TABBED, which the design mock's transcript-only card is not: live notes need a
- * home during the call (`docs/DESIGN/notes-ui.md` §5.1, already built and wired
- * through `useLiveSession`), and the redesign is a re-skin of this screen, not a
- * removal of what it does. Only the OPEN panel is mounted — the hidden one is not
- * kept alive to keep receiving anything, because it does not have to be: live notes
- * arrive on the socket and land in `useLiveSession`, which is also where the unread
- * dot comes from (`notes.hasUnseen`). This component only draws what that state
- * already knows.
+ * It once carried a second tab for the live-notes preview; that feature was
+ * removed 2026-08-04 (see `docs/DESIGN/live-notes.md`'s banner), so the card is
+ * now what the design mock always drew: the transcript strip, with a static
+ * label in the same mono voice the tab label used.
  */
 
-export type CaptureTab = 'transcript' | 'notes';
-
-/** Copy in one place; a third tab fails to compile until it has a label. */
-const TAB_LABELS: Record<CaptureTab, string> = {
-  transcript: 'TRANSCRIPT',
-  notes: 'LIVE NOTES',
-};
-
-const TAB_ORDER: readonly CaptureTab[] = ['transcript', 'notes'];
-
 export interface CapturePaneProps {
-  readonly tab: CaptureTab;
-  readonly onSelect: (tab: CaptureTab) => void;
   readonly turns: readonly LiveTranscriptTurn[];
-  readonly notes: LiveNotesState;
   readonly palette: Palette;
 }
 
 export function CapturePane({
-  tab,
-  onSelect,
   turns,
-  notes,
   palette,
 }: CapturePaneProps): React.JSX.Element {
   return (
@@ -62,86 +40,39 @@ export function CapturePane({
       testID="capture-pane"
       style={[styles.card, { backgroundColor: palette.inkFill }]}
     >
-      <View accessibilityRole="tablist" style={styles.tabs}>
-        {TAB_ORDER.map((value) => {
-          const selected = value === tab;
-          return (
-            <Pressable
-              key={value}
-              testID={`capture-tab-${value}`}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              // `aria-selected` alongside accessibilityState: react-native-web
-              // renders the aria-* props as real DOM attributes, and that is the
-              // only channel a screen reader has on the web target.
-              aria-selected={selected}
-              onPress={() => {
-                onSelect(value);
-              }}
-              style={({ pressed }) => [
-                styles.tab,
-                pressed ? styles.pressed : undefined,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.tabLabel,
-                  { color: selected ? palette.ink : palette.inkFaint },
-                ]}
-              >
-                {TAB_LABELS[value]}
-              </Text>
-              {value === 'notes' && notes.hasUnseen ? (
-                <View
-                  testID="notes-unread-dot"
-                  style={[styles.dot, { backgroundColor: palette.ink }]}
-                />
-              ) : null}
-            </Pressable>
-          );
-        })}
+      <View style={styles.labelRow}>
+        <Text
+          testID="capture-label-transcript"
+          style={[styles.label, { color: palette.ink }]}
+        >
+          TRANSCRIPT
+        </Text>
       </View>
 
-      {tab === 'transcript' ? (
-        <TranscriptTurns turns={turns} palette={palette} />
-      ) : (
-        <ScrollView contentContainerStyle={styles.notes}>
-          <LiveNotesPanel state={notes} palette={palette} />
-        </ScrollView>
-      )}
+      <TranscriptTurns turns={turns} palette={palette} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    // Tall enough that the tabs can carry a real 44pt target without the transcript
-    // losing a line to them.
+    // Tall enough for the label row plus a few transcript lines (the height the
+    // tabbed version established; the layout around it depends on it).
     height: 174,
     borderRadius: Radius.soft,
     paddingHorizontal: Space.lg,
     paddingBottom: Space.sm2,
   },
-  tabs: {
-    flexDirection: 'row',
-    gap: Space.lg,
-    alignItems: 'center',
-  },
-  // A real 44pt box, not `hitSlop` — react-native-web ignores hitSlop and Expo Web is
-  // this project's verification target. The label stays small; the target is not.
-  tab: {
+  // Keeps the label vertically centered in the same band the 44pt tab row
+  // occupied, so the transcript below it does not shift.
+  labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Space.xs2,
     minHeight: Size.tapTarget,
-    justifyContent: 'center',
   },
-  tabLabel: {
+  label: {
     fontFamily: FontFamily.monoBold,
     fontSize: FontSize.monoXs,
     letterSpacing: 1.5,
   },
-  dot: { width: Size.dot, height: Size.dot, borderRadius: Radius.pill },
-  notes: { paddingBottom: Space.sm2 },
-  pressed: { opacity: 0.7 },
 });

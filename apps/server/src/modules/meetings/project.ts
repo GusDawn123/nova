@@ -15,18 +15,9 @@ import type { MeetingListRow } from "./ports.js";
 /**
  * Project one meeting row into its list card.
  *
- * The `tldr` ladder is `notes → liveNotes → null`, mirroring the notes read model's
- * "prefer authoritative, fall back to live" rule. It matters most for the case the
- * design leans on: a call whose post-call pipeline is still running shows the
- * shimmer "Writing notes" pill, and WITHOUT this fallback its card would have a
- * blank summary line — the one moment the user is most curious about it. The live
- * fold has already produced a real tldr by then, so we show it.
- *
- * `conversationType` and `actionItemCount` deliberately do NOT take that fallback:
- * both are classification-grade claims that read as settled, and the live fold
- * revises them as the call goes on. A count that ticks 2 → 4 → 3 under a "Writing
- * notes" badge invites the user to trust a number that is still moving. The summary
- * line is prose and reads as provisional; a chip does not.
+ * Every notes-derived field comes from the post-call notes or is empty: a call
+ * whose pipeline is still running shows the shimmer "Writing notes" pill with a
+ * blank summary line until the authoritative notes land.
  */
 export function toListItem(row: MeetingListRow): MeetingListItem {
   const notes = row.notes;
@@ -36,7 +27,7 @@ export function toListItem(row: MeetingListRow): MeetingListItem {
     started_at: row.startedAt,
     ended_at: row.endedAt,
     notes_status: row.notesStatus,
-    tldr: notes?.tldr ?? row.liveNotes?.tldr ?? null,
+    tldr: notes?.tldr ?? null,
     conversation_type: notes?.conversationType ?? null,
     action_item_count: notes?.actionItems.length ?? 0,
     has_follow_up: row.hasFollowUp,

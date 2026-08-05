@@ -45,8 +45,6 @@ describe('ModePicker', () => {
     for (const mode of liveModeSchema.options) {
       expect(screen.getByTestId(`mode-pill-${mode}`)).toBeInTheDocument();
     }
-    // Live notes are a category, not a mode: they must never appear as a choice.
-    expect(screen.queryByTestId('mode-pill-live-notes')).toBeNull();
     expect(screen.getByTestId('mode-pill-general')).toHaveAttribute(
       'aria-checked',
       'true',

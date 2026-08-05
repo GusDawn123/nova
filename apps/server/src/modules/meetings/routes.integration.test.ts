@@ -24,9 +24,9 @@ import { createMeetingsRoutes } from "./routes.js";
  *
  * Proves the contract the Meetings screen depends on: the projection shape, newest-
  * first ordering with nullable `started_at`, soft-delete exclusion, user scoping,
- * the live-notes tldr fallback, the month counter, the page cap, and the uniform
- * 404 trio on the transcript route — plus the distinction the route exists to make,
- * that an EMPTY transcript is a 200 and not a 404.
+ * the month counter, the page cap, and the uniform 404 trio on the transcript
+ * route — plus the distinction the route exists to make, that an EMPTY transcript
+ * is a 200 and not a 404.
  *
  * Self-skips without the stack env so `npm run test` stays green (isolation-suite
  * convention).
@@ -47,7 +47,6 @@ function notesWith(
   tldr: string,
   kind: "sales" | "interview",
   actionItemCount: number,
-  source: "generated" | "live" = "generated",
 ): MeetingNotes {
   return identifyNotes(
     {
@@ -70,7 +69,7 @@ function notesWith(
           ? { kind: "sales", objections: [], buyingSignals: [] }
           : { kind: "interview", questionsAsked: [], answersToRevisit: [] },
     },
-    source,
+    "generated",
   );
 }
 
@@ -161,19 +160,6 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     );
   }
 
-  async function setLiveNotes(
-    meetingId: string,
-    ownerId: string,
-    notes: MeetingNotes,
-    rev = 3,
-  ): Promise<void> {
-    await pool.query(
-      `insert into live_notes (meeting_id, user_id, notes, rev)
-       values ($1, $2, $3::jsonb, $4)`,
-      [meetingId, ownerId, JSON.stringify(notes), rev],
-    );
-  }
-
   async function addTurn(
     meetingId: string,
     ownerId: string,
@@ -236,8 +222,7 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
   afterAll(async () => {
     await app.close();
     for (const id of userIds) {
-      // Children before parents — both hold an FK on meetings.
-      await pool.query("delete from live_notes where user_id = $1", [id]);
+      // Children before parents — transcripts holds an FK on meetings.
       await pool.query("delete from transcripts where user_id = $1", [id]);
       await pool.query("delete from meetings where user_id = $1", [id]);
       await admin.auth.admin.deleteUser(id);
@@ -250,7 +235,6 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
   /** Clear A's meetings so each list case starts from a known, empty state. */
   async function resetMeetings(): Promise<void> {
     for (const id of userIds) {
-      await pool.query("delete from live_notes where user_id = $1", [id]);
       await pool.query("delete from transcripts where user_id = $1", [id]);
       await pool.query("delete from meetings where user_id = $1", [id]);
     }
@@ -383,17 +367,12 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     expect(JSON.stringify(line?.fields)).not.toContain("from the future");
   });
 
-  it("falls back to the LIVE tldr while the pipeline is still running", async () => {
+  it("shows a blank summary while the pipeline is still running", async () => {
     await resetMeetings();
     const id = await newMeeting(userAId, "In progress", "2026-07-22T14:00:00Z");
     await pool.query(
       "update meetings set notes_status = 'processing' where id = $1",
       [id],
-    );
-    await setLiveNotes(
-      id,
-      userAId,
-      notesWith("Budget discussed so far.", "sales", 2, "live"),
     );
 
     const res = await app.inject({
@@ -405,8 +384,7 @@ describe.skipIf(!hasStack)("meetings REST routes (local stack)", () => {
     const body = meetingListResponseSchema.parse(res.json());
     const item = body.meetings[0];
     expect(item?.notes_status).toBe("processing");
-    expect(item?.tldr).toBe("Budget discussed so far.");
-    // The deliberate asymmetry: prose falls back, settled-looking chips do not.
+    expect(item?.tldr).toBeNull();
     expect(item?.conversation_type).toBeNull();
     expect(item?.action_item_count).toBe(0);
   });

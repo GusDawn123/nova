@@ -453,7 +453,7 @@ describe('LiveScreen — the targets', () => {
 
     await goLive();
 
-    for (const testID of ['end-session-key', 'capture-tab-notes', 'respond-key']) {
+    for (const testID of ['end-session-key', 'respond-key']) {
       const control = screen.getByTestId(testID);
       const box = Number.parseFloat(getComputedStyle(control).minHeight);
       expect(box, `${testID} is under the 44pt floor`).toBeGreaterThanOrEqual(
@@ -463,7 +463,7 @@ describe('LiveScreen — the targets', () => {
     // WIDTH is not measurable here and is not asserted rather than asserted
     // vacuously: jsdom has no layout engine, and `installLayoutStub` answers one
     // fixed `offsetWidth` for every node in the tree — so a width check would pass
-    // for a control 4pt wide. Three of these four stretch to the width of their row;
+    // for a control 4pt wide. These controls stretch to the width of their row;
     // that they do is a simulator check (spec §11, and this suite's own header).
   });
 });

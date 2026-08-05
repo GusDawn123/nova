@@ -9,7 +9,6 @@ import {
 } from "@nova/shared";
 
 import type { NotesJobStore } from "../../db/jobs.js";
-import type { LiveNotesStore } from "../../db/live-notes.js";
 import type { NoteItemStateStore } from "../../db/note-item-state.js";
 import { requireAuth } from "../../plugins/auth.js";
 import { AllProvidersFailedError, LlmError } from "../llm/index.js";
@@ -20,7 +19,7 @@ import {
   registerItemCompletionRoute,
 } from "./item-completion-routes.js";
 import type { FollowUpWriter, NotesLogger, NotesReader } from "./ports.js";
-import { selectRenderedNotes, userIdOf } from "./route-helpers.js";
+import { userIdOf } from "./route-helpers.js";
 
 /**
  * The authed notes REST surface (adr-0006 §REST-surface). Three routes, all behind
@@ -42,10 +41,10 @@ export interface NotesRoutesDeps {
   readonly reader: NotesReader;
   readonly followUpWriter: FollowUpWriter;
   /**
-   * The durable job queue behind `POST /notes/regenerate`. OPTIONAL for the same
-   * partially-configured boot posture as {@link liveNotes}: the queue needs
-   * `SUPABASE_DB_URL`, while the READ surface needs only the supabase-js seam, and a
-   * boot with one but not the other must still serve the notes a user already has.
+   * The durable job queue behind `POST /notes/regenerate`. OPTIONAL for the
+   * partially-configured boot posture: the queue needs `SUPABASE_DB_URL`, while
+   * the READ surface needs only the supabase-js seam, and a boot with one but
+   * not the other must still serve the notes a user already has.
    * Unwired means a typed 503 from regenerate — never an unmounted route, because an
    * unmounted route 404s and the mobile screen reads a 404 as "this meeting is no
    * longer available".
@@ -70,15 +69,8 @@ export interface NotesRoutesDeps {
    */
   readonly isDailyCapReached?: () => Promise<boolean>;
   /**
-   * Read seam for the live running-notes preview (Phase 8,
-   * `docs/DESIGN/live-notes.md` §7) — surfaced on GET so a tab opened before the
-   * post-call pipeline finishes has cold state to render. Optional (the DB-less
-   * boot posture): unwired means `live_notes: null`, never a throw.
-   */
-  readonly liveNotes?: LiveNotesStore;
-  /**
    * Action-item completion state (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3).
-   * Optional for the same DB-less boot posture as {@link liveNotes}: unwired means
+   * Optional for the DB-less boot posture: unwired means
    * `completed_item_ids: []` and a 503 from the write route, never a throw.
    */
   readonly noteItemState?: NoteItemStateStore;
@@ -124,43 +116,11 @@ export function createNotesRoutes(
         const model = await reader.readNotes(meetingId, userId);
         if (model === null) return reply.code(404).send(NOT_FOUND);
 
-        // AFTER the 404 gate: that gate already proved ownership and
-        // not-soft-deleted, and this way a 404 costs no second query.
-        //
-        // BEST-EFFORT, matching the unwired posture and handler.ts's
-        // readLivePreview. why: this read used to be unguarded, so a live_notes
-        // outage turned a perfectly good notes read into a 500 — the durable
-        // payload is the contract here and the live preview is a cosmetic add-on.
-        // Absent store and failing store must land in the same place: null.
-        let live: Awaited<ReturnType<LiveNotesStore["readLiveNotes"]>> | null =
-          null;
-        if (deps.liveNotes) {
-          try {
-            live = await deps.liveNotes.readLiveNotes(meetingId, userId);
-          } catch (err: unknown) {
-            // Degrading silently would hide a real outage.
-            logger.error(
-              {
-                request_id: request.id,
-                user_id: userId,
-                meeting_id: meetingId,
-                error: err instanceof Error ? err.message : String(err),
-              },
-              "notes.routes.live_notes_read_failed",
-            );
-          }
-        }
-
         // Completion is resolved against the notes the client will actually
-        // RENDER — post-call when they exist, else the live preview. That is what
-        // makes a checkmark made mid-call survive the hangup swap: `reconcileIds`
-        // carries the live item's id onto its post-call counterpart, so the stored
-        // row still matches by id, and the text guard still matches by similarity
-        // even though the post-call pass reworded it.
-        const rendered = selectRenderedNotes(model.notes, live?.notes ?? null);
+        // RENDER — the post-call model notes.
         const completed = await readCompletedIds(
           deps.noteItemState,
-          rendered,
+          model.notes,
           meetingId,
           userId,
           request.id,
@@ -172,8 +132,6 @@ export function createNotesRoutes(
           notes: model.notes,
           follow_up: model.followUp,
           notes_generated_at: model.notesGeneratedAt,
-          live_notes: live?.notes ?? null,
-          live_notes_rev: live?.rev ?? null,
           completed_item_ids: completed,
         });
         return reply.code(200).send(body);
@@ -189,7 +147,6 @@ export function createNotesRoutes(
       logger,
       now,
       ...(deps.noteItemState ? { noteItemState: deps.noteItemState } : {}),
-      ...(deps.liveNotes ? { liveNotes: deps.liveNotes } : {}),
     });
 
     app.post(

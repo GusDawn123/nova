@@ -7,9 +7,9 @@ import type { StoredItemState } from "../modules/notes/item-completion.js";
  * `public.note_item_state` store — per-item user state over a meeting's notes
  * (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3; migration `20260728140000`).
  *
- * Goes through a pg `Pool` rather than the supabase-js REST client, matching
- * `db/live-notes.ts`: this is a small, hot, per-tap write, and an HTTP round trip
- * per checkbox is the wrong tool. It rides the memoised jobs pool.
+ * Goes through a pg `Pool` rather than the supabase-js REST client: this is a
+ * small, hot, per-tap write, and an HTTP round trip per checkbox is the wrong
+ * tool. It rides the memoised jobs pool.
  *
  * Both directions are parsed at the boundary (RULES §1). Reads are user-scoped AND
  * `deleted_at is null` — the policy enforces the same, but a service-role connection

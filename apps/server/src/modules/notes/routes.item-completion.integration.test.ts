@@ -12,10 +12,6 @@ import {
 
 import { createNotesJobStore, type NotesJobStore } from "../../db/jobs.js";
 import {
-  createLiveNotesStore,
-  type LiveNotesStore,
-} from "../../db/live-notes.js";
-import {
   createNoteItemStateStore,
   type NoteItemStateStore,
 } from "../../db/note-item-state.js";
@@ -24,7 +20,6 @@ import type { LlmRouter, LlmStreamEvent } from "../llm/index.js";
 
 import { generateFollowUp } from "./follow-up.js";
 import type { NotesLogger } from "./ports.js";
-import { reconcileIds } from "./reconcile-ids.js";
 import { createNotesRoutes } from "./routes.js";
 
 /**
@@ -50,10 +45,7 @@ const noPersist = {
 } as const;
 
 /** Notes carrying the given action-item texts, ids minted positionally. */
-function notesWithItems(
-  texts: readonly string[],
-  source: "generated" | "live" = "generated",
-): MeetingNotes {
+function notesWithItems(texts: readonly string[]): MeetingNotes {
   return identifyNotes(
     {
       conversationType: "sales",
@@ -72,7 +64,7 @@ function notesWithItems(
       risks: [],
       typeInsights: { kind: "sales", objections: [], buyingSignals: [] },
     },
-    source,
+    "generated",
   );
 }
 
@@ -94,7 +86,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
   let pool: Pool;
   let admin: ReturnType<typeof createClient>;
   let store: NotesJobStore;
-  let liveNotes: LiveNotesStore;
   let itemState: NoteItemStateStore;
   let app: FastifyInstance;
   /** A second app with completion UNWIRED, for the DB-less posture. */
@@ -150,7 +141,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     void instance.register(
       createNotesRoutes({
         reader: createNotesReader(),
-        liveNotes,
         followUpWriter: createFollowUpWriter(),
         store,
         followUp: generateFollowUp({
@@ -170,7 +160,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     pool = new Pool({ connectionString: dbUrl, max: 4 });
     admin = createClient(url, serviceRoleKey, noPersist);
     store = createNotesJobStore(pool);
-    liveNotes = createLiveNotesStore(pool);
     itemState = createNoteItemStateStore(pool);
 
     const a = await createUser("a");
@@ -192,7 +181,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     await unwiredApp.close();
     for (const id of userIds) {
       await pool.query("delete from note_item_state where user_id = $1", [id]);
-      await pool.query("delete from live_notes where user_id = $1", [id]);
       await pool.query("delete from jobs where user_id = $1", [id]);
       await pool.query("delete from meetings where user_id = $1", [id]);
       await admin.auth.admin.deleteUser(id);
@@ -203,7 +191,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
   beforeEach(async () => {
     for (const id of userIds) {
       await pool.query("delete from note_item_state where user_id = $1", [id]);
-      await pool.query("delete from live_notes where user_id = $1", [id]);
       await pool.query("delete from meetings where user_id = $1", [id]);
     }
   });
@@ -295,36 +282,6 @@ describe.skipIf(!hasStack)("action-item completion (local stack)", () => {
     await setNotes(id, notesWithItems(["Confirm whether SSO is in scope."]));
 
     expect(await readCompleted(id)).toEqual([]);
-  });
-
-  it("carries a mid-call check through the live→final swap", async () => {
-    // The integration that makes checking during a call worth anything. The user
-    // checks an item on the LIVE preview; at hangup `reconcileIds` carries the live
-    // id onto the post-call item, so the stored row matches by id, and the text
-    // guard clears it even though the post-call pass reworded the task.
-    const id = await newMeeting(userAId);
-    const live = notesWithItems(
-      ["Send the scope comparison.", "Loop in procurement."],
-      "live",
-    );
-    await pool.query(
-      `insert into live_notes (meeting_id, user_id, notes, rev)
-       values ($1, $2, $3::jsonb, 4)`,
-      [id, userAId, JSON.stringify(live)],
-    );
-
-    expect(await check(id, "a1")).toBe(200);
-    expect(await readCompleted(id)).toEqual(["a1"]);
-
-    // Hangup: the post-call pass reworded both items and would mint fresh ids —
-    // reconcileIds carries the live ones across, exactly as the handler does.
-    const rawFinal = notesWithItems([
-      "Send Dana the scope comparison.",
-      "Loop in procurement about pre-pay.",
-    ]);
-    await setNotes(id, reconcileIds(live, rawFinal));
-
-    expect(await readCompleted(id)).toEqual(["a1"]);
   });
 
   // --- the guards ------------------------------------------------------------

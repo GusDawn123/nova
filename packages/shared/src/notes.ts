@@ -185,12 +185,9 @@ export type TypeInsights = z.infer<typeof typeInsightsSchema>;
 
 /**
  * Where a notes object came from. `generated`/`fallback` are the post-call
- * pipeline's two outcomes (the UI keys a retry affordance off `fallback`);
- * `live` marks the STREAMING PREVIEW written by the live-notes fold — accrued
- * mid-call, not quote-verified against the full transcript, and superseded by the
- * authoritative post-call object at call end.
+ * pipeline's two outcomes (the UI keys a retry affordance off `fallback`).
  */
-export const notesSourceSchema = z.enum(["generated", "fallback", "live"]);
+export const notesSourceSchema = z.enum(["generated", "fallback"]);
 export type NotesSource = z.infer<typeof notesSourceSchema>;
 
 /**
@@ -408,31 +405,15 @@ export const notesReadResponseSchema = z.object({
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
   /**
-   * The live running-notes PREVIEW accrued during the call (Phase 8,
-   * `docs/DESIGN/live-notes.md` §7) — `source: "live"`, null until the notes
-   * conductor has folded at least once, and null forever for calls that predate
-   * the feature or run without the entitlement.
-   *
-   * The tab prefers `notes` when non-null and falls back to `live_notes`; the
-   * post-call pipeline stays authoritative. `notes_status` is UNCHANGED by this
-   * field — it still means what it always meant, and the retry affordance still
-   * keys off it.
-   */
-  live_notes: meetingNotesSchema.nullable(),
-  /** `live_notes`' monotonic revision; null exactly when `live_notes` is null. */
-  live_notes_rev: z.number().int().nonnegative().nullable(),
-  /**
    * Action-item ids the user has checked off, filtered to those whose stored text
    * still matches the item now at that id (Phase 8.5, `docs/DESIGN/notes-ui.md`
    * §6.3). Empty when nothing is checked.
    *
    * A SEPARATE array rather than a `completed` flag on each action item, on
-   * purpose: `noteActionItemSchema` is the STORED notes shape, shared by `notes`
-   * and `live_notes` and written into `meetings.notes` verbatim. Threading a
-   * read-only, user-authored field through it would put presentation state into a
-   * server-authored document — and would imply live-notes items carry completion
-   * too, which they do not. The client renders
-   * `completed_item_ids.includes(item.id)`.
+   * purpose: `noteActionItemSchema` is the STORED notes shape, written into
+   * `meetings.notes` verbatim. Threading a read-only, user-authored field
+   * through it would put presentation state into a server-authored document.
+   * The client renders `completed_item_ids.includes(item.id)`.
    *
    * Ordered by the notes' own action-item order, so the array is stable and
    * diffable rather than dependent on the DB's row order.

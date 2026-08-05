@@ -148,8 +148,6 @@ function succeed(overrides: Partial<NotesReadResponse> = {}): void {
       notes: notes(),
       follow_up: null,
       notes_generated_at: new Date().toISOString(),
-      live_notes: null,
-      live_notes_rev: null,
       completed_item_ids: [],
       ...overrides,
     },
@@ -316,21 +314,6 @@ describe('MeetingDetailScreen — while the notes are still folding', () => {
     // must not take it away.
     fireEvent.click(screen.getByTestId('detail-tab-transcript'));
     expect(screen.getByText('Where should we start?')).toBeInTheDocument();
-  });
-
-  it('shows the running preview when there is one, and says it is one', () => {
-    succeed({
-      notes_status: 'processing',
-      notes: null,
-      live_notes: notes({ tldr: 'Still writing this down.' }),
-      live_notes_rev: 3,
-      notes_generated_at: null,
-    });
-
-    render(<MeetingDetailScreen />);
-
-    expect(screen.getByText('Still writing this down.')).toBeInTheDocument();
-    expect(screen.getByTestId('notes-preview-note')).toBeInTheDocument();
   });
 });
 

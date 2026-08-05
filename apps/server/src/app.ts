@@ -17,7 +17,6 @@ import {
 import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
-import { createLiveNotesStore } from "./db/live-notes.js";
 import { createMeetingsReader } from "./db/meetings.js";
 import { createNoteItemStateStore } from "./db/note-item-state.js";
 import { createNotesSource } from "./db/notes-source.js";
@@ -374,9 +373,6 @@ function maybeStartNotesWorker(
     source: createNotesSource(),
     writer: createNotesWriter(),
     logger: app.log,
-    // Carry live-notes ids onto the final notes so the end-of-call swap animates
-    // a diff (Phase 8 §3). Same memoised pool as the job store above.
-    liveNotes: createLiveNotesStore(notesJobStoreFromEnv(process.env).pool),
     // Claim-time llm quota gate (adr-0007 §4): over-quota jobs dead-letter with
     // 'quota_exceeded' so the paywall stays visible. Present whenever metering is.
     ...(quota
@@ -468,12 +464,12 @@ function maybeRegisterNotesRoutes(
         })
       : () => Promise.reject(new AllProvidersFailedError([]));
 
-  // The pool comes back with the store, so the live-notes and completion stores
-  // ride the same memoised pool rather than opening a fourth one (the db/plans.ts +
-  // db/roles.ts precedent). All three are absent together on a DB-url-less boot:
+  // The pool comes back with the store, so the completion store rides the same
+  // memoised pool rather than opening another one (the db/plans.ts +
+  // db/roles.ts precedent). Both are absent together on a DB-url-less boot:
   // regenerate then 503s `regenerate_unavailable`, the completion write 503s
-  // `completion_unavailable`, and the GET still serves notes with `live_notes: null`
-  // and `completed_item_ids: []`.
+  // `completion_unavailable`, and the GET still serves notes with
+  // `completed_item_ids: []`.
   const pgSeams = isJobStoreConfigured(process.env)
     ? notesJobStoreFromEnv(process.env)
     : undefined;
@@ -484,8 +480,7 @@ function maybeRegisterNotesRoutes(
       ...(pgSeams
         ? {
             store: pgSeams.store,
-            liveNotes: createLiveNotesStore(pgSeams.pool),
-            // Action-item completion (Phase 8.5) — same memoised pool again.
+            // Action-item completion (Phase 8.5) — same memoised pool.
             noteItemState: createNoteItemStateStore(pgSeams.pool),
           }
         : {}),

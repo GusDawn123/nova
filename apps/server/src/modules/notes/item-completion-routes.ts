@@ -2,13 +2,12 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
 import { noteIdSchema, type MeetingNotes } from "@nova/shared";
 
-import type { LiveNotesStore } from "../../db/live-notes.js";
 import type { NoteItemStateStore } from "../../db/note-item-state.js";
 import { requireAuth } from "../../plugins/auth.js";
 
 import { completedItemIds } from "./item-completion.js";
 import type { NotesLogger, NotesReader } from "./ports.js";
-import { selectRenderedNotes, userIdOf } from "./route-helpers.js";
+import { userIdOf } from "./route-helpers.js";
 
 /**
  * The action-item completion surface (Phase 8.5, `docs/DESIGN/notes-ui.md` §6.3),
@@ -49,17 +48,16 @@ export interface ItemCompletionDeps {
   readonly logger: NotesLogger;
   readonly now: () => Date;
   readonly noteItemState?: NoteItemStateStore;
-  readonly liveNotes?: LiveNotesStore;
 }
 
 /**
  * Resolve the checked ids for the notes about to be rendered.
  *
- * BEST-EFFORT, matching the live-notes read beside it: completion is an accent on a
- * checkbox, and an outage in this table must not turn a perfectly good notes read
- * into a 500. Absent store and failing store both land on `[]` — unchecked, which is
- * the safe direction: the user sees their task as outstanding rather than being told
- * they finished something they did not.
+ * BEST-EFFORT: completion is an accent on a checkbox, and an outage in this table
+ * must not turn a perfectly good notes read into a 500. Absent store and failing
+ * store both land on `[]` — unchecked, which is the safe direction: the user sees
+ * their task as outstanding rather than being told they finished something they
+ * did not.
  */
 export async function readCompletedIds(
   store: NoteItemStateStore | undefined,
@@ -89,43 +87,16 @@ export async function readCompletedIds(
 }
 
 /**
- * READ the notes a completion decision is made against, then pick which of them
- * render via the shared {@link selectRenderedNotes} — the same one-line rule the
- * notes GET applies, so the client can only ever check an item it is looking at.
- *
- * A live-notes outage here degrades to `null` (→ a 404 on the write) rather than
- * throwing. Best-effort, matching every other live-notes read.
+ * READ the notes a completion decision is made against — the same notes the GET
+ * renders, so the client can only ever check an item it is looking at.
  */
 async function renderedNotes(
   deps: ItemCompletionDeps,
   meetingId: string,
   userId: string,
-  requestId: string,
 ): Promise<MeetingNotes | null> {
   const model = await deps.reader.readNotes(meetingId, userId);
-  if (model === null) return null;
-
-  // The preview is read ONLY when there are no post-call notes: it is the selector's
-  // fallback arm, so fetching it otherwise buys a query whose answer is discarded.
-  let live: MeetingNotes | null = null;
-  if (model.notes === null && deps.liveNotes) {
-    try {
-      const read = await deps.liveNotes.readLiveNotes(meetingId, userId);
-      live = read?.notes ?? null;
-    } catch (err: unknown) {
-      deps.logger.error(
-        {
-          request_id: requestId,
-          user_id: userId,
-          meeting_id: meetingId,
-          error: err instanceof Error ? err.message : String(err),
-        },
-        "notes.routes.item_completion_live_read_failed",
-      );
-    }
-  }
-
-  return selectRenderedNotes(model.notes, live);
+  return model?.notes ?? null;
 }
 
 /**
@@ -164,7 +135,7 @@ export function registerItemCompletionRoute(
         return reply.code(400).send({ error: "invalid_request" });
       }
 
-      const rendered = await renderedNotes(deps, meetingId, userId, request.id);
+      const rendered = await renderedNotes(deps, meetingId, userId);
       if (rendered === null) return reply.code(404).send(NOT_FOUND);
 
       // The item must exist AND be an action item. Taking the text from here

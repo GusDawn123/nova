@@ -8,9 +8,8 @@ import { useAuth } from '@/hooks/use-auth';
  * The meeting detail read (Phase 8.5, `docs/DESIGN/notes-ui.md` §7.5), plus the
  * action-item completion write.
  *
- * The read model already prefers post-call `notes` and falls back to `live_notes`,
- * so this hook exposes ONE `notes` field and the screen never branches on which
- * source it came from — only on `notes_status`, for the pill and the retry.
+ * The read model carries the post-call `notes` and their `notes_status`; the
+ * screen branches only on the status, for the pill and the retry.
  */
 export type MeetingNotesState =
   | { status: 'loading' }

@@ -8,21 +8,10 @@ import {
   serverLiveEventSchema,
   type ServerLiveEvent,
 } from "./live.js";
-import { buildFallbackNotes, type MeetingNotes } from "./notes.js";
 
 const MEETING_ID = "11111111-1111-4111-8111-111111111111";
 const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const SUGGESTION_ID = "33333333-3333-4333-8333-333333333333";
-
-/**
- * A minimal but schema-VALID v2 notes object, built through the same helper the
- * output ladder's last rung uses so the fixture cannot drift from the schema.
- * `source: "live"` is what a real `notes.update` carries (the preview marker).
- */
-const LIVE_NOTES: MeetingNotes = {
-  ...buildFallbackNotes("Q3 renewal"),
-  source: "live",
-};
 
 /**
  * Representative accept + reject per event family (not exhaustive — the shape is
@@ -89,14 +78,13 @@ describe("clientLiveEventSchema", () => {
     ).toBe(false);
   });
 
-  it("pins the mode vocabulary — live notes is a category, never a mode", () => {
+  it("pins the mode vocabulary", () => {
     expect(liveModeSchema.options).toEqual([
       "general",
       "behavioral",
       "technical",
       "finance",
     ]);
-    expect(liveModeSchema.options).not.toContain("live-notes");
   });
 
   it("accepts the audio.frame marker, session.end and ping", () => {
@@ -226,9 +214,6 @@ describe("serverLiveEventSchema", () => {
     { v: 1, type: "error", code: "input_before_start", message: "no session" },
     { v: 1, type: "pong" },
     { v: 1, type: "audio.echo", bytes: 640 },
-    // Phase 8 (additive): the running-notes preview. rev 0 is the floor.
-    { v: 1, type: "notes.update", notes: LIVE_NOTES, rev: 0 },
-    { v: 1, type: "notes.update", notes: LIVE_NOTES, rev: 42 },
   ];
 
   it.each(accepted)("accepts a valid %o", (event) => {
@@ -252,30 +237,6 @@ describe("serverLiveEventSchema", () => {
       type: "error",
       code: "kaboom",
       message: "x",
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it.each([-1, 1.5])("rejects notes.update with rev %s", (rev) => {
-    // rev is the client's out-of-order guard — a negative or fractional value
-    // would break the `<=` comparison it exists for.
-    const result = serverLiveEventSchema.safeParse({
-      v: 1,
-      type: "notes.update",
-      notes: LIVE_NOTES,
-      rev,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects notes.update carrying a v1 notes object", () => {
-    // The wire is v2-only. v1 upcasting is a READ-boundary concern
-    // (`storedNotesSchema`), never a wire one.
-    const result = serverLiveEventSchema.safeParse({
-      v: 1,
-      type: "notes.update",
-      notes: { ...LIVE_NOTES, version: 1 },
-      rev: 1,
     });
     expect(result.success).toBe(false);
   });

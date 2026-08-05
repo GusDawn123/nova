@@ -1,5 +1,15 @@
 # Live Notes — the running-notes fold (Phase 8, backend)
 
+> **REMOVED 2026-08-04 (Gustavo).** The fold paid LLM tokens continuously during
+> every call to maintain a draft the post-call pass immediately supersedes;
+> post-call notes moved to a reasoning tier, making the preview's quality argument
+> moot. The feature was excised from server, shared and mobile
+> (`dev-nova-remove-live-notes`). This document is kept for history; the
+> `live_notes` TABLE survives in the database until a deferred contract migration
+> drops it (never edit the applied migrations `20260726120000` / `20260728120000`).
+> The body below describes the system as it was built and no longer reflects the
+> codebase.
+
 > **STATUS: DRAFT / implementation plan.** Not yet built. Ratified decisions are marked
 > as such; open questions for Gustavo are at the bottom. The ADR (`adr-0009-live-notes`)
 > and the ARCHITECTURE/CLAUDE updates get written *during* implementation, per RULES §
