@@ -8,12 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChamferSurface } from '@/design/chamfer';
 import { decorative } from '@/design/decorative';
-import { useCaret } from '@/design/motion';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   Chamfer,
@@ -29,6 +27,7 @@ import { MascotStage } from '@/features/mascot/mascot-stage';
 import { type RecencyGroup, groupMeetingsByRecency } from '@/features/meetings/format';
 import { LoadingList } from '@/features/meetings/loading-list';
 import { MeetingCard } from '@/features/meetings/meeting-card';
+import { ReadoutCaret } from '@/features/meetings/readout-caret';
 import { usePalette } from '@/hooks/use-appearance';
 import { useMeetings } from '@/hooks/use-meetings';
 
@@ -227,29 +226,6 @@ function EmptyState({
 }
 
 /**
- * Caret block: 5pt wide, one monoXs line tall — sized to its line the way stream's
- * caret is sized to body (`features/stream/streaming-text.tsx` CARET_WIDTH/HEIGHT),
- * scaled down because the readout whispers where the teleprompter speaks.
- */
-const READOUT_CARET_WIDTH = 5;
-const READOUT_CARET_HEIGHT = FontSize.monoXs;
-
-/**
- * The readout's write-head. An inline View inside Text is the app's caret idiom —
- * `features/stream/streaming-text.tsx` established it: the block rides the line's
- * baseline instead of falling after the paragraph box. Its blink is the shared
- * square-wave, so it keeps time with every other caret in the app.
- */
-function ReadoutCaret({ color }: { color: string }): React.JSX.Element {
-  const blink = useCaret();
-  return (
-    <Animated.View
-      style={[styles.readoutCaret, { backgroundColor: color }, blink]}
-    />
-  );
-}
-
-/**
  * No session. Deliberately WITHOUT a retry: nothing this screen can re-run produces
  * a session, and `(app)/_layout.tsx` already redirects a signed-out user to
  * `/sign-in` — so this is the brief window before that lands, not a dead end the
@@ -347,7 +323,6 @@ const styles = StyleSheet.create({
   // the recency headings, just quieter. The uppercase transform is inert here —
   // the lines are already uppercase, and katakana has no case.
   readoutLine: { ...eyebrowStyle, fontSize: FontSize.monoXs },
-  readoutCaret: { width: READOUT_CARET_WIDTH, height: READOUT_CARET_HEIGHT },
   emptyTitle: {
     fontFamily: FontFamily.display,
     fontSize: FontSize.displayMd,
