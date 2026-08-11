@@ -245,6 +245,18 @@ describe('MeetingsScreen — nothing yet', () => {
     expect(router.push).toHaveBeenCalledWith('/live');
   });
 
+  it('speaks the standby readout under her, both lines', () => {
+    // The ratified retro-anime addition: she is an AI, and the HUD says so in
+    // terminal register between her and the title. Line 2's text node ends before
+    // the caret View, so it is matched by prefix rather than full string.
+    succeed([], 0);
+
+    render(<MeetingsScreen />);
+
+    expect(screen.getByText('ノヴァ // NOVA.AI · STANDBY')).toBeInTheDocument();
+    expect(screen.getByText(/AWAITING FIRST CALL/)).toBeInTheDocument();
+  });
+
   it('puts her out of the reading order entirely', () => {
     // The empty state is the first screen a new account sees, and she is 220pt of
     // pure atmosphere at the top of it — five `✦` glyphs included. Under the
@@ -256,6 +268,12 @@ describe('MeetingsScreen — nothing yet', () => {
     render(<MeetingsScreen />);
 
     expect(screen.getByTestId('mascot-stage')).toHaveAttribute(
+      'aria-hidden',
+      'true',
+    );
+    // The readout too: it duplicates the caption's information in HUD flavour, so
+    // the whole container is decorative — one aria-hidden, not one per line.
+    expect(screen.getByTestId('mascot-readout')).toHaveAttribute(
       'aria-hidden',
       'true',
     );

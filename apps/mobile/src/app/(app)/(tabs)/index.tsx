@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChamferSurface } from '@/design/chamfer';
+import { decorative } from '@/design/decorative';
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import {
   Chamfer,
@@ -26,6 +27,7 @@ import { MascotStage } from '@/features/mascot/mascot-stage';
 import { type RecencyGroup, groupMeetingsByRecency } from '@/features/meetings/format';
 import { LoadingList } from '@/features/meetings/loading-list';
 import { MeetingCard } from '@/features/meetings/meeting-card';
+import { ReadoutCaret } from '@/features/meetings/readout-caret';
 import { usePalette } from '@/hooks/use-appearance';
 import { useMeetings } from '@/hooks/use-meetings';
 
@@ -178,6 +180,21 @@ function EmptyState({
   return (
     <View style={styles.empty}>
       <MascotStage size={220} color={palette.ink} />
+      {/*
+        The readout — the ratified retro-anime addition. She is an AI, and the HUD
+        speaks under her in terminal register; it says nothing the caption below
+        does not, so the whole container ships out of the reading order
+        (`design/decorative.ts`). The caret is `design/motion`'s square-wave blink —
+        deliberately not a fade, and deliberately this hook's first consumer.
+      */}
+      <View {...decorative} style={styles.readout} testID="mascot-readout">
+        <Text style={[styles.readoutLine, { color: palette.inkFaint }]}>
+          ノヴァ // NOVA.AI · STANDBY
+        </Text>
+        <Text style={[styles.readoutLine, { color: palette.inkSoft }]}>
+          AWAITING FIRST CALL <ReadoutCaret color={palette.inkSoft} />
+        </Text>
+      </View>
       <Text style={[styles.emptyTitle, { color: palette.ink }]}>
         NO CALLS YET
       </Text>
@@ -301,6 +318,11 @@ const styles = StyleSheet.create({
     gap: Space.md,
     paddingTop: Space.xl,
   },
+  readout: { alignItems: 'center', gap: Space.xs },
+  // The eyebrow voice a size down: the readout is the same mono label register as
+  // the recency headings, just quieter. The uppercase transform is inert here —
+  // the lines are already uppercase, and katakana has no case.
+  readoutLine: { ...eyebrowStyle, fontSize: FontSize.monoXs },
   emptyTitle: {
     fontFamily: FontFamily.display,
     fontSize: FontSize.displayMd,
