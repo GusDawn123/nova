@@ -1,6 +1,15 @@
 # ADR-0009 — Live notes: a fold over the transcript, not a second pipeline
 
-Status: accepted 2026-07-29. Context: Phase 5 produces notes AFTER a call ends, which
+Status: **Superseded (2026-08-04)**. Gustavo removed the live-notes feature: the
+fold paid LLM tokens continuously during every call to maintain a draft the
+post-call pipeline immediately supersedes, and with post-call notes moving to a
+reasoning tier (medium effort) the preview's quality argument was moot. The code
+(fold, conductor, store, wire event, read-model fields) was excised on
+`dev-nova-remove-live-notes`; the `live_notes` table remains until a deferred
+contract migration drops it. The decisions below are kept as the record of the
+system as designed.
+
+Status was: accepted 2026-07-29. Context: Phase 5 produces notes AFTER a call ends, which
 means the most useful minute of a sales call — the one where you are still on it — has
 no structured summary at all. Phase 8 makes the notes exist DURING the call. The Phase 7
 copilot already streams suggestions off the live transcript, so the transcript, the

@@ -85,7 +85,7 @@ describe("route registration on a partially-configured boot", () => {
     // longer available": a config gap wearing a deleted-data message.
     //
     // 401 (requireAuth ran) is the tell that the route EXISTS; the pool-backed
-    // extras degrade behind it (live_notes null, completed_item_ids []).
+    // extras degrade behind it (completed_item_ids []).
     await withSupabaseButNoDbUrl(async () => {
       const app = buildApp({ logger: false });
       try {

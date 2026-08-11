@@ -297,6 +297,23 @@ describe('LiveScreen — the cockpit', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('THEM')).toBeInTheDocument();
   });
+
+  it('keeps the capture pane transcript-only — the live-notes tab stays gone', async () => {
+    // The pane was tabbed (TRANSCRIPT | LIVE NOTES) until the live-notes removal
+    // (2026-08-04). This pins the replacement: a static transcript label where
+    // the tab row sat, and no tab control that could quietly bring the preview
+    // back without a decision.
+    render(<LiveScreen />);
+    await goLive();
+
+    expect(screen.getByTestId('capture-pane')).toBeInTheDocument();
+    expect(screen.getByTestId('capture-label-transcript')).toHaveTextContent(
+      'TRANSCRIPT',
+    );
+    expect(screen.queryByTestId('capture-tab-notes')).toBeNull();
+    expect(screen.queryByTestId('capture-tab-transcript')).toBeNull();
+    expect(screen.queryByTestId('notes-unread-dot')).toBeNull();
+  });
 });
 
 describe('LiveScreen — when it goes wrong', () => {
@@ -453,7 +470,7 @@ describe('LiveScreen — the targets', () => {
 
     await goLive();
 
-    for (const testID of ['end-session-key', 'capture-tab-notes', 'respond-key']) {
+    for (const testID of ['end-session-key', 'respond-key']) {
       const control = screen.getByTestId(testID);
       const box = Number.parseFloat(getComputedStyle(control).minHeight);
       expect(box, `${testID} is under the 44pt floor`).toBeGreaterThanOrEqual(
@@ -463,7 +480,7 @@ describe('LiveScreen — the targets', () => {
     // WIDTH is not measurable here and is not asserted rather than asserted
     // vacuously: jsdom has no layout engine, and `installLayoutStub` answers one
     // fixed `offsetWidth` for every node in the tree — so a width check would pass
-    // for a control 4pt wide. Three of these four stretch to the width of their row;
+    // for a control 4pt wide. These controls stretch to the width of their row;
     // that they do is a simulator check (spec §11, and this suite's own header).
   });
 });

@@ -1,15 +1,12 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  maybeCreateLiveConductorFactory,
-  maybeCreateLiveNotesConductorFactory,
-} from "./metering-wiring.js";
+import { maybeCreateLiveConductorFactory } from "./metering-wiring.js";
 
 /**
- * [metering-wiring] The fail-CLOSED posture of the live conductor factories.
+ * [metering-wiring] The fail-CLOSED posture of the live conductor factory.
  *
  * adr-0007 / CLAUDE.md carry a hard prohibition: no unmetered path to a paid
- * vendor API. Both live factories construct an LLM router, so BOTH must refuse to
+ * vendor API. The live factory constructs an LLM router, so it must refuse to
  * exist when the metering service cannot — otherwise a deployment with vendor keys
  * but no `usage_events` DB streams real tokens that never land on the ledger.
  *
@@ -60,17 +57,5 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
 
   it("is undefined with no LLM key at all (the keyless posture)", () => {
     expect(maybeCreateLiveConductorFactory(app)).toBeUndefined();
-  });
-});
-
-describe("[metering-wiring] the live notes factory fails closed", () => {
-  it("is undefined with an LLM key but NO usage-events DB", () => {
-    process.env.OPENAI_API_KEY = "sk-test-not-a-real-key";
-
-    expect(maybeCreateLiveNotesConductorFactory(app)).toBeUndefined();
-  });
-
-  it("is undefined with no LLM key at all", () => {
-    expect(maybeCreateLiveNotesConductorFactory(app)).toBeUndefined();
   });
 });

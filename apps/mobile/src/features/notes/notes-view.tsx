@@ -1,7 +1,7 @@
 import type { MeetingNotes, NotesStatus } from '@nova/shared';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
-import { FontFamily, FontSize, Space, type Palette } from '@/design/tokens';
+import { Space, type Palette } from '@/design/tokens';
 import { StateCard } from '@/features/meetings/state-card';
 
 import { NotesPanel } from './notes-panel';
@@ -12,10 +12,9 @@ import { NotesPanel } from './notes-panel';
  *
  * The five branches are ordered by what the user most needs to know, not by the
  * shape of the state machine. A read that failed outranks everything, because
- * nothing below it is known. Notes that EXIST outrank the status that produced them
- * — a still-`processing` call whose live preview has landed shows the preview, since
- * a "please wait" over notes the user can already read is a lie about what is on
- * screen.
+ * nothing below it is known. Notes that EXIST outrank the status that produced
+ * them — a "please wait" over notes the user can already read would be a lie
+ * about what is on screen.
  *
  * `processing` and `queued` say the same sentence: one of them is a job that has not
  * started yet, and that distinction belongs to the queue, not to a person waiting.
@@ -27,10 +26,8 @@ import { NotesPanel } from './notes-panel';
 
 export interface NotesViewProps {
   palette: Palette;
-  /** Post-call notes, or the live preview — the read model already picked. */
+  /** The post-call notes for this meeting. */
   notes: MeetingNotes | null;
-  /** True when `notes` is the running preview rather than the finished write-up. */
-  isPreview: boolean;
   status: NotesStatus | null;
   /** The read's own failure, which outranks every notes state below it. */
   errorMessage: string | null;
@@ -43,7 +40,6 @@ export interface NotesViewProps {
 export function NotesView({
   palette,
   notes,
-  isPreview,
   status,
   errorMessage,
   loading,
@@ -79,17 +75,6 @@ export function NotesView({
   if (notes !== null) {
     return (
       <View style={styles.stack}>
-        {/* Say plainly when this is the running preview rather than the finished
-            notes — the two look identical otherwise, and the user should know
-            which one they are reading. */}
-        {isPreview ? (
-          <Text
-            testID="notes-preview-note"
-            style={[styles.previewNote, { color: palette.inkFaint }]}
-          >
-            STILL BEING WRITTEN — THIS FILLS IN AS THE CALL IS PROCESSED
-          </Text>
-        ) : null}
         <NotesPanel
           notes={notes}
           palette={palette}
@@ -144,9 +129,4 @@ export function NotesView({
 
 const styles = StyleSheet.create({
   stack: { flex: 1, gap: Space.md },
-  previewNote: {
-    fontFamily: FontFamily.mono,
-    fontSize: FontSize.monoXs,
-    letterSpacing: 1,
-  },
 });

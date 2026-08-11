@@ -185,10 +185,13 @@ export type TypeInsights = z.infer<typeof typeInsightsSchema>;
 
 /**
  * Where a notes object came from. `generated`/`fallback` are the post-call
- * pipeline's two outcomes (the UI keys a retry affordance off `fallback`);
- * `live` marks the STREAMING PREVIEW written by the live-notes fold — accrued
- * mid-call, not quote-verified against the full transcript, and superseded by the
- * authoritative post-call object at call end.
+ * pipeline's two outcomes (the UI keys a retry affordance off `fallback`).
+ *
+ * `"live"` is DEPRECATED (2026-08-04, the live-notes removal): no writer stamps
+ * it any more, but it stays accepted because legacy payloads still carry it —
+ * every row in the kept `live_notes` table, and the `live_notes` field an older
+ * server puts on the read response below. Dropping it is part of the same later
+ * contract change that drops the table (RULES §migrations, expand→contract).
  */
 export const notesSourceSchema = z.enum(["generated", "fallback", "live"]);
 export type NotesSource = z.infer<typeof notesSourceSchema>;
@@ -408,31 +411,35 @@ export const notesReadResponseSchema = z.object({
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
   /**
-   * The live running-notes PREVIEW accrued during the call (Phase 8,
-   * `docs/DESIGN/live-notes.md` §7) — `source: "live"`, null until the notes
-   * conductor has folded at least once, and null forever for calls that predate
-   * the feature or run without the entitlement.
+   * DEPRECATED (2026-08-04, the live-notes removal — see the banner on
+   * `docs/DESIGN/live-notes.md`). The mid-call preview this carried is gone and
+   * this server only ever answers `null` here; removal is deferred to a later
+   * contract change, mirroring the kept `live_notes` table.
    *
-   * The tab prefers `notes` when non-null and falls back to `live_notes`; the
-   * post-call pipeline stays authoritative. `notes_status` is UNCHANGED by this
-   * field — it still means what it always meant, and the retry affordance still
-   * keys off it.
+   * Kept on the schema because the wire outlives the code on both sides:
+   *   - Optional on the way IN, so a new client still parses a response from a
+   *     server that has stopped (or will stop) sending the keys.
+   *   - Defaulted to `null` on the way OUT: the server builds its body through
+   *     this schema, and an already-installed app parses with the OLD schema,
+   *     where both keys are REQUIRED (nullable, not optional) — the default is
+   *     what keeps this server's responses parseable there.
+   *   - Still typed `meetingNotesSchema`, whose `source` keeps `"live"`: an
+   *     older server sends a non-null preview stamped exactly that, and a
+   *     deprecated field that rejects its own legacy payload protects nobody.
    */
-  live_notes: meetingNotesSchema.nullable(),
-  /** `live_notes`' monotonic revision; null exactly when `live_notes` is null. */
-  live_notes_rev: z.number().int().nonnegative().nullable(),
+  live_notes: meetingNotesSchema.nullable().default(null),
+  /** DEPRECATED with `live_notes` (its monotonic revision); same posture. */
+  live_notes_rev: z.number().int().nonnegative().nullable().default(null),
   /**
    * Action-item ids the user has checked off, filtered to those whose stored text
    * still matches the item now at that id (Phase 8.5, `docs/DESIGN/notes-ui.md`
    * §6.3). Empty when nothing is checked.
    *
    * A SEPARATE array rather than a `completed` flag on each action item, on
-   * purpose: `noteActionItemSchema` is the STORED notes shape, shared by `notes`
-   * and `live_notes` and written into `meetings.notes` verbatim. Threading a
-   * read-only, user-authored field through it would put presentation state into a
-   * server-authored document — and would imply live-notes items carry completion
-   * too, which they do not. The client renders
-   * `completed_item_ids.includes(item.id)`.
+   * purpose: `noteActionItemSchema` is the STORED notes shape, written into
+   * `meetings.notes` verbatim. Threading a read-only, user-authored field
+   * through it would put presentation state into a server-authored document.
+   * The client renders `completed_item_ids.includes(item.id)`.
    *
    * Ordered by the notes' own action-item order, so the array is stable and
    * diffable rather than dependent on the DB's row order.

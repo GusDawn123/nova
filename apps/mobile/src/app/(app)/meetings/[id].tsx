@@ -86,10 +86,7 @@ export default function MeetingDetailScreen(): React.JSX.Element {
   };
 
   const read = state.status === 'success' ? state.data : null;
-  // The read model already prefers post-call `notes` and falls back to `live_notes`,
-  // so nothing below asks which it got.
-  const notes = read === null ? null : (read.notes ?? read.live_notes);
-  const isPreview = read !== null && read.notes === null && notes !== null;
+  const notes = read?.notes ?? null;
   const errorMessage = state.status === 'error' ? state.message : null;
   const loading = state.status === 'loading';
 
@@ -149,7 +146,6 @@ export default function MeetingDetailScreen(): React.JSX.Element {
           <NotesView
             palette={palette}
             notes={notes}
-            isPreview={isPreview}
             status={read?.notes_status ?? null}
             errorMessage={errorMessage}
             loading={loading}

@@ -6,10 +6,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { tabBarClearance } from '@/design/tab-bar-metrics';
 import { Space } from '@/design/tokens';
 import { useCallClock } from '@/features/live-call/call-clock';
-import {
-  CapturePane,
-  type CaptureTab,
-} from '@/features/live-call/capture-pane';
+import { CapturePane } from '@/features/live-call/capture-pane';
 import {
   CopilotPane,
   copilotEntries,
@@ -44,7 +41,7 @@ import { useLiveSession, type LiveStatus } from '@/hooks/use-live-session';
  *
  * Dumb, as the guardrails require: `useLiveSession` owns the socket, the meeting and
  * every piece of session state. What this screen owns is presentation state only —
- * which capture tab is open, and which answer each steer belongs to.
+ * which answer each steer belongs to.
  *
  * ---------------------------------------------------------------------------
  * The MVP bridge
@@ -102,10 +99,7 @@ export default function LiveScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  // The capture pane is TABBED (`docs/DESIGN/notes-ui.md` §5.1): live notes need a
-  // home during the call, and the design prototype's card is transcript-only.
-  const [captureTab, setCaptureTab] = useState<CaptureTab>('transcript');
-  const live = useLiveSession({ notesPanelVisible: captureTab === 'notes' });
+  const live = useLiveSession();
   // Which press we are on. The clock needs it because this screen is a TAB and never
   // unmounts: without it, a start that fails would inherit the previous call's
   // summary. Every start path bumps it, including the ones that fail before the hook
@@ -143,12 +137,6 @@ export default function LiveScreen(): React.JSX.Element {
     live.sendInput(steer);
   };
 
-  const showNotes = (tab: CaptureTab): void => {
-    setCaptureTab(tab);
-    // Revealing the panel is what clears the dot — not the update that set it.
-    if (tab === 'notes') live.markNotesSeen();
-  };
-
   const banner =
     alert?.kind === 'banner' ? (
       <SessionBanner palette={palette} text={alert.text} />
@@ -180,13 +168,7 @@ export default function LiveScreen(): React.JSX.Element {
 
           {view === 'cockpit' ? (
             <>
-              <CapturePane
-                tab={captureTab}
-                onSelect={showNotes}
-                turns={live.transcript}
-                notes={live.liveNotes}
-                palette={palette}
-              />
+              <CapturePane turns={live.transcript} palette={palette} />
               <HudRail palette={palette} mode={live.mode} />
               {banner}
               <CopilotPane

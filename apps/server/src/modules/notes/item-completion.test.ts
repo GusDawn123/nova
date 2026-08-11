@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import { identifyNotes, type MeetingNotes } from "@nova/shared";
 
 import {
+  RECONCILE_THRESHOLD,
   completedItemIds,
   isSameItem,
+  similarity,
   type StoredItemState,
 } from "./item-completion.js";
 
@@ -86,7 +88,10 @@ describe("completedItemIds", () => {
   it("re-associates by position without leaking across items", () => {
     // Two items swap positions on regenerate. Each id must be judged against the
     // text now at that id — a1's row must not match a2's item.
-    const notes = notesWithItems("Loop in procurement.", "Send the comparison.");
+    const notes = notesWithItems(
+      "Loop in procurement.",
+      "Send the comparison.",
+    );
     const rows = [
       stored("a1", "Send the comparison."),
       stored("a2", "Loop in procurement."),
@@ -115,7 +120,10 @@ describe("completedItemIds", () => {
     // The product offers a checkbox on action items alone. A stray `d1` row must
     // not light up a decision the UI never made checkable.
     const notes = notesWithItems("An action.");
-    const rows = [stored("d1", "Decide before Aug 5."), stored("a1", "An action.")];
+    const rows = [
+      stored("d1", "Decide before Aug 5."),
+      stored("a1", "An action."),
+    ];
 
     expect(completedItemIds(notes, rows)).toEqual(["a1"]);
   });
@@ -146,6 +154,61 @@ describe("completedItemIds", () => {
   });
 });
 
+describe("similarity", () => {
+  it("scores 1 for texts that differ only by normalization", () => {
+    // Case, curly quotes and trailing punctuation all wash out in wordSet()
+    // (the same normalizeForMatch the quote check uses).
+    expect(
+      similarity("Send Dana’s revised quote.", "send dana's revised quote"),
+    ).toBe(1);
+  });
+
+  it("scores 0 when either side has no words", () => {
+    expect(similarity("", "Send the comparison.")).toBe(0);
+    expect(similarity("Send the comparison.", "")).toBe(0);
+    expect(similarity("", "")).toBe(0);
+    // Punctuation-only text normalizes to an empty word set.
+    expect(similarity("...", "Send the comparison.")).toBe(0);
+  });
+
+  it("lands exactly on the threshold for a one-word swap in four", () => {
+    // {review, the, pricing, deck} vs {review, the, pricing, doc}: 3 shared of
+    // 5 distinct = 0.6 — and the >= comparison means AT the threshold matches.
+    const score = similarity(
+      "Review the pricing deck.",
+      "Review the pricing doc.",
+    );
+    expect(score).toBe(RECONCILE_THRESHOLD);
+    expect(
+      isSameItem("Review the pricing deck.", "Review the pricing doc."),
+    ).toBe(true);
+  });
+
+  it("falls just short when the shared core carries too much extra", () => {
+    // {email, the, revised, quote, to, dana} vs {email, the, revised, quote,
+    // today}: 4 shared of 7 distinct = 4/7, the nearest jaccard below 0.6.
+    const score = similarity(
+      "Email the revised quote to Dana.",
+      "Email the revised quote today.",
+    );
+    expect(score).toBeCloseTo(4 / 7, 10);
+    expect(score).toBeLessThan(RECONCILE_THRESHOLD);
+  });
+
+  it("scores clearly-distinct action items near zero", () => {
+    // Only "scope" overlaps: 1 shared of 8 distinct.
+    const score = similarity(
+      "Send the scope comparison.",
+      "Confirm SSO is in scope.",
+    );
+    expect(score).toBeCloseTo(1 / 8, 10);
+  });
+
+  it("compares word SETS, so repetition adds nothing", () => {
+    expect(similarity("ship it ship it ship it", "ship it")).toBe(1);
+  });
+});
+
 describe("isSameItem", () => {
   it("is true for identical text", () => {
     expect(isSameItem("Send the comparison.", "Send the comparison.")).toBe(
@@ -154,7 +217,9 @@ describe("isSameItem", () => {
   });
 
   it("is insensitive to case and punctuation", () => {
-    expect(isSameItem("Send the comparison.", "send the comparison")).toBe(true);
+    expect(isSameItem("Send the comparison.", "send the comparison")).toBe(
+      true,
+    );
   });
 
   it("survives a modest addition", () => {

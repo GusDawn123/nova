@@ -28,7 +28,6 @@ moment-level judgment lives in `system.ts`, not in code.
 | `modes/behavioral.ts` | Extracted from the source, intact — the only mode it demonstrated end to end. |
 | `modes/technical.ts` | Thin in the source (4 bullets, no example). Structure and example added. |
 | `modes/finance.ts` | Thin in the source (6 bullets, no example). Structure and example added. |
-| `notes/live-notes.ts` | A category, not a mode. Style guidance for the rolling fold. |
 | `types.ts` | The shape every piece shares. |
 
 ## What is deliberately not here

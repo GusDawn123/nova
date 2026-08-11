@@ -1,6 +1,6 @@
 import type { MeetingNotes } from "@nova/shared";
 
-import { RECONCILE_THRESHOLD, similarity } from "./reconcile-ids.js";
+import { normalizeForMatch } from "./verify-quotes.js";
 
 /**
  * Action-item completion: which stored checkmarks still belong to the notes as they
@@ -14,12 +14,41 @@ import { RECONCILE_THRESHOLD, similarity } from "./reconcile-ids.js";
  * different task — worse than losing it, because it reads as a claim the user made.
  *
  * So a stored row counts only while its remembered text still MEANS the same thing
- * as the item now at that id, judged by the same jaccard threshold `reconcile-ids.ts`
- * uses for the live→final swap. Rewording survives ("Send the scope comparison" →
- * "Send the scope comparison to Dana"); replacement does not ("Confirm SSO scope").
- * Either way the state self-heals: a dropped checkmark simply renders unchecked, and
- * the user can re-check it.
+ * as the item now at that id, judged by the jaccard threshold below. Rewording
+ * survives ("Send the scope comparison" → "Send the scope comparison to Dana");
+ * replacement does not ("Confirm SSO scope"). Either way the state self-heals: a
+ * dropped checkmark simply renders unchecked, and the user can re-check it.
  */
+
+/**
+ * Jaccard similarity at or above which the item at an id is "the same item" a
+ * stored checkmark remembers. 0.6 mirrors the speculation reconcile threshold:
+ * high enough that two genuinely different action items do not merge, low enough
+ * to survive the rewording a regenerate inevitably applies.
+ */
+export const RECONCILE_THRESHOLD = 0.6;
+
+/** Lowercased word set, over the same normalization the quote check uses. */
+function wordSet(text: string): Set<string> {
+  return new Set(
+    normalizeForMatch(text)
+      .replace(/[^a-z0-9'\s]/g, " ")
+      .split(/\s+/)
+      .filter((word) => word.length > 0),
+  );
+}
+
+/** Jaccard overlap of the two texts' word sets, 0..1. */
+export function similarity(a: string, b: string): number {
+  const sa = wordSet(a);
+  const sb = wordSet(b);
+  if (sa.size === 0 || sb.size === 0) return 0;
+  let intersection = 0;
+  for (const word of sa) {
+    if (sb.has(word)) intersection += 1;
+  }
+  return intersection / (sa.size + sb.size - intersection);
+}
 
 /** One stored completion row, as the DB seam hands it over. */
 export interface StoredItemState {
@@ -65,9 +94,7 @@ export function completedItemIds(
  * Whether a remembered text and the current text are the same item.
  *
  * Exact-after-normalization is the overwhelmingly common case (nothing regenerated),
- * and {@link similarity} returns 1 for it, so one comparison covers both. The
- * threshold is imported rather than redeclared — if the reconcile bar ever moves,
- * this must move with it or the two answers diverge.
+ * and {@link similarity} returns 1 for it, so one comparison covers both.
  */
 export function isSameItem(rememberedText: string, currentText: string): boolean {
   return similarity(rememberedText, currentText) >= RECONCILE_THRESHOLD;

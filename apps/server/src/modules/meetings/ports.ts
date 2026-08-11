@@ -14,10 +14,10 @@ import type {
  * One meeting as the reader hands it to the projection — the DB row with its jsonb
  * already parsed and upcast.
  *
- * `notes` and `liveNotes` arrive as v2 {@link MeetingNotes} regardless of what is
- * stored: the adapter reads through `storedNotesSchema` (the v1 ∪ v2 boundary) and
- * upcasts, which is precisely the work a direct-from-PostgREST client read could not
- * do. `hasFollowUp` is a boolean rather than the draft because the list only needs to
+ * `notes` arrives as v2 {@link MeetingNotes} regardless of what is stored: the
+ * adapter reads through `storedNotesSchema` (the v1 ∪ v2 boundary) and upcasts,
+ * which is precisely the work a direct-from-PostgREST client read could not do.
+ * `hasFollowUp` is a boolean rather than the draft because the list only needs to
  * know whether the chip shows.
  */
 export interface MeetingListRow {
@@ -27,7 +27,6 @@ export interface MeetingListRow {
   readonly endedAt: string | null;
   readonly notesStatus: NotesStatus;
   readonly notes: MeetingNotes | null;
-  readonly liveNotes: MeetingNotes | null;
   readonly hasFollowUp: boolean;
 }
 

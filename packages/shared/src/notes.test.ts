@@ -139,7 +139,7 @@ describe("identifyNotes", () => {
   it("stamps version 2 and the caller's source", () => {
     expect(validNotes.version).toBe(2);
     expect(validNotes.source).toBe("generated");
-    expect(identifyNotes(validContent, "live").source).toBe("live");
+    expect(identifyNotes(validContent, "fallback").source).toBe("fallback");
   });
 });
 
@@ -169,7 +169,10 @@ describe("meetingNotesSchema (v2, the stored + wire shape)", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts 'live' as a source (the streaming preview marker)", () => {
+  it("still accepts the deprecated 'live' source (legacy payloads carry it)", () => {
+    // The fold that stamped it is gone (2026-08-04), but the value survives in
+    // the kept `live_notes` table and in an older server's read response. The
+    // enum narrows in the later contract change that drops the table, not here.
     const result = meetingNotesSchema.safeParse({
       ...validNotes,
       source: "live",
@@ -305,36 +308,16 @@ describe("buildFallbackNotes", () => {
 });
 
 describe("notesReadResponseSchema (the GET read model)", () => {
-  /** The shape a meeting with no notes and no live preview answers with. */
+  /** The shape a meeting with no notes answers with. */
   const emptyModel = {
     notes_status: "none",
     notes: null,
     follow_up: null,
     notes_generated_at: null,
-    live_notes: null,
-    live_notes_rev: null,
   };
 
-  it("accepts a model with no notes and no live preview", () => {
+  it("accepts a model with no notes", () => {
     expect(notesReadResponseSchema.safeParse(emptyModel).success).toBe(true);
-  });
-
-  it("accepts a live preview with its rev (Phase 8 §7)", () => {
-    const result = notesReadResponseSchema.safeParse({
-      ...emptyModel,
-      live_notes: { ...validNotes, source: "live" },
-      live_notes_rev: 7,
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("requires the live-notes fields to be present (null, not absent)", () => {
-    // They are part of the contract, not optional extras — an adapter that
-    // forgets to project them must fail loudly here, not ship `undefined`.
-    const { live_notes, live_notes_rev, ...withoutLive } = emptyModel;
-    void live_notes;
-    void live_notes_rev;
-    expect(notesReadResponseSchema.safeParse(withoutLive).success).toBe(false);
   });
 
   it("defaults completed_item_ids to empty when the server omits it", () => {
@@ -366,20 +349,44 @@ describe("notesReadResponseSchema (the GET read model)", () => {
     expect(result.success).toBe(false);
   });
 
-  it.each([-1, 2.5])("rejects a live_notes_rev of %s", (rev) => {
+  // The live-notes fields were removed as a feature on 2026-08-04 but stay on
+  // the contract as deprecated pass-throughs (expand→contract, RULES §migrations
+  // — the same reason the `live_notes` table is still standing). These pins are
+  // load-bearing: deleting the fields without a versioning story fails here.
+
+  it("still parses a legacy response carrying a live preview (source 'live')", () => {
+    // What an OLDER server sends when a preview existed: a non-null v2 notes
+    // object stamped `source: "live"` plus its revision. A new client must read
+    // it, not lose the notes screen to a rollback.
+    const legacyPreview = { ...validNotes, source: "live" };
+    const result = notesReadResponseSchema.safeParse({
+      ...emptyModel,
+      live_notes: legacyPreview,
+      live_notes_rev: 7,
+    });
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.live_notes).toEqual(legacyPreview);
+    expect(result.success && result.data.live_notes_rev).toBe(7);
+  });
+
+  it("emits the deprecated live-notes keys as null when a writer omits them", () => {
+    // The other direction: an already-INSTALLED app parses with the old schema,
+    // where both keys are required (nullable, not optional). The server builds
+    // its body through this schema, so the defaults are what keep its responses
+    // parseable there.
+    const result = notesReadResponseSchema.safeParse(emptyModel);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.live_notes).toBeNull();
+    expect(result.success && result.data.live_notes_rev).toBeNull();
+  });
+
+  it.each([-1, 2.5])("still rejects a live_notes_rev of %s", (rev) => {
+    // Deprecated is not unvalidated: a payload that was invalid under the old
+    // contract stays invalid under this one.
     const result = notesReadResponseSchema.safeParse({
       ...emptyModel,
       live_notes: { ...validNotes, source: "live" },
       live_notes_rev: rev,
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects a v1 object in live_notes (the table is v2-only)", () => {
-    const result = notesReadResponseSchema.safeParse({
-      ...emptyModel,
-      live_notes: { ...validNotes, version: 1 },
-      live_notes_rev: 1,
     });
     expect(result.success).toBe(false);
   });

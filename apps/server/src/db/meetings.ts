@@ -29,7 +29,6 @@ import { getSupabaseClient } from "./client.js";
 
 const MEETINGS_TABLE = "meetings";
 const TRANSCRIPTS_TABLE = "transcripts";
-const LIVE_NOTES_TABLE = "live_notes";
 
 /**
  * The meeting columns the list needs, MINUS the notes blob.
@@ -52,12 +51,6 @@ const meetingListRowSchema = z.object({
   notes_status: notesStatusSchema,
   notes: z.unknown(),
   follow_up: z.unknown().nullable(),
-});
-
-/** The live-notes preview columns used for the tldr fallback (notes parsed per row). */
-const liveNotesRowSchema = z.object({
-  meeting_id: z.string(),
-  notes: z.unknown(),
 });
 
 /** One transcript turn, in the shared wire shape (parsed at the boundary). */
@@ -101,16 +94,7 @@ function parseStoredNotes(
   return null;
 }
 
-/**
- * Build a {@link MeetingsReader} over the env-configured service-role client.
- *
- * `listMeetings` is two queries rather than an embedded join. PostgREST *can* embed
- * `live_notes` (its `meeting_id` is the primary key, so the relationship resolves
- * one-to-one), but that inference is implicit and would break silently if the key
- * ever changed. A second explicit query over the page's ids is predictable, is
- * skipped entirely when every meeting already has post-call notes, and reads the way
- * the fallback rule reads.
- */
+/** Build a {@link MeetingsReader} over the env-configured service-role client. */
 export function createMeetingsReader(
   deps: MeetingsReaderDeps = {},
 ): MeetingsReader {
@@ -153,15 +137,6 @@ export function createMeetingsReader(
         };
       });
 
-      // Only calls with no post-call notes can use the live fallback, so the
-      // second query is scoped to exactly those — usually none.
-      const needsLive = rows.filter((row) => row.notes === null);
-      const liveByMeeting = await readLivePreviews(
-        needsLive.map((row) => row.id),
-        userId,
-        logger,
-      );
-
       return rows.map((row) => ({
         id: row.id,
         title: row.title,
@@ -169,7 +144,6 @@ export function createMeetingsReader(
         endedAt: row.ended_at,
         notesStatus: row.notes_status,
         notes: row.notes,
-        liveNotes: liveByMeeting.get(row.id) ?? null,
         hasFollowUp: row.follow_up !== null && row.follow_up !== undefined,
       }));
     },
@@ -246,40 +220,4 @@ export function createMeetingsReader(
       return turns;
     },
   };
-}
-
-/** Live-notes previews for the given meetings, keyed by meeting id. */
-async function readLivePreviews(
-  meetingIds: readonly string[],
-  userId: string,
-  logger: MeetingsLogger,
-): Promise<Map<string, MeetingListRow["liveNotes"]>> {
-  const out = new Map<string, MeetingListRow["liveNotes"]>();
-  if (meetingIds.length === 0) return out;
-
-  const client = getSupabaseClient();
-  const res = await client
-    .from(LIVE_NOTES_TABLE)
-    .select("meeting_id, notes")
-    .eq("user_id", userId)
-    .is("deleted_at", null)
-    .in("meeting_id", [...meetingIds]);
-  if (res.error) {
-    throw new Error(`readLivePreviews failed: ${res.error.message}`);
-  }
-
-  for (const row of res.data) {
-    const parsed = liveNotesRowSchema.parse(row);
-    const notes = parseStoredNotes(
-      parsed.notes,
-      parsed.meeting_id,
-      userId,
-      logger,
-      "meetings.list.live_notes_unreadable",
-    );
-    // A malformed preview leaves the meeting OUT of the map — the card then falls
-    // back to no tldr, exactly as if the fold had never run for it.
-    if (notes !== null) out.set(parsed.meeting_id, notes);
-  }
-  return out;
 }

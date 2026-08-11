@@ -1,7 +1,6 @@
 import { behavioralMode } from "./modes/behavioral.js";
 import { financeMode } from "./modes/finance.js";
 import { technicalMode } from "./modes/technical.js";
-import { liveNotesCategory } from "./notes/live-notes.js";
 import type { ModePrompt } from "./types.js";
 
 export { SYSTEM_PROMPT } from "./system.js";
@@ -32,5 +31,3 @@ export const MODES = {
   finance: financeMode,
   technical: technicalMode,
 } satisfies Readonly<Record<string, ModePrompt>>;
-
-export const LIVE_NOTES_CATEGORY = liveNotesCategory;

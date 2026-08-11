@@ -12,10 +12,6 @@ import {
 } from "@nova/shared";
 
 import { createNotesJobStore, type NotesJobStore } from "../../db/jobs.js";
-import {
-  createLiveNotesStore,
-  type LiveNotesStore,
-} from "../../db/live-notes.js";
 import { createFollowUpWriter, createNotesReader } from "../../db/notes.js";
 import type { LlmRouter, LlmStreamEvent } from "../llm/index.js";
 import { LlmError } from "../llm/index.js";
@@ -116,7 +112,6 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
   let pool: Pool;
   let admin: ReturnType<typeof createClient>;
   let store: NotesJobStore;
-  let liveNotesStore: LiveNotesStore;
   let okApp: FastifyInstance;
   let downApp: FastifyInstance;
   let okLog: { logger: NotesLogger; lines: CapturedLog[] };
@@ -173,8 +168,6 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     log: NotesLogger,
     isOverLlmQuota?: (userId: string) => Promise<boolean>,
     isDailyCapReached?: () => Promise<boolean>,
-    /** Omitted to exercise the DB-less posture (`live_notes` must read null). */
-    liveNotes?: LiveNotesStore,
   ): FastifyInstance {
     const app = Fastify({ logger: false });
     void app.register(
@@ -187,7 +180,6 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
         now: () => new Date("2026-07-22T18:00:00Z"),
         ...(isOverLlmQuota ? { isOverLlmQuota } : {}),
         ...(isDailyCapReached ? { isDailyCapReached } : {}),
-        ...(liveNotes ? { liveNotes } : {}),
       }),
     );
     return app;
@@ -209,14 +201,7 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     userIds.push(userBId);
 
     okLog = capturingLogger();
-    liveNotesStore = createLiveNotesStore(pool);
-    okApp = buildApp(
-      replyRouter(OK_FOLLOW_UP_BODY),
-      okLog.logger,
-      undefined,
-      undefined,
-      liveNotesStore,
-    );
+    okApp = buildApp(replyRouter(OK_FOLLOW_UP_BODY), okLog.logger);
     downApp = buildApp(throwingRouter(), capturingLogger().logger);
     await okApp.ready();
     await downApp.ready();
@@ -227,8 +212,6 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     await downApp.close();
     for (const id of userIds) {
       await pool.query("delete from jobs where user_id = $1", [id]);
-      // live_notes before meetings — it holds the FK.
-      await pool.query("delete from live_notes where user_id = $1", [id]);
       await pool.query("delete from meetings where user_id = $1", [id]);
       await admin.auth.admin.deleteUser(id);
     }
@@ -251,120 +234,6 @@ describe.skipIf(!hasStack)("notes REST routes (local stack)", () => {
     expect(body.notes_status).toBe("none");
     expect(body.notes).toBeNull();
     expect(body.follow_up).toBeNull();
-    // No fold has run for this meeting — the preview is absent, not an error.
-    expect(body.live_notes).toBeNull();
-    expect(body.live_notes_rev).toBeNull();
-  });
-
-  it("GET surfaces the live-notes preview and its rev (Phase 8 §7)", async () => {
-    const meetingId = await newMeeting(userAId);
-    const preview: MeetingNotes = { ...COMPLETED_NOTES, source: "live" };
-    await liveNotesStore.upsertLiveNotes({
-      meetingId,
-      userId: userAId,
-      notes: preview,
-      rev: 6,
-    });
-
-    const res = await okApp.inject({
-      method: "GET",
-      url: `/meetings/${meetingId}/notes`,
-      headers: auth(tokenA),
-    });
-
-    expect(res.statusCode).toBe(200);
-    const body = notesReadResponseSchema.parse(res.json());
-    expect(body.live_notes).toEqual(preview);
-    expect(body.live_notes_rev).toBe(6);
-    // `notes_status` semantics are UNTOUCHED by the preview — the tab's retry
-    // affordance still keys off it, and a preview is not a completed generation.
-    expect(body.notes_status).toBe("none");
-    expect(body.notes).toBeNull();
-  });
-
-  it("GET reads live_notes as null when the store is unwired (DB-less posture)", async () => {
-    // `downApp` is built without a liveNotes store: the field must degrade to
-    // null, never throw and never 500.
-    const meetingId = await newMeeting(userAId);
-    await liveNotesStore.upsertLiveNotes({
-      meetingId,
-      userId: userAId,
-      notes: { ...COMPLETED_NOTES, source: "live" },
-      rev: 1,
-    });
-
-    const res = await downApp.inject({
-      method: "GET",
-      url: `/meetings/${meetingId}/notes`,
-      headers: auth(tokenA),
-    });
-
-    expect(res.statusCode).toBe(200);
-    const body = notesReadResponseSchema.parse(res.json());
-    expect(body.live_notes).toBeNull();
-    expect(body.live_notes_rev).toBeNull();
-  });
-
-  it("GET degrades live_notes to null when the store THROWS (best-effort)", async () => {
-    // The unwired case above already degrades to null and the pipeline's sibling
-    // read (handler.ts readLivePreview) catches. A WIRED store that fails must
-    // reach the same place: the primary notes payload is the contract and the
-    // live preview is a cosmetic add-on, so a live_notes outage must not turn a
-    // perfectly good read into a 500.
-    const meetingId = await newMeeting(userAId);
-    const brokenLog = capturingLogger();
-    const brokenApp = buildApp(
-      replyRouter(OK_FOLLOW_UP_BODY),
-      brokenLog.logger,
-      undefined,
-      undefined,
-      {
-        readLiveNotes: () =>
-          Promise.reject(new Error("live_notes read failed")),
-        upsertLiveNotes: () =>
-          Promise.reject(new Error("not exercised by this test")),
-      },
-    );
-
-    try {
-      const res = await brokenApp.inject({
-        method: "GET",
-        url: `/meetings/${meetingId}/notes`,
-        headers: auth(tokenA),
-      });
-
-      expect(res.statusCode).toBe(200);
-      const body = notesReadResponseSchema.parse(res.json());
-      expect(body.live_notes).toBeNull();
-      expect(body.live_notes_rev).toBeNull();
-      // Degrading silently would hide a real outage — it must be logged.
-      expect(brokenLog.lines.map((l) => l.msg)).toContain(
-        "notes.routes.live_notes_read_failed",
-      );
-    } finally {
-      await brokenApp.close();
-    }
-  });
-
-  it("GET does not leak another user's live-notes preview", async () => {
-    // The store is user-scoped in SQL as well as behind the ownership gate.
-    const meetingId = await newMeeting(userAId);
-    await liveNotesStore.upsertLiveNotes({
-      meetingId,
-      userId: userAId,
-      notes: { ...COMPLETED_NOTES, source: "live" },
-      rev: 2,
-    });
-
-    const res = await okApp.inject({
-      method: "GET",
-      url: `/meetings/${meetingId}/notes`,
-      headers: auth(tokenB),
-    });
-
-    // The ownership gate fires first: a uniform 404, no preview, no existence leak.
-    expect(res.statusCode).toBe(404);
-    expect(res.json()).toEqual({ error: "not_found" });
   });
 
   it("GET a meeting whose stored notes are v1 still returns 200 (the read boundary)", async () => {

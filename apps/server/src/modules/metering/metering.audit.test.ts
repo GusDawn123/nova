@@ -349,35 +349,6 @@ describe("modules/metering wiring audit", () => {
     expect(routes).toMatch(/createConductor/);
   });
 
-  it("[metering-wired] the live NOTES conductor is its own metered wiring site", () => {
-    // Phase 8: the running-notes fold is the SECOND live LLM path, and it runs on
-    // a per-tick cadence — an unmetered one would spend ~150 times per call.
-    //
-    // Asserting on the function BY NAME is the point. The per-function check
-    // above only proves that whichever functions build a router also mention
-    // `meterFor`; if the notes factory were nested inside
-    // `maybeCreateLiveConductorFactory` it would inherit that function's
-    // `meterFor` and pass vacuously. This pins it as a top-level block of its own.
-    const src = readFileSync(WIRING_TS, "utf8");
-    const blocks = functionBlocks(src);
-    const notesFactory = blocks.get("maybeCreateLiveNotesConductorFactory");
-    expect(
-      notesFactory,
-      "maybeCreateLiveNotesConductorFactory must be its OWN top-level function",
-    ).toBeDefined();
-    expect(notesFactory).toMatch(/createLlmRouter\(/);
-    expect(notesFactory).toMatch(/meterFor/);
-    // Its enforcement, not just its accounting: a per-user spend stop and the
-    // paid-feature gate both have to be threaded, or the fold has no ceiling.
-    expect(notesFactory).toMatch(/isOverQuota/);
-    expect(notesFactory).toMatch(/canUseLiveNotes/);
-
-    // The live transport actually consumes it.
-    const routes = readFileSync(LIVE_ROUTES_TS, "utf8");
-    expect(routes).toMatch(/maybeCreateLiveNotesConductorFactory/);
-    expect(routes).toMatch(/createNotesConductor/);
-  });
-
   it("[metering-wired] the live STT transport wires the usage + quota seam", () => {
     // Task-3 tightening: the WS transport must hand the session the metering
     // seam (recordSttSeconds/isOverSttQuota) built from the REAL service — an

@@ -7,10 +7,6 @@ import { toListItem, toListItems } from "./project.js";
 /**
  * The row→card projection (`docs/DESIGN/notes-ui.md` §6.1). Pure, so this suite
  * needs no database and no stack env — it runs everywhere `npm run test` runs.
- *
- * The cases that matter are the FALLBACK RULES: which fields fall back to the live
- * preview when post-call notes have not landed, and — the part that is easy to get
- * wrong later — which deliberately do not.
  */
 
 /** Post-call notes: two action items, a sales classification, a settled tldr. */
@@ -44,38 +40,6 @@ const FINAL_NOTES: MeetingNotes = identifyNotes(
   "generated",
 );
 
-/**
- * The LIVE preview of the same call, mid-fold: a different (provisional) tldr, a
- * different classification, and a different number of action items. Every field
- * differs from FINAL_NOTES on purpose so a wrong fallback is visible, not lucky.
- */
-const LIVE_NOTES: MeetingNotes = identifyNotes(
-  {
-    conversationType: "interview",
-    title: "Northwind discovery",
-    tldr: "Budget and timeline discussed so far.",
-    overview: "In progress.",
-    decisions: [],
-    actionItems: [
-      {
-        text: "Send something.",
-        owner: null,
-        deadline: null,
-        deadlineRaw: null,
-        quote: null,
-      },
-    ],
-    openQuestions: [],
-    risks: [],
-    typeInsights: {
-      kind: "interview",
-      questionsAsked: [],
-      answersToRevisit: [],
-    },
-  },
-  "live",
-);
-
 /** A row with everything null/absent; each case overrides only what it tests. */
 function row(overrides: Partial<MeetingListRow> = {}): MeetingListRow {
   return {
@@ -85,7 +49,6 @@ function row(overrides: Partial<MeetingListRow> = {}): MeetingListRow {
     endedAt: "2026-07-22T13:14:00.000Z",
     notesStatus: "none",
     notes: null,
-    liveNotes: null,
     hasFollowUp: false,
     ...overrides,
   };
@@ -105,36 +68,14 @@ describe("toListItem", () => {
     expect(item.has_follow_up).toBe(true);
   });
 
-  it("prefers post-call notes for every derived field", () => {
+  it("derives every notes field from the post-call notes", () => {
     const item = toListItem(
-      row({ notes: FINAL_NOTES, liveNotes: LIVE_NOTES, notesStatus: "completed" }),
+      row({ notes: FINAL_NOTES, notesStatus: "completed" }),
     );
 
     expect(item.tldr).toBe(FINAL_NOTES.tldr);
     expect(item.conversation_type).toBe("sales");
     expect(item.action_item_count).toBe(2);
-  });
-
-  it("falls back to the live tldr while the pipeline is still running", () => {
-    // The case the design leans on: a "Writing notes" card would otherwise show a
-    // blank summary at the exact moment the user is most curious about the call.
-    const item = toListItem(
-      row({ notes: null, liveNotes: LIVE_NOTES, notesStatus: "processing" }),
-    );
-
-    expect(item.tldr).toBe("Budget and timeline discussed so far.");
-  });
-
-  it("does NOT fall back for conversation type or the action-item count", () => {
-    // Deliberate asymmetry, not an oversight. The live fold revises both as the
-    // call goes on; a chip that reads "interview" and later flips to "sales", or a
-    // count that ticks 2 -> 4 -> 3, presents a moving value as a settled one. Prose
-    // reads as provisional under a "Writing notes" badge; a chip does not.
-    const item = toListItem(row({ notes: null, liveNotes: LIVE_NOTES }));
-
-    expect(item.tldr).toBe("Budget and timeline discussed so far.");
-    expect(item.conversation_type).toBeNull();
-    expect(item.action_item_count).toBe(0);
   });
 
   it("yields nulls and a zero count when there are no notes at all", () => {

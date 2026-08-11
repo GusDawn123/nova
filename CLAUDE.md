@@ -122,8 +122,9 @@ admissions, a position-pinned FINAL CHECK (recency anchor — a test asserts it
 stays last), per-mode voice anchors, and re-voiced few-shots (the model believes
 the demonstration over the instruction). Behavioral = a four-beat spoken story;
 technical splits by what the output IS (code structured, prose spoken); finance
-says the calculation inline. Live notes is inverse-leakage-tested: the spoken
-register must never appear in its prompt. Reference learning is
+says the calculation inline. (Live notes WAS inverse-leakage-tested — the spoken
+register kept out of its prompt — until the feature's 2026-08-04 removal took the
+prompt and the test with it.) Reference learning is
 techniques-only — prompt text stays Nova-authored, never transcribed (RULES §9).
 NOT DONE: the paid live gates (relevance/grounding/quiet) have NOT been re-run
 against any of the 2026-08-01 prompt text — those numbers above are the legacy
@@ -162,6 +163,18 @@ at session end (the ended state can only link home); each refused quota retry mi
 no plan tier, so Account's ACTIVE chip is a placeholder. NOT DONE: simulator
 verification is Gustavo's (jsdom + react-native-web prove structure and colour, never
 native layout or how a blur lands).**
+**LIVE NOTES REMOVED (2026-08-04, `dev-nova-remove-live-notes`, Gustavo-ratified): the
+mid-call streaming notes fold is GONE — fold machinery (`live-fold*.ts`, `prompts/live-fold.ts`,
+`reconcile-ids.ts`), the notes conductor + trigger + config, `db/live-notes.ts`,
+`maybeCreateLiveNotesConductorFactory`, `canUseLiveNotes`, the `notes.update` wire event,
+the `live_notes`/`live_notes_rev` read-model fields and every fallback that read them
+(meetings-list tldr, detail preview banner), and the mobile LIVE NOTES tab (capture card is
+now a plain transcript strip; `useLiveSession` lost `liveNotes`/`markNotesSeen`). Rationale:
+the fold paid metered LLM tokens all call for a draft the post-call pass supersedes;
+post-call notes are moving to a reasoning tier instead (notes v3 — adaptive `sections`,
+gpt-5.6-terra at medium effort, in flight on the next branch). The `live_notes` TABLE and
+its migrations remain (dropping is a deferred contract migration); adr-0009 is Superseded;
+`docs/DESIGN/live-notes.md` is banner-tombstoned.**
 Phase 5 (`modules/notes`, merged via PR #6): the durable `jobs` queue (SKIP LOCKED claim,
 lease+reaper recovery, sweep backstop), classify → single-pass|map-reduce →
 structured-output-ladder → quote-verify pipeline, follow-up drafts (cites notes by

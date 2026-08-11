@@ -8,7 +8,6 @@ export {
   liveErrorCodeSchema,
   liveErrorSchema,
   liveModeSchema,
-  notesUpdateSchema,
   parseClientEvent,
   pingSchema,
   pongSchema,

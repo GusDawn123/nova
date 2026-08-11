@@ -1,12 +1,8 @@
 /**
- * Small-talk detection, shared by the two live gates (docs/DESIGN/live-notes.md §5
- * — "reuse `SMALL_TALK_PATTERNS`, extract to a shared module rather than copy it").
- *
- * `trigger.ts` uses it to decide whether an utterance is worth a SUGGESTION;
- * `notes-trigger.ts` uses it to decide whether a 25s delta is worth a FOLD. The two
- * gates have opposite economics (see notes-trigger.ts), but "is this pure
- * pleasantry?" is the same question, and one drifting copy of these patterns would
- * make the two disagree about the same words.
+ * Small-talk detection for the live trigger gate. `trigger.ts` uses it to decide
+ * whether an utterance is worth a SUGGESTION. (It was extracted to its own module
+ * when the live-notes fold shared it; the fold is gone — 2026-08-04 — and the
+ * extraction is harmless, so it stays.)
  *
  * Extracted verbatim from `trigger.ts` (Phase 7) — no pattern changed, so the 11/11
  * quiet fixtures and the 3 filler-prefix fixtures still describe the same behavior.
