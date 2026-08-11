@@ -52,14 +52,19 @@ store-rejection roulette and is off the table).
    error: the user's side still transcribes, and the already-shipped typed-input
    path (`transcript.input`) carries "them". Route changes are typed events on
    the port, same discipline as mic interruptions.
-2. **Capture policy under Bluetooth (Phase 9 test matrix).** Even on
-   speakerphone, an active BT route threatens capture two ways: OS
-   voice-processing is trained to delete exactly the speaker-leak we depend on
-   (the `.measurement` / `VOICE_RECOGNITION` configs above exist for this), and a
-   BT SCO mic is narrowband — poison for STT accuracy. Policy: **prefer the
-   phone's own mic array for capture even when BT carries the call**, and the
-   Phase 3 accuracy gates re-run per-route (speaker / speaker+BT-call / wired)
-   on real hardware.
+2. **Capture policy under Bluetooth (Phase 9 test matrix).** A route has two
+   independent dimensions: **input** (which mic captures) and **output** (where
+   the call's audio plays) — mic policy governs only the input. With output on
+   the loudspeaker but a BT device merely connected, the OS may auto-select the
+   BT SCO mic for input — narrowband, poison for STT — so policy: **pin capture
+   to the phone's own mic array**; that is what the `.measurement` /
+   `VOICE_RECOGNITION` configs and this policy actually buy. With output in the
+   headset, the far voice never enters the air and no input choice restores
+   "them" — that case falls to item 1's route detection + guided degradation.
+   The Phase 3 accuracy gates re-run per input×output pair on real hardware:
+   speaker-out + phone-mic is the full two-speaker route; BT-call-out +
+   phone-mic and wired-out + phone-mic are one-sided/degraded, never to be
+   labeled a two-speaker route.
 3. **HELD — server-side bridge (post-MVP).** Nova joining the call as an audio
    leg (conference bridge / VoIP dialer) is the real fix — routing-immune, works
    with any headset — but it adds per-minute telephony cost (a new constant for
