@@ -148,6 +148,10 @@ function succeed(overrides: Partial<NotesReadResponse> = {}): void {
       notes: notes(),
       follow_up: null,
       notes_generated_at: new Date().toISOString(),
+      // Deprecated pass-throughs the schema defaults in on every real parse
+      // (kept for old installs; see notesReadResponseSchema).
+      live_notes: null,
+      live_notes_rev: null,
       completed_item_ids: [],
       ...overrides,
     },

@@ -297,6 +297,23 @@ describe('LiveScreen — the cockpit', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('THEM')).toBeInTheDocument();
   });
+
+  it('keeps the capture pane transcript-only — the live-notes tab stays gone', async () => {
+    // The pane was tabbed (TRANSCRIPT | LIVE NOTES) until the live-notes removal
+    // (2026-08-04). This pins the replacement: a static transcript label where
+    // the tab row sat, and no tab control that could quietly bring the preview
+    // back without a decision.
+    render(<LiveScreen />);
+    await goLive();
+
+    expect(screen.getByTestId('capture-pane')).toBeInTheDocument();
+    expect(screen.getByTestId('capture-label-transcript')).toHaveTextContent(
+      'TRANSCRIPT',
+    );
+    expect(screen.queryByTestId('capture-tab-notes')).toBeNull();
+    expect(screen.queryByTestId('capture-tab-transcript')).toBeNull();
+    expect(screen.queryByTestId('notes-unread-dot')).toBeNull();
+  });
 });
 
 describe('LiveScreen — when it goes wrong', () => {

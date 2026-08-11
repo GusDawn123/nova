@@ -186,8 +186,14 @@ export type TypeInsights = z.infer<typeof typeInsightsSchema>;
 /**
  * Where a notes object came from. `generated`/`fallback` are the post-call
  * pipeline's two outcomes (the UI keys a retry affordance off `fallback`).
+ *
+ * `"live"` is DEPRECATED (2026-08-04, the live-notes removal): no writer stamps
+ * it any more, but it stays accepted because legacy payloads still carry it —
+ * every row in the kept `live_notes` table, and the `live_notes` field an older
+ * server puts on the read response below. Dropping it is part of the same later
+ * contract change that drops the table (RULES §migrations, expand→contract).
  */
-export const notesSourceSchema = z.enum(["generated", "fallback"]);
+export const notesSourceSchema = z.enum(["generated", "fallback", "live"]);
 export type NotesSource = z.infer<typeof notesSourceSchema>;
 
 /**
@@ -404,6 +410,26 @@ export const notesReadResponseSchema = z.object({
   notes: meetingNotesSchema.nullable(),
   follow_up: followUpStoredSchema.nullable(),
   notes_generated_at: z.string().nullable(),
+  /**
+   * DEPRECATED (2026-08-04, the live-notes removal — see the banner on
+   * `docs/DESIGN/live-notes.md`). The mid-call preview this carried is gone and
+   * this server only ever answers `null` here; removal is deferred to a later
+   * contract change, mirroring the kept `live_notes` table.
+   *
+   * Kept on the schema because the wire outlives the code on both sides:
+   *   - Optional on the way IN, so a new client still parses a response from a
+   *     server that has stopped (or will stop) sending the keys.
+   *   - Defaulted to `null` on the way OUT: the server builds its body through
+   *     this schema, and an already-installed app parses with the OLD schema,
+   *     where both keys are REQUIRED (nullable, not optional) — the default is
+   *     what keeps this server's responses parseable there.
+   *   - Still typed `meetingNotesSchema`, whose `source` keeps `"live"`: an
+   *     older server sends a non-null preview stamped exactly that, and a
+   *     deprecated field that rejects its own legacy payload protects nobody.
+   */
+  live_notes: meetingNotesSchema.nullable().default(null),
+  /** DEPRECATED with `live_notes` (its monotonic revision); same posture. */
+  live_notes_rev: z.number().int().nonnegative().nullable().default(null),
   /**
    * Action-item ids the user has checked off, filtered to those whose stored text
    * still matches the item now at that id (Phase 8.5, `docs/DESIGN/notes-ui.md`
