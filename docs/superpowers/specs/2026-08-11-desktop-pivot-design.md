@@ -149,38 +149,66 @@ code on either side.
 Three findings from the research materially constrain the product. They are
 facts about macOS and Windows, not opinions about our design.
 
-### 4.1 macOS: the public API is dead; the private surface is unresearched
+### 4.1 macOS: the public API is dead, but the mechanism exists — and Chrome uses it
 
-Two things are established and not in dispute:
+The public flag (`NSWindow.sharingType`, which Electron's
+`setContentProtection(true)` sets) is finished: Apple's own documentation calls
+it a legacy constant and tells developers not to use it to hide content, and
+Apple DTS confirmed in July 2025 that no **public** API exists.
 
-- Apple's documentation for `NSWindow.SharingType.none` — what Electron's
-  `setContentProtection(true)` sets — now describes it as a legacy constant and
-  instructs developers not to use it to hide content from capture.
-- In July 2025 an Apple DTS engineer answered this exact question on the
-  developer forums: there are no **public** APIs for preventing screen capture.
+**That is not the whole story.** The working mechanism is a private
+CoreGraphics/WindowServer call:
 
-Note the word *public*. That is the limit of what has been verified, and it is
-narrower than "macOS cannot do this."
+```
+CGSSetWindowCaptureExcludeShape(CGSMainConnectionID(), windowNumber, region)
+```
 
-**What is not yet established, and is being researched:** the private
-WindowServer surface. The reference implementation already reaches one private
-SPI (`_setPreventsActivation:`, which flips a bit in the WindowServer's
-per-window tag bitmap via `CGSSetWindowTags`) to get behaviour AppKit does not
-expose. Whether an analogous tag or SkyLight (`SLS*`) call excludes a window
-from capture is an open question, as is how currently-shipping competitors
-achieve their macOS claims, and whether ScreenCaptureKit's behaviour depends on
-which `SCContentFilter` shape the capturing app builds — Apple has an open bug
-(FB21115847) where their own sample app *does* omit sharing-none windows.
+Pass a region and the WindowServer excludes that region of that window from
+capture; pass `NULL` to re-enable. It is **region-shaped**, which is strictly
+more expressive than the old boolean flag — an implementation can exclude only
+the answer panel and leave other chrome visible.
 
-**This does not block us,** because Windows ships first (§4.2, §6). The macOS
-answer is due before the macOS chunk, not before chunk 1. Nova ships outside the
-App Store, so private API use is a stability risk to manage, not a distribution
-blocker.
+Three facts make this credible rather than a forum rumour:
 
-**What we will not do** is put a capability in marketing before it is proven on
-the OS in question. Windows claims get made when the Windows probe passes; macOS
-claims get made when the macOS implementation is verified against a real Zoom
-share. That is a rule about sequencing, not a limit on ambition.
+1. **Chromium ships it at HEAD, today**, in
+   `native_widget_ns_window_bridge.mm`, as its *only* macOS content-protection
+   mechanism. Chromium **deleted `sharingType`** from its Mac window code
+   entirely.
+2. **Google Chrome's content protection on every Mac depends on it right now.**
+   If Apple breaks it, Chrome breaks first and loudly — a free canary and a
+   strong reason Apple would provide a migration.
+3. The symbol has existed since at least macOS 10.13 and Apple's own apps call
+   it.
+
+**Why every competitor is still visible.** Electron briefly picked up Chromium's
+new implementation and **reverted it** (electron#46886) — for a *rendering*
+regression (transparent child windows drawing grey), **not** a hiding failure.
+So Chrome protects windows with the working call while every Electron app,
+including Cluely and its clones, still uses the dead flag. That single fact
+explains the entire category's macOS problem, and it is fixable in a small
+native addon.
+
+**Status: STRONG, not yet proven.** Nobody has published a test of this call
+against ScreenCaptureKit on macOS 15+. The inference is sound — Chromium
+switched to it in the same window Apple made the flag inert, and it operates at
+the WindowServer layer that *produces* SCK frames rather than the AppKit layer
+Apple deprecated — but it is inference. **Chunk 8 opens with a ~30-minute
+standalone probe** (borderless window, call the SPI, then capture with
+Cmd-Shift-5, QuickTime, a minimal `SCStream`, and a real Zoom full-display
+share) before any macOS work is planned around it.
+
+**Two things we will not do.** We will not build on ScreenCaptureKit happening
+to honour the old flag — that behaviour is a bug in both directions (Apple's own
+sample omits such windows on a fresh filter and reveals them after a live filter
+update; bug FB21115847), which is exactly why competitors' users sometimes get
+caught. And we will not put an unqualified invisibility claim in marketing for
+an OS until it has been verified there against a real screen share.
+
+**Also worth recording, because it is everywhere and it is false:** several
+sites claim these tools render "on a GPU hardware overlay plane below what
+screen sharing captures." There is no app-accessible hardware overlay plane on
+macOS; Metal layers are composited by the WindowServer like everything else.
+That story is fabricated SEO content and must not enter any Nova design.
 
 ### 4.2 Windows: real, documented — and the first target
 
@@ -343,6 +371,7 @@ this list, it is not sanctioned — build it the way that is known to work.
 | **Keep the audio callback genuinely lock-free** | The reference's callback locks a mutex to signal a condition variable that nothing waits on. Removing it is strictly less work at strictly lower risk. |
 | **C++ over Node-API instead of Rust** | Gustavo's call, ratified. Node-API is the same ABI-stable boundary the reference uses (napi-rs is Node-API), so this is a language change, not an architecture change. |
 | **Reuse Nova's existing server** | The reference is a self-contained desktop app. Nova already has an authed `/live` socket, STT failover, RAG memory, metering, quotas and notes in production. The desktop client is a client. |
+| **macOS: `CGSSetWindowCaptureExcludeShape`, not `sharingType`** (chunk 8) | The single most valuable finding in this research. The reference — and Cluely, and every clone in the category — hides windows with a flag Apple retired, which is why their users get caught. Chromium replaced that flag with this SPI and Chrome depends on it today. Using the call that actually works is not deviation, it is the difference between the feature existing and not. |
 
 **Everything else mirrors the reference**, including the parts that look odd: the
 Windows opacity-shield ordering before setting the capture flag, the DWM settle

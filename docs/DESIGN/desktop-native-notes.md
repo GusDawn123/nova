@@ -301,6 +301,65 @@ Windows path unless marked otherwise.
   attribute application and reveal into one path so a swallowed error cannot
   expose an unprotected window.
 
+### macOS — the call that actually works (chunk 8)
+
+Do **not** use `NSWindow.sharingType` / Electron's `setContentProtection`. Apple
+retired it, and it is why every Electron competitor in this category is visible
+in a modern screen share.
+
+The mechanism is a private CoreGraphics/WindowServer SPI:
+
+```
+CGSConnectionID CGSMainConnectionID(void);
+CGError CGSSetWindowCaptureExcludeShape(CGSConnectionID cid,
+                                        CGSWindowID wid,
+                                        CGRegionRef region);
+CGRegionRef CGRegionCreateWithRect(CGRect rect);
+```
+
+Pass a region built from the window's frame (origin zeroed) to exclude; pass
+`NULL` to re-enable. `wid` is the window's `windowNumber`. It operates per
+window and per region — strictly more expressive than the old boolean.
+
+**Why to trust it:** Chromium calls exactly this at HEAD, in
+`components/remote_cocoa/app_shim/native_widget_ns_window_bridge.mm`
+(`NativeWidgetNSWindowBridge::SetAllowScreenshots`), having removed `sharingType`
+from its Mac window code entirely. Chrome's content protection depends on it on
+every Mac today. The symbol dates to at least macOS 10.13 and Apple's own apps
+call it.
+
+**Why Electron apps do not have it:** Electron picked up Chromium's replacement
+and reverted it (electron#46886) over a *rendering* bug — transparent child
+windows drawing grey — not a hiding failure. Chromium's version made the call
+async, which is the likely culprit; a synchronous direct call may not reproduce
+it. **If Nova's overlay is transparent with child windows, budget for this.**
+
+**Unproven, and must be probed first.** No published test exists against
+ScreenCaptureKit on macOS 15+. Chunk 8 opens with a standalone ~30-minute probe:
+a borderless always-on-top window, the SPI called with a full-frame region, then
+capture via Cmd-Shift-5, QuickTime, a minimal `SCStream` on
+`SCContentFilter(display:excludingApplications:exceptingWindows:)`, and a real
+Zoom full-display share to a second device. Verify the `NULL`-region round trip
+re-enables capture.
+
+**Secondary lead if it fails:** `kCGSAvoidsCaptureTagBit` (bit 6 of the *hi*
+word) in the WindowServer per-window tag bitmap, set via `CGSSetWindowTags` —
+the same bitmap the `_setPreventsActivation:` trick uses (bit 16, lo word). It
+is the only capture-related tag in the reverse-engineered enumeration, and
+nobody has published a working use of it. Try it only if the exclude-shape call
+does not hold up.
+
+**Private API risk posture.** Nova ships outside the App Store, so this is a
+stability question, not a distribution blocker — and the profile is unusually
+good: decade-old symbol, Apple's own apps use it, Chrome breaks first if it ever
+goes away.
+
+**A detect-and-hide fallback exists but is not a primary mechanism.**
+`CGSIsScreenWatcherPresent()` and the `isCaptured` change notification let an app
+react to a capture starting — but the notification is reactive (the first frames
+are already captured), and it is reported not to fire for Microsoft Teams at all.
+Useful as a second layer, never as the feature.
+
 ### The watchdog — our improvement, not a copy
 
 The reference implementation has **no read-back and no watchdog at all**. It
