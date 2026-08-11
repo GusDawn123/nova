@@ -268,14 +268,24 @@ If we build the tap:
 
 ---
 
-## 4. Content protection and the watchdog — chunk 6
+## 4. Content protection and the watchdog — chunks 4 and 6
 
-**Start from design doc §4.1: on macOS this does not work and Apple says not to
-use it.** What follows applies to Windows, plus macOS legacy capture paths.
+**This is the product-defining feature, and Windows is where it ships first.**
+The Windows mechanism is real and documented; the macOS public API is dead and
+its private surface is under research (design doc §4.1). Everything below is the
+Windows path unless marked otherwise.
 
-- **Windows: set the flag *after* the window is shown and composited, not
-  before.** The documented workaround is show-at-opacity-0 → set flag → wait
-  ~60 ms → opacity 1. A flag applied to a not-yet-composited window is ignored.
+- **Set the flag *after* the window is shown and composited, not before.** The
+  ordering that works is show-at-opacity-0 → set flag → wait ~60 ms → opacity 1.
+  A flag applied to a not-yet-composited window is silently ignored — this is
+  the single most common reason a "working" implementation isn't hidden.
+- **Windows 11 caveat to settle in chunk 1:** there are reports that the affinity
+  call fails specifically for Chromium/Electron-class windows on Windows 11
+  (returning an error while succeeding for classic Win32 apps), acknowledged by
+  a Microsoft engineer around 2022 with no published fix. Nobody has verified it
+  against current builds. Probe it on real hardware before designing around it;
+  if it reproduces, the window layer moves into the native addon rather than
+  relying on Electron's wrapper.
 - **macOS is the opposite** — set before showing.
 - **Dedupe redundant writes.** Repeated identical sets cause compositor churn
   that can leave the window in a transient blank frame for hundreds of ms.

@@ -15,9 +15,15 @@ Companion: [`docs/DESIGN/desktop-native-notes.md`](../../DESIGN/desktop-native-n
 
 | | |
 |---|---|
-| **Ratified** | desktop pivot; Electron + C++ Node-API addon; audio-first build order; wire format; two-stream speaker attribution |
-| **Open — needs Gustavo** | stealth posture (A/B below); `apps/mobile` fate; bundle id; macOS minimum version |
+| **Ratified** | desktop pivot; Electron + C++ Node-API addon; audio-first build order; wire format; two-stream speaker attribution; **stealth is a core product feature, not a nice-to-have**; **Windows ships first, macOS is scaffolded but not built** |
+| **Open — needs Gustavo** | `apps/mobile` fate; bundle id; macOS minimum version |
 | **Not started** | every chunk. No code has been written. |
+
+**Ratified 2026-08-11 (Gustavo, explicit):** stealth is the reason this product
+exists — a sales copilot that is visible in a screen share is not the product.
+No architecture is dropped. We build Windows first, where the mechanism is
+documented and real, and we lay the macOS folder structure and port boundaries
+in place so the macOS implementation drops in later without a refactor.
 
 ---
 
@@ -98,11 +104,16 @@ not the product.
 │  /live socket client .................... packages/shared   │
 │                                                             │
 │  ┌─ native addon ── C++ / Node-API ──────────────────────┐  │
-│  │  system audio:  macOS CoreAudio tap  (14.4+)          │  │
-│  │                 macOS ScreenCaptureKit (13+, fallback)│  │
-│  │                 Windows WASAPI loopback               │  │
-│  │  microphone:    one cross-platform capture path       │  │
-│  │  → normalises everything to ONE PCM format            │  │
+│  │  AudioCapture port                                    │  │
+│  │    Windows: WASAPI loopback + mic        ◄── FIRST    │  │
+│  │    macOS:   CoreAudio tap (14.4+) / SCK (13+)         │  │
+│  │    → normalises everything to ONE PCM format          │  │
+│  │                                                       │  │
+│  │  StealthWindow port                                   │  │
+│  │    Windows: display affinity + read-back ◄── FIRST    │  │
+│  │    macOS:   AppKit — NSPanel attributes Electron      │  │
+│  │             does not expose, and the WindowServer     │  │
+│  │             tag surface beneath it                    │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -117,9 +128,19 @@ adapter by another name: OS APIs live behind one `AudioCapture` port, the same
 way vendor SDKs live only under `modules/*/adapters/`. Nothing above the addon
 boundary knows whether it is talking to CoreAudio or WASAPI.
 
-**The addon does audio and nothing else — at first.** Everything in chunks 1, 3,
-4 and 5 is achievable in pure Electron. Native code is expensive to build, sign,
-and debug; we add it only where the platform gives us no choice.
+**Two ports, both platform-split, both scaffolded for macOS from day one.** The
+macOS branch of each port exists as a stub with the real signature from the
+first commit, so adding the macOS implementation later is filling in a file
+rather than reshaping the boundary. That is the whole reason to define the port
+now rather than after Windows ships.
+
+**Where Electron is enough, use Electron; where it is not, go native.** On
+Windows the capture-exclusion mechanism is reachable through Electron's own API,
+so the Windows branch of `StealthWindow` is thin — it exists for the read-back
+and re-assert that Electron does not expose (§10). On macOS it will not be thin:
+the attributes that matter live in AppKit and below it, and Electron exposes
+none of them. That asymmetry is expected and is not a reason to avoid native
+code on either side.
 
 ---
 
@@ -128,25 +149,40 @@ and debug; we add it only where the platform gives us no choice.
 Three findings from the research materially constrain the product. They are
 facts about macOS and Windows, not opinions about our design.
 
-### 4.1 macOS cannot hide a window from screen capture. At all.
+### 4.1 macOS: the public API is dead; the private surface is unresearched
 
-Apple's own documentation for `NSWindow.SharingType.none` — the flag every
-overlay app uses, and what Electron's `setContentProtection(true)` sets — now
-describes it as a legacy constant macOS no longer uses, and instructs developers
-not to use it to hide content from capture. In July 2025 an Apple DTS engineer
-answered this exact question on the developer forums: there are **no public APIs
-for preventing screen capture**, and asked the developer to file an enhancement
-request.
+Two things are established and not in dispute:
 
-> **Consequence:** on macOS, if the user shares their whole screen, the Nova
-> overlay is visible to everyone on the call. There is no workaround. Any
-> marketing claim of invisibility on macOS would be false.
+- Apple's documentation for `NSWindow.SharingType.none` — what Electron's
+  `setContentProtection(true)` sets — now describes it as a legacy constant and
+  instructs developers not to use it to hide content from capture.
+- In July 2025 an Apple DTS engineer answered this exact question on the
+  developer forums: there are no **public** APIs for preventing screen capture.
 
-The one thing that still works is structural and not ours to control: if the
-user shares a **single window** rather than the full display, our overlay was
-never in the capture to begin with.
+Note the word *public*. That is the limit of what has been verified, and it is
+narrower than "macOS cannot do this."
 
-### 4.2 Windows can, but Microsoft disclaims it — and Electron may be excluded.
+**What is not yet established, and is being researched:** the private
+WindowServer surface. The reference implementation already reaches one private
+SPI (`_setPreventsActivation:`, which flips a bit in the WindowServer's
+per-window tag bitmap via `CGSSetWindowTags`) to get behaviour AppKit does not
+expose. Whether an analogous tag or SkyLight (`SLS*`) call excludes a window
+from capture is an open question, as is how currently-shipping competitors
+achieve their macOS claims, and whether ScreenCaptureKit's behaviour depends on
+which `SCContentFilter` shape the capturing app builds — Apple has an open bug
+(FB21115847) where their own sample app *does* omit sharing-none windows.
+
+**This does not block us,** because Windows ships first (§4.2, §6). The macOS
+answer is due before the macOS chunk, not before chunk 1. Nova ships outside the
+App Store, so private API use is a stability risk to manage, not a distribution
+blocker.
+
+**What we will not do** is put a capability in marketing before it is proven on
+the OS in question. Windows claims get made when the Windows probe passes; macOS
+claims get made when the macOS implementation is verified against a real Zoom
+share. That is a rule about sequencing, not a limit on ambition.
+
+### 4.2 Windows: real, documented — and the first target
 
 `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` is real, documented, and
 works on Windows 10 2004+. Microsoft's own docs state it is not a security
@@ -217,21 +253,30 @@ is a design problem for a later chunk, but it belongs on the record now.
 Ordered to stand the shell up, then prove the one risk that can kill the product,
 then make it usable, then ship it. Each row is a self-contained branch.
 
+**Windows only.** Every chunk below targets Windows. The macOS branch of each
+port is created as a signature-complete stub in the same chunk that creates the
+Windows one, so nothing has to be reshaped later — but no macOS implementation
+is written until the Windows product works end to end.
+
 | # | Chunk | Native? | Deliverable | How we prove it |
 |---|---|---|---|---|
 | 0 | **This design doc** | no | the pivot written down; CLAUDE.md and doc amendments | Gustavo reviews and ratifies |
-| 1 | **Electron shell** | no | a normal visible window that boots, loads the UI, signs in through the existing Supabase seam, and calls `GET /me` | app shows the signed-in user's data, pulled from the real server. Plus: the §4.2 Windows 11 probe, result recorded |
-| 2 | **System audio capture** | **yes** | two labelled PCM streams (loopback + mic) arriving in the Electron main process in the §5.2 wire format | a recorded two-party call produces two `.wav` files, each containing only its own speaker |
+| 1 | **Electron shell** | no | a normal visible window that boots, loads the UI, signs in through the existing Supabase seam, and calls `GET /me` | app shows the signed-in user's data from the real server. **Plus the §4.2 probe:** call the affinity API from a real Electron window on this Windows 11 machine, record the return value, screen-share to a second device and look |
+| 2 | **System audio capture** | **yes** | two labelled PCM streams — WASAPI loopback + mic — arriving in the main process in the §5.2 wire format, handling **both** the multimedia and communications default output roles | a recorded two-party Zoom call produces two `.wav` files, each containing only its own speaker, with the meeting routed to the communications device |
 | 3 | **Live transcription end-to-end** | no | both streams over the existing `/live` socket; transcript renders with correct `me`/`them` labels | a real call transcribes live, speakers correctly attributed, notes generated post-call |
-| 4 | **Overlay window** | partly | frameless, always-on-top, floats over fullscreen Zoom, never steals focus | clicking the overlay during a Zoom call does not dim or un-focus Zoom, on both OSes |
-| 5 | **Hotkeys + click-through** | no | summon, dismiss, and steer without ever clicking into the overlay | full copilot loop driven from the keyboard while the meeting app stays frontmost |
-| 6 | **Content protection + honest status** | no | best-effort hide-from-capture where the OS supports it, plus a UI state that distinguishes *hidden* / *visible* / *cannot verify* | flag read back from the OS, not from our own stored intent — the thing the reference implementation never did |
-| 7 | **Packaging and shipping** | no | signed, notarized, auto-updating installers for macOS and Windows | a fresh machine installs from the artifact and auto-updates to the next build |
+| 4 | **Stealth overlay window** | **yes** | frameless, always-on-top over fullscreen Zoom, capture-excluded, applied in the correct DWM order, never steals focus | **the product test:** join a Zoom call from this machine, share the full screen to a second device, and confirm the overlay is absent from what the second device sees while remaining visible locally |
+| 5 | **Overlay interaction** | no | global hotkeys to summon, dismiss, and steer; click-through so clicks reach the app underneath | the full copilot loop driven from the keyboard with the meeting app frontmost the entire time |
+| 6 | **Stealth watchdog + status** | **yes** | read the affinity flag back from the OS, re-assert on the reset events, and surface *hidden* / *visible* / **cannot verify** to the UI | force a reset (display change, session lock, fullscreen transition) and watch the app detect it and recover — the thing the reference implementation never built |
+| 7 | **Packaging and shipping** | no | signed, auto-updating Windows installer | a fresh Windows machine installs from the artifact and auto-updates to the next build |
+| 8+ | **macOS** | **yes** | fill in the macOS branch of each port | its own design pass, informed by the §4.1 research, before any of it is planned |
 
 **Chunk 2 is the existential one.** If system audio capture cannot be made to
-work reliably, there is no product, and we want to know that in week one rather
-than after building an overlay around it. Everything before it exists only to
-give chunk 2 somewhere to land.
+work reliably, there is no product. Chunks 0 and 1 exist only to give it
+somewhere to land.
+
+**Chunk 4 is the product-defining one.** A sales copilot that appears in a
+screen share is not the product. Its proof criterion is deliberately the real
+one — an actual Zoom share observed from a second device — not a unit test.
 
 **Screenshots are deliberately absent.** The reference app captures the screen
 on demand and sends it to a vision model. It is entirely pure-Electron
@@ -246,53 +291,69 @@ chunk — it is not on the critical path to a working call copilot.
 Expo/EAS handled packaging, signing, and updates. None of that exists for
 Electron until we build it (chunk 7).
 
-| Item | Cost | Required? |
+| Item | Cost | When |
 |---|---|---|
-| Apple Developer Program | **$99/yr** | **Yes** for macOS. Without it users see "app is damaged" and auto-update cannot install |
-| Windows code-signing (Azure Trusted Signing) | ~$120/yr (estimate) | No — but unsigned means every user meets the SmartScreen warning |
-| CI that builds native binaries per platform | GitHub Actions minutes | Yes — macOS arm64, macOS x64, Windows x64 |
+| Windows code-signing (Azure Trusted Signing) | ~$120/yr (estimate) | **Chunk 7.** Unsigned ships and works, but every user meets the "Windows protected your PC" warning, which costs installs |
+| CI that builds the native addon | GitHub Actions minutes (Windows runners bill at 1×) | Chunk 2 onward — Windows x64 only, at first |
+| Apple Developer Program | $99/yr | **Deferred to chunk 8+.** Not needed until macOS is built |
 
-Enrolling in the Apple program as an individual is fine (CLAUDE.md: no entity
-yet, store accounts individual). Note the app will list Gustavo's own name as
-the developer.
+Both signing options enroll fine as an individual (CLAUDE.md: no entity yet,
+store accounts individual), with the caveat that the certificate will carry
+Gustavo's own name rather than a company's. Azure Trusted Signing additionally
+requires an organisation 3+ years old, so if that gate applies, a standard OV
+certificate (~$200–400/yr, estimate) is the fallback.
 
 ---
 
 ## 8. Open decisions — Gustavo
 
-**8.1 — Stealth posture.** Given §4.1:
-
-- **A (recommended): demote.** Stealth becomes a best-effort Windows feature with
-  an honest UI state, sequenced late (chunk 6). macOS simply does not get
-  invisibility and we say so plainly. Never claim "invisible" in marketing.
-- **B: keep as a pillar.** Build it Windows-first anyway and accept that macOS
-  users get a visible overlay while we wait for Apple to reverse a documented
-  position.
-
-Recommendation is **A**. B spends the scariest chunks on something Apple has
-publicly closed, and puts a promise in the marketing we would have to retract.
-The chunk list above is written assuming A; under B, chunk 6 moves to position 3.
-
-**8.2 — `apps/mobile`.** Delete outright, or freeze in place with a tombstone
+**8.1 — `apps/mobile`.** Delete outright, or freeze in place with a tombstone
 banner? Deleting is cleaner and git keeps the history; freezing keeps the
 duotone component library visible while the desktop renderer is built. Mild
 preference for **freeze now, delete after chunk 4**, once we know what the
 renderer actually reuses.
 
-**8.3 — Bundle id.** Must be chosen **before the first signed build** and can
-never change afterwards: macOS ties every permission grant to it, so changing it
-resets every user's microphone, screen-recording and accessibility approvals.
-Suggested `com.novaapp.nova`. Gustavo's call.
+**8.2 — Bundle id / app id.** Must be chosen **before the first signed build**.
+On macOS it can never change afterwards — every permission grant is keyed to it,
+so changing it resets every user's microphone, screen-recording and
+accessibility approvals. Even though Windows ships first, pick it now so the two
+platforms agree. Suggested `com.novaapp.nova`. Gustavo's call.
 
-**8.4 — macOS minimum version.** 14.4 gives the clean CoreAudio tap with no
-screen-recording prompt. 13.0 reaches more users but forces the
-ScreenCaptureKit path and its scary permission dialog for *every* user. Leaning
-**support both, prefer 14.4 at runtime** — but that is a chunk-2 decision and can
-wait.
+**8.3 — macOS minimum version.** Deferred to the macOS design pass (chunk 8+).
+Not needed for anything on the Windows path.
 
 ---
 
-## 9. Documents this pivot amends
+## 9. Where we deliberately differ from the reference — and why
+
+The default is **mirror it**. The reference implementation's shape is the proven
+shape for this category, and its comments are a ledger of production bugs
+someone already paid for. Deviating without a reason costs performance and
+quality and buys nothing.
+
+So every deviation is listed here with its justification. If a change is not on
+this list, it is not sanctioned — build it the way that is known to work.
+
+| We differ | Why it is *better*, not just different |
+|---|---|
+| **Handle both Windows output device roles** (multimedia *and* communications) | Not a preference — the reference binds only the multimedia default, and its own comments record that this captures **silence** when the meeting routes to the communications device, which is what Zoom, Teams and Discord commonly do. It is an open bug there. Fixing it is table stakes. |
+| **Read the affinity flag back from the OS and re-assert on reset events** | The reference has no read-back and no watchdog. Its UI reports stored *intent*, so it can display "hidden" while the OS has silently switched the flag off — the user finds out when a prospect mentions it. Both platforms expose a read-back; using it is strictly more correct. |
+| **A third UI state: *cannot verify*** | Follows directly from the read-back. A binary on/off toggle cannot express "we asked, and we could not confirm", which is the state that actually matters to someone about to share their screen. |
+| **Count and surface ring-buffer overruns** | The reference discards every push result, so audio drops are invisible and surface later as an unexplained transcription gap. A counter costs nothing. |
+| **Keep the audio callback genuinely lock-free** | The reference's callback locks a mutex to signal a condition variable that nothing waits on. Removing it is strictly less work at strictly lower risk. |
+| **C++ over Node-API instead of Rust** | Gustavo's call, ratified. Node-API is the same ABI-stable boundary the reference uses (napi-rs is Node-API), so this is a language change, not an architecture change. |
+| **Reuse Nova's existing server** | The reference is a self-contained desktop app. Nova already has an authed `/live` socket, STT failover, RAG memory, metering, quotas and notes in production. The desktop client is a client. |
+
+**Everything else mirrors the reference**, including the parts that look odd: the
+Windows opacity-shield ordering before setting the capture flag, the DWM settle
+delay, deduping redundant flag writes, NSPanel-before-attributes on macOS,
+destroy-and-recreate rather than stop-and-start for captures, the ~12 s
+silent-capture watchdogs, and the asymmetric VAD configuration. Those are not
+stylistic choices. Each one is a bug someone else already found.
+
+---
+
+## 10. Documents this pivot amends
 
 To be updated in the PR that lands this doc:
 
