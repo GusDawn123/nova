@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 /**
  * Root vitest config. The DB integration suites all run against ONE local Supabase
@@ -13,6 +13,13 @@ import { defineConfig } from "vitest/config";
  *
  * Written as `.mjs` (plain JS) so eslint's type-aware project service does not need a
  * tsconfig entry for it — same treatment as `eslint.config.mjs`.
+ *
+ * TWO VITES, ON PURPOSE. The root declares `vite` ^7 as a devDependency for
+ * `apps/desktop`: electron-vite resolves vite from wherever npm hoists it, and its
+ * types need vite >= 6 (`BuildEnvironmentOptions`), which vitest 2.1's transitive
+ * vite 5 does not have. Declaring 7 at the root makes it the hoisted copy and
+ * leaves vitest with its own nested 5.4.x, which is what these suites still run
+ * on. Do not "dedupe" them onto one version without moving vitest itself.
  *
  * ---------------------------------------------------------------------------
  * Mobile (Phase 8.5, `docs/DESIGN/notes-ui.md` §9)
@@ -100,6 +107,13 @@ export default defineConfig({
   },
   test: {
     fileParallelism: false,
+    // `apps/mobile` is frozen for the desktop pivot (apps/mobile/FROZEN.md): it
+    // left the workspaces list, so its dependencies are no longer installed and
+    // its 46 suites would fail on resolution alone rather than on anything real.
+    // The aliases and `.web.*` extensions above are deliberately NOT removed
+    // with it — the frozen tree is still on disk and a later chunk decides its
+    // fate. Spread over vitest's own defaults so this adds to them.
+    exclude: [...configDefaults.exclude, "apps/mobile/**"],
     server: {
       deps: {
         // react-native-svg has to go THROUGH vite rather than round Node: only then
@@ -113,6 +127,15 @@ export default defineConfig({
     // installing jsdom globals would be pure overhead and could mask a real
     // Node-only assumption.
     environmentMatchGlobs: [["apps/mobile/**", "jsdom"]],
-    setupFiles: ["./apps/mobile/src/testing/setup.ts"],
+    // `setupFiles: ["./apps/mobile/src/testing/setup.ts"]` was here, and it is
+    // gone with the freeze rather than by choice. setupFiles runs for EVERY
+    // suite, and loading that path makes vite read the nearest tsconfig —
+    // `apps/mobile/tsconfig.json`, which extends `expo/tsconfig.base`. With
+    // apps/mobile out of the workspaces list, expo is not installed, so the
+    // lookup throws and every one of the 128 remaining files fails before it
+    // collects. Nothing is lost meanwhile: the file only ever registered
+    // jest-dom matchers and Testing Library cleanup, both guarded on a DOM
+    // existing, and no jsdom suite runs any more. It comes back with the mobile
+    // suites if they come back.
   },
 });

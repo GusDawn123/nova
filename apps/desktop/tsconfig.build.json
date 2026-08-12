@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Everything in this workspace is bundled by Vite — main, preload and
+    // renderer alike — so resolution is the bundler's, not Node's. That is a
+    // deliberate departure from the NodeNext pair in tsconfig.base.json, and it
+    // is why relative imports under apps/desktop carry NO `.js` extension the
+    // way apps/server's do. Do not "fix" this back to NodeNext.
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    // The renderer runs in Chromium; the base lib is Node-only.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["electron-vite/node"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["dist", "**/*.test.ts", "**/*.test.tsx"],
+  "references": [{ "path": "../../packages/shared/tsconfig.build.json" }]
+}

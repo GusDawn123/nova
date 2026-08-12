@@ -4,6 +4,9 @@ build
 .expo
 *.tsbuildinfo
 
+# electron-vite bundle output (apps/desktop/out) — generated, never authored.
+apps/desktop/out
+
 # Pre-existing governance docs — owned by the docs loop, not reformatted here.
 *.md
 docs/
