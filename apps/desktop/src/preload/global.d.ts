@@ -11,6 +11,11 @@ import type { NovaBridge } from "./index";
 // with nothing to show for it. (The electron-vite template gets away with that
 // name only because its preload source and its declarations live in two
 // different tsconfig projects.)
+//
+// The type is imported rather than restated, so the renderer's view of the
+// bridge and the object the preload actually exposes cannot drift: adding a
+// member to `NovaBridge` without exposing it, or exposing one without declaring
+// it, fails the build in `src/preload/index.ts`.
 declare global {
   interface Window {
     readonly novaBridge: NovaBridge;

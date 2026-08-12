@@ -1,0 +1,254 @@
+/**
+ * Nova desktop — sign-in surface.
+ *
+ * Every value here is a custom property set by `design/theme.ts` from
+ * `design/tokens.ts`. No literal colour appears below, which is the mechanical
+ * form of the duotone rule: one blue, one white, everything else an opacity of
+ * the theme's ink. Errors are said in WORDS, never in red
+ * (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §11).
+ *
+ * The chamfer is here too, at the one place the language asks for it: chamfered
+ * means actionable (spec §3), so the primary key is cut and everything readable
+ * keeps a soft radius. The mobile app draws that cut with an SVG polygon because
+ * React Native has no `clip-path`; a Chromium renderer does, so it is four
+ * lines instead of a component.
+ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--nova-canvas);
+  color: var(--nova-ink);
+  font-family: var(--nova-font-body);
+  font-size: var(--nova-text-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The window is the app's chrome; nothing here should feel like a web page. */
+::selection {
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+}
+
+.screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: var(--nova-space-xxl);
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--nova-space-xxl);
+  border: 1px solid var(--nova-ink-hairline);
+  border-radius: var(--nova-radius-card);
+  background: var(--nova-ink-fill);
+}
+
+.card--wide {
+  max-width: 520px;
+}
+
+.wordmark {
+  margin: 0;
+  font-family: var(--nova-font-display);
+  font-size: var(--nova-text-display-lg);
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  display: block;
+  font-family: var(--nova-font-mono);
+  font-size: var(--nova-text-mono-sm);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--nova-ink-soft);
+}
+
+.lede {
+  margin: var(--nova-space-sm2) 0 var(--nova-space-xl);
+  color: var(--nova-ink-soft);
+  font-size: var(--nova-text-body-sm);
+}
+
+/* ---------------------------------------------------------------- form ---- */
+
+.field {
+  display: block;
+  margin-bottom: var(--nova-space-lg);
+}
+
+.field__label {
+  display: block;
+  margin-bottom: var(--nova-space-xs2);
+  font-family: var(--nova-font-mono);
+  font-size: var(--nova-text-mono-sm);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--nova-ink-soft);
+}
+
+.field__input {
+  width: 100%;
+  min-height: var(--nova-tap-target);
+  padding: 0 var(--nova-space-lg);
+  border: 1px solid var(--nova-ink-hairline);
+  border-radius: var(--nova-radius-panel);
+  background: transparent;
+  color: var(--nova-ink);
+  font-family: var(--nova-font-body);
+  font-size: var(--nova-text-body);
+}
+
+.field__input::placeholder {
+  color: var(--nova-ink-faint);
+}
+
+.field__input:focus-visible {
+  outline: none;
+  border-color: var(--nova-ink);
+  box-shadow: 0 0 0 1px var(--nova-ink);
+}
+
+.field__input:disabled {
+  color: var(--nova-ink-faint);
+}
+
+.actions {
+  display: flex;
+  gap: var(--nova-space-md);
+  margin-top: var(--nova-space-xl);
+}
+
+/* ------------------------------------------------------------- controls ---- */
+
+.key {
+  flex: 1;
+  min-height: var(--nova-tap-target);
+  padding: 0 var(--nova-space-xl);
+  border: 1px solid var(--nova-ink);
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+  font-family: var(--nova-font-body);
+  font-size: var(--nova-text-body-sm);
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  /* Chamfered = actionable. 8px matches `Chamfer.control` in tokens.ts. */
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+}
+
+/* An outline would be clipped away with the corners, so the focus ring is drawn
+   INSIDE the shape instead — visible, and still the cut silhouette. */
+.key:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--nova-canvas);
+}
+
+.key--quiet {
+  background: transparent;
+  color: var(--nova-ink);
+  border-color: var(--nova-ink-hairline);
+}
+
+.key--quiet:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--nova-ink);
+}
+
+.key:disabled {
+  cursor: default;
+  background: var(--nova-ink-fill);
+  border-color: var(--nova-ink-hairline);
+  color: var(--nova-ink-faint);
+}
+
+/* ----------------------------------------------------------- messaging ---- */
+
+/*
+ * A failure is a labelled block of text, not a colour. The mono eyebrow does the
+ * work a red border would do elsewhere, and it survives being read aloud.
+ */
+.notice {
+  margin-top: var(--nova-space-lg);
+  padding: var(--nova-space-lg);
+  border: 1px solid var(--nova-ink-hairline);
+  border-radius: var(--nova-radius-panel);
+}
+
+.notice__body {
+  margin: var(--nova-space-xs2) 0 0;
+  font-size: var(--nova-text-body-sm);
+  color: var(--nova-ink-soft);
+}
+
+/* ------------------------------------------------------------ identity ---- */
+
+.identity {
+  margin: var(--nova-space-xl) 0 0;
+  border-top: 1px solid var(--nova-ink-hairline);
+}
+
+.identity__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--nova-space-lg);
+  padding: var(--nova-space-lg) 0;
+  border-bottom: 1px solid var(--nova-ink-hairline);
+}
+
+.identity__value {
+  font-family: var(--nova-font-mono);
+  font-size: var(--nova-text-mono);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.identity__value--absent {
+  color: var(--nova-ink-faint);
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: var(--nova-space-xs2);
+  margin-top: var(--nova-space-xl);
+  font-family: var(--nova-font-mono);
+  font-size: var(--nova-text-mono-sm);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--nova-ink-soft);
+}
+
+.status-line__dot {
+  width: var(--nova-dot);
+  height: var(--nova-dot);
+  border-radius: 999px;
+  background: var(--nova-ink);
+}
+
+.status-line__dot--hollow {
+  background: transparent;
+  border: 1px solid var(--nova-ink-hairline);
+}
