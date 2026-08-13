@@ -26,9 +26,25 @@ import { describe, expect, it } from "vitest";
  * and has no desktop-specific content.
  */
 
+/**
+ * `git ls-files` lists only what is UNDER its working directory. Run from
+ * anywhere but the repo root it silently narrows to that subtree, and a guard
+ * that quietly checks less than it claims is worse than no guard — it would
+ * pass while a stray `*.web.ts` sat under `apps/server`. The original in
+ * `apps/mobile` resolved the root for this reason; dropping it in the move was
+ * a real weakening, so the root is resolved explicitly rather than inherited
+ * from whatever cwd the runner happens to use.
+ */
+function repoRoot(): string {
+  return execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+  }).trim();
+}
+
 /** Tracked files only — untracked scratch and `node_modules` are not the repo. */
 function trackedWebFiles(): string[] {
   const listed = execFileSync("git", ["ls-files", "*.web.*"], {
+    cwd: repoRoot(),
     encoding: "utf8",
   });
   return listed.split("\n").filter((line) => line !== "");

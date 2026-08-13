@@ -62,22 +62,50 @@ function hardenNavigation(window: BrowserWindow): void {
   });
 
   window.webContents.on("will-navigate", (event, url) => {
-    const target = new URL(url);
-    const current = new URL(window.webContents.getURL());
-    // Same-document navigation is how the dev server's HMR client reloads, so
-    // the origin is compared rather than the whole URL. In a packaged build
-    // both sides are `file://` and the origins match as `null`, which is why
-    // the href is checked too.
-    const sameOrigin =
-      target.origin === current.origin && target.origin !== "null";
-    const sameFile =
-      target.protocol === "file:" && target.pathname === current.pathname;
-    if (sameOrigin || sameFile) {
+    if (isSameDocumentNavigation(url, window.webContents.getURL())) {
       return;
     }
     event.preventDefault();
     console.warn(`[window] blocked a navigation to ${url}`);
   });
+}
+
+/**
+ * Whether a requested navigation stays inside the document we loaded.
+ *
+ * Pure and exported so the decision has its own test: this is a security
+ * boundary, and the version living inside an Electron event handler could only
+ * be checked by launching the app.
+ *
+ * Two accepted shapes, because dev and production differ. Under the dev server
+ * both sides are `http://localhost:5173` and the ORIGIN matches — that is how
+ * the HMR client reloads. In a packaged build both are `file://`, whose origin
+ * serialises to the string `"null"`; comparing origins there would accept any
+ * file on disk, so the path is compared instead.
+ */
+export function isSameDocumentNavigation(
+  targetUrl: string,
+  currentUrl: string,
+): boolean {
+  let target: URL;
+  let current: URL;
+  try {
+    target = new URL(targetUrl);
+    current = new URL(currentUrl);
+  } catch {
+    // Unparseable is not something we recognise, and the default is to refuse.
+    return false;
+  }
+
+  if (target.protocol === "file:" || current.protocol === "file:") {
+    return (
+      target.protocol === "file:" &&
+      current.protocol === "file:" &&
+      target.pathname === current.pathname
+    );
+  }
+
+  return target.origin === current.origin && target.origin !== "null";
 }
 
 /**
