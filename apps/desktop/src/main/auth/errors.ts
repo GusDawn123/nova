@@ -47,6 +47,12 @@ export type AuthActionResult = z.infer<typeof authActionResultSchema>;
 export interface AuthFailure {
   readonly status?: number | undefined;
   readonly message: string;
+  /**
+   * The SDK's error class name. Load-bearing rather than decorative: it is the
+   * only reliable way to spot a transport failure, because supabase-js reports
+   * one with `status: 0` and a message that varies by platform.
+   */
+  readonly name?: string | undefined;
 }
 
 const FALLBACK_CREDENTIALS_MESSAGE = "Invalid credentials";
@@ -61,9 +67,37 @@ const FALLBACK_NETWORK_MESSAGE = "Network request failed";
  * other status is `unknown` — which is honest, and keeps a 500 from being
  * reported to the user as a typo.
  */
+/**
+ * supabase-js does NOT throw when the network is down. Its fetch layer raises
+ * `AuthRetryableFetchError` — `status: 0` for a dead fetch, the 5xx status for a
+ * server error — and `GoTrueClient` then catches it and RETURNS it as `error`
+ * because it is an `AuthError`. So an offline sign-in arrives here as a returned
+ * value, not as a throw, and without this check it would fall through to
+ * `unknown` and tell the user "Something went wrong" when the honest answer is
+ * "you are offline".
+ *
+ * Matched on the class name first because that is the SDK's own signal; the
+ * `status === 0` arm covers a plain object that lost its prototype crossing a
+ * boundary.
+ *
+ * Note `=== 0` rather than `(status ?? 0) === 0`. An EXPLICIT zero is what the
+ * SDK stamps on a dead fetch; an ABSENT status just means the error never
+ * carried one, which is the `unknown` case and not a network claim.
+ */
+function isRetryableTransportFailure(error: AuthFailure): boolean {
+  return error.name === "AuthRetryableFetchError" || error.status === 0;
+}
+
 export function classifyAuthError(error: AuthFailure | null): AuthActionResult {
   if (error === null) {
     return { ok: true };
+  }
+  if (isRetryableTransportFailure(error)) {
+    return {
+      ok: false,
+      kind: "network",
+      message: error.message || FALLBACK_NETWORK_MESSAGE,
+    };
   }
   const status = error.status ?? 0;
   if (status === 400 || status === 401 || status === 422) {

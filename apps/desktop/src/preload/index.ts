@@ -2,7 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import type { AuthActionResult } from "../main/auth/errors";
 import type { AuthState } from "../main/auth/state";
-import { IpcChannel } from "../main/ipc/channels";
+import { IpcChannel, type IpcChannelName } from "../main/ipc/channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
@@ -55,12 +55,31 @@ export interface NovaBridge {
  * crossing IPC arrives in the UI as a stringified stack. So it degrades to the
  * same typed failure everything else uses.
  */
+async function invoke(
+  channel: IpcChannelName,
+  ...args: unknown[]
+): Promise<unknown> {
+  // `ipcRenderer.invoke` REJECTS whenever the main handler throws, and a
+  // rejection here surfaces in the UI as a stringified stack trace while
+  // leaving whichever in-flight flag the caller set latched on. The renderer is
+  // written on the promise that these calls always resolve; this is where that
+  // promise is kept, so `undefined` falls through to the same off-contract path
+  // as a mis-shaped payload.
+  try {
+    return await ipcRenderer.invoke(channel, ...args);
+  } catch (error: unknown) {
+    console.error(`[bridge] ${channel} did not answer`, error);
+    return undefined;
+  }
+}
+
 async function invokeAuthAction(
-  channel: string,
+  channel: IpcChannelName,
   ...args: unknown[]
 ): Promise<AuthActionResult> {
-  const raw: unknown = await ipcRenderer.invoke(channel, ...args);
-  const parsed = authResultMessageSchema.safeParse(raw);
+  const parsed = authResultMessageSchema.safeParse(
+    await invoke(channel, ...args),
+  );
   if (parsed.success) {
     return parsed.data;
   }
@@ -79,8 +98,9 @@ const novaBridge: NovaBridge = {
   signOut: () => invokeAuthAction(IpcChannel.authSignOut),
 
   getAuthState: async () => {
-    const raw: unknown = await ipcRenderer.invoke(IpcChannel.authGetState);
-    const parsed = authStateMessageSchema.safeParse(raw);
+    const parsed = authStateMessageSchema.safeParse(
+      await invoke(IpcChannel.authGetState),
+    );
     // A state we cannot read is not a state we may guess at. `unavailable` is
     // the branch that stops and explains itself rather than offering a sign-in.
     return parsed.success
@@ -107,8 +127,9 @@ const novaBridge: NovaBridge = {
   },
 
   getMe: async () => {
-    const raw: unknown = await ipcRenderer.invoke(IpcChannel.apiGetMe);
-    const parsed = meResultMessageSchema.safeParse(raw);
+    const parsed = meResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiGetMe),
+    );
     return parsed.success
       ? parsed.data
       : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };

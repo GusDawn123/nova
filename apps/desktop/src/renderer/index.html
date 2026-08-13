@@ -3,6 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The renderer is treated as hostile, and `contextIsolation` alone does not
+      stop it FETCHING. `default-src 'none'` means anything not named below is
+      refused outright, so injected markup cannot beacon out or pull a script.
+
+      Notes on the two loosenings:
+        style-src 'unsafe-inline' — Vite injects the stylesheet as an inline
+          <style> in dev, and `design/theme.ts` paints its tokens as inline
+          custom properties on the root element.
+        connect-src ws:/wss: — the Vite HMR client's socket. Only dev needs it;
+          the renderer itself opens no sockets, because every network call is
+          made by the main process. Chunk 7 should drop it from the packaged
+          build, where there is no dev server to talk to.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' ws: wss:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; object-src 'none'"
+    />
     <title>Nova</title>
   </head>
   <body>

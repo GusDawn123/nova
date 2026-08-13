@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { meResponseSchema, type MeResponse } from "@nova/shared";
 
+import type { ApiResult } from "./errors";
+
+export type { ApiErrorKind, ApiResult } from "./errors";
+
 /**
  * The Nova server client, and the only place in the desktop app that makes a
  * network call.
@@ -16,30 +20,6 @@ import { meResponseSchema, type MeResponse } from "@nova/shared";
  * into something a person can act on, which is why the failure kinds are named
  * for what the user should DO rather than for what broke.
  */
-
-/**
- *   signed-out    — no token to send. Never reached the network.
- *   unauthorized  — the server rejected the token (401). Sign in again.
- *   unavailable   — the server cannot serve this (503). Not the user's doing.
- *   timeout       — no answer inside the budget. Retrying is reasonable.
- *   network       — the request never landed, or the answer was not JSON.
- *   server        — some other non-2xx. Retrying rarely helps.
- *   schema        — a shape this build cannot read, i.e. the client is older
- *                   than the server.
- */
-export const apiErrorKindSchema = z.enum([
-  "signed-out",
-  "unauthorized",
-  "unavailable",
-  "timeout",
-  "network",
-  "server",
-  "schema",
-]);
-export type ApiErrorKind = z.infer<typeof apiErrorKindSchema>;
-
-export type ApiResult<T> =
-  { ok: true; data: T } | { ok: false; kind: ApiErrorKind; message: string };
 
 /**
  * A schema failure reduced to what is safe to log. Paths and codes only: a
@@ -92,7 +72,22 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     endpoint: string,
     schema: z.ZodType<T>,
   ): Promise<ApiResult<T>> {
-    const accessToken = await deps.getAccessToken();
+    // Inside its own guard: `getAccessToken` reaches into supabase-js, which
+    // refreshes an expired token over the network and rejects when that fails.
+    // Left unguarded, that rejection would escape `ApiResult` entirely and
+    // reject a promise every caller was told always resolves.
+    let accessToken: string | null;
+    try {
+      accessToken = await deps.getAccessToken();
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        kind: "network",
+        message: `Could not refresh your session (${reason}).`,
+      };
+    }
+
     if (accessToken === null) {
       return {
         ok: false,
@@ -132,6 +127,16 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
       try {
         body = await response.json();
       } catch {
+        // The deadline covers the BODY too, not just the headers. A server that
+        // answers 200 and then stalls mid-stream aborts the read, and calling
+        // that "unreadable" would hide the fact that it was simply too slow.
+        if (deadline.exceeded) {
+          return {
+            ok: false,
+            kind: "timeout",
+            message: "Nova took too long to respond.",
+          };
+        }
         return {
           ok: false,
           kind: "network",

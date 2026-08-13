@@ -53,7 +53,16 @@ export function createAuthService(
   function emit(next: AuthState): void {
     state = next;
     for (const listener of listeners) {
-      listener(next);
+      // Isolated per listener. `emit` runs inside supabase-js's own
+      // `onAuthStateChange` callback, so an unguarded throw would skip every
+      // remaining subscriber AND unwind into the SDK — which would mean one
+      // broken window handler could stop the IPC broadcast that every other
+      // window depends on.
+      try {
+        listener(next);
+      } catch (error: unknown) {
+        console.error("[auth] a state listener threw", error);
+      }
     }
   }
 

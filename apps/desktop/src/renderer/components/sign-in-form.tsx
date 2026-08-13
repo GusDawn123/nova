@@ -28,7 +28,15 @@ export function SignInForm({ signIn, signUp }: SignInFormProps): JSX.Element {
   const [password, setPassword] = useState("");
   /** `null` when idle; the action in flight otherwise. */
   const [pending, setPending] = useState<Submission | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * The failure carries WHICH action produced it, not just its sentence. A
+   * rejected sign-up headed "Could not sign in" sends the user to re-check a
+   * password that was never the problem.
+   */
+  const [failure, setFailure] = useState<{
+    intent: Submission;
+    message: string;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   async function submit(intent: Submission): Promise<void> {
@@ -39,7 +47,7 @@ export function SignInForm({ signIn, signUp }: SignInFormProps): JSX.Element {
     const result = await run(email, password);
     setPending(null);
     if (!result.ok) {
-      setFailure(result.message);
+      setFailure({ intent, message: result.message });
       return;
     }
     if (intent === "sign-up") {
@@ -115,8 +123,12 @@ export function SignInForm({ signIn, signUp }: SignInFormProps): JSX.Element {
 
       {failure !== null && (
         <div className="notice" role="alert">
-          <span className="eyebrow">Could not sign in</span>
-          <p className="notice__body">{failure}</p>
+          <span className="eyebrow">
+            {failure.intent === "sign-in"
+              ? "Could not sign in"
+              : "Could not create account"}
+          </span>
+          <p className="notice__body">{failure.message}</p>
         </div>
       )}
 

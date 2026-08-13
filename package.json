@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "description": "Nova — desktop AI call copilot (npm-workspaces monorepo)",
   "engines": {
-    "node": ">=22",
+    "node": ">=22.12.0",
     "npm": ">=10"
   },
   "workspaces": [

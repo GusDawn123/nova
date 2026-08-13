@@ -60,6 +60,54 @@ describe("classifyAuthError", () => {
   });
 });
 
+/**
+ * The offline path, which is easy to get wrong because it does not look like
+ * one. supabase-js does NOT throw when the network is down: its fetch layer
+ * raises `AuthRetryableFetchError` and `GoTrueClient` catches it and RETURNS it,
+ * because it is an `AuthError`. So the offline case arrives as a returned value
+ * and must not fall through to `unknown` — a user with no wifi should be told
+ * that, not "Something went wrong".
+ */
+describe("classifyAuthError — a returned transport failure", () => {
+  it("maps an explicit status 0 to network", () => {
+    expect(
+      classifyAuthError({ status: 0, message: "Failed to fetch" }),
+    ).toEqual({
+      ok: false,
+      kind: "network",
+      message: "Failed to fetch",
+    });
+  });
+
+  it("maps the SDK's retryable error by name, whatever its status", () => {
+    // The same class carries the 5xx statuses too, so the name has to win over
+    // the status check that would otherwise call this a server problem.
+    expect(
+      classifyAuthError({
+        name: "AuthRetryableFetchError",
+        status: 503,
+        message: "Service temporarily unavailable",
+      }),
+    ).toMatchObject({ ok: false, kind: "network" });
+  });
+
+  it("does NOT treat a merely status-less error as a network failure", () => {
+    // The distinction the implementation turns on: an explicit zero is the
+    // SDK's dead-fetch signal, an absent status is just an error without one.
+    expect(classifyAuthError({ message: "no status" })).toMatchObject({
+      kind: "unknown",
+    });
+  });
+
+  it("falls back to a sentence when a transport failure carries no message", () => {
+    expect(classifyAuthError({ status: 0, message: "" })).toEqual({
+      ok: false,
+      kind: "network",
+      message: "Network request failed",
+    });
+  });
+});
+
 describe("classifyThrown", () => {
   it("maps a thrown Error to network, keeping its message", () => {
     expect(classifyThrown(new TypeError("fetch failed"))).toEqual({
@@ -73,6 +121,9 @@ describe("classifyThrown", () => {
     ["a string", "boom"],
     ["undefined", undefined],
     ["a plain object", { nope: true }],
+    // An Error carrying nothing to say still has to produce a sentence — an
+    // empty alert box is worse than a generic one.
+    ["an Error with an empty message", new Error("")],
   ])("maps %s to network with a fallback message", (_label, thrown) => {
     expect(classifyThrown(thrown)).toEqual({
       ok: false,

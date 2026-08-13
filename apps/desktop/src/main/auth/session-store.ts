@@ -69,6 +69,21 @@ export function createFileSessionStore(
    */
   let writeQueue: Promise<void> = Promise.resolve();
 
+  /**
+   * `onIssue` is caller-supplied, so it can throw. Unguarded, a throw from the
+   * corrupt-file path would reject `readFromDisk`, and because that promise is
+   * memoised in `loading` the rejection would be replayed to every later
+   * caller — turning one bad callback into a store that is permanently broken
+   * rather than one that reported a problem once.
+   */
+  function report(issue: SessionStoreIssue): void {
+    try {
+      onIssue(issue);
+    } catch (error: unknown) {
+      console.error("[session-store] the issue reporter threw", error);
+    }
+  }
+
   async function readFromDisk(): Promise<Record<string, string>> {
     let raw: string;
     try {
@@ -89,7 +104,7 @@ export function createFileSessionStore(
 
     const map = asStringMap(parsed);
     if (map === null) {
-      onIssue({
+      report({
         kind: "corrupt",
         message: `${SESSION_FILE_NAME} is not a string map`,
       });
@@ -110,7 +125,16 @@ export function createFileSessionStore(
     // Write-then-rename, so a crash mid-write cannot leave a half-written file
     // where a valid session used to be. Rename is atomic within a filesystem,
     // and it consumes the temp file rather than leaving one behind.
-    await writeFile(tempPath, JSON.stringify(snapshot), "utf8");
+    //
+    // `mode: 0o600` is not decoration: this file holds a refresh token, and
+    // `writeFile`'s default is 0o666 masked by the umask — world-readable on a
+    // typical box. The mode applies to the temp file, and rename carries the
+    // permissions with it. (Ignored on Windows, which uses ACLs; the users this
+    // protects are on macOS and Linux.)
+    await writeFile(tempPath, JSON.stringify(snapshot), {
+      encoding: "utf8",
+      mode: 0o600,
+    });
     await rename(tempPath, filePath);
   }
 
@@ -123,7 +147,7 @@ export function createFileSessionStore(
         // the in-memory session is still good, so the user is not thrown out of
         // the session they are in the middle of.
         const reason = error instanceof Error ? error.message : String(error);
-        onIssue({
+        report({
           kind: "unwritable",
           message: `could not write ${SESSION_FILE_NAME} (${reason})`,
         });

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { meResponseSchema } from "@nova/shared";
 
-import { apiErrorKindSchema } from "../api/client";
+import { apiErrorKindSchema } from "../api/errors";
 import { authActionResultSchema } from "../auth/errors";
 import { authStateSchema } from "../auth/state";
 
@@ -50,6 +50,7 @@ export const authResultMessageSchema = authActionResultSchema;
 
 /** main → renderer: the answer to `authGetState`, and the `authStateChanged` push. */
 export const authStateMessageSchema = authStateSchema;
+export type AuthStateMessage = z.infer<typeof authStateMessageSchema>;
 
 /** main → renderer: the answer to `apiGetMe`. */
 export const meResultMessageSchema = z.discriminatedUnion("ok", [

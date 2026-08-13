@@ -99,6 +99,50 @@ describe("getMe", () => {
     expect(result).toMatchObject({ ok: false, kind: "signed-out" });
   });
 
+  it("keeps a failed token refresh inside the result type", async () => {
+    // `getAccessToken` reaches into supabase-js, which refreshes an expired
+    // token over the network and rejects when that fails. If that rejection
+    // escapes, it rejects a promise every caller was told always resolves —
+    // and the UI latches on a spinner with no way back.
+    let called = false;
+
+    const result = await client({
+      getAccessToken: () => Promise.reject(new Error("refresh failed")),
+      fetch: () => {
+        called = true;
+        return Promise.resolve(new Response("{}"));
+      },
+    }).getMe();
+
+    expect(called).toBe(false);
+    expect(result).toMatchObject({ ok: false, kind: "network" });
+    expect(result.ok ? "" : result.message).toContain("refresh failed");
+  });
+
+  it("calls a stalled body read a timeout, not an unreadable reply", async () => {
+    // The deadline covers the body, not just the headers: a server that answers
+    // 200 and then stalls mid-stream is slow, and saying "could not be read"
+    // would hide that.
+    const headersThenStall: typeof globalThis.fetch = (_input, init) =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          new Promise((_resolve, reject) => {
+            init?.signal?.addEventListener("abort", () => {
+              reject(new Error("aborted"));
+            });
+          }),
+      } as unknown as Response);
+
+    const result = await client({
+      fetch: headersThenStall,
+      timeoutMs: 10,
+    }).getMe();
+
+    expect(result).toMatchObject({ ok: false, kind: "timeout" });
+  });
+
   it("maps 401 to unauthorized", async () => {
     const result = await client({
       fetch: jsonFetch(401, { error: "unauthorized" }),
