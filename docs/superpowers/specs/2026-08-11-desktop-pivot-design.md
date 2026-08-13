@@ -341,11 +341,17 @@ duotone component library visible while the desktop renderer is built. Mild
 preference for **freeze now, delete after chunk 4**, once we know what the
 renderer actually reuses.
 
-**8.2 — Bundle id / app id.** Must be chosen **before the first signed build**.
-On macOS it can never change afterwards — every permission grant is keyed to it,
-so changing it resets every user's microphone, screen-recording and
-accessibility approvals. Even though Windows ships first, pick it now so the two
-platforms agree. Suggested `com.novaapp.nova`. Gustavo's call.
+**8.2 — Bundle id / app id. RATIFIED 2026-08-12: `com.novacopilot.nova`.**
+
+Chosen before the first signed build, deliberately. On macOS it can never change
+afterwards — every permission grant is keyed to it, so changing it later resets
+every user's microphone, screen-recording and accessibility approvals at once.
+The reference implementation is stuck shipping v2.7 under a leftover
+`com.electron.meeting-notes` for exactly this reason.
+
+Windows ships first, but both platforms use the same id so nothing has to be
+reconciled later. It lands in the packaging config in chunk 7; nothing before
+that reads it.
 
 **8.3 — macOS minimum version.** Deferred to the macOS design pass (chunk 8+).
 Not needed for anything on the Windows path.
