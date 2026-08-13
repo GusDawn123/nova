@@ -90,6 +90,22 @@ export default defineConfig({
   },
   preload: {
     build: {
+      // Bundle this script's dependencies INTO it. Not optional, and the one
+      // setting that governs it — electron-vite auto-applies its
+      // `vite:externalize-deps` plugin unless this is false, so every
+      // package.json dependency becomes a bare `require` at runtime.
+      //
+      // That default is right for the main process, which can resolve
+      // node_modules, and fatal for a SANDBOXED preload, which cannot: a
+      // sandboxed preload may require `electron` and a few polyfilled Node
+      // builtins and nothing else. With the default, `require("zod")` throws,
+      // the script dies BEFORE `exposeInMainWorld`, and the renderer gets no
+      // bridge at all — the window paints its background and stops, with the
+      // only evidence in the renderer's own console.
+      //
+      // Note this is NOT `ssr.noExternal` and NOT `rollupOptions.external`;
+      // the preload preset already sets both, and neither overrides the plugin.
+      externalizeDeps: false,
       rollupOptions: {
         output: {
           // Electron runs a sandboxed preload as plain CommonJS; ESM preloads
