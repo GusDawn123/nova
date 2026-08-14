@@ -5,6 +5,10 @@ build/
 .expo/
 *.tsbuildinfo
 
+# electron-vite bundles main/preload/renderer here (apps/desktop/dist is already
+# covered by the dist/ rule above — that one is tsc's typecheck emit)
+apps/desktop/out/
+
 # Expo / React Native (apps/mobile — merged from the template's .gitignore)
 # expo-env.d.ts is CLI-generated and ignored; apps/mobile/expo-types.d.ts is the
 # committed equivalent that keeps `tsc --noEmit` deterministic in CI.

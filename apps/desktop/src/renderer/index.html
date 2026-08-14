@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The policy below is filled in at build and dev-serve time by the
+      nova-content-security-policy plugin in electron.vite.config.ts, which is
+      where the directives and the reasoning for each of them live.
+
+      It is generated per environment rather than written here, because a
+      packaged build must not carry the dev server's socket permissions: the
+      renderer sits behind a bridge to account data, and a blanket websocket
+      grant would be a standing way out for it. The plugin throws if it cannot
+      find this attribute, so a window can never quietly load with no policy.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="%CSP%" />
+    <title>Nova</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./main.tsx"></script>
+  </body>
+</html>

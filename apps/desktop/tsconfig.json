@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Same bundler-resolution reasoning as tsconfig.build.json — see the comment
+    // there before changing either of these.
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["electron-vite/node"],
+    "composite": false,
+    "noEmit": true
+    // No `rootDir` here, unlike tsconfig.build.json: this project also covers
+    // electron.vite.config.ts, which sits at the workspace root by convention
+    // and is not compiled by us. tsc reports TS6059 for a file outside rootDir
+    // even under noEmit, and rootDir buys a non-emitting project nothing.
+  },
+  // The config file earns its place: eslint's type-aware rules run over every
+  // .ts file in the repo, and a file in no project is a lint error.
+  "include": ["src/**/*", "electron.vite.config.ts"]
+}

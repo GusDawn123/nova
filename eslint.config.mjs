@@ -28,6 +28,9 @@ export default tseslint.config(
       "**/build/**",
       "**/node_modules/**",
       "**/.expo/**",
+      // electron-vite's bundle output (main/preload/renderer) — generated, and
+      // the renderer asset is a minified React build.
+      "apps/desktop/out/**",
       // Expo template (apps/mobile) is linted by its own `expo lint`
       // (eslint-config-expo). The strict-type-checked root config below is tuned
       // for the TypeScript we author (server + shared); do not run it over the

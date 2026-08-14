@@ -1,3 +1,7 @@
+> **FROZEN as of 2026-08-11.** Nova pivoted to a desktop client; this app is out
+> of the npm workspaces list, out of CI, and out of the test run. Nothing below
+> is expected to work without reinstating it. See [`FROZEN.md`](./FROZEN.md).
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

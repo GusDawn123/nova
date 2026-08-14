@@ -3,19 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "license": "UNLICENSED",
-  "description": "Nova — mobile AI call copilot (npm-workspaces monorepo)",
+  "description": "Nova — desktop AI call copilot (npm-workspaces monorepo)",
   "engines": {
-    "node": ">=22",
+    "node": ">=22.12.0",
     "npm": ">=10"
   },
   "workspaces": [
     "packages/*",
-    "apps/*"
+    "apps/server",
+    "apps/desktop"
   ],
   "scripts": {
-    "typecheck": "tsc -b && npm run typecheck:tests && npm run typecheck --workspace apps/mobile",
-    "typecheck:tests": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit",
-    "lint": "eslint . && npm run lint --workspace apps/mobile",
+    "typecheck": "tsc -b && npm run typecheck:tests",
+    "typecheck:tests": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit && tsc -p apps/desktop/tsconfig.json --noEmit",
+    "lint": "eslint .",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test",
     "db:start": "supabase start",
@@ -36,6 +37,7 @@
     "prettier": "^3.4.2",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.21.0",
+    "vite": "^7.3.6",
     "vitest": "^2.1.8"
   }
 }
