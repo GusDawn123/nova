@@ -91,3 +91,16 @@ export function resizePillWindow(height: number): void {
   // getBounds() has the honest non-optional type.
   pillWindow.setContentSize(pillWindow.getBounds().width, height);
 }
+
+/**
+ * Let clicks fall through the window's invisible gutters — a transparent
+ * window still eats every click inside its rectangle, shadow padding included.
+ * `forward: true` keeps mouse-move events flowing to the page while ignored,
+ * so the renderer can see the pointer return to real content and flip back.
+ */
+export function setPillClickThrough(clickThrough: boolean): void {
+  if (pillWindow === null || pillWindow.isDestroyed()) {
+    return;
+  }
+  pillWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
+}

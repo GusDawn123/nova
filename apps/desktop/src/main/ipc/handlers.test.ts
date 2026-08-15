@@ -90,6 +90,7 @@ interface Stubs {
   privacySet: ReturnType<typeof vi.fn>;
   openSettings: ReturnType<typeof vi.fn>;
   resizePill: ReturnType<typeof vi.fn>;
+  setPillClickThrough: ReturnType<typeof vi.fn>;
   emit: (state: unknown) => void;
   dispose: () => void;
 }
@@ -127,6 +128,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
   });
   const openSettings = vi.fn();
   const resizePill = vi.fn();
+  const setPillClickThrough = vi.fn();
 
   const dispose = registerIpcHandlers({
     auth,
@@ -138,6 +140,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     },
     openSettings,
     resizePill,
+    setPillClickThrough,
   });
 
   return {
@@ -147,6 +150,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     privacySet,
     openSettings,
     resizePill,
+    setPillClickThrough,
     dispose,
     emit: (state) => {
       // Cast because one test pushes a state the contract forbids, which is
@@ -372,6 +376,28 @@ describe("one-way window management", () => {
     send(IpcChannel.pillResize, payload);
 
     expect(resizePill).not.toHaveBeenCalled();
+  });
+
+  it("flips the pill's click-through as asked", () => {
+    const { setPillClickThrough } = register();
+
+    send(IpcChannel.pillClickThrough, { clickThrough: true });
+
+    expect(setPillClickThrough).toHaveBeenCalledTimes(1);
+    expect(setPillClickThrough).toHaveBeenCalledWith(true);
+  });
+
+  it.each([
+    ["a bare boolean", true],
+    ["an extra key", { clickThrough: true, mode: "extra" }],
+    ["a stringy boolean", { clickThrough: "true" }],
+  ])("drops %s instead of flipping click-through", (_label, payload) => {
+    const { setPillClickThrough } = register();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    send(IpcChannel.pillClickThrough, payload);
+
+    expect(setPillClickThrough).not.toHaveBeenCalled();
   });
 });
 

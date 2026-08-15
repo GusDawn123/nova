@@ -31,11 +31,13 @@ export const IpcChannel = {
   privacyStateChanged: "nova:privacy:state-changed",
   /**
    * renderer → main, one-way. No answer to give: the pill asks main to open
-   * the settings window, or to resize the pill window to its content — both
-   * are fire-and-forget window management.
+   * the settings window, to resize the pill window to its content, or to let
+   * clicks fall through its invisible gutters — all fire-and-forget window
+   * management.
    */
   settingsOpen: "nova:settings:open",
   pillResize: "nova:pill:resize",
+  pillClickThrough: "nova:pill:click-through",
 } as const;
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel];

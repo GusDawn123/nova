@@ -58,6 +58,11 @@ export interface NovaBridge {
   readonly openSettings: () => void;
   /** Tell main the pill's content height so the window can hug it. */
   readonly resizePill: (height: number) => void;
+  /**
+   * Let clicks pass through the pill window's invisible gutters (or take them
+   * again). Sent as the pointer crosses between content and empty space.
+   */
+  readonly setPillClickThrough: (clickThrough: boolean) => void;
 }
 
 /**
@@ -186,6 +191,10 @@ const novaBridge: NovaBridge = {
 
   resizePill: (height) => {
     ipcRenderer.send(IpcChannel.pillResize, { height });
+  },
+
+  setPillClickThrough: (clickThrough) => {
+    ipcRenderer.send(IpcChannel.pillClickThrough, { clickThrough });
   },
 };
 

@@ -75,6 +75,36 @@ export function PillApp(): JSX.Element {
     };
   }, []);
 
+  // The window is bigger than the pill (shadow/tooltip/menu gutters), and a
+  // transparent window still eats every click inside its rectangle — so the
+  // invisible border would block whatever sits under it. Pointer over bare
+  // stage → let clicks fall through; pointer over real content → take them.
+  // Main sets `forward: true` while ignoring, so mouse-move keeps arriving and
+  // re-entry is seen. Drag regions swallow real moves, but by the time the
+  // pointer is on one the last message was already "take clicks" — the gutter
+  // (or a forwarded move over content) always fires first on the way in.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (stage === null) {
+      return;
+    }
+    let clickThrough = false;
+    const onMouseMove = (event: MouseEvent): void => {
+      const overContent =
+        event.target instanceof Node &&
+        event.target !== stage &&
+        stage.contains(event.target);
+      if (overContent === clickThrough) {
+        clickThrough = !overContent;
+        window.novaBridge.setPillClickThrough(clickThrough);
+      }
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+    };
+  }, []);
+
   const togglePause = (): void => {
     setAudio((current) => ({ ...current, paused: !current.paused }));
   };

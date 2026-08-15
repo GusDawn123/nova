@@ -5,7 +5,11 @@ import { API_BASE_URL } from "./api/config";
 import { createAuthService } from "./auth/service";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createScreenPrivacy } from "./privacy/screen-privacy";
-import { createPillWindow, resizePillWindow } from "./windows/pill-window";
+import {
+  createPillWindow,
+  resizePillWindow,
+  setPillClickThrough,
+} from "./windows/pill-window";
 import { openSettingsWindow } from "./windows/settings-window";
 
 /**
@@ -55,6 +59,7 @@ async function bootstrap(): Promise<void> {
       });
     },
     resizePill: resizePillWindow,
+    setPillClickThrough,
   });
   app.on("will-quit", () => {
     disposeIpc();

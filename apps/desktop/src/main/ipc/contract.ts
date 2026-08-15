@@ -84,6 +84,17 @@ export const pillResizeMessageSchema = z
   .object({ height: z.number().int().min(60).max(1200) })
   .strict();
 
+/**
+ * renderer → main: whether the pill window should let mouse clicks fall
+ * through to whatever sits underneath it. The window is larger than the
+ * visible pill (shadow and tooltip gutters), and a transparent window still
+ * eats clicks in its invisible parts — so the renderer reports which region
+ * the pointer is over and main flips `setIgnoreMouseEvents` to match.
+ */
+export const pillClickThroughMessageSchema = z
+  .object({ clickThrough: z.boolean() })
+  .strict();
+
 /** The sentence a renderer gets when what it sent did not parse. */
 export const INVALID_CREDENTIALS_PAYLOAD_MESSAGE =
   "Enter an email address and a password.";

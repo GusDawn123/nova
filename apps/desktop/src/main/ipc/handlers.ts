@@ -11,6 +11,7 @@ import {
   authStateMessageSchema,
   credentialsSchema,
   meResultMessageSchema,
+  pillClickThroughMessageSchema,
   pillResizeMessageSchema,
   privacyStateMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
@@ -44,6 +45,8 @@ export interface IpcDeps {
   openSettings: () => void;
   /** Resize the pill window to its content height, already bounds-checked. */
   resizePill: (height: number) => void;
+  /** Let clicks fall through the pill window's invisible gutters (or stop). */
+  setPillClickThrough: (clickThrough: boolean) => void;
 }
 
 const INVALID_CREDENTIALS_RESULT: AuthActionResult = {
@@ -113,7 +116,8 @@ function broadcast(channel: string, payload: unknown): void {
 
 /** Registers every handler and the auth push. Returns its own teardown. */
 export function registerIpcHandlers(deps: IpcDeps): () => void {
-  const { auth, api, privacy, openSettings, resizePill } = deps;
+  const { auth, api, privacy, openSettings, resizePill, setPillClickThrough } =
+    deps;
 
   ipcMain.handle(IpcChannel.authGetState, () =>
     outbound(
@@ -217,6 +221,18 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
   };
   ipcMain.on(IpcChannel.pillResize, onPillResize);
 
+  const onPillClickThrough = (_event: unknown, payload: unknown): void => {
+    const parsed = pillClickThroughMessageSchema.safeParse(payload);
+    if (!parsed.success) {
+      // Dropped: a garbled payload must not decide whether the window takes
+      // clicks — the pointer's next move over a valid region re-sends it.
+      reportOffContract(IpcChannel.pillClickThrough, parsed.error);
+      return;
+    }
+    setPillClickThrough(parsed.data.clickThrough);
+  };
+  ipcMain.on(IpcChannel.pillClickThrough, onPillClickThrough);
+
   const unsubscribe = auth.subscribe((state) => {
     const parsed = authStateMessageSchema.safeParse(state);
     if (!parsed.success) {
@@ -235,6 +251,7 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     unsubscribe();
     ipcMain.removeListener(IpcChannel.settingsOpen, onSettingsOpen);
     ipcMain.removeListener(IpcChannel.pillResize, onPillResize);
+    ipcMain.removeListener(IpcChannel.pillClickThrough, onPillClickThrough);
     for (const channel of [
       IpcChannel.authGetState,
       IpcChannel.authSignIn,
