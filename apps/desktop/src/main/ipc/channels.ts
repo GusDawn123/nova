@@ -16,11 +16,26 @@ export const IpcChannel = {
   authSignOut: "nova:auth:sign-out",
   authGetState: "nova:auth:get-state",
   apiGetMe: "nova:api:get-me",
+  privacyGetState: "nova:privacy:get-state",
+  privacySetState: "nova:privacy:set-state",
   /**
    * main → renderer, push. The UI cannot poll for this: a token refresh or a
    * restored session happens on Supabase's schedule, not on a click.
    */
   authStateChanged: "nova:auth:state-changed",
+  /**
+   * main → renderer, push. Two windows show the same undetectability state
+   * (the pill's eye, the settings toggle); a change made in one must land in
+   * the other without either polling.
+   */
+  privacyStateChanged: "nova:privacy:state-changed",
+  /**
+   * renderer → main, one-way. No answer to give: the pill asks main to open
+   * the settings window, or to resize the pill window to its content — both
+   * are fire-and-forget window management.
+   */
+  settingsOpen: "nova:settings:open",
+  pillResize: "nova:pill:resize",
 } as const;
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel];

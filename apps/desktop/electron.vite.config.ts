@@ -1,3 +1,5 @@
+import { resolve } from "node:path";
+
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "electron-vite";
 import type { Plugin } from "vite";
@@ -121,5 +123,17 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), contentSecurityPolicy()],
+    build: {
+      rollupOptions: {
+        // One HTML document per window. The main process picks which one a
+        // window loads (windows/navigation.ts::loadRendererPage); each gets
+        // the same CSP treatment from the plugin above.
+        input: {
+          index: resolve(import.meta.dirname, "src/renderer/index.html"),
+          pill: resolve(import.meta.dirname, "src/renderer/pill.html"),
+          settings: resolve(import.meta.dirname, "src/renderer/settings.html"),
+        },
+      },
+    },
   },
 });

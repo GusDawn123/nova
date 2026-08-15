@@ -7,8 +7,10 @@ import {
   authResultMessageSchema,
   authStateMessageSchema,
   meResultMessageSchema,
+  privacyStateMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
   type MeResultMessage,
+  type PrivacyStateMessage,
 } from "../main/ipc/contract";
 
 /**
@@ -42,6 +44,20 @@ export interface NovaBridge {
     listener: (state: AuthState) => void,
   ) => () => void;
   readonly getMe: () => Promise<MeResultMessage>;
+  /**
+   * Undetectability. The renderer only ever ASKS — the flag itself is a
+   * main-process act on the windows (docs/DESIGN/desktop-screen-privacy-notes.md),
+   * and every answer here is what main reports back, not what the UI wished.
+   */
+  readonly getScreenPrivacy: () => Promise<PrivacyStateMessage>;
+  readonly setScreenPrivacy: (enabled: boolean) => Promise<PrivacyStateMessage>;
+  readonly onScreenPrivacyChange: (
+    listener: (state: PrivacyStateMessage) => void,
+  ) => () => void;
+  /** Ask main to open (or focus) the settings window. Fire-and-forget. */
+  readonly openSettings: () => void;
+  /** Tell main the pill's content height so the window can hug it. */
+  readonly resizePill: (height: number) => void;
 }
 
 /**
@@ -133,6 +149,43 @@ const novaBridge: NovaBridge = {
     return parsed.success
       ? parsed.data
       : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  getScreenPrivacy: async () => {
+    const parsed = privacyStateMessageSchema.safeParse(
+      await invoke(IpcChannel.privacyGetState),
+    );
+    // An unreadable answer reports DETECTABLE — the direction where a wrong
+    // belief makes the user double-check, not overshare.
+    return parsed.success ? parsed.data : { enabled: false };
+  },
+
+  setScreenPrivacy: async (enabled) => {
+    const parsed = privacyStateMessageSchema.safeParse(
+      await invoke(IpcChannel.privacySetState, { enabled }),
+    );
+    return parsed.success ? parsed.data : { enabled: false };
+  },
+
+  onScreenPrivacyChange: (listener) => {
+    const forward = (_event: unknown, raw: unknown): void => {
+      const parsed = privacyStateMessageSchema.safeParse(raw);
+      if (parsed.success) {
+        listener(parsed.data);
+      }
+    };
+    ipcRenderer.on(IpcChannel.privacyStateChanged, forward);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.privacyStateChanged, forward);
+    };
+  },
+
+  openSettings: () => {
+    ipcRenderer.send(IpcChannel.settingsOpen);
+  },
+
+  resizePill: (height) => {
+    ipcRenderer.send(IpcChannel.pillResize, { height });
   },
 };
 

@@ -4,7 +4,9 @@ import { createApiClient } from "./api/client";
 import { API_BASE_URL } from "./api/config";
 import { createAuthService } from "./auth/service";
 import { registerIpcHandlers } from "./ipc/handlers";
-import { createMainWindow } from "./windows/main-window";
+import { createScreenPrivacy } from "./privacy/screen-privacy";
+import { createPillWindow, resizePillWindow } from "./windows/pill-window";
+import { openSettingsWindow } from "./windows/settings-window";
 
 /**
  * Composition root. Everything with a dependency is built here and injected;
@@ -19,6 +21,13 @@ import { createMainWindow } from "./windows/main-window";
  * also where the later chunks need this to be: audio capture is a main-process
  * concern, and an overlay renderer cannot be trusted to hold state at all.
  */
+// One owner for the undetectability flag, module-scoped because macOS's
+// `activate` can rebuild the pill after bootstrap finished and the new window
+// must attach to the SAME state, not a fresh one. It starts DETECTABLE
+// (Gustavo's call for the first Windows test: launch visible, toggle live);
+// every window attaches at creation and is born wearing the current state.
+const privacy = createScreenPrivacy();
+
 async function bootstrap(): Promise<void> {
   await app.whenReady();
 
@@ -36,13 +45,23 @@ async function bootstrap(): Promise<void> {
     getAccessToken: () => auth.getAccessToken(),
   });
 
-  const disposeIpc = registerIpcHandlers({ auth, api });
+  const disposeIpc = registerIpcHandlers({
+    auth,
+    api,
+    privacy,
+    openSettings: () => {
+      openSettingsWindow(privacy).catch((error: unknown) => {
+        console.error("[main] failed to open the settings window:", error);
+      });
+    },
+    resizePill: resizePillWindow,
+  });
   app.on("will-quit", () => {
     disposeIpc();
     auth.dispose();
   });
 
-  await createMainWindow();
+  await createPillWindow(privacy);
 }
 
 // Windows and Linux expect a desktop app to exit with its last window. macOS
@@ -61,8 +80,8 @@ app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length > 0) {
     return;
   }
-  createMainWindow().catch((error: unknown) => {
-    console.error("[main] failed to reopen the main window:", error);
+  createPillWindow(privacy).catch((error: unknown) => {
+    console.error("[main] failed to reopen the pill window:", error);
   });
 });
 
