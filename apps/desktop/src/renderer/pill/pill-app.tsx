@@ -86,9 +86,7 @@ export function PillApp(): JSX.Element {
   return (
     <div
       ref={stageRef}
-      className={
-        modeMenu ? "pill-stage pill-stage--menu-open" : "pill-stage"
-      }
+      className={modeMenu ? "pill-stage pill-stage--menu-open" : "pill-stage"}
     >
       <div className="pill-shell">
         {view === "pill" && (

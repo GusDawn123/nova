@@ -16,7 +16,9 @@ export function SectionHead({
   readonly spaced?: boolean;
 }): JSX.Element {
   return (
-    <div className={spaced ? "section-head section-head--spaced" : "section-head"}>
+    <div
+      className={spaced ? "section-head section-head--spaced" : "section-head"}
+    >
       <span className="section-title">{title}</span>
       {sub !== undefined && <span className="section-sub">{sub}</span>}
     </div>

@@ -6,12 +6,21 @@ import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { hardenNavigation, loadRendererPage } from "./navigation";
 
 /**
+ * How long the pill is: a fraction of the screen's width, per Gustavo's
+ * 2026-08-15 sizing pass ("a bit less than 1/3"). The pill's INTERNAL sizes —
+ * row thickness, fonts, icons — never change; the shell just stretches to
+ * fill whatever window this hands it (`.pill-stage` is 100vw), so this
+ * constant is the one knob for the pill's length.
+ */
+const PILL_SCREEN_FRACTION = 0.3;
+
+/**
  * The window is wider than the pill so the CSS drop shadow has somewhere to
  * land — a transparent window clips at its own bounds, and a shadow cut off in
- * a hard rectangle reads as a rendering bug. The renderer's shell reserves the
- * same margins, so the numbers live in one place each side of the boundary.
+ * a hard rectangle reads as a rendering bug. Must equal the `.pill-stage`
+ * side padding in pill.css (40px each side).
  */
-const WINDOW_WIDTH = 860;
+const SHADOW_GUTTERS = 80;
 const INITIAL_HEIGHT = 160;
 const TOP_MARGIN = 12;
 
@@ -26,11 +35,13 @@ export async function createPillWindow(
   privacy: ScreenPrivacyService,
 ): Promise<BrowserWindow> {
   const { workArea } = screen.getPrimaryDisplay();
+  const windowWidth =
+    Math.round(workArea.width * PILL_SCREEN_FRACTION) + SHADOW_GUTTERS;
 
   const window = new BrowserWindow({
-    width: WINDOW_WIDTH,
+    width: windowWidth,
     height: INITIAL_HEIGHT,
-    x: workArea.x + Math.round((workArea.width - WINDOW_WIDTH) / 2),
+    x: workArea.x + Math.round((workArea.width - windowWidth) / 2),
     y: workArea.y + TOP_MARGIN,
     show: false,
     frame: false,
@@ -76,5 +87,7 @@ export function resizePillWindow(height: number): void {
   if (pillWindow === null || pillWindow.isDestroyed()) {
     return;
   }
-  pillWindow.setContentSize(WINDOW_WIDTH, height);
+  // Frameless window: bounds and content size are the same rectangle, and
+  // getBounds() has the honest non-optional type.
+  pillWindow.setContentSize(pillWindow.getBounds().width, height);
 }

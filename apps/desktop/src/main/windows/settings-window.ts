@@ -1,17 +1,13 @@
 import { join } from "node:path";
 
-import { BrowserWindow } from "electron";
+import { BrowserWindow, screen } from "electron";
 
 import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { hardenNavigation, loadRendererPage } from "./navigation";
-
-// The mockup's native design size: an 1150-wide panel, ~140 of title + tabs
-// and a 640 content pane.
-const WIDTH = 1150;
-const HEIGHT = 780;
-/** Matches the custom title bar the renderer draws, so the native
- * minimize/maximize/close cluster sits vertically centered on it. */
-const TITLE_BAR_HEIGHT = 44;
+import {
+  settingsWindowSize,
+  SETTINGS_TITLE_BAR_HEIGHT,
+} from "./settings-layout";
 
 let settingsWindow: BrowserWindow | null = null;
 
@@ -33,9 +29,15 @@ export async function openSettingsWindow(
     return;
   }
 
+  // Sized to the screen, not the design: the renderer zooms the fixed-size
+  // design to fit (settings-layout.ts owns the law for both sides).
+  const { width, height } = settingsWindowSize(
+    screen.getPrimaryDisplay().workArea.width,
+  );
+
   const window = new BrowserWindow({
-    width: WIDTH,
-    height: HEIGHT,
+    width,
+    height,
     useContentSize: true,
     resizable: false,
     show: false,
@@ -45,7 +47,7 @@ export async function openSettingsWindow(
     titleBarOverlay: {
       color: "#0c0c0e",
       symbolColor: "#ececef",
-      height: TITLE_BAR_HEIGHT,
+      height: SETTINGS_TITLE_BAR_HEIGHT,
     },
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),

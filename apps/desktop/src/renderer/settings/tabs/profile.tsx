@@ -15,7 +15,12 @@ export function ProfileTab(): JSX.Element {
       <div className="profile__identity">
         <span className="profile__avatar">G</span>
         <span className="profile__name">Gustavo Rosas</span>
-        <a href="#" onClick={(event) => { event.preventDefault(); }}>
+        <a
+          href="#"
+          onClick={(event) => {
+            event.preventDefault();
+          }}
+        >
           Update profile
         </a>
       </div>

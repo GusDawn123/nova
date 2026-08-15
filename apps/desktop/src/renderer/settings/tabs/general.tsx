@@ -44,7 +44,11 @@ export function GeneralTab(): JSX.Element {
         </button>
       </SettingRow>
 
-      <SectionHead spaced title="General" sub="Customize how Nova works for you" />
+      <SectionHead
+        spaced
+        title="General"
+        sub="Customize how Nova works for you"
+      />
       <SettingRow
         icon={
           undetectable ? <IncognitoIcon size={22} /> : <EyeIcon size={22} />

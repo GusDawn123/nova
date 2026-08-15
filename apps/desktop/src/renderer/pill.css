@@ -25,11 +25,14 @@ body {
 /*
  * The stage is the window: 40px side gutters and a deep bottom gutter so the
  * pill's drop shadow (and the tooltips above it) render inside the transparent
- * window instead of clipping at its edge. windows/pill-window.ts sizes the
- * OS window to this element's height.
+ * window instead of clipping at its edge. 100vw, not a fixed width — the MAIN
+ * process decides how long the pill is (a fraction of the screen,
+ * windows/pill-window.ts) and the shell stretches to fill; the side padding
+ * here must equal SHADOW_GUTTERS there. Row thickness, fonts and icons are
+ * untouched by that stretch.
  */
 .pill-stage {
-  width: 860px;
+  width: 100vw;
   padding: 48px 40px 72px;
 }
 
@@ -303,7 +306,10 @@ body {
 
 .mode-menu {
   position: absolute;
-  left: 400px;
+  /* The mockup pins it 400px into a 780px pill; proportional (51%) so it
+     stays under the squares icon at every pill length, clamped so a short
+     pill never pushes it past the window's edge. */
+  left: min(51%, calc(100% - 270px));
   top: calc(100% + 6px);
   width: 270px;
   background: #141417;

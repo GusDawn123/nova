@@ -69,6 +69,16 @@ a:hover {
   color: #ececef;
 }
 
+/*
+ * The design at its fixed size, scaled as one block. `zoom` and the design
+ * width/height arrive inline from settings-layout.ts via settings-app.tsx —
+ * the single source both processes size from.
+ */
+.settings__zoom {
+  display: flex;
+  flex-direction: column;
+}
+
 .settings__tabs {
   flex: none;
   display: flex;

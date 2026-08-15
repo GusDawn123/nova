@@ -1,5 +1,10 @@
-import { useState, type JSX, type ReactNode } from "react";
+import { useMemo, useState, type JSX, type ReactNode } from "react";
 
+import {
+  settingsZoom,
+  SETTINGS_CONTENT_DESIGN_HEIGHT,
+  SETTINGS_DESIGN_WIDTH,
+} from "../../main/windows/settings-layout";
 import { CalendarIcon } from "../design/icons";
 import {
   TabAboutIcon,
@@ -64,43 +69,59 @@ const PANES: Record<TabId, () => JSX.Element> = {
  * The settings window: a centered title strip (the native Windows controls
  * ride its right edge via titleBarOverlay), the nine-tab bar, and one pane.
  * The Modes pane owns its own columns, so it opts out of the scroll padding.
+ *
+ * Everything below the title strip is the mockup at its fixed design size,
+ * zoomed as one block to fill the window main sized to the screen
+ * (settings-layout.ts owns the law for both sides). Chromium's standardized
+ * `zoom` scales layout too, so design pixels inside stay honest. The window
+ * is not resizable, so the zoom is computed once.
  */
 export function SettingsApp(): JSX.Element {
   const [tab, setTab] = useState<TabId>("general");
   const Pane = PANES[tab];
+  const zoom = useMemo(() => settingsZoom(window.innerWidth), []);
 
   return (
     <>
       <div className="settings__titlebar">
         <span className="settings__title">Nova Settings</span>
       </div>
-      <div className="settings__tabs">
-        {TABS.map((entry) => (
-          <button
-            type="button"
-            key={entry.id}
-            className={
-              entry.id === tab
-                ? "settings__tab settings__tab--active"
-                : "settings__tab"
-            }
-            onClick={() => {
-              setTab(entry.id);
-            }}
-          >
-            {entry.icon}
-            <span>{entry.name}</span>
-          </button>
-        ))}
-      </div>
       <div
-        className={
-          tab === "modes"
-            ? "settings__pane settings__pane--modes"
-            : "settings__pane"
-        }
+        className="settings__zoom"
+        style={{
+          zoom,
+          width: SETTINGS_DESIGN_WIDTH,
+          height: SETTINGS_CONTENT_DESIGN_HEIGHT,
+        }}
       >
-        <Pane />
+        <div className="settings__tabs">
+          {TABS.map((entry) => (
+            <button
+              type="button"
+              key={entry.id}
+              className={
+                entry.id === tab
+                  ? "settings__tab settings__tab--active"
+                  : "settings__tab"
+              }
+              onClick={() => {
+                setTab(entry.id);
+              }}
+            >
+              {entry.icon}
+              <span>{entry.name}</span>
+            </button>
+          ))}
+        </div>
+        <div
+          className={
+            tab === "modes"
+              ? "settings__pane settings__pane--modes"
+              : "settings__pane"
+          }
+        >
+          <Pane />
+        </div>
       </div>
     </>
   );

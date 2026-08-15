@@ -113,9 +113,7 @@ export function PillBar(props: PillBarProps): JSX.Element {
 
             <span className="tipwrap">
               <span
-                className={
-                  props.modeMenuOpen ? "tip tip--suppressed" : "tip"
-                }
+                className={props.modeMenuOpen ? "tip tip--suppressed" : "tip"}
               >
                 {activeName}
               </span>
