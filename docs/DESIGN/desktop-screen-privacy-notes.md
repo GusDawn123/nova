@@ -15,9 +15,9 @@ our own, reproduced from scratch.
   applied **at window creation**. Not React, not GPU, not a private API.
 - **macOS: PROVEN.** On macOS 26.5.2 (Apple Silicon, Electron 43) the window is
   **absent from a live Google Meet full-screen share** and fully visible locally.
-- **Windows: NOT YET TESTED.** The same call maps to a different OS API there,
-  with a documented risk it does not take effect for Electron windows. Must be
-  tested on real Windows hardware before we trust it. See
+- **Windows: PROVEN.** On Windows 11 (build 10.0.26200, Electron 43.4.0) both
+  Nova windows disappear from a live screen share when the toggle is on and
+  return when it is off — toggled live over IPC, both directions. See
   [Windows](#windows--still-to-test).
 - Screen-capture exclusion lives in **main**; the React renderer can only *ask*
   main to toggle it over IPC. Putting it in the renderer is impossible and would
@@ -164,7 +164,14 @@ Windows needs a workaround.
    **Fail:** it shows in the share.
 4. Record the result here (Windows version/build, Electron version, outcome).
 
-**Windows result: __________ (pending — Gustavo, on real Win11 hardware).**
+**Windows result: WORKS (2026-08-15 — Gustavo, real hardware).** Windows 11
+Home (build 10.0.26200), Electron 43.4.0, the real Nova desktop app (pill +
+settings windows). `setContentProtection` toggled **live over IPC** — not only
+at creation: with the toggle ON both windows are absent from the screen share;
+with it OFF both appear; both directions repeatable mid-share. This also
+retires the §4.2 risk for this machine — the "fails for Chromium-class windows
+on Win11" report did not reproduce — and shows the lazy-apply path works on
+Windows (the macOS timing note above stands unrevisited).
 
 ---
 

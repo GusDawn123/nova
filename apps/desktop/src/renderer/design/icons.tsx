@@ -64,6 +64,23 @@ export function EyeIcon({ size = 18 }: IconProps): JSX.Element {
   );
 }
 
+/**
+ * Hat and glasses — the undetectability toggle's face while Nova is HIDDEN
+ * from screen capture (the eye shows while detectable). Drawn in-house in the
+ * mockups' stroke style; not from the bundle, which predates this state swap.
+ */
+export function IncognitoIcon({ size = 18 }: IconProps): JSX.Element {
+  return (
+    <Svg size={size} strokeWidth={1.4}>
+      <path d="M2.8 9.4h14.4" />
+      <path d="M5.4 9.4 6.6 5a1.7 1.7 0 0 1 2.2-1.1l.6.22a1.7 1.7 0 0 0 1.2 0l.6-.22A1.7 1.7 0 0 1 13.4 5l1.2 4.4" />
+      <circle cx="6.6" cy="14.2" r="2.2" />
+      <circle cx="13.4" cy="14.2" r="2.2" />
+      <path d="M8.8 13.8c.8-.5 1.6-.5 2.4 0" />
+    </Svg>
+  );
+}
+
 /** The 2×2 squares — the mode picker. Filled while a mode is engaged. */
 export function SquaresIcon({
   size = 18,

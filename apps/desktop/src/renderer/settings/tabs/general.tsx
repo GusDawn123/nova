@@ -4,6 +4,7 @@ import {
   AudioBarsIcon,
   ExternalIcon,
   EyeIcon,
+  IncognitoIcon,
   RefreshIcon,
 } from "../../design/icons";
 import { useScreenPrivacy } from "../../hooks/use-screen-privacy";
@@ -45,7 +46,9 @@ export function GeneralTab(): JSX.Element {
 
       <SectionHead spaced title="General" sub="Customize how Nova works for you" />
       <SettingRow
-        icon={<EyeIcon size={22} />}
+        icon={
+          undetectable ? <IncognitoIcon size={22} /> : <EyeIcon size={22} />
+        }
         title="Undetectability"
         desc="Off means Nova is detectable by screen sharing."
       >

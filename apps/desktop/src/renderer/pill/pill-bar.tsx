@@ -7,6 +7,7 @@ import {
   DownArrowIcon,
   EyeIcon,
   FileIcon,
+  IncognitoIcon,
   PauseGlyph,
   PlayGlyph,
   ReturnIcon,
@@ -106,7 +107,7 @@ export function PillBar(props: PillBarProps): JSX.Element {
                 className={iconButton(props.undetectable)}
                 onClick={props.onToggleUndetectable}
               >
-                <EyeIcon />
+                {props.undetectable ? <IncognitoIcon /> : <EyeIcon />}
               </button>
             </span>
 
