@@ -6,8 +6,8 @@ const DEFAULT_WIDTH = 1100;
 const DEFAULT_HEIGHT = 760;
 
 /**
- * The one visible window. Later chunks add the stealth overlay beside it; this
- * is the ordinary window the user signs in through.
+ * The one visible window. Later chunks add the screen-privacy overlay beside it;
+ * this is the ordinary window the user signs in through.
  */
 export async function createMainWindow(): Promise<BrowserWindow> {
   const window = new BrowserWindow({

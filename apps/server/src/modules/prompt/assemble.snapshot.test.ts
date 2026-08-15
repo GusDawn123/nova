@@ -26,7 +26,7 @@ const PINNED: Record<PromptMode, string> = {
   // spoken-prose default. The source doc's headline-and-bullets card and the
   // "**Objection: [Name]**" coaching label were quietly fighting THE REGISTER;
   // both are gone. Added: em-dash/semicolon spoken-punctuation ban, the 15-30s
-  // length law, opener rotation, context stealth, speakable admissions, and the
+  // length law, opener rotation, silent context, speakable admissions, and the
   // position-pinned FINAL CHECK. Earlier same-day repins: (1) the teleprompter
   // register (the "no pronouns" narration fix); (2) SOUND HUMAN (spoken-rhythm
   // mechanics + machine-tell blacklist).

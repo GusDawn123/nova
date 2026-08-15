@@ -43,8 +43,8 @@
  *    that is genuinely structural (code, notes, requested breakdowns). The same
  *    study killed the "**Objection: [Name]**" label — a coaching tag the user
  *    cannot say — in favour of speakable acknowledgment openers, added the
- *    em-dash/semicolon spoken-punctuation ban, the 15-30s length law, context
- *    stealth, speakable admissions, and the position-pinned FINAL CHECK.
+ *    em-dash/semicolon spoken-punctuation ban, the 15-30s length law, silent
+ *    context, speakable admissions, and the position-pinned FINAL CHECK.
  */
 
 const IDENTITY = `You are Nova, developed and created by Nova, and you are the user's live-meeting co-pilot.

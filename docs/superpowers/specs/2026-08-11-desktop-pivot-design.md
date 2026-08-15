@@ -15,12 +15,13 @@ Companion: [`docs/DESIGN/desktop-native-notes.md`](../../DESIGN/desktop-native-n
 
 | | |
 |---|---|
-| **Ratified** | desktop pivot; Electron + C++ Node-API addon; audio-first build order; wire format; two-stream speaker attribution; **stealth is a core product feature, not a nice-to-have**; **Windows ships first, macOS is scaffolded but not built** |
+| **Ratified** | desktop pivot; Electron + C++ Node-API addon; audio-first build order; wire format; two-stream speaker attribution; **screen privacy is a core product feature, not a nice-to-have**; **Windows ships first, macOS is scaffolded but not built** |
 | **Open — needs Gustavo** | `apps/mobile` fate; bundle id; macOS minimum version |
 | **Not started** | every chunk. No code has been written. |
 
-**Ratified 2026-08-11 (Gustavo, explicit):** stealth is the reason this product
-exists — a sales copilot that is visible in a screen share is not the product.
+**Ratified 2026-08-11 (Gustavo, explicit):** screen privacy is the reason this
+product exists — a sales copilot that shows up in the user's own screen share is
+not the product.
 No architecture is dropped. We build Windows first, where the mechanism is
 documented and real, and we lay the macOS folder structure and port boundaries
 in place so the macOS implementation drops in later without a refactor.
@@ -109,7 +110,7 @@ not the product.
 │  │    macOS:   CoreAudio tap (14.4+) / SCK (13+)         │  │
 │  │    → normalises everything to ONE PCM format          │  │
 │  │                                                       │  │
-│  │  StealthWindow port                                   │  │
+│  │  ScreenPrivacy port                                   │  │
 │  │    Windows: display affinity + read-back ◄── FIRST    │  │
 │  │    macOS:   AppKit — NSPanel attributes Electron      │  │
 │  │             does not expose, and the WindowServer     │  │
@@ -136,7 +137,7 @@ now rather than after Windows ships.
 
 **Where Electron is enough, use Electron; where it is not, go native.** On
 Windows the capture-exclusion mechanism is reachable through Electron's own API,
-so the Windows branch of `StealthWindow` is thin — it exists for the read-back
+so the Windows branch of `ScreenPrivacy` is thin — it exists for the read-back
 and re-assert that Electron does not expose (§10). On macOS it will not be thin:
 the attributes that matter live in AppKit and below it, and Electron exposes
 none of them. That asymmetry is expected and is not a reason to avoid native
@@ -180,11 +181,11 @@ Three facts make this credible rather than a forum rumour:
 3. The symbol has existed since at least macOS 10.13 and Apple's own apps call
    it.
 
-**Why every competitor is still visible.** Electron briefly picked up Chromium's
-new implementation and **reverted it** (electron#46886) — for a *rendering*
-regression (transparent child windows drawing grey), **not** a hiding failure.
-So Chrome protects windows with the working call while every Electron app,
-including Cluely and its clones, still uses the dead flag. That single fact
+**Why Electron apps in this category still appear in captures.** Electron
+briefly picked up Chromium's new implementation and **reverted it**
+(electron#46886) — for a *rendering* regression (transparent child windows
+drawing grey), **not** an exclusion failure. So Chrome excludes windows with the
+working call while Electron apps still use the dead flag. That single fact
 explains the entire category's macOS problem, and it is fixable in a small
 native addon.
 
@@ -231,7 +232,7 @@ Win32 apps, acknowledged by a Microsoft engineer.
 | **Type free-form text without taking focus** | ✅ only via a session `CGEventTap` — needs **Accessibility** permission and an app restart after granting | ❌ **not possible.** The overlay must take real focus; the meeting app sees a focus change |
 
 This is a **documented capability split**, not a gap to close. We should not ship
-a Windows path that pretends to be stealthy.
+a Windows path that claims a capability the OS does not give it.
 
 ### 4.4 Permissions the user must grant
 
@@ -244,6 +245,16 @@ a Windows path that pretends to be stealthy.
 
 macOS onboarding therefore has to walk a user through two prompts minimum. That
 is a design problem for a later chunk, but it belongs on the record now.
+
+**Consent and disclosure.** Nova captures a meeting the same way any notetaker
+does — the user's own microphone and the system output on the user's own
+machine. Disclosure to the other party is a product requirement, not an
+afterthought: the app must show a visible in-call recording state, and
+onboarding must tell the user they are responsible for disclosure wherever their
+jurisdiction requires it. Nova does not join calls as a bot, and captures
+nothing when no session is running. Screen privacy keeps the copilot out of the
+user's *own* screen share; it is not a way to hide the recording from the people
+on the call.
 
 ---
 
@@ -292,9 +303,9 @@ is written until the Windows product works end to end.
 | 1 | **Electron shell** | no | a normal visible window that boots, loads the UI, signs in through the existing Supabase seam, and calls `GET /me` | app shows the signed-in user's data from the real server. **Plus the §4.2 probe:** call the affinity API from a real Electron window on this Windows 11 machine, record the return value, screen-share to a second device and look |
 | 2 | **System audio capture** | **yes** | two labelled PCM streams — WASAPI loopback + mic — arriving in the main process in the §5.2 wire format, handling **both** the multimedia and communications default output roles | a recorded two-party Zoom call produces two `.wav` files, each containing only its own speaker, with the meeting routed to the communications device |
 | 3 | **Live transcription end-to-end** | no | both streams over the existing `/live` socket; transcript renders with correct `me`/`them` labels | a real call transcribes live, speakers correctly attributed, notes generated post-call |
-| 4 | **Stealth overlay window** | **yes** | frameless, always-on-top over fullscreen Zoom, capture-excluded, applied in the correct DWM order, never steals focus | **the product test:** join a Zoom call from this machine, share the full screen to a second device, and confirm the overlay is absent from what the second device sees while remaining visible locally |
+| 4 | **Screen-privacy overlay window** | **yes** | frameless, always-on-top over fullscreen Zoom, capture-excluded, applied in the correct DWM order, never steals focus | **the product test:** join a Zoom call from this machine, share the full screen to a second device, and confirm the overlay is absent from what the second device sees while remaining visible locally |
 | 5 | **Overlay interaction** | no | global hotkeys to summon, dismiss, and steer; click-through so clicks reach the app underneath | the full copilot loop driven from the keyboard with the meeting app frontmost the entire time |
-| 6 | **Stealth watchdog + status** | **yes** | read the affinity flag back from the OS, re-assert on the reset events, and surface *hidden* / *visible* / **cannot verify** to the UI | force a reset (display change, session lock, fullscreen transition) and watch the app detect it and recover — the thing the reference implementation never built |
+| 6 | **Screen-privacy watchdog + status** | **yes** | read the affinity flag back from the OS, re-assert on the reset events, and surface *hidden* / *visible* / **cannot verify** to the UI | force a reset (display change, session lock, fullscreen transition) and watch the app detect it and recover — the thing the reference implementation never built |
 | 7 | **Packaging and shipping** | no | signed, auto-updating Windows installer | a fresh Windows machine installs from the artifact and auto-updates to the next build |
 | 8+ | **macOS** | **yes** | fill in the macOS branch of each port | its own design pass, informed by the §4.1 research, before any of it is planned |
 
@@ -377,7 +388,7 @@ this list, it is not sanctioned — build it the way that is known to work.
 | **Keep the audio callback genuinely lock-free** | The reference's callback locks a mutex to signal a condition variable that nothing waits on. Removing it is strictly less work at strictly lower risk. |
 | **C++ over Node-API instead of Rust** | Gustavo's call, ratified. Node-API is the same ABI-stable boundary the reference uses (napi-rs is Node-API), so this is a language change, not an architecture change. |
 | **Reuse Nova's existing server** | The reference is a self-contained desktop app. Nova already has an authed `/live` socket, STT failover, RAG memory, metering, quotas and notes in production. The desktop client is a client. |
-| **macOS: `CGSSetWindowCaptureExcludeShape`, not `sharingType`** (chunk 8) | The single most valuable finding in this research. The reference — and Cluely, and every clone in the category — hides windows with a flag Apple retired, which is why their users get caught. Chromium replaced that flag with this SPI and Chrome depends on it today. Using the call that actually works is not deviation, it is the difference between the feature existing and not. |
+| **macOS: `CGSSetWindowCaptureExcludeShape`, not `sharingType`** (chunk 8) | The single most valuable finding in this research. The reference — and others in the category — exclude windows with a flag Apple retired, which is why their overlays still turn up in captures. Chromium replaced that flag with this SPI and Chrome depends on it today. Using the call that actually works is not deviation, it is the difference between the feature existing and not. |
 
 **Everything else mirrors the reference**, including the parts that look odd: the
 Windows opacity-shield ordering before setting the capture flag, the DWM settle
@@ -403,5 +414,5 @@ To be updated in the PR that lands this doc:
 - **`docs/LOOP_PLAYBOOK.md`** — phases 8/9 were written around mobile.
 - **`docs/BUSINESS/unit-economics.md`** — mark stale (two streams, desktop
   session lengths). Explicitly deferred by Gustavo, not silently ignored.
-- **A new ADR** recording the pivot itself and the §4.1 macOS stealth finding,
+- **A new ADR** recording the pivot itself and the §4.1 macOS screen-privacy finding,
   so nobody re-litigates it in six months.

@@ -117,7 +117,7 @@ and the `**Objection: [Name]**` coaching label are GONE (both fought the
 teleprompter register on every answer); the default shape is a speakable paragraph
 with 1-3 bolded key terms as the glance aid (bold is never spoken), structure only
 for code/notes/explicit requests. Added: the em-dash/semicolon spoken-punctuation
-ban, the 15-30s length law, opener rotation, context stealth, speakable
+ban, the 15-30s length law, opener rotation, silent context, speakable
 admissions, a position-pinned FINAL CHECK (recency anchor — a test asserts it
 stays last), per-mode voice anchors, and re-voiced few-shots (the model believes
 the demonstration over the instruction). Behavioral = a four-beat spoken story;

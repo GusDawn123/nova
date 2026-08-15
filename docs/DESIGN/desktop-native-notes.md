@@ -26,6 +26,14 @@ below is a port.
 
 ## 1. System audio + microphone — chunk 2
 
+**Consent and disclosure.** What follows is the same capture any meeting
+notetaker performs: the user's own microphone plus the system output on the
+user's own machine, both under OS permission grants the user makes explicitly
+(§4.4 of the design doc). Disclosure to the other party is a product
+requirement — the app must show a visible in-call recording state, and
+onboarding must tell the user they are responsible for disclosure wherever their
+jurisdiction requires it. Nothing is captured when no session is running.
+
 ### 1.1 macOS: two paths, one version cliff
 
 | | CoreAudio process tap | ScreenCaptureKit |
@@ -234,6 +242,12 @@ unregister-all-then-re-register, so there is never a gap.
 
 ## 3. Typing without focus — macOS only
 
+**Purpose: typing into Nova's own overlay.** The tap exists so the user can type
+a question to their copilot without the meeting app losing focus mid-call. It
+reads keystrokes only while the user is addressing Nova, forwards everything
+else untouched, and nothing typed into other applications is stored or sent
+anywhere. It is an input path for our own window, not a keystroke log.
+
 A session-level `CGEventTap` is the **only** way to accept free-form typed text
 while another app remains key. Electron's `globalShortcut` gives discrete
 accelerators and nothing more; any DOM-focus path forces the panel to become key
@@ -304,8 +318,8 @@ Windows path unless marked otherwise.
 ### macOS — the call that actually works (chunk 8)
 
 Do **not** use `NSWindow.sharingType` / Electron's `setContentProtection`. Apple
-retired it, and it is why every Electron competitor in this category is visible
-in a modern screen share.
+retired it, and it is why Electron windows in this category still appear in a
+modern screen share.
 
 The mechanism is a private CoreGraphics/WindowServer SPI:
 
