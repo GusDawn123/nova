@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet"><style>
+body{margin:0;background:#e9e7e2;font-family:"Space Grotesk",system-ui,sans-serif}
+a{color:#3aa2e0}a:hover{color:#6cc0ef}
+::-webkit-scrollbar{width:10px}::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px;border:3px solid #0c0c0e}::-webkit-scrollbar-track{background:transparent}
+select option{background:#131316;color:#f0f0f2}
+input::placeholder{color:rgba(255,255,255,.55)}
+</style></helmet>
+
+<div style="position:relative;width:2620px;height:1000px;overflow:hidden;background:#e9e7e2">
+<span style="position:absolute;left:24px;top:18px;font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(10,10,40,.4)">nova settings — canvas = full screen · drag either panel · click the tabs</span>
+
+<sc-if value="{{ showPill }}" hint-placeholder-val="{{ true }}">
+<div onMouseDown="{{ startDrag }}" data-screen-label="Nova Pill" style="position:absolute;left:477px;top:56px;width:645px;height:98px;z-index:3;cursor:grab">
+<div style="width:780px;transform:scale(0.827);transform-origin:top left;position:relative">
+<sc-if value="{{ pillMode }}" hint-placeholder-val="{{ true }}">
+<div style="border-radius:14px;overflow:hidden;background:rgba(14,20,30,.74);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.16);box-shadow:0 20px 50px rgba(10,14,30,.22)">
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,.16)">
+    <sc-if value="{{ tabHint }}" hint-placeholder-val="{{ true }}">
+    <span data-int="1" onClick="{{ focusAsk }}" style="flex:1;display:flex;align-items:center;gap:8px;cursor:text">
+      <span style="font:500 11.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px">Tab</span>
+      <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">to focus</span>
+    </span>
+    </sc-if>
+    <sc-if value="{{ askMode }}" hint-placeholder-val="{{ false }}">
+    <input data-int="1" ref="{{ askRef }}" onBlur="{{ blurAsk }}" placeholder="{{ askLabel }}" style="flex:1;background:transparent;border:none;outline:none;font:400 15.5px 'Space Grotesk',sans-serif;color:#fff"/>
+    </sc-if>
+    <span style="flex:none;width:30px;height:30px;border-radius:8px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg></span>
+  </div>
+  <div style="display:flex;align-items:center;padding:7px 16px;border-top:1px solid rgba(238,240,255,.09)">
+    <span data-int="1" onClick="{{ toggleSettings }}" title="Open Nova settings" style="flex:none;width:22px;height:22px;border-radius:50%;overflow:hidden;background:#fff;opacity:.9;cursor:pointer"><img src="uploads/nova-logo-transparent.png" alt="Open Nova settings" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <div style="margin:0 auto;display:flex;align-items:center;gap:6px;color:rgba(255,255,255,.72)">
+      <span style="position:relative;display:flex">
+        <span style="{{ tipScreen }}">Uses Screen</span>
+        <span data-int="1" onMouseEnter="{{ hScreen.enter }}" onMouseLeave="{{ hScreen.leave }}" onClick="{{ hScreen.click }}" style="{{ hScreen.btn }}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"></rect><circle cx="7.5" cy="8" r="1.4"></circle><path d="M3 14l4.2-4 3.3 3.1 2.6-2.4L17 14"></path></svg></span>
+      </span>
+      <span style="position:relative;display:flex">
+        <span style="{{ tipEye }}">{{ eyeLabel }}</span>
+        <span data-int="1" onMouseEnter="{{ hEye.enter }}" onMouseLeave="{{ hEye.leave }}" onClick="{{ hEye.click }}" style="{{ hEye.btn }}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg></span>
+      </span>
+      <span style="position:relative;display:flex">
+        <span style="{{ tipSquares }}">{{ modeLabel }}</span>
+        <span data-int="1" onMouseEnter="{{ hSquares.enter }}" onMouseLeave="{{ hSquares.leave }}" onClick="{{ hSquares.click }}" style="{{ hSquares.btn }}"><svg width="18" height="18" viewBox="0 0 20 20" fill="{{ squaresFill }}" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg></span>
+      </span>
+      <span style="width:1px;height:16px;background:rgba(238,240,255,.16);margin:0 8px"></span>
+      <span style="position:relative;display:flex">
+        <span style="{{ tipAudio }}">{{ audioLabel }}</span>
+        <span style="{{ audioCluster }}">
+          <sc-if value="{{ audioOff }}" hint-placeholder-val="{{ true }}">
+          <span data-int="1" onMouseEnter="{{ hAudio.enter }}" onMouseLeave="{{ hAudio.leave }}" onClick="{{ hAudio.click }}" style="{{ hAudio.btn }}"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 8v4M7 5.5v9M10 7v6M13 4.5v11M16 8.5v3"></path></svg></span>
+          </sc-if>
+          <sc-if value="{{ audioOn }}" hint-placeholder-val="{{ false }}">
+          <span data-int="1" onClick="{{ togglePause }}" title="Pause" style="flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#fff">
+            <sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 16 16" fill="rgba(255,255,255,.9)"><rect x="3.4" y="2.5" width="3" height="11" rx="1"></rect><rect x="9.6" y="2.5" width="3" height="11" rx="1"></rect></svg></sc-if>
+            <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 16 16" fill="rgba(255,255,255,.9)"><path d="M4 2.8v10.4L13 8Z"></path></svg></sc-if>
+          </span>
+          <span data-int="1" onClick="{{ stopAudio }}" title="Stop session" style="flex:none;width:30px;height:30px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:11px;height:11px;border-radius:3px;background:#0a0a14"></span></span>
+          <span style="flex:none;font:500 13px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.85)">{{ audioTime }}</span>
+          </sc-if>
+        </span>
+      </span>
+    </div>
+    <sc-if value="{{ audioOff }}" hint-placeholder-val="{{ true }}">
+    <div data-int="1" onClick="{{ openHistory }}" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+      <span style="font:500 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">History</span>
+      <span style="width:24px;height:24px;border-radius:7px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5v9M4.5 9 8 12.5 11.5 9"></path></svg></span>
+    </div>
+    </sc-if>
+    <sc-if value="{{ audioOn }}" hint-placeholder-val="{{ false }}">
+    <div data-int="1" onClick="{{ openTranscript }}" style="display:flex;align-items:center;gap:8px;cursor:pointer;color:rgba(255,255,255,.8)">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h7L15.5 6v11.5h-10.5Z"></path><path d="M12 2.5V6h3.5"></path></svg>
+      <span style="font:500 12px 'Space Grotesk',sans-serif">Transcript</span>
+    </div>
+    </sc-if>
+  </div>
+</div>
+<sc-if value="{{ modeMenuOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;left:400px;top:calc(100% + 6px);width:270px;background:#141417;border:1px solid rgba(255,255,255,.1);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.5);padding:8px 0;z-index:7">
+  <sc-for list="{{ menuModes }}" as="mm" hint-placeholder-count="5">
+    <div data-int="1" onClick="{{ mm.onClick }}" style="display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;font:400 16px 'Space Grotesk',sans-serif;color:#f0f0f2" style-hover="background:rgba(255,255,255,.07)">
+      <span style="flex:1">{{ mm.name }}</span>
+      <svg style="{{ mm.checkStyle }}" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10.5 8.2 14.5 16 5.5"></path></svg>
+    </div>
+  </sc-for>
+  <div style="height:1px;background:rgba(255,255,255,.1);margin:8px 0"></div>
+  <div data-int="1" onClick="{{ openManage }}" style="display:flex;align-items:center;gap:12px;padding:11px 20px;cursor:pointer;font:400 16px 'Space Grotesk',sans-serif;color:#f0f0f2" style-hover="background:rgba(255,255,255,.07)">
+    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg>
+    <span>Manage</span>
+  </div>
+</div>
+</sc-if>
+</sc-if>
+
+<sc-if value="{{ historyMode }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;overflow:hidden;background:rgba(10,12,16,.93);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.14);box-shadow:0 24px 60px rgba(10,14,30,.35)">
+  <div style="display:flex;align-items:center;gap:14px;padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.09)">
+    <span data-int="1" onClick="{{ closeHistory }}" title="Back to pill" style="flex:none;width:36px;height:36px;border-radius:10px;background:rgba(238,240,255,.12);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(238,240,255,.2)"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8H3M7 3.5 2.5 8 7 12.5"></path></svg></span>
+    <span style="flex:1;font:400 17px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.5)">Ask or search anything</span>
+    <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,.6)" stroke-width="1.5" stroke-linecap="round"><circle cx="9" cy="9" r="5.5"></circle><path d="M13.2 13.2 17 17"></path></svg>
+  </div>
+  <div style="padding:18px 16px 10px;display:flex;flex-direction:column;gap:13px">
+    <span style="display:flex;align-items:center;gap:10px;font:600 12px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">UPCOMING<svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8a6 6 0 1 1-.6 4M4.5 8V4.5M4.5 8H8"></path></svg></span>
+    <div data-int="1" style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.07);border-radius:12px;padding:12px 14px;cursor:pointer" style-hover="background:rgba(255,255,255,.11)">
+      <span style="flex:none;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.2" width="14" height="12.8" rx="2"></rect><path d="M3 8.4h14M7 2.4v3M13 2.4v3"></path></svg></span>
+      <span style="font:500 16px 'Space Grotesk',sans-serif;color:#f0f0f2">Connect your calendar</span>
+    </div>
+    <span style="font:600 12px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45);margin-top:8px">FRI, AUG 14, 2026</span>
+    <div data-int="1" style="display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.07);border-radius:12px;padding:12px 14px;cursor:pointer" style-hover="background:rgba(255,255,255,.11)">
+      <span style="flex:none;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 2.8h5.5L15 6v11.2H6Z"></path><path d="M11.5 2.8V6H15"></path></svg></span>
+      <span style="flex:1;font:500 16px 'Space Grotesk',sans-serif;color:#f0f0f2">Weekend Crew Scheduling Call</span>
+      <span style="background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font:500 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">4h 8m</span>
+      <span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">3:00 PM</span>
+    </div>
+    <div data-int="1" style="display:flex;align-items:center;gap:14px;border-radius:12px;padding:12px 14px;cursor:pointer" style-hover="background:rgba(255,255,255,.07)">
+      <span style="flex:none;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 2.8h5.5L15 6v11.2H6Z"></path><path d="M11.5 2.8V6H15"></path></svg></span>
+      <span style="flex:1;font:500 16px 'Space Grotesk',sans-serif;color:#f0f0f2">Untitled session</span>
+      <span style="background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font:500 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">1m</span>
+      <span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">10:30 AM</span>
+    </div>
+    <div data-int="1" style="display:flex;align-items:center;gap:14px;border-radius:12px;padding:12px 14px;cursor:pointer" style-hover="background:rgba(255,255,255,.07)">
+      <span style="flex:none;width:38px;height:38px;border-radius:10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)"><svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M6 2.8h5.5L15 6v11.2H6Z"></path><path d="M11.5 2.8V6H15"></path></svg></span>
+      <span style="flex:1;font:500 16px 'Space Grotesk',sans-serif;color:#f0f0f2">Untitled session</span>
+      <span style="background:rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font:500 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">1m</span>
+      <span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">10:30 AM</span>
+    </div>
+    <div style="height:120px"></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:14px;padding:12px 16px;border-top:1px solid rgba(255,255,255,.09)">
+    <span style="flex:none;width:22px;height:22px;border-radius:50%;overflow:hidden;background:#fff;opacity:.9"><img src="uploads/nova-logo-transparent.png" alt="Nova" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <span style="flex:1"></span>
+    <span style="display:flex;align-items:center;gap:9px;font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">Open<span style="width:28px;height:28px;border-radius:8px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg></span></span>
+    <span style="width:1px;height:18px;background:rgba(255,255,255,.14)"></span>
+    <span style="display:flex;align-items:center;gap:9px;font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.75)"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4.5" width="13" height="11" rx="2"></rect><path d="M10 7.2v4.6M7.7 9.5h4.6"></path></svg>New chat<span style="width:26px;height:26px;border-radius:7px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center;font:500 12.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">⌘</span><span style="width:26px;height:26px;border-radius:7px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center;font:500 12.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">R</span></span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ transcriptMode }}" hint-placeholder-val="{{ false }}">
+<div style="border-radius:16px;overflow:hidden;background:rgba(14,20,30,.62);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 55px rgba(10,14,30,.25)">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,.16)">
+    <span data-int="1" onClick="{{ closeTranscript }}" title="Back to pill" style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;cursor:pointer" style-hover="background:rgba(255,255,255,.24)">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8h-9M7 3.5 2.5 8 7 12.5"></path></svg>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span style="font:500 11.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px">Tab</span>
+      <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">to focus</span>
+    </span>
+    <span style="flex:1"></span>
+    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg>
+    </span>
+  </div>
+  <div style="padding:22px 18px 20px;display:flex;flex-direction:column;gap:22px;min-height:300px">
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:21</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Mm-hmm.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:23</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">So walk me through the rollout timeline again?</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:29</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">and the three sites go live in Q1.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:31</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Honestly it's more than we planned to spend.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:46</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Oh, no.</span>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;padding:11px 16px;border-top:1px solid rgba(255,255,255,.1)">
+    <span data-int="1" onClick="{{ toggleSettings }}" title="Open Nova settings" style="flex:none;width:24px;height:24px;border-radius:50%;overflow:hidden;background:#fff;cursor:pointer;box-shadow:0 0 0 1.5px rgba(255,255,255,.3)"><img src="uploads/nova-logo-transparent.png" alt="Open Nova settings" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <div style="margin:0 auto;display:flex;align-items:center;gap:14px;color:rgba(255,255,255,.72)">
+      <span data-int="1" onClick="{{ togglePause }}" style="flex:none;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <sc-if value="{{ playing }}" hint-placeholder-val="{{ true }}"><svg width="15" height="15" viewBox="0 0 16 16" fill="rgba(255,255,255,.9)"><rect x="3.4" y="2.5" width="3" height="11" rx="1"></rect><rect x="9.6" y="2.5" width="3" height="11" rx="1"></rect></svg></sc-if>
+        <sc-if value="{{ paused }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 16 16" fill="rgba(255,255,255,.9)"><path d="M4 2.8v10.4L13 8Z"></path></svg></sc-if>
+      </span>
+      <span data-int="1" onClick="{{ stopAudio }}" title="Stop session" style="flex:none;width:30px;height:30px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer"><span style="width:11px;height:11px;border-radius:3px;background:#0a0a14"></span></span>
+      <span style="font:500 13px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.85)">{{ audioTime }}</span>
+    </div>
+    <div data-int="1" onClick="{{ closeTranscript }}" style="display:flex;align-items:center;gap:9px;color:rgba(255,255,255,.85);cursor:pointer">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 9.5a7 6.5 0 0 1-7 6.5c-1 0-2-.2-2.8-.55L3 17l1.3-3.4A6.3 6.3 0 0 1 3 9.5 7 6.5 0 0 1 10 3a7 6.5 0 0 1 7 6.5Z"></path></svg>
+      <span style="font:500 14px 'Space Grotesk',sans-serif">View Chat</span>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</sc-if>
+
+<div data-screen-label="Pill states reference" style="position:absolute;left:1230px;top:20px;width:1370px">
+<span style="font:500 10.5px 'IBM Plex Mono',monospace;letter-spacing:.14em;text-transform:uppercase;color:rgba(10,10,40,.4)">pill states — reference</span>
+
+<div style="position:absolute;left:0;top:36px;width:645px;display:flex;flex-direction:column;gap:8px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(10,10,40,.4)">idle</span>
+<div style="width:780px;transform:scale(0.827);transform-origin:top left;border-radius:14px;overflow:hidden;background:rgba(14,20,30,.74);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.16);box-shadow:0 20px 50px rgba(10,14,30,.22)">
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 16px;background:rgba(255,255,255,.16)">
+    <span style="flex:1;font:400 15.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.66)">Ask anything about your call</span>
+    <span style="flex:none;width:30px;height:30px;border-radius:8px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg></span>
+  </div>
+  <div style="display:flex;align-items:center;padding:10px 16px;border-top:1px solid rgba(238,240,255,.09)">
+    <span style="width:20px;height:20px;border-radius:50%;overflow:hidden;background:#fff;opacity:.85"><img src="uploads/nova-logo-transparent.png" alt="Nova" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <div style="margin:0 auto;display:flex;align-items:center;gap:22px;color:rgba(255,255,255,.72)">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"></rect><circle cx="7.5" cy="8" r="1.4"></circle><path d="M3 14l4.2-4 3.3 3.1 2.6-2.4L17 14"></path></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg>
+      <span style="width:1px;height:16px;background:rgba(238,240,255,.16)"></span>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 8v4M7 5.5v9M10 7v6M13 4.5v11M16 8.5v3"></path></svg>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font:500 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">History</span>
+      <span style="width:24px;height:24px;border-radius:7px;background:rgba(238,240,255,.13);display:flex;align-items:center;justify-content:center"><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3.5v9M4.5 9 8 12.5 11.5 9"></path></svg></span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div style="position:absolute;left:0;top:176px;width:645px;display:flex;flex-direction:column;gap:8px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(10,10,40,.4)">listening</span>
+<div style="width:780px;transform:scale(0.827);transform-origin:top left;border-radius:14px;overflow:hidden;background:rgba(14,20,30,.74);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.16);box-shadow:0 20px 50px rgba(10,14,30,.22)">
+  <div style="display:flex;align-items:center;gap:12px;padding:15px 16px;background:rgba(255,255,255,.14)">
+    <span style="width:22px;height:22px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1.5px rgba(255,255,255,.5)"><img src="uploads/nova-eyes-open-transparent.png" alt="Nova" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <span style="flex:1;font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">Dana is talking — Nova is following along</span>
+    <span style="font:500 11px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.72)">14:22</span>
+  </div>
+  <div style="display:flex;align-items:center;padding:11px 16px;border-top:1px solid rgba(238,240,255,.09)">
+    <span style="width:20px"></span>
+    <div style="margin:0 auto;display:flex;align-items:center;gap:22px;color:rgba(255,255,255,.72)">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"></rect><circle cx="7.5" cy="8" r="1.4"></circle><path d="M3 14l4.2-4 3.3 3.1 2.6-2.4L17 14"></path></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg>
+      <span style="width:1px;height:16px;background:rgba(255,255,255,.18)"></span>
+      <span style="display:flex;align-items:center;gap:12px">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="rgba(255,255,255,.85)"><rect x="3.4" y="2.5" width="3" height="11" rx="1"></rect><rect x="9.6" y="2.5" width="3" height="11" rx="1"></rect></svg>
+        <span style="width:30px;height:30px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center"><span style="width:11px;height:11px;border-radius:3px;background:#0a0a14"></span></span>
+        <span style="font:500 13px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.85)">0:25</span>
+      </span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;color:rgba(255,255,255,.8)">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 2.5h7L15.5 6v11.5h-10.5Z"></path><path d="M12 2.5V6h3.5"></path></svg>
+      <span style="font:500 13px 'Space Grotesk',sans-serif">Transcript</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div style="position:absolute;left:0;top:300px;width:645px;display:flex;flex-direction:column;gap:8px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(10,10,40,.4)">answering</span>
+<div style="width:780px;transform:scale(0.827);transform-origin:top left;border-radius:16px;overflow:hidden;background:rgba(14,20,30,.62);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 55px rgba(10,14,30,.25)">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,.16)">
+    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8h-9M7 3.5 2.5 8 7 12.5"></path></svg>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span style="font:500 11.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px">Tab</span>
+      <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">to focus</span>
+    </span>
+    <span style="flex:1"></span>
+    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg>
+    </span>
+  </div>
+  <div style="position:relative;padding:18px 18px 14px;display:flex;flex-direction:column;gap:14px">
+    <div style="align-self:flex-end;max-width:70%;font:400 14.5px/1.4 'Space Grotesk',sans-serif;color:rgba(255,255,255,.9);background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.12);border-radius:14px;padding:9px 14px">How do I answer the budget pushback?</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span style="font:400 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">Heard on call · 14:22</span>
+      <div style="font:400 15px/1.6 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92);text-wrap:pretty">Get her approved number before you touch yours: “What did you get approved for? I'd rather shape scope around that.” Anchor on the 3 sites she named at 06:02 — <span style="font:500 13px 'IBM Plex Mono',monospace;background:rgba(255,255,255,.12);border-radius:5px;padding:1px 6px">$38k saved each</span>.</div>
+    </div>
+    <div style="position:absolute;right:14px;bottom:12px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v9.5M4 9l4 4 4-4"></path></svg>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;padding:11px 16px;border-top:1px solid rgba(255,255,255,.1)">
+    <div style="display:flex;align-items:center;gap:22px;color:rgba(255,255,255,.72)">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"></rect><circle cx="7.5" cy="8" r="1.4"></circle><path d="M3 14l4.2-4 3.3 3.1 2.6-2.4L17 14"></path></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg>
+      <span style="width:1px;height:16px;background:rgba(255,255,255,.18)"></span>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 8v4M7 5.5v9M10 7v6M13 4.5v11M16 8.5v3"></path></svg>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:9px">
+      <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">New Chat</span>
+      <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font:500 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">⌘</span>
+      <span style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;font:500 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85)">R</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div style="position:absolute;left:700px;top:36px;width:645px;display:flex;flex-direction:column;gap:8px">
+<span style="font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:.16em;text-transform:uppercase;color:rgba(10,10,40,.4)">transcript</span>
+<div style="width:780px;transform:scale(0.827);transform-origin:top left;border-radius:16px;overflow:hidden;background:rgba(14,20,30,.62);backdrop-filter:blur(26px) saturate(150%);border:1px solid rgba(255,255,255,.14);box-shadow:0 22px 55px rgba(10,14,30,.25)">
+  <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;background:rgba(255,255,255,.16)">
+    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12.5 8h-9M7 3.5 2.5 8 7 12.5"></path></svg>
+    </span>
+    <span style="display:flex;align-items:center;gap:8px">
+      <span style="font:500 11.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:3px 10px">Tab</span>
+      <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">to focus</span>
+    </span>
+    <span style="flex:1"></span>
+    <span style="flex:none;width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,.85)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3v4.5a2 2 0 0 1-2 2H3.5"></path><path d="M6 7 3.2 9.6 6 12.2"></path></svg>
+    </span>
+  </div>
+  <div style="padding:22px 18px 20px;display:flex;flex-direction:column;gap:24px">
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:21</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Mm-hmm.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:23</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">So walk me through the rollout timeline again?</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:29</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">and the three sites go live in Q1.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:31</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Honestly it's more than we planned to spend.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">7:46</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Oh, no.</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:0">
+      <span style="flex:none;width:96px;font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">8:12</span>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 9.5px 'Space Grotesk',sans-serif;letter-spacing:.18em;color:rgba(255,255,255,.45)">ME</span>
+        <span style="font:400 16px/1.35 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Hmm.</span>
+      </div>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;padding:11px 16px;border-top:1px solid rgba(255,255,255,.1)">
+    <span style="width:26px;height:26px;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1.5px rgba(255,255,255,.3)"><img src="uploads/nova-logo-transparent.png" alt="Nova" style="width:100%;height:100%;object-fit:cover;display:block"/></span>
+    <div style="margin-left:22px;display:flex;align-items:center;gap:22px;color:rgba(255,255,255,.72)">
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="15" height="13" rx="2.5"></rect><circle cx="7.5" cy="8" r="1.4"></circle><path d="M3 14l4.2-4 3.3 3.1 2.6-2.4L17 14"></path></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><rect x="2.6" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="2.6" width="6" height="6" rx="1.4"></rect><rect x="2.6" y="11.4" width="6" height="6" rx="1.4"></rect><rect x="11.4" y="11.4" width="6" height="6" rx="1.4"></rect></svg>
+      <span style="width:1px;height:16px;background:rgba(255,255,255,.18)"></span>
+      <span style="display:flex;align-items:center;gap:12px">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="rgba(255,255,255,.85)"><path d="M4 2.8v10.4L13 8Z"></path></svg>
+        <span style="width:30px;height:30px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center"><span style="width:11px;height:11px;border-radius:3px;background:#0a0a14"></span></span>
+        <span style="font:500 13px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.85)">0:36</span>
+      </span>
+    </div>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:9px;color:rgba(255,255,255,.85)">
+      <svg width="17" height="17" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M17 9.5a7 6.5 0 0 1-7 6.5c-1 0-2-.2-2.8-.55L3 17l1.3-3.4A6.3 6.3 0 0 1 3 9.5 7 6.5 0 0 1 10 3a7 6.5 0 0 1 7 6.5Z"></path></svg>
+      <span style="font:500 14px 'Space Grotesk',sans-serif">View Chat</span>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+
+<sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
+<div onMouseDown="{{ startDrag }}" data-screen-label="Nova Settings window" style="position:absolute;left:372px;top:200px;width:855px;height:573px;z-index:2;cursor:grab">
+<div style="width:1150px;transform:scale(0.744);transform-origin:top left;border-radius:16px;overflow:hidden;background:#0c0c0e;border:1px solid rgba(255,255,255,.12);box-shadow:0 40px 90px rgba(10,14,30,.45)">
+<dc-import name="NovaSettingsTabs" active="{{ tab }}" on-select="{{ setTab }}" hint-size="1148px,128px"></dc-import>
+<div style="border-top:1px solid rgba(255,255,255,.08)">
+
+<sc-if value="{{ showGeneral }}" hint-placeholder-val="{{ true }}">
+<div data-screen-label="General tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Updates</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Check for the latest Nova desktop release</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3v8.5M6.2 8.3 10 12.1l3.8-3.8M4 16.5h12"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Nova Version</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">You are currently using Nova version 2.1.20</span></div>
+    <span data-int="1" style="flex:none;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 20px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">Check for updates</span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin:28px 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">General</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Customize how Nova works for you</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1.8 10S4.7 4.8 10 4.8 18.2 10 18.2 10 15.3 15.2 10 15.2 1.8 10 1.8 10Z"></path><circle cx="10" cy="10" r="2.4"></circle></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Undetectability</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Off means Nova is detectable by screen sharing.</span></div>
+    <span data-int="1" onClick="{{ tUndetect.click }}" style="{{ tUndetect.track }}"><span style="{{ tUndetect.knob }}"></span></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 5.6a6.4 6.4 0 1 0 7.6 0M10 2.6v6.2"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Launch Nova at login</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Nova will open automatically when you log in.</span></div>
+    <span data-int="1" onClick="{{ tLaunch.click }}" style="{{ tLaunch.track }}"><span style="{{ tLaunch.knob }}"></span></span>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin:28px 0 12px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Meetings</span></div>
+  <div style="border:1px solid rgba(255,255,255,.1);border-radius:14px;overflow:hidden">
+    <div style="padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="flex:none;width:46px;height:46px;border-radius:11px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M4 8v4M7 5.5v9M10 7v6M13 4.5v11M16 8.5v3"></path></svg></span>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Free meetings</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">0 free meetings or audio sessions left</span></div>
+        <span style="font:600 15px 'Space Grotesk',sans-serif;color:#f2f2f4">0/3</span>
+      </div>
+      <div style="height:6px;border-radius:999px;background:rgba(255,255,255,.14)"></div>
+      <span style="font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.5)">Free usage is shared between scheduled meetings and audio sessions.</span>
+    </div>
+    <div data-int="1" style="background:#1a1a1e;padding:16px 22px;display:flex;align-items:center;gap:16px;cursor:pointer" style-hover="background:#202026">
+      <span style="flex:none;border:1.5px solid #2d9fdb;color:#63b8e8;border-radius:999px;padding:5px 15px;font:600 14px 'Space Grotesk',sans-serif">Pro</span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font:600 15.5px 'Space Grotesk',sans-serif;color:#f2f2f4">Upgrade for unlimited meetings</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Unlock unlimited meetings and audio sessions</span></div>
+      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="rgba(255,255,255,.7)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 6M8 6h6v6"></path></svg>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin:30px 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Language</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Choose how Nova listens and responds during meetings</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 10c1.2-4.5 2.3-4.5 3.5 0s2.3 4.5 3.5 0 2.3-4.5 3.5 0 2.3 4.5 3.5 0"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Transcription language</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Select the language you speak in meetings.</span></div>
+    <select data-int="1" style="flex:none;background:#131316;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 14px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer"><option>English (recommended)</option><option>Spanish</option><option>Portuguese</option><option>French</option><option>German</option></select>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 5h8M7.5 3v2M9.8 5c-.8 3-3.2 5.8-6.3 7.2M5.5 8.5c1.2 2 3.1 3.6 4.9 4.3M11 16.5l3.2-8 3.2 8M12.2 13.8h4"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Output language</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Your preferred language for AI and meeting notes.</span></div>
+    <select data-int="1" style="flex:none;background:#131316;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 14px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer"><option>English</option><option>Spanish</option><option>Portuguese</option><option>French</option><option>German</option></select>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin:28px 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Audio Settings</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Test your audio input before you hop into a call</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="7.8" y="2.8" width="4.4" height="8" rx="2.2"></rect><path d="M5.4 9.4a4.6 4.6 0 0 0 9.2 0M10 14.6V17"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Microphone Source</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Default - MacBook Air Microphone (Built-in)</span></div>
+    <span data-int="1" style="flex:none;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 20px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">Test Microphone</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:26px;margin-top:26px;padding-top:20px;border-top:1px solid rgba(255,255,255,.1)">
+    <span style="flex:1;font:400 14.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.5)">Account and app</span>
+    <span data-int="1" style="display:flex;align-items:center;gap:8px;font:500 14.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8);cursor:pointer" style-hover="color:#fff"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 8a6 6 0 1 1-.6 4M4.5 8V4.5M4.5 8H8"></path></svg>Reset onboarding</span>
+    <span data-int="1" style="display:flex;align-items:center;gap:8px;font:500 14.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8);cursor:pointer" style-hover="color:#fff"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H4.5v14H8M13 6.5 16.5 10 13 13.5M16.5 10h-9"></path></svg>Log out</span>
+    <span data-int="1" style="display:flex;align-items:center;gap:8px;font:500 14.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8);cursor:pointer" style-hover="color:#fff"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6.2 5.6a6.4 6.4 0 1 0 7.6 0M10 2.6v6.2M3 17l1.5-1.5"></path></svg>Quit</span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showCalendar }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Calendar tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Calendar</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Manage the calendar account Nova uses to show meetings and reminders.</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.2" width="14" height="12.8" rx="2"></rect><path d="M3 8.4h14M7 2.4v3M13 2.4v3"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Google Calendar</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Connect a Google personal or workspace account.</span></div>
+    <span data-int="1" style="flex:none;display:flex;align-items:center;gap:10px;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 20px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer" style-hover="background:rgba(255,255,255,.08)"><svg width="17" height="17" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.9 7.2l7.6 5.9c4.4-4.1 7.1-10.1 7.1-17.6z"></path><path fill="#FBBC05" d="M10.4 28.7a14.5 14.5 0 0 1 0-9.4l-7.8-6.1a24 24 0 0 0 0 21.6l7.8-6.1z"></path><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.4-5.9l-7.6-5.9c-2.1 1.4-4.8 2.3-7.8 2.3-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z"></path></svg>Connect</span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showNotifications }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Notifications tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 8px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Notifications</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Choose when Nova should prompt you before calls</span></div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.6" y="4.2" width="12" height="12.8" rx="2"></rect><path d="M2.6 8.4h12M6.2 2.4v3M11 2.4v3"></path><circle cx="14.6" cy="13.4" r="3.4" fill="#1b1b1f"></circle><path d="M14.6 11.9v1.5l1.1.9"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Scheduled meetings</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Show notifications 1 minute before meetings start based on your Calendar.</span></div>
+    <span data-int="1" onClick="{{ tSched.click }}" style="{{ tSched.track }}"><span style="{{ tSched.knob }}"></span></span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showModes }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Modes tab" style="height:640px;display:flex;flex-direction:column">
+  <div style="flex:1;display:flex;min-height:0">
+    <div style="flex:none;width:340px;box-sizing:border-box;background:#121215;border-right:1px solid rgba(255,255,255,.08);padding:18px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+      <div data-int="1" style="display:flex;align-items:center;gap:14px;padding:13px 14px;border-radius:12px;cursor:pointer;background:#12222e;border:1px solid rgba(45,159,219,.3)">
+        <span style="flex:none;width:40px;height:40px;border-radius:10px;background:#1c3b50;display:flex;align-items:center;justify-content:center;color:#4db2e8"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M10 4v12M4 10h12"></path></svg></span>
+        <span style="font:600 16px 'Space Grotesk',sans-serif;color:#4db2e8">New Mode</span>
+      </div>
+      <div data-int="1" onClick="{{ selectGeneralMode }}" style="{{ generalModeStyle }}" style-hover="background:#1b1b1f">
+        <span style="flex:none;width:40px;height:40px;border-radius:10px;background:#232328;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)"><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.8h5.5L15 6v11.2H6Z"></path><path d="M11.5 2.8V6H15"></path></svg></span>
+        <span style="font:600 16px 'Space Grotesk',sans-serif;color:#f0f0f2">General</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 4px 2px"><span style="font:400 13px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.45)">Sales</span><span style="flex:1;height:1px;background:rgba(255,255,255,.12)"></span></div>
+      <sc-for list="{{ salesModes }}" as="m" hint-placeholder-count="4">
+        <div data-int="1" onClick="{{ m.onClick }}" style="{{ m.style }}" style-hover="background:#1b1b1f">
+          <span style="flex:none;width:40px;height:40px;border-radius:10px;background:#232328;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.8)">{{ m.icon }}</span>
+          <span style="font:600 16px 'Space Grotesk',sans-serif;color:#f0f0f2">{{ m.name }}</span>
+        </div>
+      </sc-for>
+    </div>
+    <div style="flex:1;padding:44px 56px;overflow-y:auto;box-sizing:border-box">
+      <div style="font:600 40px 'Space Grotesk',sans-serif;color:#fff;margin:0 0 22px">{{ modeTitle }}</div>
+      <div style="font:400 19px/1.55 'Space Grotesk',sans-serif;color:rgba(255,255,255,.75);max-width:760px;text-wrap:pretty">{{ modeDesc }}</div>
+    </div>
+  </div>
+  <div style="flex:none;border-top:1px solid rgba(255,255,255,.08);padding:14px 24px;display:flex;justify-content:flex-end">
+    <span data-int="1" onClick="{{ setActiveMode }}" style="{{ setActiveStyle }}">{{ setActiveLabel }}</span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showKeybinds }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Keybinds tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 14px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">Keyboard shortcuts</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Nova works with these easy to remember commands. Click any of the keybinds to edit.</span></div>
+  <div style="font:600 17px 'Space Grotesk',sans-serif;color:#f0f0f2;margin:14px 0 4px">General</div>
+  <sc-for list="{{ generalKeys }}" as="k" hint-placeholder-count="5">
+    <div data-int="1" style="display:flex;align-items:center;gap:16px;padding:13px 10px;border-radius:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">
+      <span style="flex:none;color:rgba(255,255,255,.6)">{{ k.icon }}</span>
+      <span style="flex:1;font:400 15.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.88)">{{ k.label }}</span>
+      <span style="display:flex;gap:8px">{{ k.chips }}</span>
+    </div>
+  </sc-for>
+  <div style="font:600 17px 'Space Grotesk',sans-serif;color:#f0f0f2;margin:26px 0 4px">Window</div>
+  <sc-for list="{{ windowKeys }}" as="k" hint-placeholder-count="4">
+    <div data-int="1" style="display:flex;align-items:center;gap:16px;padding:13px 10px;border-radius:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">
+      <span style="flex:none;color:rgba(255,255,255,.6)">{{ k.icon }}</span>
+      <span style="flex:1;font:400 15.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.88)">{{ k.label }}</span>
+      <span style="display:flex;gap:8px">{{ k.chips }}</span>
+    </div>
+  </sc-for>
+  <div style="font:600 17px 'Space Grotesk',sans-serif;color:#f0f0f2;margin:26px 0 4px">Scroll</div>
+  <sc-for list="{{ scrollKeys }}" as="k" hint-placeholder-count="2">
+    <div data-int="1" style="display:flex;align-items:center;gap:16px;padding:13px 10px;border-radius:12px;cursor:pointer" style-hover="background:rgba(255,255,255,.05)">
+      <span style="flex:none;color:rgba(255,255,255,.6)">{{ k.icon }}</span>
+      <span style="flex:1;font:400 15.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.88)">{{ k.label }}</span>
+      <span style="display:flex;gap:8px">{{ k.chips }}</span>
+    </div>
+  </sc-for>
+</div>
+</sc-if>
+
+<sc-if value="{{ showProfile }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Profile tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="background:#131316;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:34px 42px">
+    <div style="font:600 24px 'Space Grotesk',sans-serif;color:#fff;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)">Profile details</div>
+    <div style="font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85);margin:24px 0 14px">Profile</div>
+    <div style="display:flex;align-items:center;gap:18px">
+      <span style="flex:none;width:52px;height:52px;border-radius:50%;background:#1f5e50;display:flex;align-items:center;justify-content:center;font:600 22px 'Space Grotesk',sans-serif;color:#fff">G</span>
+      <span style="flex:1;font:500 17px 'Space Grotesk',sans-serif;color:#f2f2f4">Gustavo Rosas</span>
+      <a data-int="1" href="#" style="font:500 15px 'Space Grotesk',sans-serif;text-decoration:none">Update profile</a>
+    </div>
+    <div style="height:1px;background:rgba(255,255,255,.1);margin:24px 0"></div>
+    <div style="font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85);margin:0 0 14px">Email addresses</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font:400 15.5px 'Space Grotesk',sans-serif;color:#f2f2f4">gustavo@tcinteractivegroup.com</span>
+      <span style="background:#242428;border-radius:8px;padding:3px 10px;font:500 12.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">Primary</span>
+      <span data-int="1" style="margin-left:auto;color:rgba(255,255,255,.5);cursor:pointer;font:600 16px 'Space Grotesk',sans-serif;letter-spacing:2px">···</span>
+    </div>
+    <a data-int="1" href="#" style="display:inline-flex;align-items:center;gap:8px;margin-top:16px;font:500 15px 'Space Grotesk',sans-serif;text-decoration:none"><span style="font:400 19px 'Space Grotesk',sans-serif">+</span>Add email address</a>
+    <div style="height:1px;background:rgba(255,255,255,.1);margin:24px 0"></div>
+    <div style="font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85);margin:0 0 14px">Connected accounts</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.5 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.7 9.5 24 9.5z"></path><path fill="#4285F4" d="M46.5 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.7c-.6 3-2.3 5.5-4.9 7.2l7.6 5.9c4.4-4.1 7.1-10.1 7.1-17.6z"></path><path fill="#FBBC05" d="M10.4 28.7a14.5 14.5 0 0 1 0-9.4l-7.8-6.1a24 24 0 0 0 0 21.6l7.8-6.1z"></path><path fill="#34A853" d="M24 48c6.2 0 11.4-2 15.4-5.9l-7.6-5.9c-2.1 1.4-4.8 2.3-7.8 2.3-6.3 0-11.7-3.7-13.6-9.8l-7.8 6.1C6.5 42.6 14.6 48 24 48z"></path></svg>
+      <span style="font:500 15.5px 'Space Grotesk',sans-serif;color:#f2f2f4">Google</span>
+      <span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">· gustavo@tcinteractivegroup.com</span>
+      <span data-int="1" style="margin-left:auto;color:rgba(255,255,255,.5);cursor:pointer;font:600 16px 'Space Grotesk',sans-serif;letter-spacing:2px">···</span>
+    </div>
+    <a data-int="1" href="#" style="display:inline-flex;align-items:center;gap:8px;margin-top:16px;font:500 15px 'Space Grotesk',sans-serif;text-decoration:none"><span style="font:400 19px 'Space Grotesk',sans-serif">+</span>Connect account</a>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showSecurity }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Security tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="background:#131316;border:1px solid rgba(255,255,255,.07);border-radius:14px;padding:34px 42px">
+    <div style="font:600 24px 'Space Grotesk',sans-serif;color:#fff;padding-bottom:20px;border-bottom:1px solid rgba(255,255,255,.1)">Security</div>
+    <div style="font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85);margin:24px 0 12px">Password</div>
+    <a data-int="1" href="#" style="font:500 15.5px 'Space Grotesk',sans-serif;text-decoration:none">Set password</a>
+    <div style="height:1px;background:rgba(255,255,255,.1);margin:24px 0"></div>
+    <div style="font:500 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.85);margin:0 0 18px">Active devices</div>
+    <div style="display:flex;gap:16px;margin-bottom:22px">
+      <span style="flex:none;width:44px;height:30px;border-radius:5px;background:#000;border:1px solid rgba(255,255,255,.25);margin-top:2px"></span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+        <span style="display:flex;align-items:center;gap:10px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Macintosh</span><span style="background:#242428;border-radius:8px;padding:3px 10px;font:500 12.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">This device</span></span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Electron 40.8.0</span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">2603:900b:1040:2c2:2c7d:a1db:37d5:fc51 (Kissimmee, United States)</span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Today at 9:05 PM</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px">
+      <span style="flex:none;width:44px;height:30px;border-radius:5px;background:#000;border:1px solid rgba(255,255,255,.25);margin-top:2px"></span>
+      <div style="flex:1;display:flex;flex-direction:column;gap:5px">
+        <span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Macintosh</span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Chrome 151.0.0.0</span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">2603:9001:f00:136d:8104:126a:3026:636d (Orlando, United States)</span>
+        <span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Today at 3:04 PM</span>
+      </div>
+      <span data-int="1" style="color:rgba(255,255,255,.5);cursor:pointer;font:600 16px 'Space Grotesk',sans-serif;letter-spacing:2px">···</span>
+    </div>
+    <div style="height:1px;background:rgba(255,255,255,.1);margin:26px 0 22px"></div>
+    <span data-int="1" style="font:500 15.5px 'Space Grotesk',sans-serif;color:#e0564d;cursor:pointer" style-hover="color:#f07a72">Delete account</span>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showBilling }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="Billing tab" style="height:640px;overflow-y:auto;padding:28px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:20px">
+    <div style="background:#1a1a1e;border-radius:999px;padding:4px;display:flex;gap:2px">
+      <span data-int="1" onClick="{{ setMonthly }}" style="{{ mChipStyle }}">Monthly</span>
+      <span data-int="1" onClick="{{ setAnnual }}" style="{{ aChipStyle }}">Annual<sc-if value="{{ isAnnual }}" hint-placeholder-val="{{ true }}"><span style="background:#cfe0fb;color:#2b62d9;border-radius:999px;padding:3px 11px;font:600 13px 'Space Grotesk',sans-serif">Save 45%</span></sc-if></span>
+    </div>
+  </div>
+  <div style="display:flex;gap:24px;justify-content:center">
+    <div style="flex:1;max-width:470px;border-radius:20px;padding:28px 30px;background:linear-gradient(165deg,#9db9f2 0%,#5c7fe6 100%);display:flex;flex-direction:column;gap:0">
+      <span style="font:500 17px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.92)">Pro plan</span>
+      <div style="display:flex;align-items:baseline;gap:12px;margin:10px 0 18px">
+        <sc-if value="{{ isAnnual }}" hint-placeholder-val="{{ true }}"><span style="font:500 22px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6);text-decoration:line-through">$19.99</span></sc-if>
+        <span style="font:700 44px 'Space Grotesk',sans-serif;color:#fff">{{ proPrice }}</span>
+        <span style="font:400 17px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">/month</span>
+      </div>
+      <div style="height:1px;background:rgba(255,255,255,.35);margin-bottom:18px"></div>
+      <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:26px">
+        <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;color:#fff">∞</span><span style="font:400 15.5px 'Space Grotesk',sans-serif;color:#fff">Unlimited AI Responses</span></span>
+        <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;color:#fff">∞</span><span style="font:400 15.5px 'Space Grotesk',sans-serif;color:#fff">Unlimited audio sessions</span></span>
+        <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:#fff">✓</span><span style="font:400 15.5px 'Space Grotesk',sans-serif;color:#fff">Access to newest AI models</span></span>
+        <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:#fff">✓</span><span style="font:400 15.5px 'Space Grotesk',sans-serif;color:#fff">Priority chat support</span></span>
+      </div>
+      <div data-int="1" style="margin-top:auto;background:#fff;border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:600 18px 'Space Grotesk',sans-serif;color:#1d2b56" style-hover="background:#f0f4ff">Upgrade<sc-if value="{{ isAnnual }}" hint-placeholder-val="{{ true }}"><span style="background:#d9e4fb;color:#3763d6;border-radius:999px;padding:3px 12px;font:600 13px 'Space Grotesk',sans-serif">-45%</span></sc-if></div>
+    </div>
+    <div style="flex:1;max-width:470px;border-radius:20px;padding:28px 30px;background:linear-gradient(165deg,#7a7890 0%,#585669 100%);display:flex;flex-direction:column">
+      <span style="display:flex;align-items:center;gap:12px"><span style="font:500 17px 'Space Grotesk',sans-serif;color:#fff">Pro + Undetectability</span><span style="background:rgba(255,255,255,.18);border-radius:999px;padding:4px 13px;font:500 13.5px 'Space Grotesk',sans-serif;color:#fff">Popular</span></span>
+      <div style="display:flex;align-items:baseline;gap:12px;margin:10px 0 18px">
+        <sc-if value="{{ isAnnual }}" hint-placeholder-val="{{ true }}"><span style="font:500 22px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55);text-decoration:line-through">$149.99</span></sc-if>
+        <span style="font:700 44px 'Space Grotesk',sans-serif;color:#fff">{{ undPrice }}</span>
+        <span style="font:400 17px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.75)">/month</span>
+      </div>
+      <div style="height:1px;background:rgba(255,255,255,.3);margin-bottom:18px"></div>
+      <div style="display:flex;gap:13px;margin-bottom:18px">
+        <span style="flex:none;width:26px;height:26px;border-radius:50%;background:#3f8fdc;display:flex;align-items:center;justify-content:center;font:600 13px 'Space Grotesk',sans-serif;color:#fff">✓</span>
+        <div style="display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#fff">Nova Undetectability</span><span style="font:400 14.5px/1.4 'Space Grotesk',sans-serif;color:rgba(255,255,255,.75)">Nova stays hidden from screen share and recordings</span></div>
+      </div>
+      <div style="height:140px;border-radius:12px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.10) 0 10px,rgba(255,255,255,.04) 10px 20px);display:flex;align-items:center;justify-content:center;margin-bottom:20px"><span style="font:500 11px 'IBM Plex Mono',monospace;color:rgba(255,255,255,.65)">undetectability art</span></div>
+      <div data-int="1" style="margin-top:auto;background:linear-gradient(90deg,#6b93f2,#4d74e4);border-radius:14px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font:600 18px 'Space Grotesk',sans-serif;color:#fff" style-hover="filter:brightness(1.08)">Upgrade<sc-if value="{{ isAnnual }}" hint-placeholder-val="{{ true }}"><span style="background:rgba(255,255,255,.22);color:#fff;border-radius:999px;padding:3px 12px;font:600 13px 'Space Grotesk',sans-serif">-45%</span></sc-if></div>
+    </div>
+  </div>
+  <div style="height:1px;background:rgba(255,255,255,.12);margin:32px 0 26px"></div>
+  <div style="display:flex;align-items:center;gap:60px">
+    <div style="display:flex;flex-direction:column;gap:6px"><span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Free plan</span><span style="font:600 34px 'Space Grotesk',sans-serif;color:#fff">$0</span></div>
+    <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:16px 40px">
+      <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#242428;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">✓</span><span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">Limited AI usage per meeting</span></span>
+      <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#242428;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">✓</span><span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">Limited free meetings</span></span>
+      <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#242428;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">✓</span><span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">Ask AI about past meetings</span></span>
+      <span style="display:flex;align-items:center;gap:13px"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:#242428;display:flex;align-items:center;justify-content:center;font:600 12px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">✓</span><span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.8)">Customize AI instructions</span></span>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{ showAbout }}" hint-placeholder-val="{{ false }}">
+<div data-screen-label="About tab" style="height:640px;overflow-y:auto;padding:34px 64px 40px;box-sizing:border-box">
+  <div style="display:flex;flex-direction:column;gap:6px;margin:0 0 16px"><span style="font:600 19px 'Space Grotesk',sans-serif;color:#fff">About</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Release notes, support, and app information</span></div>
+  <div style="border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:22px 24px;display:flex;gap:18px">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2.8h5.5L15 6v11.2H6Z"></path><path d="M11.5 2.8V6H15M8.4 9.5h3.8M8.4 12.2h3.8"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+      <span style="display:flex;align-items:baseline;gap:12px"><span style="font:600 17px 'Space Grotesk',sans-serif;color:#f2f2f4">Welcome to Nova 2.0</span><span style="font:400 14px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.5)">April 3, 2026</span></span>
+      <span style="font:400 14.5px/1.5 'Space Grotesk',sans-serif;color:rgba(255,255,255,.7)">Nova 2.0 is a complete rewrite focused on reliability, speed, and a smoother day-to-day experience.</span>
+      <ul style="margin:4px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:7px">
+        <li style="font:400 14.5px/1.5 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">AI chat responds faster, with time to first token decreased by 50%.</li>
+        <li style="font:400 14.5px/1.5 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">Long meetings keep better context, including earlier details that matter later.</li>
+        <li style="font:400 14.5px/1.5 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">File search is improved so modes can reference large uploaded documents more reliably.</li>
+      </ul>
+    </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:18px 0 4px;margin-top:10px">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="10" cy="10" r="7.2"></circle><circle cx="10" cy="10" r="3"></circle><path d="M5 5l2.9 2.9M12.1 12.1 15 15M15 5l-2.9 2.9M7.9 12.1 5 15"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Help Center</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Find answers and setup help.</span></div>
+    <span data-int="1" style="flex:none;display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 20px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">Open<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 6M8 6h6v6"></path></svg></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0 4px">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="2.8" y="4.8" width="14.4" height="10.6" rx="2"></rect><path d="M3.4 6.4 10 11l6.6-4.6"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Contact Support</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">Reach the Nova team directly.</span></div>
+    <span data-int="1" style="flex:none;display:flex;align-items:center;gap:9px;border:1px solid rgba(255,255,255,.28);border-radius:10px;padding:11px 20px;font:500 14.5px 'Space Grotesk',sans-serif;color:#f0f0f2;cursor:pointer" style-hover="background:rgba(255,255,255,.08)">Email<svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 14 14 6M8 6h6v6"></path></svg></span>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:14px 0 4px">
+    <span style="flex:none;width:54px;height:54px;border-radius:12px;background:#1b1b1f;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.75)"><svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><circle cx="10" cy="10" r="7.2"></circle><path d="M8 8.1a2 2 0 1 1 2.9 1.8c-.6.3-.9.8-.9 1.5M10 14.2v.2"></path></svg></span>
+    <div style="flex:1;display:flex;flex-direction:column;gap:4px"><span style="font:600 16px 'Space Grotesk',sans-serif;color:#f2f2f4">Nova Version</span><span style="font:400 13.5px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.55)">The desktop version currently installed.</span></div>
+    <span style="font:400 15px 'Space Grotesk',sans-serif;color:rgba(255,255,255,.6)">2.1.20</span>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</div>
+</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startTab&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;general&quot;,&quot;calendar&quot;,&quot;notifications&quot;,&quot;modes&quot;,&quot;keybinds&quot;,&quot;profile&quot;,&quot;security&quot;,&quot;billing&quot;,&quot;about&quot;],&quot;default&quot;:&quot;general&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Settings&quot;},&quot;showPill&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Settings&quot;}}">
+class Component extends DCLogic {
+  state = {
+    tab: this.props.startTab ?? 'general',
+    undetect: false, launch: true, sched: true,
+    period: 'annual', mode: 'general', activeMode: 'general',
+    settingsOpen: false, pillView: 'pill', usesScreen: true, audioOn: false, modeMenu: false, hover: null,
+    focusMode: false, paused: false, audioSeconds: 0
+  };
+  askRef = React.createRef();
+  componentDidMount() {
+    this._kd = (e) => {
+      if (e.key === 'Tab' && this.state.pillView === 'pill' && !this.state.focusMode) {
+        e.preventDefault();
+        this.setState({focusMode: true}, () => { if (this.askRef.current) this.askRef.current.focus(); });
+      }
+    };
+    window.addEventListener('keydown', this._kd);
+    this._tick = setInterval(() => {
+      if (this.state.audioOn && !this.state.paused) this.setState({audioSeconds: this.state.audioSeconds + 1});
+    }, 1000);
+  }
+  componentWillUnmount() {
+    window.removeEventListener('keydown', this._kd);
+    clearInterval(this._tick);
+  }
+  renderVals() {
+    const e = React.createElement;
+    const s = this.state;
+    const mkT = (k) => ({
+      track: {flex: 'none', width: '46px', height: '27px', borderRadius: '999px', background: s[k] ? '#2d9fdb' : 'rgba(255,255,255,.22)', position: 'relative', cursor: 'pointer', transition: 'background .18s'},
+      knob: {position: 'absolute', top: '3px', left: s[k] ? '22px' : '3px', width: '21px', height: '21px', borderRadius: '50%', background: '#fff', transition: 'left .18s', boxShadow: '0 1px 3px rgba(0,0,0,.3)'},
+      click: () => this.setState({[k]: !s[k]})
+    });
+    const svg = (paths, w) => e('svg', {width: w || 18, height: w || 18, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round'}, paths.map((d, i) => e('path', {d, key: i})));
+    const modes = [
+      {id: 'general', name: 'General', desc: 'The default mode. No custom prompt, summary template, or attached files. Nova uses its baseline behavior. Set this active to clear any mode you have selected.'},
+      {id: 'discovery', name: 'Discovery Call', desc: 'Nova asks the right qualifying questions, tracks pain points as they come up, and flags gaps in your qualification checklist so you leave discovery with a complete picture.', icon: svg(['M10 2.8a7.2 7.2 0 1 0 0 14.4 7.2 7.2 0 0 0 0-14.4Z', 'M12.8 7.2 11 11l-3.8 1.8L9 9Z'])},
+      {id: 'demo', name: 'Demo', desc: 'Nova keeps your demo tied to the pain points from discovery, suggests which feature to show next, and catches buying signals the moment they surface.', icon: svg(['M3 4.5h14v9H3Z', 'M8 17h4M10 13.5V17', 'M8.4 7.2 12 9l-3.6 1.8Z'])},
+      {id: 'objection', name: 'Objection Handling', desc: 'Nova hears the objection, matches it to your playbook, and feeds you a response anchored in what the prospect already said on the call.', icon: svg(['M17 9.5a7 6.5 0 0 1-7 6.5c-1 0-2-.2-2.8-.55L3 17l1.3-3.4A6.3 6.3 0 0 1 3 9.5 7 6.5 0 0 1 10 3a7 6.5 0 0 1 7 6.5Z'])},
+      {id: 'negotiation', name: 'Negotiation', desc: 'Nova tracks every number mentioned, reminds you of your walk-away, and suggests trades instead of discounts when pricing pressure starts.', icon: svg(['M10 3v14', 'M4 6.5h12', 'M4 6.5 2.2 11a2.6 2.6 0 0 0 3.6 0L4 6.5ZM16 6.5 14.2 11a2.6 2.6 0 0 0 3.6 0L16 6.5Z'])}
+    ];
+    const itemStyle = (sel) => ({display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 14px', borderRadius: '12px', cursor: 'pointer', background: sel ? '#1e1e23' : 'transparent'});
+    const cur = modes.find(m => m.id === s.mode) || modes[0];
+    const isActive = s.activeMode === s.mode;
+    const chip = (t) => e('span', {key: t, style: {minWidth: '32px', height: '32px', borderRadius: '8px', background: '#242428', display: 'flex', alignItems: 'center', justifyContent: 'center', font: "500 14px 'Space Grotesk',system-ui,sans-serif", color: 'rgba(255,255,255,.9)', padding: '0 9px', boxSizing: 'border-box'}}, t);
+    const kb = (icon, label, keys) => ({icon, label, chips: keys.map(chip)});
+    const isAnnual = s.period === 'annual';
+    const pChip = (on) => ({display: 'flex', alignItems: 'center', gap: '9px', padding: '8px 18px', borderRadius: '999px', cursor: 'pointer', font: (on ? '600' : '500') + " 15px 'Space Grotesk',system-ui,sans-serif", color: on ? '#fff' : 'rgba(255,255,255,.55)', background: on ? '#2e2e35' : 'transparent'});
+    const hov = (k) => ({enter: () => this.setState({hover: k}), leave: () => this.setState({hover: null})});
+    const iconBtn = (k, on) => ({flex: 'none', width: '36px', height: '36px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', background: s.hover === k ? 'rgba(238,240,255,.15)' : 'transparent', color: on ? '#fff' : 'rgba(255,255,255,.55)', transition: 'background .12s, color .15s'});
+    const tip = (k) => ({position: 'absolute', bottom: 'calc(100% + 9px)', left: '50%', transform: 'translateX(-50%)', background: '#000', color: '#fff', borderRadius: '10px', padding: '8px 14px', font: "500 14px 'Space Grotesk',system-ui,sans-serif", whiteSpace: 'nowrap', display: s.hover === k ? 'block' : 'none', zIndex: 6, pointerEvents: 'none'});
+    const tipSq = Object.assign(tip('squares'), {display: s.hover === 'squares' && !s.modeMenu ? 'block' : 'none'});
+    return {
+      tab: s.tab, setTab: (k) => this.setState({tab: k}),
+      showPill: this.props.showPill ?? true,
+      showSettings: s.settingsOpen,
+      toggleSettings: () => this.setState({settingsOpen: !s.settingsOpen, modeMenu: false}),
+      pillMode: s.pillView === 'pill', historyMode: s.pillView === 'history',
+      openHistory: () => this.setState({pillView: 'history', modeMenu: false}),
+      closeHistory: () => this.setState({pillView: 'pill'}),
+      modeMenuOpen: s.modeMenu,
+      eyeLabel: s.undetect ? 'Undetectable' : 'Detectable',
+      modeLabel: (modes.find(m => m.id === s.activeMode) || modes[0]).name,
+      audioLabel: s.audioOn ? 'Stop Audio Session' : 'Start Audio Session',
+      hScreen: Object.assign(hov('screen'), {click: () => this.setState({usesScreen: !s.usesScreen}), btn: iconBtn('screen', s.usesScreen)}),
+      hEye: Object.assign(hov('eye'), {click: () => this.setState({undetect: !s.undetect}), btn: iconBtn('eye', s.undetect)}),
+      hSquares: Object.assign(hov('squares'), {click: () => this.setState({modeMenu: !s.modeMenu}), btn: iconBtn('squares', s.modeMenu)}),
+      hAudio: Object.assign(hov('audio'), {click: () => this.setState({audioOn: true, paused: false, audioSeconds: 0, hover: null}), btn: iconBtn('audio', s.audioOn)}),
+      audioOn: s.audioOn, audioOff: !s.audioOn,
+      paused: s.paused, playing: !s.paused,
+      togglePause: () => this.setState({paused: !s.paused}),
+      stopAudio: () => this.setState({audioOn: false, paused: false, audioSeconds: 0, pillView: 'pill'}),
+      audioTime: Math.floor(s.audioSeconds / 60) + ':' + String(s.audioSeconds % 60).padStart(2, '0'),
+      audioCluster: {display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden', width: s.audioOn ? '140px' : '36px', transition: 'width .3s ease'},
+      transcriptMode: s.pillView === 'transcript',
+      openTranscript: () => this.setState({pillView: 'transcript'}),
+      closeTranscript: () => this.setState({pillView: 'pill'}),
+      squaresFill: (s.modeMenu || s.activeMode !== 'general') ? 'currentColor' : 'none',
+      tabHint: !s.focusMode, askMode: s.focusMode,
+      askRef: this.askRef,
+      focusAsk: () => this.setState({focusMode: true}, () => { if (this.askRef.current) this.askRef.current.focus(); }),
+      blurAsk: () => this.setState({focusMode: false}),
+      askLabel: s.audioOn ? 'Ask anything about the meeting' : (s.usesScreen ? 'Ask anything about your screen' : 'Ask anything about your call'),
+      tipScreen: tip('screen'), tipEye: tip('eye'), tipSquares: tipSq, tipAudio: tip('audio'),
+      menuModes: modes.map(m => ({name: m.name, onClick: () => this.setState({activeMode: m.id, mode: m.id, modeMenu: false}), checkStyle: {display: m.id === s.activeMode ? 'block' : 'none'}})),
+      openManage: () => this.setState({modeMenu: false, settingsOpen: true, tab: 'modes'}),
+      showGeneral: s.tab === 'general', showCalendar: s.tab === 'calendar', showNotifications: s.tab === 'notifications',
+      showModes: s.tab === 'modes', showKeybinds: s.tab === 'keybinds', showProfile: s.tab === 'profile',
+      showSecurity: s.tab === 'security', showBilling: s.tab === 'billing', showAbout: s.tab === 'about',
+      tUndetect: mkT('undetect'), tLaunch: mkT('launch'), tSched: mkT('sched'),
+      salesModes: modes.slice(1).map(m => ({name: m.name, icon: m.icon, style: itemStyle(s.mode === m.id), onClick: () => this.setState({mode: m.id})})),
+      generalModeStyle: itemStyle(s.mode === 'general'),
+      selectGeneralMode: () => this.setState({mode: 'general'}),
+      modeTitle: cur.name, modeDesc: cur.desc,
+      setActiveMode: () => this.setState({activeMode: s.mode}),
+      setActiveLabel: isActive ? 'Active ✓' : 'Set Active',
+      setActiveStyle: {font: "600 15px 'Space Grotesk',system-ui,sans-serif", color: isActive ? '#7cc9f0' : '#fff', background: isActive ? 'rgba(45,159,219,.18)' : '#2d9fdb', border: isActive ? '1px solid rgba(45,159,219,.4)' : '1px solid transparent', borderRadius: '999px', padding: '11px 26px', cursor: 'pointer'},
+      generalKeys: [
+        kb(svg(['M3 5.5h14v9H3Z']), 'Toggle visibility of Nova', ['⌘', '\\']),
+        kb(svg(['M17 9.5a7 6.5 0 0 1-7 6.5c-1 0-2-.2-2.8-.55L3 17l1.3-3.4A6.3 6.3 0 0 1 3 9.5 7 6.5 0 0 1 10 3a7 6.5 0 0 1 7 6.5Z']), 'Ask Nova about your screen or audio', ['⌘', '↵']),
+        kb(svg(['M3.5 4.5h13v9h-13Z', 'M10 6.8v4.4M7.8 9h4.4']), 'Start a new chat', ['⌘', 'R']),
+        kb(svg(['M10 2.5v2.3M10 15.2v2.3M2.5 10h2.3M15.2 10h2.3M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M15.3 4.7l-1.6 1.6M6.3 13.7l-1.6 1.6', 'M10 7.4a2.6 2.6 0 1 0 0 5.2 2.6 2.6 0 0 0 0-5.2Z']), 'Open Nova settings', ['⌘', ',']),
+        kb(svg(['M7.8 2.8h4.4v8a2.2 2.2 0 1 1-4.4 0Z', 'M5.4 9.4a4.6 4.6 0 0 0 9.2 0M10 14.6V17']), 'Start or stop a Nova session', ['⇧', '⌘', '\\'])
+      ],
+      windowKeys: [
+        kb(svg(['M3.5 3.5h13v13h-13Z', 'M7 11l3-3 3 3']), 'Move the window position up', ['⌘', '↑']),
+        kb(svg(['M3.5 3.5h13v13h-13Z', 'M7 9l3 3 3-3']), 'Move the window position down', ['⌘', '↓']),
+        kb(svg(['M3.5 3.5h13v13h-13Z', 'M11 7l-3 3 3 3']), 'Move the window position left', ['⌘', '←']),
+        kb(svg(['M3.5 3.5h13v13h-13Z', 'M9 7l3 3-3 3']), 'Move the window position right', ['⌘', '→'])
+      ],
+      scrollKeys: [
+        kb(svg(['M10 16V5.5M6.5 9 10 5.5 13.5 9', 'M5 3h10']), 'Scroll the response window up', ['⇧', '⌘', '↑']),
+        kb(svg(['M10 4v10.5M6.5 11 10 14.5 13.5 11', 'M5 17h10']), 'Scroll the response window down', ['⇧', '⌘', '↓'])
+      ],
+      isAnnual,
+      setMonthly: () => this.setState({period: 'monthly'}), setAnnual: () => this.setState({period: 'annual'}),
+      mChipStyle: pChip(!isAnnual), aChipStyle: pChip(isAnnual),
+      proPrice: isAnnual ? '$11.99' : '$19.99', undPrice: isAnnual ? '$79.99' : '$149.99',
+      startDrag: (ev) => {
+        if (ev.target.closest('[data-int],select,a,input')) return;
+        ev.preventDefault();
+        const el = ev.currentTarget, sx = ev.clientX, sy = ev.clientY;
+        const ox = parseFloat(el.dataset.dx || 0), oy = parseFloat(el.dataset.dy || 0);
+        el.style.cursor = 'grabbing';
+        const move = (m) => {
+          const dx = ox + m.clientX - sx, dy = oy + m.clientY - sy;
+          el.dataset.dx = dx; el.dataset.dy = dy;
+          el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+        };
+        const up = () => {
+          el.style.cursor = 'grab';
+          document.removeEventListener('mousemove', move);
+          document.removeEventListener('mouseup', up);
+        };
+        document.addEventListener('mousemove', move);
+        document.addEventListener('mouseup', up);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
