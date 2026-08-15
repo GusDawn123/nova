@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet"><style>body{margin:0;background:#0c0c0e}a{color:#4db2e8}a:hover{color:#7cc9f0}</style></helmet>
+<div style="background:#0c0c0e;font-family:'Space Grotesk',system-ui,sans-serif">
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;padding:18px 20px 4px">
+    <div style="position:absolute;left:20px;top:18px;display:flex;gap:8px">
+      <span style="width:13px;height:13px;border-radius:50%;background:#ff5f57"></span>
+      <span style="width:13px;height:13px;border-radius:50%;background:#febc2e"></span>
+      <span style="width:13px;height:13px;border-radius:50%;background:#28c840"></span>
+    </div>
+    <span style="font:600 15.5px 'Space Grotesk',system-ui,sans-serif;color:#ececef">Nova Settings</span>
+  </div>
+  <div style="display:flex;justify-content:center;align-items:flex-start;gap:6px;padding:14px 16px 16px">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="9">
+      <div style="{{ t.style }}" onClick="{{ t.onClick }}" data-int="1">{{ t.icon }}<span>{{ t.name }}</span></div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1150,&quot;height&quot;:140},&quot;active&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;general&quot;,&quot;calendar&quot;,&quot;notifications&quot;,&quot;modes&quot;,&quot;keybinds&quot;,&quot;profile&quot;,&quot;security&quot;,&quot;billing&quot;,&quot;about&quot;],&quot;default&quot;:&quot;general&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const e = React.createElement;
+    const svg = (kids) => e('svg', {width: 20, height: 20, viewBox: '0 0 20 20', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round'}, kids);
+    const p = (d, k) => e('path', {d, key: 'p' + k});
+    const c = (cx, cy, r, k) => e('circle', {cx, cy, r, key: 'c' + k});
+    const r = (x, y, w, h, rx, k) => e('rect', {x, y, width: w, height: h, rx, key: 'r' + k});
+    const icons = {
+      general: [c(10, 10, 2.6, 0), p('M10 2.5v2.3M10 15.2v2.3M2.5 10h2.3M15.2 10h2.3M4.7 4.7l1.6 1.6M13.7 13.7l1.6 1.6M15.3 4.7l-1.6 1.6M6.3 13.7l-1.6 1.6', 1)],
+      calendar: [r(3, 4.2, 14, 12.8, 2, 0), p('M3 8.4h14M7 2.4v3M13 2.4v3', 1)],
+      notifications: [p('M6 8.2a4 4 0 0 1 8 0c0 3 1.1 3.9 1.6 4.5H4.4C4.9 12.1 6 11.2 6 8.2Z', 0), p('M8.5 15.2a1.6 1.6 0 0 0 3 0', 1)],
+      modes: [p('M3 6.3h5.4M12.6 6.3H17M3 13.7h3.4M10.6 13.7H17', 0), c(10.5, 6.3, 1.9, 1), c(8.5, 13.7, 1.9, 2)],
+      keybinds: [r(2.5, 5, 15, 10.4, 2, 0), p('M5.3 8.2h1M9.5 8.2h1M13.7 8.2h1M6.5 12.2h7', 1)],
+      profile: [c(10, 7, 3, 0), p('M4.6 16.6a5.6 5.6 0 0 1 10.8 0', 1)],
+      security: [c(6.8, 13.2, 3, 0), p('M9 11l7-7M13.4 6.6l2 2', 1)],
+      billing: [r(2.5, 4.8, 15, 10.6, 2, 0), p('M2.5 8.4h15M5.4 12.4h3.4', 1)],
+      about: [c(10, 10, 7.4, 0), p('M10 9.2v4.4M10 6.2v.2', 1)]
+    };
+    const names = {general: 'General', calendar: 'Calendar', notifications: 'Notifications', modes: 'Modes', keybinds: 'Keybinds', profile: 'Profile', security: 'Security', billing: 'Billing', about: 'About'};
+    const active = this.props.active ?? 'general';
+    const tabs = Object.keys(names).map(k => ({
+      name: names[k],
+      icon: svg(icons[k]),
+      onClick: () => this.props.onSelect?.(k),
+      style: {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '7px', padding: '12px 17px', borderRadius: '13px', cursor: 'pointer',
+        font: (k === active ? '600' : '500') + " 13.5px 'Space Grotesk',system-ui,sans-serif",
+        color: k === active ? '#fff' : 'rgba(255,255,255,.55)',
+        background: k === active ? '#26262b' : 'transparent'
+      }
+    }));
+    return {tabs};
+  }
+}
+</script>
+</body>
+</html>
