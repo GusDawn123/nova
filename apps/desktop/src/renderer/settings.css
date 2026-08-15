@@ -1,0 +1,287 @@
+/*
+ * The settings window's shell and shared vocabulary. Values transcribed from
+ * the ratified mockups ("Nova Settings.dc.html" + "NovaSettingsTabs.dc.html");
+ * tab-specific styles live in settings/panes.css.
+ */
+
+:root {
+  --sg: "Space Grotesk", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #0c0c0e;
+  font-family: var(--sg);
+  overflow: hidden;
+  user-select: none;
+}
+
+a {
+  color: #3aa2e0;
+  text-decoration: none;
+}
+
+a:hover {
+  color: #6cc0ef;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 3px solid #0c0c0e;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/*
+ * The title bar. On Windows the native minimize/maximize/close cluster is
+ * drawn by the OS over this strip (titleBarOverlay, right side); the whole
+ * strip is the drag handle.
+ */
+.settings__titlebar {
+  flex: none;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-app-region: drag;
+}
+
+.settings__title {
+  font: 600 15.5px var(--sg);
+  color: #ececef;
+}
+
+.settings__tabs {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 16px 16px;
+}
+
+.settings__tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 12px 17px;
+  border-radius: 13px;
+  cursor: pointer;
+  font: 500 13.5px var(--sg);
+  color: rgba(255, 255, 255, 0.55);
+  background: transparent;
+  border: none;
+}
+
+.settings__tab--active {
+  font-weight: 600;
+  color: #fff;
+  background: #26262b;
+}
+
+.settings__pane {
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  padding: 34px 64px 40px;
+}
+
+/* The modes tab manages its own columns and scrolling. */
+.settings__pane--modes {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- shared rows and controls ---- */
+
+.section-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+
+.section-head--spaced {
+  margin: 28px 0 8px;
+}
+
+.section-title {
+  font: 600 19px var(--sg);
+  color: #fff;
+}
+
+.section-sub {
+  font: 400 13.5px var(--sg);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.srow {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 0;
+}
+
+.srow__icon {
+  flex: none;
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: #1b1b1f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.srow__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.srow__title {
+  font: 600 16px var(--sg);
+  color: #f2f2f4;
+}
+
+.srow__desc {
+  font: 400 13.5px var(--sg);
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.btn-outline {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  padding: 11px 20px;
+  font: 500 14.5px var(--sg);
+  color: #f0f0f2;
+  cursor: pointer;
+  background: transparent;
+}
+
+.btn-outline:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.select {
+  flex: none;
+  background: #131316;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  padding: 11px 14px;
+  font: 500 14.5px var(--sg);
+  color: #f0f0f2;
+  cursor: pointer;
+}
+
+.select option {
+  background: #131316;
+  color: #f0f0f2;
+}
+
+/* The 46×27 toggle, from the mockup's mkT helper. */
+.toggle {
+  flex: none;
+  width: 46px;
+  height: 27px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  position: relative;
+  cursor: pointer;
+  transition: background 0.18s;
+  border: none;
+  padding: 0;
+}
+
+.toggle--on {
+  background: #2d9fdb;
+}
+
+.toggle__knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 21px;
+  height: 21px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.18s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle--on .toggle__knob {
+  left: 22px;
+}
+
+/* The dark card frame (profile, security). */
+.card {
+  background: #131316;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 34px 42px;
+}
+
+.card__title {
+  font: 600 24px var(--sg);
+  color: #fff;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.card__label {
+  font: 500 15px var(--sg);
+  color: rgba(255, 255, 255, 0.85);
+  margin: 24px 0 14px;
+}
+
+.card__divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 24px 0;
+}
+
+.chip-dim {
+  background: #242428;
+  border-radius: 8px;
+  padding: 3px 10px;
+  font: 500 12.5px var(--sg);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.dots {
+  margin-left: auto;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  font: 600 16px var(--sg);
+  letter-spacing: 2px;
+  background: transparent;
+  border: none;
+}

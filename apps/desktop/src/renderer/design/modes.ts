@@ -13,12 +13,15 @@ export interface NovaMode {
   readonly desc: string;
 }
 
+/** The default mode — exported on its own so fallbacks never index the list. */
+export const GENERAL_MODE: NovaMode = {
+  id: "general",
+  name: "General",
+  desc: "The default mode. No custom prompt, summary template, or attached files. Nova uses its baseline behavior. Set this active to clear any mode you have selected.",
+};
+
 export const NOVA_MODES: readonly NovaMode[] = [
-  {
-    id: "general",
-    name: "General",
-    desc: "The default mode. No custom prompt, summary template, or attached files. Nova uses its baseline behavior. Set this active to clear any mode you have selected.",
-  },
+  GENERAL_MODE,
   {
     id: "discovery",
     name: "Discovery Call",
