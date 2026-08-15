@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Filled in per environment by the nova-content-security-policy plugin in
+      electron.vite.config.ts — see index.html for the full reasoning. The
+      plugin throws if the placeholder is missing, so this window can never
+      quietly load with no policy.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="%CSP%" />
+    <title>Nova Settings</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./settings.tsx"></script>
+  </body>
+</html>
