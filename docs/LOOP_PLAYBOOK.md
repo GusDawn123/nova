@@ -34,7 +34,9 @@ GUARDRAILS:
   (ARCHITECTURE.md, PARITY.md status column, ADRs, CLAUDE.md commands) in the SAME
   branch. A loop that changed behavior but not docs is NOT done.
 - PARITY: check off the phase's rows in docs/PARITY.md with links to the evidence.
-- Never read from ~/Documents/natively-cluely-ai-assistant.
+- The reference repo (~/Documents/natively-cluely-ai-assistant) may be READ for
+  techniques, OS API selection, call ordering and known failure modes. Never copy,
+  translate, paraphrase or adapt its code or wording into this repo (RULES §9).
 - Commit after each verified step; message names the loop + step.
 ```
 

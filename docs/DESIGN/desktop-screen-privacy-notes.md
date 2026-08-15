@@ -1,7 +1,8 @@
-# Desktop stealth — clean-room notes
+# Desktop screen-capture exclusion — clean-room notes
 
-How Nova's desktop window stays absent from a screen share while remaining
-visible locally. Written 2026-08-14 from **public Electron/Apple/Microsoft
+How Nova's desktop window stays out of a screen share while remaining visible on
+the user's own display — so a user who shares their screen does not broadcast
+their own copilot. Written 2026-08-14 from **public Electron/Apple/Microsoft
 documentation and our own testing** — no source from any reference app was read
 or copied. The mechanism is a documented public API; the discoveries below are
 our own, reproduced from scratch.
@@ -15,10 +16,12 @@ our own, reproduced from scratch.
 - **macOS: PROVEN.** On macOS 26.5.2 (Apple Silicon, Electron 43) the window is
   **absent from a live Google Meet full-screen share** and fully visible locally.
 - **Windows: NOT YET TESTED.** The same call maps to a different OS API there,
-  with a documented risk it fails for Electron windows. Must be tested on real
-  Windows hardware before we trust it. See [Windows](#windows--still-to-test).
-- Stealth lives in **main**; the React renderer can only *ask* main to toggle it
-  over IPC. Putting it in the renderer is impossible and would be a security hole.
+  with a documented risk it does not take effect for Electron windows. Must be
+  tested on real Windows hardware before we trust it. See
+  [Windows](#windows--still-to-test).
+- Screen-capture exclusion lives in **main**; the React renderer can only *ask*
+  main to toggle it over IPC. Putting it in the renderer is impossible and would
+  be a security hole.
 
 ---
 
@@ -40,16 +43,18 @@ the WindowServer to exclude the window — which is exactly what this flag does.
 The "renders on a GPU layer below capture" story is fabricated and must not enter
 any Nova design.
 
-## Architecture: main hides, the renderer only asks
+## Architecture: main applies the exclusion, the renderer only asks
 
-Stealth is a main-process concern, the same trust boundary as the auth token:
+Screen-capture exclusion is a main-process concern, the same trust boundary as
+the auth token:
 
 - **Main process** owns the window and calls `setContentProtection`. It is the
-  only place with the power to hide.
-- **Renderer (React)** never hides anything. The closest thing to a "React
-  function" for stealth is a hook — e.g. `useStealth()` — that calls a
-  preload-exposed `window.api.setStealth(true|false)` over IPC. React decides
-  *when* (a toggle, a hotkey) and reflects the state in the UI; main does the act.
+  only place that can apply the exclusion.
+- **Renderer (React)** never applies anything. The closest thing to a "React
+  function" for this is a hook — e.g. `useScreenPrivacy()` — that calls a
+  preload-exposed `window.api.setScreenPrivacy(true|false)` over IPC. React
+  decides *when* (a toggle, a hotkey) and reflects the state in the UI; main does
+  the act.
 
 ---
 
@@ -66,8 +71,8 @@ cleanly — the share shows what is *behind* the window, no artifact.
   mangled the window), and it appeared not to work — a contaminated result.
   Apply at birth and re-assert.
 - **Opacity does not matter for this call.** Our probe used a plain opaque
-  window and it still hid cleanly. (Contrast the failed approach below, which is
-  opacity-sensitive.)
+  window and it was still excluded cleanly. (Contrast the failed approach below,
+  which is opacity-sensitive.)
 
 **What does NOT work, for the record:**
 
@@ -76,7 +81,7 @@ cleanly — the share shows what is *behind* the window, no artifact.
   on an opaque Electron window the excluded region renders **grey** in the
   capture rather than see-through — the documented Electron rendering regression
   (electron#46886, why Electron reverted Chromium's implementation). Useless for
-  covert use. Abandoned in favor of `setContentProtection`.
+  this purpose. Abandoned in favor of `setContentProtection`.
 - **Lazily-applied `setContentProtection`** — see the timing note above.
 
 **Correction to our own design doc.** `docs/superpowers/specs/2026-08-11-desktop-pivot-design.md`
@@ -92,17 +97,16 @@ design doc should be amended.
    Meet**, and viewed the shared feed on a **second device (a phone joined to the
    same meeting)** — the reliable check, since Meet's own self-preview can lie.
 3. **Result:** the probe window was **absent from what the phone saw**, and fully
-   visible on the Mac. Clean invisibility.
-4. **Corroboration by inspecting a shipped competitor:** the Cluely (New) 2.1.x
-   app bundle is Electron **40.8.0** with **no native stealth addon** (its only
-   native module is an unrelated deep-link handler) — so its invisibility is the
-   same pure-Electron `setContentProtection`. This confirmed our approach and is
-   how we found it.
+   visible on the Mac. Cleanly excluded.
+4. **Corroboration from a shipped Electron app in this category:** its bundle is
+   Electron **40.8.0** with **no native screen-capture addon** (its only native
+   module is an unrelated deep-link handler) — so its capture exclusion is the
+   same pure-Electron `setContentProtection`. This corroborated our approach.
 
 ### Minimal reproduction
 
 ```js
-// main process — the whole trick is one call, applied at creation
+// main process — the whole mechanism is one call, applied at creation
 const win = new BrowserWindow({
   width, height,
   alwaysOnTop: true,
@@ -111,7 +115,7 @@ const win = new BrowserWindow({
   // macOS overlay niceties: type: 'panel', hiddenInMissionControl: true,
   webPreferences: { contextIsolation: true, nodeIntegration: false, preload },
 });
-win.setContentProtection(true);                 // <-- hides from capture
+win.setContentProtection(true);                 // <-- excludes from screen capture
 win.setAlwaysOnTop(true, 'screen-saver');
 win.once('ready-to-show', () => win.setContentProtection(true)); // re-assert
 ```
@@ -121,21 +125,21 @@ device, confirm the window is absent there and present locally.
 
 ---
 
-## The broader "undetectable window" toolkit
+## The broader window-privacy options
 
-Screen-share invisibility is one piece. The rest of "undetectable" is a small set
-of **main-process** `BrowserWindow` options — none of them React:
+Screen-capture exclusion is one piece. The rest is a small set of
+**main-process** `BrowserWindow` options — none of them React:
 
 | Goal | Option / call | Notes |
 |---|---|---|
-| Invisible to capture/recording | `setContentProtection(true)` | the core one |
+| Excluded from screen capture | `setContentProtection(true)` | the core one |
 | Not in the Windows taskbar / switcher | `skipTaskbar: true` | no-op on macOS |
 | No macOS dock icon | `app.dock.hide()` / `LSUIElement` | menu-bar-less agent app |
 | Float over fullscreen apps (macOS) | `type: 'panel'` | appears on all spaces |
-| Hidden during Mission Control | `hiddenInMissionControl: true` | macOS |
+| Not shown during Mission Control | `hiddenInMissionControl: true` | macOS |
 | No window chrome | `frame: false`, `transparent: true` | overlay look |
 | Never steal focus from the call | non-activating window config | so the meeting app stays frontmost |
-| Not flagged by name | generic window title / process name | defeats title-scanning monitors |
+| Generic window title | generic window title / process name | keeps the product name out of the title bar |
 
 ---
 
@@ -145,10 +149,11 @@ of **main-process** `BrowserWindow` options — none of them React:
 WDA_EXCLUDEFROMCAPTURE)`, real and documented on Windows 10 version 2004+.
 
 **The risk (from the pivot research, §4.2):** there are reports that on Windows
-11 this call **fails for Chromium/Electron-class windows** while succeeding for
-classic Win32 apps — acknowledged by a Microsoft engineer. So the macOS win does
-**not** automatically carry over. If it fails on Windows, the risk has *flipped*:
-macOS becomes the easy platform and Windows needs a workaround.
+11 this call **does not take effect for Chromium/Electron-class windows** while
+succeeding for classic Win32 apps — acknowledged by a Microsoft engineer. So the
+macOS result does **not** automatically carry over. If it does not work on
+Windows, the difficulty has *flipped*: macOS becomes the easy platform and
+Windows needs a workaround.
 
 **How to test (must be real hardware, not a VM):**
 
@@ -166,18 +171,19 @@ macOS becomes the easy platform and Windows needs a workaround.
 ## Open edges to stress-test (both platforms)
 
 - **Mid-session capture-filter change** (macOS ScreenCaptureKit bug FB21115847):
-  a protected window can be omitted on a fresh capture filter and *revealed*
+  an excluded window can be omitted on a fresh capture filter and *re-appear*
   after the filter updates mid-call (e.g. switching what is shared). Test whether
-  the window stays hidden across a mid-call share change. This is the case a
+  the window stays excluded across a mid-call share change. This is the case a
   read-back/watchdog (re-assert on reset events) would catch.
 - Neither Apple nor Microsoft guarantees these flags as a security feature; they
-  can lose to some capture paths and OS versions. Treat stealth as best-effort and
-  verify per platform/OS release.
+  can lose to some capture paths and OS versions. Treat screen-capture exclusion
+  as best-effort and verify per platform/OS release.
 
 ---
 
 ## Clean-room / license
 
 This mechanism is a documented public Electron API, validated by our own testing.
-We do not copy code from any reference implementation. Nova's stealth is built
-from the Electron/Apple/Microsoft documentation and the results recorded here.
+We do not copy code from any reference implementation. Nova's screen-capture
+exclusion is built from the Electron/Apple/Microsoft documentation and the
+results recorded here.

@@ -325,7 +325,7 @@
 
 ## Explicitly OUT of scope (decided, not forgotten)
 
-- Desktop overlay / screen-share stealth — desktop-only concept, contrary to Nova's model
+- Desktop overlay / screen-capture exclusion — desktop-only concept, contrary to Nova's model
 - Screenshot/vision "read my screen" answers — desktop feature; revisit post-MVP
 - BYO API keys — Nova is company-keys + subscription by design
 - Local/offline models on device — cloud-first; revisit if privacy tier demanded
