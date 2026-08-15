@@ -7,12 +7,12 @@ import { hardenNavigation, loadRendererPage } from "./navigation";
 
 /**
  * How long the pill is: a fraction of the screen's width, per Gustavo's
- * 2026-08-15 sizing pass ("a bit less than 1/3"). The pill's INTERNAL sizes —
+ * 2026-08-15 sizing pass ("a bit bigger than 1/3"). The pill's INTERNAL sizes —
  * row thickness, fonts, icons — never change; the shell just stretches to
  * fill whatever window this hands it (`.pill-stage` is 100vw), so this
  * constant is the one knob for the pill's length.
  */
-const PILL_SCREEN_FRACTION = 0.3;
+const PILL_SCREEN_FRACTION = 0.36;
 
 /**
  * The window is wider than the pill so the CSS drop shadow has somewhere to

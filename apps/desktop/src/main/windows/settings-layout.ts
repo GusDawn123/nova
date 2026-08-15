@@ -13,7 +13,7 @@
  */
 
 /** The slice of screen width the settings window occupies — THE tuning knob. */
-export const SETTINGS_SCREEN_FRACTION = 1 / 3;
+export const SETTINGS_SCREEN_FRACTION = 2 / 3;
 
 /** The width the mockup is drawn at. Do not change without redrawing. */
 export const SETTINGS_DESIGN_WIDTH = 1150;
