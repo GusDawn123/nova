@@ -27,12 +27,14 @@ class GapFiller {
   };
 
   // 200 ms before a deficit is a gap; refills leave 100 ms in place.
-  static constexpr Config kWireDefaults{wire::kSampleRateHz / 5,
-                                        wire::kSampleRateHz / 10};
+  static constexpr Config kWireDefaults{
+      .toleranceSamples = wire::kSampleRateHz / 5,
+      .refillTargetSamples = wire::kSampleRateHz / 10};
 
   // Zero tolerance: every tick fills straight up to the wall clock. This is
   // the mode for a slot with no device behind it — pure explicit silence.
-  static constexpr Config kFillEverything{0, 0};
+  static constexpr Config kFillEverything{.toleranceSamples = 0,
+                                          .refillTargetSamples = 0};
 
   explicit GapFiller(Config config = kWireDefaults);
 
@@ -42,12 +44,14 @@ class GapFiller {
   void setConfig(Config config);
 
   // `wallSamples`: how many samples the wall clock says should exist by now.
-  // `arrived`: real samples that just landed. Returns the silence owed, which
-  // the caller writes BEFORE the arrived samples — a gap being repaired
-  // predates the audio that just came in.
+  // `arrived`: real samples that just landed — credited BEFORE the deficit is
+  // measured, so a late burst that already covers the gap injects nothing
+  // (and the stream can never be pushed past the wall by fill + burst
+  // double-counting). Returns the silence owed, which the caller writes
+  // before the arrived samples.
   size_t advance(size_t wallSamples, size_t arrived);
 
-  size_t injectedTotal() const { return injected_; }
+  [[nodiscard]] size_t injectedTotal() const { return injected_; }
 
  private:
   Config config_;

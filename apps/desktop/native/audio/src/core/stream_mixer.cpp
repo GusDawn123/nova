@@ -12,17 +12,19 @@ StreamMixer::StreamMixer(int sourceCount) {
 }
 
 void StreamMixer::push(int source, const int16_t* samples, size_t count) {
-  assert(source >= 0 && static_cast<size_t>(source) < pending_.size());
-  auto& pending = pending_[static_cast<size_t>(source)];
+  if (count == 0) {
+    return;  // an empty scratch may hand over a null pointer — never touch it
+  }
+  auto& pending = pending_.at(static_cast<size_t>(source));
   pending.insert(pending.end(), samples, samples + count);
 }
 
 size_t StreamMixer::drainInto(std::vector<int16_t>& out) {
-  size_t ready = pending_.front().size();
+  size_t ready = std::numeric_limits<size_t>::max();
   for (const auto& pending : pending_) {
     ready = std::min(ready, pending.size());
   }
-  if (ready == 0) {
+  if (pending_.empty() || ready == 0) {
     return 0;
   }
   // Both branches below were the profiler's #1 hotspot as a naive per-sample

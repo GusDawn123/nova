@@ -19,6 +19,11 @@ GapFiller::GapFiller(Config config) : config_(clamped(config)) {}
 void GapFiller::setConfig(Config config) { config_ = clamped(config); }
 
 size_t GapFiller::advance(size_t wallSamples, size_t arrived) {
+  // Credit what arrived first: a burst that covers the gap means the gap no
+  // longer exists, and filling it anyway would both inject spurious silence
+  // and push the stream past the wall — a surplus the mixer would then hold
+  // against the wall-paced slot for the rest of the call.
+  position_ += arrived;
   size_t fill = 0;
   if (wallSamples > position_) {
     const size_t deficit = wallSamples - position_;
@@ -26,7 +31,7 @@ size_t GapFiller::advance(size_t wallSamples, size_t arrived) {
       fill = deficit - config_.refillTargetSamples;
     }
   }
-  position_ += fill + arrived;
+  position_ += fill;
   injected_ += fill;
   return fill;
 }

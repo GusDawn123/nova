@@ -86,25 +86,36 @@ void Start(const Napi::CallbackInfo& info) {
   next->capture = nova::audio::makeAudioCapture();
 
   Engine* raw = next.get();
+  try {
+    next->capture->start(
+        [raw](FrameBatch&& batch) {
+          // Ownership passes to CallBatch on success (it deletes the payload
+          // even during environment teardown).
+          auto* payload = new FrameBatch(std::move(batch));
+          if (raw->onBatch.NonBlockingCall(payload, CallBatch) != napi_ok) {
+            delete payload;
+            raw->droppedBatches.fetch_add(1, std::memory_order_relaxed);
+          }
+        },
+        [raw](const CaptureEvent& event) {
+          auto* payload = new EventPayload{nova::audio::toString(event.type),
+                                           event.detail};
+          if (raw->onEvent.NonBlockingCall(payload, CallEvent) != napi_ok) {
+            // Dropped events are not tracked: they are advisory, audio is not.
+            delete payload;
+          }
+        });
+  } catch (...) {
+    // A failed start must leave NOTHING behind: no latched engine blocking a
+    // retry, no live TSFNs pinning the event loop open forever.
+    next->capture->stop();  // idempotent; joins anything half-started
+    next->onBatch.Release();
+    next->onEvent.Release();
+    throw;
+  }
+  // Published only after start() succeeded, so a throw above cannot strand a
+  // half-started engine behind the "already running" guard.
   engine = std::move(next);
-  engine->capture->start(
-      [raw](FrameBatch&& batch) {
-        // Ownership passes to CallBatch on success (it deletes the payload
-        // even during environment teardown).
-        auto* payload = new FrameBatch(std::move(batch));
-        if (raw->onBatch.NonBlockingCall(payload, CallBatch) != napi_ok) {
-          delete payload;
-          raw->droppedBatches.fetch_add(1, std::memory_order_relaxed);
-        }
-      },
-      [raw](const CaptureEvent& event) {
-        auto* payload = new EventPayload{nova::audio::toString(event.type),
-                                         event.detail};
-        if (raw->onEvent.NonBlockingCall(payload, CallEvent) != napi_ok) {
-          // Dropped events are not tracked: they are advisory, audio is not.
-          delete payload;
-        }
-      });
 }
 
 Napi::Value Stop(const Napi::CallbackInfo& info) {

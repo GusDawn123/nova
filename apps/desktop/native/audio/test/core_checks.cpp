@@ -109,6 +109,27 @@ void gapFillerBackfillsARealGap() {
   }
 }
 
+void gapFillerIgnoresABurstThatCoversTheGap() {
+  // Delivery stalls just under the tolerance, then everything arrives at
+  // once. Arrivals are credited before the deficit is measured, so the burst
+  // must fully cancel the gap — zero injected silence, no overshoot.
+  GapFiller filler;
+  size_t wall = 0;
+  for (int tick = 0; tick < 10; ++tick) {  // 3200 behind: at, not past, 3200
+    wall += wire::kFrameSamples;
+    CHECK(filler.advance(wall, 0) == 0);
+  }
+  wall += wire::kFrameSamples;
+  CHECK(filler.advance(wall, 11 * wire::kFrameSamples) == 0);
+  CHECK(filler.injectedTotal() == 0);
+  // And the stream is exactly on the wall afterwards: steady delivery
+  // resumes with no fill and no carried surplus.
+  for (int tick = 0; tick < 20; ++tick) {
+    wall += wire::kFrameSamples;
+    CHECK(filler.advance(wall, wire::kFrameSamples) == 0);
+  }
+}
+
 void gapFillerFillsEverythingForDeadSources() {
   GapFiller filler(GapFiller::kFillEverything);
   size_t wall = 0;
@@ -147,6 +168,9 @@ void sampleQueueSurvivesConcurrentPushers() {
   std::vector<int16_t> drained;
   while (drained.size() + queue.droppedTotal() < 2 * chunks * chunkSamples) {
     queue.drainInto(drained);
+    // Without the yield this loop monopolises a core and starves the
+    // producers under TSan's serialised scheduling.
+    std::this_thread::yield();
   }
   producerA.join();
   producerB.join();
@@ -271,6 +295,9 @@ void pipelineKeepsTheTimelineAcrossADeadSpell() {
       ++zeros;
     }
   }
+  // Recovery audio must actually exist — the sentinel value of first2000
+  // would let pure silence pass the ordering check below.
+  CHECK(first2000 < flat.size());
   CHECK(last1000 < first2000);
   CHECK(zeros >= 200 * static_cast<size_t>(wire::kFrameSamples) -
                      GapFiller::kWireDefaults.toleranceSamples -
@@ -299,12 +326,19 @@ void pipelineSurvivesConcurrentPushAndTick() {
   me.tick(wall, batches);  // final drain
 
   size_t emitted = 0;
+  size_t realSamples = 0;
   for (const auto& batch : batches) {
     emitted += batch.samples.size();
     for (const int16_t sample : batch.samples) {
       CHECK(sample == 7 || sample == 0);
+      if (sample == 7) {
+        ++realSamples;
+      }
     }
   }
+  // Pure injected silence would satisfy every conservation identity below —
+  // real audio must have reached the wire for this to prove anything.
+  CHECK(realSamples > 0);
   // Conservation against what ACTUALLY flowed, not against the synthetic
   // wall: if the pusher lags the ticker, the filler injects silence AND the
   // late real samples still arrive, so output can legitimately exceed the
@@ -329,6 +363,7 @@ int main() {
   framerRegroupsAnySliceIntoExactBatches();
   gapFillerStaysQuietUnderJitter();
   gapFillerBackfillsARealGap();
+  gapFillerIgnoresABurstThatCoversTheGap();
   gapFillerFillsEverythingForDeadSources();
   sampleQueueDropsIncomingWhenFullAndCounts();
   sampleQueueSurvivesConcurrentPushers();

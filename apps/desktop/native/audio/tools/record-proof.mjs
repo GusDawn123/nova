@@ -14,6 +14,12 @@ const require = createRequire(import.meta.url);
 const addon = require("../build/Release/nova_audio.node");
 
 const seconds = Number(process.argv[2] ?? 30);
+if (!Number.isFinite(seconds) || seconds < 1 || seconds > 3600) {
+  // Out-of-range values would be silently clamped to a 1 ms timer by Node,
+  // producing empty WAVs that LOOK like a capture failure.
+  console.error("usage: node tools/record-proof.mjs [seconds]  (1-3600)");
+  process.exit(1);
+}
 const { sampleRateHz } = addon.wireFormat;
 const captured = { me: [], them: [] };
 

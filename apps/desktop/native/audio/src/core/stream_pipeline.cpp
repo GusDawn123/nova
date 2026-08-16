@@ -15,17 +15,19 @@ StreamPipeline::StreamPipeline(StreamLabel label, int sourceCount)
 }
 
 SampleQueue& StreamPipeline::queue(int source) {
-  assert(source >= 0 && static_cast<size_t>(source) < sources_.size());
-  return sources_[static_cast<size_t>(source)]->queue;
+  // .at(): the addon ships as a Release build where assert() is compiled
+  // away, and a bad index must throw, not corrupt memory. A negative int
+  // wraps to a huge size_t and throws the same way.
+  return sources_.at(static_cast<size_t>(source))->queue;
 }
 
 void StreamPipeline::setSourceLive(int source, bool live) {
-  assert(source >= 0 && static_cast<size_t>(source) < sources_.size());
   // The SAME filler is reconfigured (never replaced): its stream position
   // survives the flip, so a device coming back can't be mistaken for one
   // giant gap since the start of the call.
-  sources_[static_cast<size_t>(source)]->filler.setConfig(
-      live ? GapFiller::kWireDefaults : GapFiller::kFillEverything);
+  sources_.at(static_cast<size_t>(source))
+      ->filler.setConfig(live ? GapFiller::kWireDefaults
+                              : GapFiller::kFillEverything);
 }
 
 void StreamPipeline::tick(size_t wallSamples, std::vector<FrameBatch>& out) {

@@ -12,6 +12,10 @@ Checks: >
   performance-*,
   modernize-*,
   -modernize-use-trailing-return-type
-WarningsAsErrors: ""
+# The bug-shaped families FAIL the check; modernize/performance stay advisory.
+WarningsAsErrors: >
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*
 HeaderFilterRegex: "(src|test)/.*"
 FormatStyle: none

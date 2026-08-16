@@ -13,8 +13,8 @@ namespace {
 class MacAudioCapture final : public AudioCapture {
  public:
   void start(BatchSink /*onBatch*/, EventSink onEvent) override {
-    onEvent({CaptureEventType::Error,
-             "macOS audio capture is not implemented yet (chunk 8+)"});
+    onEvent({.type = CaptureEventType::Error,
+             .detail = "macOS audio capture is not implemented yet (chunk 8+)"});
   }
   void stop() override {}
 };

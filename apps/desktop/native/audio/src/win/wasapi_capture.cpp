@@ -113,8 +113,8 @@ class WasapiCapture final : public AudioCapture {
 void WasapiCapture::run() {
   win::ComApartment com;
   if (!com.ok()) {
-    onEvent_({CaptureEventType::Error,
-              "COM initialization failed — audio capture cannot run"});
+    onEvent_({.type = CaptureEventType::Error,
+              .detail = "COM initialization failed — audio capture cannot run"});
     return;
   }
 
@@ -122,17 +122,21 @@ void WasapiCapture::run() {
   HRESULT hr = CoCreateInstance(__uuidof(MMDeviceEnumerator), nullptr,
                                 CLSCTX_ALL, IID_PPV_ARGS(&enumerator));
   if (FAILED(hr)) {
-    onEvent_({CaptureEventType::Error,
-              win::describeFailure("device enumerator unavailable", hr)});
+    onEvent_({.type = CaptureEventType::Error,
+              .detail =
+                  win::describeFailure("device enumerator unavailable", hr)});
     return;
   }
 
   // The watcher's callback runs on COM worker threads — it only pokes this
-  // flag; the tick loop does the actual (debounced) reacting.
-  std::atomic<bool> devicesDirty{false};
+  // flag; the tick loop does the actual (debounced) reacting. Heap-owned and
+  // shared into the closure: UnregisterEndpointNotificationCallback does NOT
+  // join a callback already dispatched on a worker thread, so the flag must
+  // be allowed to outlive this stack frame.
+  auto devicesDirty = std::make_shared<std::atomic<bool>>(false);
   ComPtr<win::DeviceWatcher> watcher;
-  watcher.Attach(new win::DeviceWatcher([&devicesDirty] {
-    devicesDirty.store(true, std::memory_order_relaxed);
+  watcher.Attach(new win::DeviceWatcher([devicesDirty] {
+    devicesDirty->store(true, std::memory_order_relaxed);
   }));
   enumerator->RegisterEndpointNotificationCallback(watcher.Get());
 
@@ -143,11 +147,25 @@ void WasapiCapture::run() {
   // the one calls actually use — and BOTH render roles, because Zoom routes
   // to the communications device while media plays on the multimedia one.
   std::vector<Slot> slots;
-  slots.push_back({"microphone", eCapture, eCommunications, false, &me, 0});
-  slots.push_back(
-      {"system audio (default output)", eRender, eConsole, true, &them, 0});
-  slots.push_back({"system audio (communications output)", eRender,
-                   eCommunications, true, &them, 1, /*dedupeAgainstSlot=*/1});
+  slots.push_back({.name = "microphone",
+                   .flow = eCapture,
+                   .role = eCommunications,
+                   .loopback = false,
+                   .pipeline = &me,
+                   .source = 0});
+  slots.push_back({.name = "system audio (default output)",
+                   .flow = eRender,
+                   .role = eConsole,
+                   .loopback = true,
+                   .pipeline = &them,
+                   .source = 0});
+  slots.push_back({.name = "system audio (communications output)",
+                   .flow = eRender,
+                   .role = eCommunications,
+                   .loopback = true,
+                   .pipeline = &them,
+                   .source = 1,
+                   .dedupeAgainstSlot = 1});
 
   rebuild(enumerator.Get(), slots, /*firstBuild=*/true);
 
@@ -170,7 +188,7 @@ void WasapiCapture::run() {
 
     // A notification burst keeps pushing the quiet timer out; one change =
     // one rebuild.
-    if (devicesDirty.exchange(false, std::memory_order_relaxed)) {
+    if (devicesDirty->exchange(false, std::memory_order_relaxed)) {
       dirtySince = now;
     }
     const bool debounceExpired =
@@ -195,10 +213,12 @@ void WasapiCapture::run() {
         me.stats().droppedSamples + them.stats().droppedSamples;
     if (drops > reportedDrops &&
         now - lastOverflowReport >= kOverflowReportPeriod) {
-      onEvent_({CaptureEventType::Overflow,
-                "consumer stalled; dropped " +
-                    std::to_string(drops - reportedDrops) +
-                    " samples (timeline stays correct via silence backfill)"});
+      onEvent_(
+          {.type = CaptureEventType::Overflow,
+           .detail =
+               "consumer stalled; dropped " +
+               std::to_string(drops - reportedDrops) +
+               " samples (timeline stays correct via silence backfill)"});
       reportedDrops = drops;
       lastOverflowReport = now;
     }
@@ -243,10 +263,10 @@ void WasapiCapture::rebuild(IMMDeviceEnumerator* enumerator,
 
     if (id.empty()) {
       if (!duplicate && !slot.reportedMissing) {
-        onEvent_({CaptureEventType::DeviceLost,
-                  std::string(slot.name) +
-                      ": no default device — streaming silence until one "
-                      "appears"});
+        onEvent_({.type = CaptureEventType::DeviceLost,
+                  .detail = std::string(slot.name) +
+                            ": no default device — streaming silence until "
+                            "one appears"});
         slot.reportedMissing = true;
       }
       continue;
@@ -263,10 +283,10 @@ void WasapiCapture::rebuild(IMMDeviceEnumerator* enumerator,
     slot.pipeline->setSourceLive(slot.source, true);
     slot.reportedMissing = false;
     if (!firstBuild) {
-      onEvent_({hadSession ? CaptureEventType::DeviceChanged
-                           : CaptureEventType::DeviceRestored,
-                std::string(slot.name) +
-                    ": now capturing the current default device"});
+      onEvent_({.type = hadSession ? CaptureEventType::DeviceChanged
+                                   : CaptureEventType::DeviceRestored,
+                .detail = std::string(slot.name) +
+                          ": now capturing the current default device"});
     }
   }
 }

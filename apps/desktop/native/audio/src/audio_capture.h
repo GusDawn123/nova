@@ -17,7 +17,9 @@ using BatchSink = std::function<void(FrameBatch&&)>;
 // wrong (no mic YET, headphones unplugged mid-call, defaults switched) is
 // transient, and the engine's job is to ride it out — streaming gap-filled
 // silence and reporting through the EventSink until the hardware comes back.
-// Both sinks are invoked from internal capture threads, never the caller's.
+// Sinks must be thread-agnostic: they normally fire from internal capture
+// threads, but a failure raised during start() itself may be reported on the
+// caller's thread (the macOS stub does exactly that).
 class AudioCapture {
  public:
   virtual ~AudioCapture() = default;

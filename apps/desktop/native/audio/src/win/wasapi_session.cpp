@@ -38,8 +38,8 @@ std::unique_ptr<WasapiSession> WasapiSession::open(IMMDevice* device,
   using Microsoft::WRL::ComPtr;
 
   const auto fail = [&](const char* what, HRESULT hr) {
-    events({CaptureEventType::Error,
-            std::string(name) + ": " + describeFailure(what, hr)});
+    events({.type = CaptureEventType::Error,
+            .detail = std::string(name) + ": " + describeFailure(what, hr)});
     return nullptr;
   };
 
@@ -54,6 +54,11 @@ std::unique_ptr<WasapiSession> WasapiSession::open(IMMDevice* device,
   // s16) regardless of the device's native rate/channels — the whole reason
   // this repo carries no resampler. SRC_DEFAULT_QUALITY picks the good
   // converter rather than the drift-prone linear one.
+  //
+  // Platform floor: LOOPBACK + EVENTCALLBACK succeeds but never signals the
+  // event before Windows 10 1703 — a capture thread there would block
+  // forever. Nova cannot meet that fate: Electron itself requires Windows 10
+  // 1809+, which is past the fixed build.
   DWORD flags = AUDCLNT_STREAMFLAGS_EVENTCALLBACK |
                 AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM |
                 AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY;
@@ -135,8 +140,19 @@ void WasapiSession::run() {
   for (;;) {
     const DWORD which = WaitForMultipleObjects(
         static_cast<DWORD>(waits.size()), waits.data(), FALSE, INFINITE);
+    if (which == WAIT_OBJECT_0) {
+      return;  // stop signalled
+    }
     if (which != WAIT_OBJECT_0 + 1) {
-      return;  // stop signalled (or the wait itself broke — nothing to read)
+      // WAIT_FAILED / WAIT_ABANDONED: this session can no longer hear its
+      // device, and it must SAY so — a dead thread with alive_ still true is
+      // a slot the self-healing sweep would trust forever.
+      alive_.store(false, std::memory_order_relaxed);
+      events_({.type = CaptureEventType::DeviceLost,
+               .detail = std::string(name_) + ": " +
+                         describeFailure("capture wait failed",
+                                         HRESULT_FROM_WIN32(GetLastError()))});
+      return;
     }
 
     UINT32 packetFrames = 0;
@@ -168,9 +184,9 @@ void WasapiSession::run() {
       // Flag it and bow out; the engine rebuilds around the new defaults and
       // the gap filler keeps the stream's timeline honest meanwhile.
       alive_.store(false, std::memory_order_relaxed);
-      events_({CaptureEventType::DeviceLost,
-               std::string(name_) + ": " +
-                   describeFailure("capture stream failed", hr)});
+      events_({.type = CaptureEventType::DeviceLost,
+               .detail = std::string(name_) + ": " +
+                         describeFailure("capture stream failed", hr)});
       return;
     }
   }

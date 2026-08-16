@@ -48,7 +48,7 @@ class StreamPipeline {
     size_t droppedSamples;
     size_t injectedSilenceSamples;
   };
-  Stats stats() const;
+  [[nodiscard]] Stats stats() const;
 
  private:
   struct Source {

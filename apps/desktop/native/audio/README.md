@@ -8,7 +8,7 @@ the signature-complete stub the spec requires.
 
 ## Build (Windows)
 
-```
+```sh
 npm run build:native --workspace apps/desktop
 ```
 
@@ -27,7 +27,7 @@ The core is deliberately buildable on Linux so every tool can reach it:
 
 ## Proof recording (the chunk's acceptance test)
 
-```
+```sh
 node tools/record-proof.mjs 30
 ```
 
