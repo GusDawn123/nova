@@ -1,0 +1,21 @@
+# The static gate for the native addon, read by clang-tidy via the
+# cpp-analysis MCP server's static_check tools. Curated for signal:
+#   - bugprone / clang-analyzer / concurrency / performance: the point.
+#   - modernize: keeps the C++ current; trailing-return-type is style noise.
+#   - easily-swappable-parameters fires on every (samples, count) PCM
+#     signature — the shape this codebase is made of — so it is off.
+Checks: >
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  clang-analyzer-*,
+  concurrency-*,
+  performance-*,
+  modernize-*,
+  -modernize-use-trailing-return-type
+# The bug-shaped families FAIL the check; modernize/performance stay advisory.
+WarningsAsErrors: >
+  bugprone-*,
+  clang-analyzer-*,
+  concurrency-*
+HeaderFilterRegex: "(src|test)/.*"
+FormatStyle: none
