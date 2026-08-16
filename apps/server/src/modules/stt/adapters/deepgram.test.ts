@@ -9,11 +9,15 @@ function results(opts: {
   isFinal?: boolean;
   start?: number;
   speaker?: number;
+  channelIndex?: number;
 }): unknown {
   return {
     type: "Results",
     is_final: opts.isFinal ?? false,
     start: opts.start ?? 0,
+    ...(opts.channelIndex === undefined
+      ? {}
+      : { channel_index: [opts.channelIndex, 2] }),
     channel: {
       alternatives: [
         {
@@ -67,6 +71,30 @@ describe("translateResults", () => {
     expect(
       translateResults(results({ transcript: "yes", speaker: 0 })),
     ).toMatchObject({ speaker: "0" });
+  });
+
+  it("labels stereo channels as me/them — the channel IS the speaker", () => {
+    expect(
+      translateResults(results({ transcript: "hi", channelIndex: 0 }), 2),
+    ).toMatchObject({ speaker: "me" });
+    expect(
+      translateResults(results({ transcript: "hey", channelIndex: 1 }), 2),
+    ).toMatchObject({ speaker: "them" });
+  });
+
+  it("ignores diarized speaker numbers in the stereo case", () => {
+    // A stray per-word speaker number must never override the channel label.
+    const event = translateResults(
+      results({ transcript: "hi", channelIndex: 1, speaker: 0 }),
+      2,
+    );
+    expect(event).toMatchObject({ speaker: "them" });
+  });
+
+  it("falls back to a null speaker when a stereo Results omits channel_index", () => {
+    expect(translateResults(results({ transcript: "hi" }), 2)).toMatchObject({
+      speaker: null,
+    });
   });
 
   it("ignores non-Results messages (Metadata / UtteranceEnd / SpeechStarted)", () => {

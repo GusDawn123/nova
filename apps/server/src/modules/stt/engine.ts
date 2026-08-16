@@ -364,6 +364,12 @@ export const createSttEngine: CreateSttEngine = (
   vendors: readonly SttVendor[],
 ): SttEngine => ({
   startSession(info: SttSessionInfo, emit: SttEmit): SttSessionHandle {
-    return new SttSession(config, vendors, info, emit);
+    // Only vendors that can attribute every channel the session sends. An
+    // empty result reuses the exhaustion path (one typed error) — never a
+    // mono-only vendor silently transcribing garbled interleaved stereo.
+    const capable = vendors.filter(
+      (vendor) => (vendor.maxChannels ?? 1) >= (info.channels ?? 1),
+    );
+    return new SttSession(config, capable, info, emit);
   },
 });

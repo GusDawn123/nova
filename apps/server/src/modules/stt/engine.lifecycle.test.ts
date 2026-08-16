@@ -145,3 +145,72 @@ describe("STT engine — stop", () => {
     }).not.toThrow();
   });
 });
+
+describe("STT engine — channel capability filter", () => {
+  it("[channels] refuses a stereo session when no vendor can attribute both channels", async () => {
+    // A vendor with no declared maxChannels is mono-only. Feeding it stereo
+    // would transcribe garbled audio, so the engine must exclude it and take
+    // the exhaustion path instead: one typed error, no vendor connect.
+    const monoOnly = new MockVendor({
+      id: "assemblyai",
+      connections: [{ events: [], terminal: "hang" }],
+    });
+    const engine = createSttEngine(cfg(), [monoOnly]);
+    const { emit, events } = capture();
+
+    engine.startSession(
+      { sessionId: "sess-2ch", sampleRateHz: 16000, channels: 2 },
+      emit,
+    );
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(events).toEqual([
+      expect.objectContaining({ type: "error", code: "internal" }),
+    ]);
+    expect(monoOnly.connectCalls).toHaveLength(0);
+  });
+
+  it("[channels] admits a vendor that declares stereo support", async () => {
+    const inner = new MockVendor({
+      id: "deepgram",
+      connections: [
+        {
+          events: [
+            {
+              afterMs: 10,
+              event: {
+                type: "final",
+                text: "stereo hello",
+                speaker: "me",
+                ts_ms: 1,
+              },
+            },
+          ],
+          terminal: "hang",
+        },
+      ],
+    });
+    const stereoCapable = {
+      id: inner.id,
+      maxChannels: 2,
+      connect: inner.connect.bind(inner),
+    };
+    const engine = createSttEngine(cfg(), [stereoCapable]);
+    const { emit, events } = capture();
+
+    const handle = engine.startSession(
+      { sessionId: "sess-2ch", sampleRateHz: 16000, channels: 2 },
+      emit,
+    );
+    await vi.advanceTimersByTimeAsync(20);
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "transcript.final",
+        text: "stereo hello",
+        speaker: "me",
+      }),
+    );
+    handle.stop();
+  });
+});

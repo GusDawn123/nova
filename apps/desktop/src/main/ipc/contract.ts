@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { meResponseSchema } from "@nova/shared";
+import { liveModeSchema, meResponseSchema } from "@nova/shared";
 
 import { apiErrorKindSchema } from "../api/errors";
 import { authActionResultSchema } from "../auth/errors";
@@ -94,6 +94,54 @@ export const pillResizeMessageSchema = z
 export const pillClickThroughMessageSchema = z
   .object({ clickThrough: z.boolean() })
   .strict();
+
+/**
+ * renderer → main: start a live session in the picked copilot mode. The mode
+ * vocabulary is the shared protocol's own (`liveModeSchema`) — the desktop
+ * cannot invent a mode the server would refuse.
+ */
+export const liveStartMessageSchema = z
+  .object({ mode: liveModeSchema })
+  .strict();
+
+/** main → renderer: the answer to `liveStart` / `liveStop`. */
+export const liveActionResultSchema = z
+  .object({ ok: z.boolean(), message: z.string().optional() })
+  .strict();
+export type LiveActionResult = z.infer<typeof liveActionResultSchema>;
+
+/** renderer → main: gate the session's audio intake without ending it. */
+export const livePausedMessageSchema = z
+  .object({ paused: z.boolean() })
+  .strict();
+
+/**
+ * main → renderer: the `liveEvent` push — everything the pill needs to render
+ * a live call. Deliberately smaller than the server's wire protocol: the
+ * renderer gets transcript rows and human-readable states, never vendor
+ * vocabulary or session ids.
+ */
+export const liveSessionEventSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("status"),
+      state: z.enum(["connecting", "live", "ended", "error"]),
+      message: z.string().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("transcript"),
+      final: z.boolean(),
+      speaker: z.string().nullable(),
+      text: z.string(),
+      ts_ms: z.number(),
+    })
+    .strict(),
+  /** Advisory only (device changes, provider failover) — never state. */
+  z.object({ kind: z.literal("notice"), message: z.string() }).strict(),
+]);
+export type LiveSessionEvent = z.infer<typeof liveSessionEventSchema>;
 
 /** The sentence a renderer gets when what it sent did not parse. */
 export const INVALID_CREDENTIALS_PAYLOAD_MESSAGE =

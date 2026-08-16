@@ -108,6 +108,14 @@ export interface SttSessionInfo {
   readonly sessionId: string;
   /** PCM sample rate of the mic feed (design doc: 16 kHz). */
   readonly sampleRateHz: number;
+  /**
+   * PCM channels in the binary frames. Omitted = 1 (the phone's mono feed).
+   * 2 = the desktop's interleaved stereo where channel 0 is "me" and channel 1
+   * is "them" — the channels carry the speaker labels, so a 2-channel session
+   * runs without diarization. Only vendors whose {@link SttVendor.maxChannels}
+   * covers this count are eligible (the engine filters its lineup).
+   */
+  readonly channels?: 1 | 2;
 }
 
 /**
@@ -118,6 +126,14 @@ export interface SttSessionInfo {
  */
 export interface SttVendor {
   readonly id: string;
+  /**
+   * The most PCM channels this vendor can transcribe with per-channel
+   * attribution. Omitted = 1. The engine excludes a vendor from any session
+   * asking for more than it supports — feeding interleaved stereo to a
+   * mono-only vendor would transcribe garbled half-speed audio, which is
+   * strictly worse than failing over.
+   */
+  readonly maxChannels?: number;
   connect(
     opts: SttSessionInfo,
     signal: AbortSignal,

@@ -50,6 +50,8 @@ const resultsSchema = z.object({
   type: z.literal("Results"),
   is_final: z.boolean().optional(),
   start: z.number(),
+  /** `[index, total]` — present only when `multichannel` is on. */
+  channel_index: z.array(z.number()).optional(),
   channel: z.object({
     alternatives: z.array(
       z.object({
@@ -71,8 +73,16 @@ const resultsSchema = z.object({
  * - Returns `null` for a non-`Results` message or an empty transcript.
  * - Returns an `error` event (protocol) when a `Results` payload breaks schema.
  * Exported for direct unit testing (no network needed).
+ *
+ * `channels` is the session's channel count. In the 2-channel (desktop) case
+ * the speaker IS the channel — 0 is "me", 1 is "them" (the shared protocol's
+ * documented convention) — and diarization plays no part. Mono keeps the
+ * original per-word diarized speaker numbers.
  */
-export function translateResults(raw: unknown): SttVendorEvent | null {
+export function translateResults(
+  raw: unknown,
+  channels: 1 | 2 = 1,
+): SttVendorEvent | null {
   // Cheap discriminant read first: ignore Metadata/UtteranceEnd/SpeechStarted.
   const envelope = z.object({ type: z.string() }).safeParse(raw);
   if (!envelope.success || envelope.data.type !== "Results") return null;
@@ -91,8 +101,15 @@ export function translateResults(raw: unknown): SttVendorEvent | null {
   const transcript = alternative?.transcript ?? "";
   if (transcript.trim() === "") return null;
 
-  const speakerNumber = alternative?.words?.[0]?.speaker;
-  const speaker = speakerNumber === undefined ? null : String(speakerNumber);
+  let speaker: string | null;
+  if (channels === 2) {
+    const channelIndex = data.channel_index?.[0];
+    speaker =
+      channelIndex === undefined ? null : channelIndex === 0 ? "me" : "them";
+  } else {
+    const speakerNumber = alternative?.words?.[0]?.speaker;
+    speaker = speakerNumber === undefined ? null : String(speakerNumber);
+  }
 
   return {
     type: data.is_final === true ? "final" : "partial",
@@ -151,6 +168,9 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
 
   return {
     id: "deepgram",
+    // Deepgram transcribes multichannel PCM with per-channel results — the
+    // capability the desktop's stereo me/them sessions require.
+    maxChannels: 2,
     async connect(
       info: SttSessionInfo,
       signal: AbortSignal,
@@ -158,6 +178,7 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
       if (signal.aborted) {
         throw new SttTransientError("deepgram: aborted before connect");
       }
+      const channels = info.channels ?? 1;
 
       // `.catch` (never-returning) maps any SDK rejection to a typed error so no
       // raw SDK error leaks out of the adapter (RULES §5), without a `let`.
@@ -168,10 +189,13 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
           language: opts.language ?? "en",
           encoding: "linear16",
           sample_rate: info.sampleRateHz,
-          channels: 1,
+          channels,
+          // Stereo sessions: per-channel results carry the me/them labels, so
+          // diarization would only add noise — the channel split IS the truth.
+          ...(channels === 2 ? { multichannel: "true" } : {}),
           interim_results: "true",
           punctuate: "true",
-          diarize: boolFlag(opts.diarize ?? true),
+          diarize: boolFlag(channels === 2 ? false : (opts.diarize ?? true)),
           endpointing: opts.endpointingMs ?? 300,
           reconnectAttempts: 0,
           abortSignal: signal,
@@ -194,7 +218,7 @@ export function createDeepgramVendor(opts: DeepgramVendorOptions): SttVendor {
         settleOpen?.();
       });
       socket.on("message", (message) => {
-        const event = translateResults(message);
+        const event = translateResults(message, channels);
         if (event) queue.push(event);
       });
       socket.on("error", (err) => {

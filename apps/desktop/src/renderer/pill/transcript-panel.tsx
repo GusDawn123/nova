@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useEffect, useRef, type JSX } from "react";
 
 import novaLogo from "../assets/nova-logo-transparent.png";
 import {
@@ -10,28 +10,52 @@ import {
 } from "../design/icons";
 import type { AudioSession } from "./audio-session";
 import { formatSeconds } from "./pill-bar";
+import type { LiveSessionView } from "./use-live-session";
 
 interface TranscriptPanelProps {
   readonly audio: AudioSession;
+  readonly live: LiveSessionView;
   readonly onTogglePause: () => void;
   readonly onStopAudio: () => void;
   readonly onBack: () => void;
 }
 
-/** Placeholder turns, verbatim from the mockup, until live STT is wired in. */
-const TURNS = [
-  { at: "7:21", text: "Mm-hmm." },
-  { at: "7:23", text: "So walk me through the rollout timeline again?" },
-  { at: "7:29", text: "and the three sites go live in Q1." },
-  { at: "7:31", text: "Honestly it's more than we planned to spend." },
-  { at: "7:46", text: "Oh, no." },
-];
+/** Call-relative `mm:ss` from the transcript event's audio-time offset. */
+function formatTs(tsMs: number): string {
+  return formatSeconds(Math.max(0, Math.floor(tsMs / 1000)));
+}
+
+/** What an empty transcript should say for each session state. */
+function emptyText(live: LiveSessionView): string {
+  switch (live.state) {
+    case "connecting":
+      return "Connecting…";
+    case "live":
+      return "Listening — say something.";
+    case "error":
+      return live.message ?? "The live session hit an error.";
+    default:
+      return "Start a session to see the live transcript.";
+  }
+}
 
 /**
- * The live-transcript view of an audio session. The session controls here are
- * the same presentational state the pill bar drives; the logo opens settings.
+ * The live-transcript view of an audio session: real rows from main's
+ * `liveEvent` push, labelled by stream (chunk 3 — the channels ARE the
+ * speakers). Partial rows render dimmed until the vendor commits them.
  */
 export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  // Follow the conversation: a transcript that doesn't keep the newest line
+  // in view is a transcript the user has to chase mid-call.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (body !== null) {
+      body.scrollTop = body.scrollHeight;
+    }
+  }, [props.live.rows]);
+
   return (
     <div className="panel">
       <div className="panel__head">
@@ -53,16 +77,38 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
         </span>
       </div>
 
-      <div className="transcript__body">
-        {TURNS.map((turn) => (
-          <div key={turn.at} className="transcript__row">
-            <span className="transcript__ts">{turn.at}</span>
-            <div className="transcript__turn">
-              <span className="transcript__who">ME</span>
-              <span className="transcript__text">{turn.text}</span>
-            </div>
+      <div className="transcript__body" ref={bodyRef}>
+        {props.live.rows.length === 0 ? (
+          <div className="transcript__row">
+            <span className="transcript__text transcript__text--hint">
+              {emptyText(props.live)}
+            </span>
           </div>
-        ))}
+        ) : (
+          props.live.rows.map((row) => (
+            <div key={row.key} className="transcript__row">
+              <span className="transcript__ts">{formatTs(row.tsMs)}</span>
+              <div className="transcript__turn">
+                <span className="transcript__who">
+                  {row.speaker === "me"
+                    ? "ME"
+                    : row.speaker === "them"
+                      ? "THEM"
+                      : "—"}
+                </span>
+                <span
+                  className={
+                    row.final
+                      ? "transcript__text"
+                      : "transcript__text transcript__text--partial"
+                  }
+                >
+                  {row.text}
+                </span>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       <div className="transcript__foot">

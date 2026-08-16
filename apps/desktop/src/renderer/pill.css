@@ -1,7 +1,7 @@
-/*
+﻿/*
  * The pill window's stylesheet. Every value is transcribed from the ratified
  * mockups (docs/superpowers/mockups/2026-08-14-app-design/project/
- * "Nova Settings.dc.html", the interactive pill) — treat that file as the
+ * "Nova Settings.dc.html", the interactive pill) â€” treat that file as the
  * source of truth before "improving" anything here.
  */
 
@@ -25,7 +25,7 @@ body {
 /*
  * The stage is the window: 40px side gutters and a deep bottom gutter so the
  * pill's drop shadow (and the tooltips above it) render inside the transparent
- * window instead of clipping at its edge. 100vw, not a fixed width — the MAIN
+ * window instead of clipping at its edge. 100vw, not a fixed width â€” the MAIN
  * process decides how long the pill is (a fraction of the screen,
  * windows/pill-window.ts) and the shell stretches to fill; the side padding
  * here must equal SHADOW_GUTTERS there. Row thickness, fonts and icons are
@@ -613,6 +613,15 @@ body {
 .transcript__text {
   font: 400 16px/1.35 var(--sg);
   color: rgba(255, 255, 255, 0.92);
+}
+/* A partial is a hypothesis still forming; a hint is not a transcript at all. */
+.transcript__text--partial {
+  opacity: 0.55;
+}
+
+.transcript__text--hint {
+  opacity: 0.55;
+  font-style: italic;
 }
 
 .transcript__foot {

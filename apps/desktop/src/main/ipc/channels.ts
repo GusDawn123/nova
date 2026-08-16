@@ -16,6 +16,8 @@ export const IpcChannel = {
   authSignOut: "nova:auth:sign-out",
   authGetState: "nova:auth:get-state",
   apiGetMe: "nova:api:get-me",
+  liveStart: "nova:live:start",
+  liveStop: "nova:live:stop",
   privacyGetState: "nova:privacy:get-state",
   privacySetState: "nova:privacy:set-state",
   /**
@@ -30,6 +32,11 @@ export const IpcChannel = {
    */
   privacyStateChanged: "nova:privacy:state-changed",
   /**
+   * main → renderer, push. Transcript lines and session states arrive on the
+   * server's schedule, not on a click — the pill can only listen.
+   */
+  liveEvent: "nova:live:event",
+  /**
    * renderer → main, one-way. No answer to give: the pill asks main to open
    * the settings window, to resize the pill window to its content, or to let
    * clicks fall through its invisible gutters — all fire-and-forget window
@@ -38,6 +45,7 @@ export const IpcChannel = {
   settingsOpen: "nova:settings:open",
   pillResize: "nova:pill:resize",
   pillClickThrough: "nova:pill:click-through",
+  liveSetPaused: "nova:live:set-paused",
 } as const;
 
 export type IpcChannelName = (typeof IpcChannel)[keyof typeof IpcChannel];

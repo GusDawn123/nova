@@ -1,0 +1,282 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { LiveSessionEvent } from "../ipc/contract";
+import type { AudioBatch, AudioEngineEvent } from "./audio-engine";
+import { createLiveSessionService, type LiveSocket } from "./session";
+
+/**
+ * The orchestration seams, faked at their narrow interfaces: a scripted
+ * socket, a hand-cranked engine, an instant meeting. What's asserted is the
+ * only thing that matters — what goes UP the socket and what comes OUT the
+ * emit channel.
+ */
+
+class FakeSocket implements LiveSocket {
+  readonly sent: (string | Buffer)[] = [];
+  closed = false;
+  private readonly listeners = new Map<
+    string,
+    ((...args: never[]) => void)[]
+  >();
+
+  send(data: string | Buffer): void {
+    this.sent.push(data);
+  }
+  close(): void {
+    this.closed = true;
+  }
+  on(event: string, listener: (...args: never[]) => void): void {
+    const list = this.listeners.get(event) ?? [];
+    list.push(listener);
+    this.listeners.set(event, list);
+  }
+  fire(event: string, ...args: unknown[]): void {
+    for (const listener of this.listeners.get(event) ?? []) {
+      (listener as (...a: unknown[]) => void)(...args);
+    }
+  }
+  jsonSent(): unknown[] {
+    return this.sent
+      .filter((d): d is string => typeof d === "string")
+      .map((d): unknown => JSON.parse(d));
+  }
+  binarySent(): Buffer[] {
+    return this.sent.filter((d): d is Buffer => Buffer.isBuffer(d));
+  }
+}
+
+class FakeEngine {
+  onBatch: ((batch: AudioBatch) => void) | null = null;
+  onEvent: ((event: AudioEngineEvent) => void) | null = null;
+  stopped = 0;
+
+  start(
+    onBatch: (batch: AudioBatch) => void,
+    onEvent: (event: AudioEngineEvent) => void,
+  ): void {
+    this.onBatch = onBatch;
+    this.onEvent = onEvent;
+  }
+  stop(): { droppedBatches: number } {
+    this.stopped += 1;
+    return { droppedBatches: 0 };
+  }
+}
+
+function harness(overrides?: { accessToken?: string | null }) {
+  const socket = new FakeSocket();
+  const engine = new FakeEngine();
+  const events: LiveSessionEvent[] = [];
+  const service = createLiveSessionService({
+    apiBaseUrl: "http://127.0.0.1:3000",
+    loadEngine: () => ({ ok: true, engine }),
+    connect: () => socket,
+    getAccessToken: () =>
+      Promise.resolve(
+        overrides?.accessToken === undefined
+          ? "token-1"
+          : overrides.accessToken,
+      ),
+    getUserId: () => "user-1",
+    createMeeting: () =>
+      Promise.resolve({
+        ok: true,
+        meetingId: "11111111-2222-4333-8444-555555555555",
+      }),
+    emit: (event) => {
+      events.push(event);
+    },
+  });
+  return { socket, engine, events, service };
+}
+
+/** A wire batch (960 samples ≈ 60 ms) of a constant PCM16 value. */
+function batch(stream: "me" | "them", value: number): AudioBatch {
+  const pcm = Buffer.alloc(1920);
+  for (let i = 0; i < 960; i++) pcm.writeInt16LE(value, i * 2);
+  return { stream, pcm };
+}
+
+const ready = JSON.stringify({
+  v: 1,
+  type: "session.ready",
+  session_id: "99999999-8888-4777-8666-555555555555",
+});
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("live session service", () => {
+  it("opens the socket and starts a stereo session in the picked mode", async () => {
+    const { socket, events, service } = harness();
+    const result = await service.start("technical");
+    expect(result.ok).toBe(true);
+    expect(events[0]).toEqual({ kind: "status", state: "connecting" });
+
+    socket.fire("open");
+    expect(socket.jsonSent()).toEqual([
+      {
+        v: 1,
+        type: "session.start",
+        meeting_id: "11111111-2222-4333-8444-555555555555",
+        mode: "technical",
+        channels: 2,
+      },
+    ]);
+  });
+
+  it("starts the engine only on session.ready and ships interleaved stereo", async () => {
+    const { socket, engine, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    expect(engine.onBatch).toBeNull(); // audio before ready would be refused
+
+    socket.fire("message", ready);
+    expect(events).toContainEqual({ kind: "status", state: "live" });
+    expect(engine.onBatch).not.toBeNull();
+
+    engine.onBatch?.(batch("me", 100));
+    expect(socket.binarySent()).toHaveLength(0); // needs BOTH channels
+    engine.onBatch?.(batch("them", -200));
+    const frames = socket.binarySent();
+    expect(frames).toHaveLength(1);
+    const frame = frames[0];
+    if (frame === undefined) throw new Error("expected a frame");
+    expect(frame.length).toBe(3840); // 960 stereo samples
+    expect([frame.readInt16LE(0), frame.readInt16LE(2)]).toEqual([100, -200]);
+  });
+
+  it("forwards transcript partials and finals to the emit channel", async () => {
+    const { socket, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "transcript.partial",
+        text: "hel",
+        speaker: "me",
+        ts_ms: 120,
+      }),
+    );
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "transcript.final",
+        text: "hello there",
+        speaker: "them",
+        ts_ms: 900,
+        is_final: true,
+      }),
+    );
+    expect(events).toContainEqual({
+      kind: "transcript",
+      final: false,
+      speaker: "me",
+      text: "hel",
+      ts_ms: 120,
+    });
+    expect(events).toContainEqual({
+      kind: "transcript",
+      final: true,
+      speaker: "them",
+      text: "hello there",
+      ts_ms: 900,
+    });
+  });
+
+  it("pauses by gating intake so both channels stay aligned", async () => {
+    const { socket, engine, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+
+    service.setPaused(true);
+    engine.onBatch?.(batch("me", 1));
+    engine.onBatch?.(batch("them", 1));
+    expect(socket.binarySent()).toHaveLength(0);
+
+    service.setPaused(false);
+    engine.onBatch?.(batch("me", 2));
+    engine.onBatch?.(batch("them", 2));
+    expect(socket.binarySent()).toHaveLength(1);
+  });
+
+  it("stop() sends session.end, and the server's close ends the session cleanly", async () => {
+    const { socket, engine, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+
+    service.stop();
+    expect(socket.jsonSent().at(-1)).toMatchObject({ type: "session.end" });
+
+    socket.fire("close");
+    expect(engine.stopped).toBe(1);
+    expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
+
+    // A second session may start after the first ended.
+    const again = await service.start("general");
+    expect(again.ok).toBe(true);
+  });
+
+  it("stop() force-closes when the server never answers", async () => {
+    const { socket, engine, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+
+    service.stop();
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(engine.stopped).toBe(1);
+    expect(socket.closed).toBe(true);
+    expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
+  });
+
+  it("an unexpected close mid-call surfaces as an error status", async () => {
+    const { socket, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+
+    socket.fire("close");
+    expect(events.at(-1)).toEqual({
+      kind: "status",
+      state: "error",
+      message: "The live connection closed unexpectedly.",
+    });
+  });
+
+  it("refuses a second concurrent start", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    const second = await service.start("general");
+    expect(second).toEqual({
+      ok: false,
+      message: "A live session is already running.",
+    });
+  });
+
+  it("fails typed (and emits an error status) when signed out", async () => {
+    const { events, service } = harness({ accessToken: null });
+    const result = await service.start("general");
+    expect(result).toEqual({ ok: false, message: "You are not signed in." });
+    expect(events.at(-1)).toEqual({
+      kind: "status",
+      state: "error",
+      message: "You are not signed in.",
+    });
+    // And the failed attempt must not latch the running-guard.
+    const retry = await service.start("general");
+    expect(retry.ok).toBe(false); // still signed out…
+    expect(retry.message).toBe("You are not signed in."); // …but not "already running"
+  });
+});
