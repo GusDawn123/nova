@@ -27,6 +27,19 @@ import { SectionHead, SettingRow, Toggle } from "../rows";
 export function GeneralTab(): JSX.Element {
   const { enabled: undetectable, request } = useScreenPrivacy();
   const [launchAtLogin, setLaunchAtLogin] = useState(true);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const logOut = (): void => {
+    setSigningOut(true);
+    void window.novaBridge.signOut().then((result) => {
+      // On success there is nothing to reset — main hears signed-out and
+      // swaps this window for the login window.
+      if (!result.ok) {
+        console.error("[settings] sign-out failed:", result.message);
+        setSigningOut(false);
+      }
+    });
+  };
 
   return (
     <>
@@ -169,9 +182,14 @@ export function GeneralTab(): JSX.Element {
           <RefreshIcon size={16} />
           Reset onboarding
         </button>
-        <button type="button" className="general__footer-action">
+        <button
+          type="button"
+          className="general__footer-action"
+          disabled={signingOut}
+          onClick={logOut}
+        >
           <LogoutIcon />
-          Log out
+          {signingOut ? "Logging out…" : "Log out"}
         </button>
         <button type="button" className="general__footer-action">
           <QuitIcon />

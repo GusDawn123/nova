@@ -34,6 +34,12 @@ let pillWindow: BrowserWindow | null = null;
 export async function createPillWindow(
   privacy: ScreenPrivacyService,
 ): Promise<BrowserWindow> {
+  // Idempotent: auth pushes signed-in on every token refresh, and each of
+  // those must not stack another pill on screen.
+  if (pillWindow !== null && !pillWindow.isDestroyed()) {
+    return pillWindow;
+  }
+
   const { workArea } = screen.getPrimaryDisplay();
   const windowWidth =
     Math.round(workArea.width * PILL_SCREEN_FRACTION) + SHADOW_GUTTERS;
@@ -72,10 +78,18 @@ export async function createPillWindow(
   });
 
   hardenNavigation(window);
+  // Assigned before the page loads so a second call during the load returns
+  // this window instead of building another one.
+  pillWindow = window;
   await loadRendererPage(window, "pill.html");
 
-  pillWindow = window;
   return window;
+}
+
+export function closePillWindow(): void {
+  if (pillWindow !== null && !pillWindow.isDestroyed()) {
+    pillWindow.close();
+  }
 }
 
 /**

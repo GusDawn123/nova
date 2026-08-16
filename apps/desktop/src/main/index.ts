@@ -3,14 +3,20 @@ import { app, BrowserWindow } from "electron";
 import { createApiClient } from "./api/client";
 import { API_BASE_URL } from "./api/config";
 import { createAuthService } from "./auth/service";
+import type { AuthState } from "./auth/state";
 import { registerIpcHandlers } from "./ipc/handlers";
 import { createScreenPrivacy } from "./privacy/screen-privacy";
+import { closeLoginWindow, openLoginWindow } from "./windows/login-window";
 import {
+  closePillWindow,
   createPillWindow,
   resizePillWindow,
   setPillClickThrough,
 } from "./windows/pill-window";
-import { openSettingsWindow } from "./windows/settings-window";
+import {
+  closeSettingsWindow,
+  openSettingsWindow,
+} from "./windows/settings-window";
 
 /**
  * Composition root. Everything with a dependency is built here and injected;
@@ -66,7 +72,50 @@ async function bootstrap(): Promise<void> {
     auth.dispose();
   });
 
-  await createPillWindow(privacy);
+  // The boot gate: which windows exist is a function of auth state, nothing
+  // else. `loading` builds nothing — supabase resolves it from disk in a
+  // moment, and waiting is what lets a remembered session boot straight into
+  // the pill with no sign-in flash.
+  //
+  // Ordering inside each branch matters: the replacement window is CREATED
+  // before the old ones close, so the window count never touches zero — on
+  // Windows, zero windows is `window-all-closed`, which quits the app.
+  const syncWindowsToAuth = (state: AuthState): void => {
+    if (state.status === "loading") {
+      return;
+    }
+    if (state.status === "signed-in") {
+      createPillWindow(privacy)
+        .then(() => {
+          closeLoginWindow();
+        })
+        .catch((error: unknown) => {
+          console.error("[main] failed to open the pill window:", error);
+        });
+      return;
+    }
+    // signed-out and unavailable both mean "the front door": the login window
+    // renders the right screen for each.
+    openLoginWindow(privacy)
+      .then(() => {
+        closePillWindow();
+        closeSettingsWindow();
+      })
+      .catch((error: unknown) => {
+        console.error("[main] failed to open the login window:", error);
+      });
+  };
+  auth.subscribe(syncWindowsToAuth);
+  syncWindowsToAuth(auth.getState());
+
+  // macOS: a dock-icon click while the app has no windows must rebuild the
+  // right one for the current auth state. Registered here because it needs
+  // `auth`; Windows never reaches it (the app quits with its last window).
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      syncWindowsToAuth(auth.getState());
+    }
+  });
 }
 
 // Windows and Linux expect a desktop app to exit with its last window. macOS
@@ -76,18 +125,6 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
-});
-
-// The other half of that bargain — on macOS the dock icon can be clicked while
-// the app is running with no windows at all, and that click has to be able to
-// build one again.
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length > 0) {
-    return;
-  }
-  createPillWindow(privacy).catch((error: unknown) => {
-    console.error("[main] failed to reopen the pill window:", error);
-  });
 });
 
 bootstrap().catch((error: unknown) => {

@@ -9,28 +9,26 @@ import {
   SETTINGS_TITLE_BAR_HEIGHT,
 } from "./settings-layout";
 
-let settingsWindow: BrowserWindow | null = null;
+let loginWindow: BrowserWindow | null = null;
 
 /**
- * The settings window — one per app, reopened on demand. Attached to the
- * screen-privacy service at birth for the same reason the pill is: opened
- * mid-share while Nova is hidden, it must be born hidden.
+ * The sign-in window — the app's front door while nobody is signed in. Wears
+ * the settings window's exact chrome and sizing law so the two read as one
+ * app; the login VISUALS are a stand-in for a later design pass, but the
+ * Supabase seam behind them is already the real one.
  *
- * Windows variant (docs/superpowers/mockups/2026-08-14-app-design/WINDOWS-VARIANT.md):
- * the native window controls, on the right, drawn by the OS over our dark
- * title bar — not the mockup's macOS traffic lights.
+ * Attached to the screen-privacy service like every Nova window: signing back
+ * in mid-share while Nova is hidden must not flash a window into the share.
  */
-export async function openSettingsWindow(
+export async function openLoginWindow(
   privacy: ScreenPrivacyService,
 ): Promise<void> {
-  if (settingsWindow !== null && !settingsWindow.isDestroyed()) {
-    settingsWindow.show();
-    settingsWindow.focus();
+  if (loginWindow !== null && !loginWindow.isDestroyed()) {
+    loginWindow.show();
+    loginWindow.focus();
     return;
   }
 
-  // Sized to the screen, not the design: the renderer zooms the fixed-size
-  // design to fit (settings-layout.ts owns the law for both sides).
   const { width, height } = settingsWindowSize(
     screen.getPrimaryDisplay().workArea.width,
   );
@@ -41,7 +39,7 @@ export async function openSettingsWindow(
     useContentSize: true,
     resizable: false,
     show: false,
-    title: "Nova Settings",
+    title: "Nova",
     backgroundColor: "#0c0c0e",
     titleBarStyle: "hidden",
     titleBarOverlay: {
@@ -63,16 +61,18 @@ export async function openSettingsWindow(
     window.show();
   });
   window.on("closed", () => {
-    settingsWindow = null;
+    loginWindow = null;
   });
 
   hardenNavigation(window);
-  settingsWindow = window;
-  await loadRendererPage(window, "settings.html");
+  // Assigned before the page loads so a second call during the load is a
+  // no-op instead of a second window — auth pushes can arrive in bursts.
+  loginWindow = window;
+  await loadRendererPage(window, "index.html");
 }
 
-export function closeSettingsWindow(): void {
-  if (settingsWindow !== null && !settingsWindow.isDestroyed()) {
-    settingsWindow.close();
+export function closeLoginWindow(): void {
+  if (loginWindow !== null && !loginWindow.isDestroyed()) {
+    loginWindow.close();
   }
 }

@@ -1,7 +1,6 @@
 import type { JSX, ReactNode } from "react";
 
 import { SignInForm } from "./components/sign-in-form";
-import { SignedInPanel } from "./components/signed-in-panel";
 import { useAuthState } from "./hooks/use-auth-state";
 
 /**
@@ -65,13 +64,17 @@ export function App(): JSX.Element {
         </Screen>
       );
 
+    // Shown for the moment between the session landing and main swapping this
+    // window for the pill — main owns that swap, this just says it is coming.
     case "signed-in":
       return (
-        <Screen wide>
-          <SignedInPanel
-            user={state.user}
-            signOut={window.novaBridge.signOut}
-          />
+        <Screen>
+          <span className="eyebrow">Nova</span>
+          <p className="status-line">
+            <span className="status-line__dot" />
+            Signed in{state.user.email !== undefined && ` as ${state.user.email}`}
+            {" — opening Nova"}
+          </p>
         </Screen>
       );
   }
@@ -85,8 +88,13 @@ function Screen({
   readonly wide?: boolean;
 }): JSX.Element {
   return (
-    <main className="screen">
-      <div className={wide ? "card card--wide" : "card"}>{children}</div>
-    </main>
+    <>
+      <div className="login__titlebar">
+        <span className="login__title">Nova</span>
+      </div>
+      <main className="screen">
+        <div className={wide ? "card card--wide" : "card"}>{children}</div>
+      </main>
+    </>
   );
 }

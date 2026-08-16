@@ -1,28 +1,30 @@
 import type { JSX } from "react";
 
-import { GoogleIcon } from "../../design/icons";
+import { useAuthState } from "../../hooks/use-auth-state";
+import { useMe } from "../../hooks/use-me";
 
 /**
- * The Profile tab, verbatim from the mockup — placeholder identity data until
- * the auth seam feeds this window.
+ * The Profile tab, wired to the real account: the identity block mirrors the
+ * auth state main pushes, and the server section is a live `GET /me` — seeing
+ * a user_id there means the whole chain held (session on disk, token
+ * refreshed in main, JWT verified by the server). The mockup's placeholder
+ * rows (add email, connected accounts) return when those features exist.
  */
 export function ProfileTab(): JSX.Element {
+  const auth = useAuthState();
+  const { state: me, reload } = useMe();
+  const email = auth.status === "signed-in" ? auth.user.email : undefined;
+
   return (
     <div className="card">
       <div className="card__title">Profile details</div>
 
       <div className="card__label">Profile</div>
       <div className="profile__identity">
-        <span className="profile__avatar">G</span>
-        <span className="profile__name">Gustavo Rosas</span>
-        <a
-          href="#"
-          onClick={(event) => {
-            event.preventDefault();
-          }}
-        >
-          Update profile
-        </a>
+        <span className="profile__avatar">
+          {(email ?? "N").charAt(0).toUpperCase()}
+        </span>
+        <span className="profile__name">{email ?? "Signed-in account"}</span>
       </div>
 
       <div className="card__divider" />
@@ -31,44 +33,42 @@ export function ProfileTab(): JSX.Element {
         Email addresses
       </div>
       <div className="profile__row">
-        <span className="profile__value">gustavo@tcinteractivegroup.com</span>
+        <span className="profile__value">
+          {email ?? "No email on this account"}
+        </span>
         <span className="chip-dim">Primary</span>
-        <button type="button" className="dots">
-          ···
-        </button>
       </div>
-      <a
-        href="#"
-        className="profile__add"
-        onClick={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <span className="profile__add-plus">+</span>Add email address
-      </a>
 
       <div className="card__divider" />
 
       <div className="card__label" style={{ marginTop: 0 }}>
-        Connected accounts
+        Server account
       </div>
-      <div className="profile__row">
-        <GoogleIcon size={18} />
-        <span className="profile__provider">Google</span>
-        <span className="profile__meta">· gustavo@tcinteractivegroup.com</span>
-        <button type="button" className="dots">
-          ···
-        </button>
-      </div>
-      <a
-        href="#"
-        className="profile__add"
-        onClick={(event) => {
-          event.preventDefault();
-        }}
-      >
-        <span className="profile__add-plus">+</span>Connect account
-      </a>
+      {me.status === "loading" && (
+        <span className="srow__desc">Asking the server…</span>
+      )}
+      {me.status === "error" && (
+        <div className="profile__row">
+          <span className="srow__desc">{me.message}</span>
+          <button type="button" className="btn-outline" onClick={reload}>
+            Try again
+          </button>
+        </div>
+      )}
+      {me.status === "success" && (
+        <>
+          <div className="profile__row">
+            <span className="profile__meta">User ID</span>
+            <span className="profile__value">{me.data.user_id}</span>
+          </div>
+          <div className="profile__row">
+            <span className="profile__meta">Plan role</span>
+            {/* Absent is a real answer: /me omits role on a DB-less server
+                boot, and clients treat that as customer (adr-0008). */}
+            <span className="profile__value">{me.data.role ?? "customer"}</span>
+          </div>
+        </>
+      )}
     </div>
   );
 }
