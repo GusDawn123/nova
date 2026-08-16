@@ -25,6 +25,9 @@ function formatTs(tsMs: number): string {
   return formatSeconds(Math.max(0, Math.floor(tsMs / 1000)));
 }
 
+/** Within this many pixels of the bottom, the user is following, not reading. */
+const STICK_TO_BOTTOM_PX = 48;
+
 /** What an empty transcript should say for each session state. */
 function emptyText(live: LiveSessionView): string {
   switch (live.state) {
@@ -48,10 +51,17 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement>(null);
 
   // Follow the conversation: a transcript that doesn't keep the newest line
-  // in view is a transcript the user has to chase mid-call.
+  // in view is a transcript the user has to chase mid-call. But a user who has
+  // scrolled up is reading — partials arrive several times a second, and
+  // yanking them back down every time makes scrollback impossible.
   useEffect(() => {
     const body = bodyRef.current;
-    if (body !== null) {
+    if (body === null) {
+      return;
+    }
+    const distanceFromBottom =
+      body.scrollHeight - body.scrollTop - body.clientHeight;
+    if (distanceFromBottom <= STICK_TO_BOTTOM_PX) {
       body.scrollTop = body.scrollHeight;
     }
   }, [props.live.rows]);

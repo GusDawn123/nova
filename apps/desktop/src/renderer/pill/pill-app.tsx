@@ -128,13 +128,21 @@ export function PillApp(): JSX.Element {
   };
   const startAudio = (): void => {
     setAudio({ on: true, paused: false, seconds: 0 });
-    void window.novaBridge.startLiveSession(activeMode).then((result) => {
-      if (!result.ok) {
-        // The typed reason lands in the transcript panel via the status push;
-        // here the controls just refuse to pretend a session is running.
+    void (async (): Promise<void> => {
+      try {
+        const result = await window.novaBridge.startLiveSession(activeMode);
+        if (!result.ok) {
+          // The typed reason lands in the transcript panel via the status push;
+          // here the controls just refuse to pretend a session is running.
+          setAudio(AUDIO_OFF);
+        }
+      } catch (error: unknown) {
+        // A rejected invoke pushes no status event, so nothing else would ever
+        // clear the optimistic clock.
+        console.error("[pill] live start failed:", error);
         setAudio(AUDIO_OFF);
       }
-    });
+    })();
   };
 
   return (

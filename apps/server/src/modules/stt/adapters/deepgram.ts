@@ -104,8 +104,20 @@ export function translateResults(
   let speaker: string | null;
   if (channels === 2) {
     const channelIndex = data.channel_index?.[0];
-    speaker =
-      channelIndex === undefined ? null : channelIndex === 0 ? "me" : "them";
+    if (channelIndex === undefined) {
+      speaker = null;
+    } else if (channelIndex === 0 || channelIndex === 1) {
+      speaker = channelIndex === 0 ? "me" : "them";
+    } else {
+      // An index outside a 2-channel session is a protocol break, not a
+      // guessable speaker — mislabeling who said what is worse than failing.
+      return {
+        type: "error",
+        error: new SttProtocolError(
+          `deepgram: channel_index ${String(channelIndex)} in a 2-channel session`,
+        ),
+      };
+    }
   } else {
     const speakerNumber = alternative?.words?.[0]?.speaker;
     speaker = speakerNumber === undefined ? null : String(speakerNumber);

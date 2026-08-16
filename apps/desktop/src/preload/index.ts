@@ -226,9 +226,14 @@ const novaBridge: NovaBridge = {
   onLiveEvent: (listener) => {
     const forward = (_event: unknown, raw: unknown): void => {
       const parsed = liveSessionEventSchema.safeParse(raw);
-      if (parsed.success) {
-        listener(parsed.data);
+      if (!parsed.success) {
+        // Main validates before broadcasting, so a failure here means the
+        // preload and main bundles disagree about the schema — silence would
+        // present as a transcript that simply stops.
+        console.error("[bridge] off-contract live event", parsed.error.issues);
+        return;
       }
+      listener(parsed.data);
     };
     ipcRenderer.on(IpcChannel.liveEvent, forward);
     return () => {

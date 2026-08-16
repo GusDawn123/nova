@@ -4,6 +4,8 @@
 // While it runs, speak (→ me) and/or play speech on the PC (→ them).
 //
 // Usage: node tools/live-proof.mjs [seconds]   (local dev only; default 20)
+// Needs in apps/desktop/.env: NOVA_SUPABASE_URL, NOVA_SUPABASE_ANON_KEY,
+// NOVA_DEV_EMAIL, NOVA_DEV_PASSWORD (the local seed account).
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -14,8 +16,6 @@ const addon = require("../native/audio/build/Release/nova_audio.node");
 
 const seconds = Number(process.argv[2] ?? 20);
 const SERVER = "http://127.0.0.1:3000";
-const DEV_EMAIL = "dev@nova.test";
-const DEV_PASSWORD = "nova-dev-1234"; // the local seed account (supabase/seed.sql)
 
 // The desktop app's own env file carries the local Supabase coordinates.
 function readEnv() {
@@ -34,17 +34,26 @@ function readEnv() {
   );
   const url = entries.get("NOVA_SUPABASE_URL");
   const anonKey = entries.get("NOVA_SUPABASE_ANON_KEY");
-  if (url === undefined || anonKey === undefined) {
-    throw new Error("apps/desktop/.env is missing the Supabase settings");
+  const email = entries.get("NOVA_DEV_EMAIL");
+  const password = entries.get("NOVA_DEV_PASSWORD");
+  if (
+    url === undefined ||
+    anonKey === undefined ||
+    email === undefined ||
+    password === undefined
+  ) {
+    throw new Error(
+      "apps/desktop/.env is missing the Supabase or dev sign-in settings",
+    );
   }
-  return { url, anonKey };
+  return { url, anonKey, email, password };
 }
 
 async function signIn(env) {
   const response = await fetch(`${env.url}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: { apikey: env.anonKey, "Content-Type": "application/json" },
-    body: JSON.stringify({ email: DEV_EMAIL, password: DEV_PASSWORD }),
+    body: JSON.stringify({ email: env.email, password: env.password }),
   });
   if (!response.ok) throw new Error(`sign-in failed (${response.status})`);
   const body = await response.json();

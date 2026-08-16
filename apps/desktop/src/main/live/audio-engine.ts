@@ -45,7 +45,11 @@ function isAudioEngine(value: unknown): value is AudioEngine {
 
 let cached: AudioEngineResult | null = null;
 
-export function loadAudioEngine(): AudioEngineResult {
+export function loadAudioEngine(
+  // Injected so the wrong-shape and cache branches are testable without a
+  // built native addon on the machine running the suite.
+  requireAddon: (path: string) => unknown = createRequire(import.meta.url),
+): AudioEngineResult {
   if (cached !== null) {
     return cached;
   }
@@ -56,8 +60,7 @@ export function loadAudioEngine(): AudioEngineResult {
       import.meta.dirname,
       "../../native/audio/build/Release/nova_audio.node",
     );
-    const nodeRequire = createRequire(import.meta.url);
-    const addon: unknown = nodeRequire(addonPath);
+    const addon: unknown = requireAddon(addonPath);
     cached = isAudioEngine(addon)
       ? { ok: true, engine: addon }
       : {

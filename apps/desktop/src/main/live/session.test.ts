@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { LiveSessionEvent } from "../ipc/contract";
-import type { AudioBatch, AudioEngineEvent } from "./audio-engine";
+import type {
+  AudioBatch,
+  AudioEngineEvent,
+  AudioEngineResult,
+} from "./audio-engine";
+import type { CreateMeetingResult } from "./meeting";
 import { createLiveSessionService, type LiveSocket } from "./session";
 
 /**
@@ -63,31 +68,46 @@ class FakeEngine {
   }
 }
 
-function harness(overrides?: { accessToken?: string | null }) {
+function harness(overrides?: {
+  accessToken?: string | null;
+  userId?: string | null;
+  engineResult?: AudioEngineResult;
+  meeting?: CreateMeetingResult | Promise<CreateMeetingResult>;
+  connect?: (url: string, accessToken: string) => LiveSocket;
+}) {
   const socket = new FakeSocket();
   const engine = new FakeEngine();
   const events: LiveSessionEvent[] = [];
+  let connectCalls = 0;
   const service = createLiveSessionService({
     apiBaseUrl: "http://127.0.0.1:3000",
-    loadEngine: () => ({ ok: true, engine }),
-    connect: () => socket,
+    loadEngine: () => overrides?.engineResult ?? { ok: true, engine },
+    connect: (url, token) => {
+      connectCalls += 1;
+      return overrides?.connect === undefined
+        ? socket
+        : overrides.connect(url, token);
+    },
     getAccessToken: () =>
       Promise.resolve(
         overrides?.accessToken === undefined
           ? "token-1"
           : overrides.accessToken,
       ),
-    getUserId: () => "user-1",
+    getUserId: () =>
+      overrides?.userId === undefined ? "user-1" : overrides.userId,
     createMeeting: () =>
-      Promise.resolve({
-        ok: true,
-        meetingId: "11111111-2222-4333-8444-555555555555",
-      }),
+      overrides?.meeting === undefined
+        ? Promise.resolve<CreateMeetingResult>({
+            ok: true,
+            meetingId: "11111111-2222-4333-8444-555555555555",
+          })
+        : Promise.resolve(overrides.meeting),
     emit: (event) => {
       events.push(event);
     },
   });
-  return { socket, engine, events, service };
+  return { socket, engine, events, service, connectCalls: () => connectCalls };
 }
 
 /** A wire batch (960 samples ≈ 60 ms) of a constant PCM16 value. */
@@ -206,7 +226,13 @@ describe("live session service", () => {
     service.setPaused(false);
     engine.onBatch?.(batch("me", 2));
     engine.onBatch?.(batch("them", 2));
-    expect(socket.binarySent()).toHaveLength(1);
+    const frames = socket.binarySent();
+    expect(frames).toHaveLength(1);
+    const frame = frames[0];
+    if (frame === undefined) throw new Error("expected a frame");
+    // The pre-pause value 1 must appear nowhere: pause gates INTAKE, so no
+    // half-pair survives it to be mispaired with post-resume audio.
+    expect([frame.readInt16LE(0), frame.readInt16LE(2)]).toEqual([2, 2]);
   });
 
   it("stop() sends session.end, and the server's close ends the session cleanly", async () => {
@@ -278,5 +304,114 @@ describe("live session service", () => {
     const retry = await service.start("general");
     expect(retry.ok).toBe(false); // still signed out…
     expect(retry.message).toBe("You are not signed in."); // …but not "already running"
+  });
+
+  it("fails typed when the user id is missing despite a valid token", async () => {
+    const { events, service } = harness({ userId: null });
+    const result = await service.start("general");
+    expect(result).toEqual({ ok: false, message: "You are not signed in." });
+    expect(events.at(-1)).toMatchObject({ kind: "status", state: "error" });
+  });
+
+  it("fails typed when the meeting row cannot be created", async () => {
+    const { events, service } = harness({
+      meeting: { ok: false, message: "Could not create the meeting (500)." },
+    });
+    const result = await service.start("general");
+    expect(result).toEqual({
+      ok: false,
+      message: "Could not create the meeting (500).",
+    });
+    expect(events.at(-1)).toMatchObject({ kind: "status", state: "error" });
+    // The guard released: the retry hits the same meeting error, not
+    // "A live session is already running."
+    const retry = await service.start("general");
+    expect(retry).toEqual({
+      ok: false,
+      message: "Could not create the meeting (500).",
+    });
+  });
+
+  it("fails typed when the native engine cannot load, and opens no socket", async () => {
+    const { events, service, connectCalls } = harness({
+      engineResult: { ok: false, message: "The audio engine could not load." },
+    });
+    const result = await service.start("general");
+    expect(result).toEqual({
+      ok: false,
+      message: "The audio engine could not load.",
+    });
+    expect(connectCalls()).toBe(0);
+    expect(events.at(-1)).toMatchObject({ kind: "status", state: "error" });
+  });
+
+  it("a close before session.ready reads as a refused connection", async () => {
+    const { socket, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("close");
+    expect(events.at(-1)).toEqual({
+      kind: "status",
+      state: "error",
+      message:
+        "The live connection was refused. Is the server running (and are you signed in)?",
+    });
+    // The guard released: a second start is accepted.
+    const again = await service.start("general");
+    expect(again.ok).toBe(true);
+  });
+
+  it("dispose() during the meeting insert never opens a socket", async () => {
+    let resolveMeeting!: (result: CreateMeetingResult) => void;
+    const meeting = new Promise<CreateMeetingResult>((resolve) => {
+      resolveMeeting = resolve;
+    });
+    const { events, service, connectCalls } = harness({ meeting });
+    const pending = service.start("general");
+    // App quit while the insert is in flight: the socket a late-resolving
+    // start would open could never be closed (`active` is already null).
+    service.dispose();
+    resolveMeeting({
+      ok: true,
+      meetingId: "11111111-2222-4333-8444-555555555555",
+    });
+    const result = await pending;
+    expect(result).toEqual({
+      ok: false,
+      message: "The live session was cancelled.",
+    });
+    expect(connectCalls()).toBe(0);
+    expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
+  });
+
+  it("a throwing connect fails typed and releases the running-guard", async () => {
+    const { events, service } = harness({
+      connect: () => {
+        throw new Error("bad url");
+      },
+    });
+    const result = await service.start("general");
+    expect(result).toEqual({
+      ok: false,
+      message: "Could not open the live connection (bad url).",
+    });
+    expect(events.at(-1)).toMatchObject({ kind: "status", state: "error" });
+    // Released: the retry hits the same connect error, not "already running."
+    const again = await service.start("general");
+    expect(again).toEqual({
+      ok: false,
+      message: "Could not open the live connection (bad url).",
+    });
+  });
+
+  it("dispose() tears down a live session (the will-quit path)", async () => {
+    const { socket, engine, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    service.dispose();
+    expect(engine.stopped).toBe(1);
+    expect(socket.closed).toBe(true);
+    expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
   });
 });

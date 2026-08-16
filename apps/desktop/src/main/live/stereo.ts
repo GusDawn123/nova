@@ -36,6 +36,9 @@ export class StereoInterleaver {
   ) {}
 
   push(stream: "me" | "them", pcm: Buffer): void {
+    if (pcm.length === 0) {
+      return; // an empty chunk would sit in `chunks` forever (bytes never grow)
+    }
     const queue = stream === "me" ? this.me : this.them;
     queue.chunks.push(pcm);
     queue.bytes += pcm.length;

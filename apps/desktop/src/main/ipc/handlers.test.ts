@@ -60,9 +60,11 @@ vi.mock("electron", () => ({
   },
 }));
 
-const { registerIpcHandlers } = await import("./handlers");
+const { pushLiveEvent, registerIpcHandlers } = await import("./handlers");
 const { IpcChannel } = await import("./channels");
 const { INVALID_BRIDGE_RESPONSE_MESSAGE } = await import("./contract");
+
+type LiveSessionEvent = import("./contract").LiveSessionEvent;
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -490,5 +492,48 @@ describe("the live session channels", () => {
 
     send(IpcChannel.liveSetPaused, { paused: "yes" });
     expect(liveSetPaused).toHaveBeenCalledTimes(1);
+  });
+
+  it("broadcasts a valid live event and drops a mis-shaped one", () => {
+    windows = [
+      {
+        isDestroyed: () => false,
+        webContents: {
+          send: (channel: string, payload: unknown) => {
+            sentToWindows.push({ channel, payload });
+          },
+        },
+      },
+    ];
+
+    pushLiveEvent({
+      kind: "transcript",
+      final: true,
+      speaker: "me",
+      text: "hello there",
+      ts_ms: 900,
+    });
+    expect(sentToWindows).toEqual([
+      {
+        channel: IpcChannel.liveEvent,
+        payload: {
+          kind: "transcript",
+          final: true,
+          speaker: "me",
+          text: "hello there",
+          ts_ms: 900,
+        },
+      },
+    ]);
+
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // Cast because the contract makes this value unconstructable by design.
+    pushLiveEvent({
+      kind: "transcript",
+      text: 7,
+    } as unknown as LiveSessionEvent);
+    // Dropped, not substituted: a mis-shaped line must never put invented
+    // words on the user's screen — nothing new reached any window.
+    expect(sentToWindows).toHaveLength(1);
   });
 });

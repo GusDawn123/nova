@@ -144,7 +144,20 @@ export function createLiveSessionService(
       return fail(engine.message);
     }
 
-    const socket = deps.connect(liveUrl(deps.apiBaseUrl), accessToken);
+    // stop()/dispose() can land during any await above. Opening a socket for a
+    // session already torn down would leak it: `active` is null by then, so
+    // nothing could ever close it.
+    if (session.finished || active !== session) {
+      return { ok: false, message: "The live session was cancelled." };
+    }
+
+    let socket: LiveSocket;
+    try {
+      socket = deps.connect(liveUrl(deps.apiBaseUrl), accessToken);
+    } catch (error: unknown) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return fail(`Could not open the live connection (${reason}).`);
+    }
     session.socket = socket;
 
     socket.on("open", () => {

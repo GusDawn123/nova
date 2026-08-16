@@ -32,15 +32,22 @@ export function useLiveSession(): LiveSessionView {
   const partials = useRef(new Map<string, TranscriptRow>());
 
   useEffect(() => {
-    const rowsNow = (): TranscriptRow[] => [
-      ...finals.current,
-      ...partials.current.values(),
-    ];
+    const rowsNow = (): TranscriptRow[] =>
+      // Sorted rather than concatenated: a partial from one speaker can be
+      // OLDER than a final from the other, and bucket order would draw it below.
+      [...finals.current, ...partials.current.values()].sort(
+        (a, b) => a.tsMs - b.tsMs,
+      );
     return window.novaBridge.onLiveEvent((event) => {
       if (event.kind === "status") {
         if (event.state === "connecting") {
           // A new session starts a new transcript.
           finals.current = [];
+          partials.current.clear();
+        }
+        if (event.state === "ended" || event.state === "error") {
+          // A partial is a hypothesis the vendor never confirmed; leaving it
+          // rendered would present unverified text as the record of the call.
           partials.current.clear();
         }
         setView({

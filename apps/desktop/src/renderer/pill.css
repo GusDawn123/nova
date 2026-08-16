@@ -614,9 +614,11 @@ body {
   font: 400 16px/1.35 var(--sg);
   color: rgba(255, 255, 255, 0.92);
 }
-/* A partial is a hypothesis still forming; a hint is not a transcript at all. */
+/* A partial is a hypothesis still forming; a hint is not a transcript at all.
+   Dimmed via a solid-enough color, not opacity: the translucent pill can sit
+   over a white desktop, where 0.55 opacity fell below WCAG AA (4.5:1). */
 .transcript__text--partial {
-  opacity: 0.55;
+  color: rgba(255, 255, 255, 0.78);
 }
 
 .transcript__text--hint {
