@@ -5,7 +5,9 @@
 //
 // Usage: node tools/live-proof.mjs [seconds]   (local dev only; default 20)
 // Needs in apps/desktop/.env: NOVA_SUPABASE_URL, NOVA_SUPABASE_ANON_KEY,
-// NOVA_DEV_EMAIL, NOVA_DEV_PASSWORD (the local seed account).
+// LIVE_PROOF_EMAIL, LIVE_PROOF_PASSWORD (the local seed account). The
+// credential keys deliberately do NOT carry the NOVA_ prefix: electron-vite
+// treats NOVA_* as build-time PUBLIC values, and a password may never be one.
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
@@ -34,8 +36,8 @@ function readEnv() {
   );
   const url = entries.get("NOVA_SUPABASE_URL");
   const anonKey = entries.get("NOVA_SUPABASE_ANON_KEY");
-  const email = entries.get("NOVA_DEV_EMAIL");
-  const password = entries.get("NOVA_DEV_PASSWORD");
+  const email = entries.get("LIVE_PROOF_EMAIL");
+  const password = entries.get("LIVE_PROOF_PASSWORD");
   if (
     url === undefined ||
     anonKey === undefined ||

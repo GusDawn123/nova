@@ -69,16 +69,20 @@ class FakeEngine {
 }
 
 function harness(overrides?: {
-  accessToken?: string | null;
+  accessToken?: string | null | Promise<string | null>;
   userId?: string | null;
   engineResult?: AudioEngineResult;
-  meeting?: CreateMeetingResult | Promise<CreateMeetingResult>;
+  meeting?:
+    | CreateMeetingResult
+    | Promise<CreateMeetingResult>
+    | (() => CreateMeetingResult | Promise<CreateMeetingResult>);
   connect?: (url: string, accessToken: string) => LiveSocket;
 }) {
   const socket = new FakeSocket();
   const engine = new FakeEngine();
   const events: LiveSessionEvent[] = [];
   let connectCalls = 0;
+  let meetingCalls = 0;
   const service = createLiveSessionService({
     apiBaseUrl: "http://127.0.0.1:3000",
     loadEngine: () => overrides?.engineResult ?? { ok: true, engine },
@@ -96,18 +100,31 @@ function harness(overrides?: {
       ),
     getUserId: () =>
       overrides?.userId === undefined ? "user-1" : overrides.userId,
-    createMeeting: () =>
-      overrides?.meeting === undefined
-        ? Promise.resolve<CreateMeetingResult>({
-            ok: true,
-            meetingId: "11111111-2222-4333-8444-555555555555",
-          })
-        : Promise.resolve(overrides.meeting),
+    createMeeting: () => {
+      meetingCalls += 1;
+      const meeting = overrides?.meeting;
+      if (meeting === undefined) {
+        return Promise.resolve<CreateMeetingResult>({
+          ok: true,
+          meetingId: "11111111-2222-4333-8444-555555555555",
+        });
+      }
+      return Promise.resolve(
+        typeof meeting === "function" ? meeting() : meeting,
+      );
+    },
     emit: (event) => {
       events.push(event);
     },
   });
-  return { socket, engine, events, service, connectCalls: () => connectCalls };
+  return {
+    socket,
+    engine,
+    events,
+    service,
+    connectCalls: () => connectCalls,
+    meetingCalls: () => meetingCalls,
+  };
 }
 
 /** A wire batch (960 samples ≈ 60 ms) of a constant PCM16 value. */
@@ -382,6 +399,74 @@ describe("live session service", () => {
     });
     expect(connectCalls()).toBe(0);
     expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
+  });
+
+  it("dispose() before the token resolves never creates a meeting row", async () => {
+    let resolveToken!: (token: string | null) => void;
+    const accessToken = new Promise<string | null>((resolve) => {
+      resolveToken = resolve;
+    });
+    const { events, service, meetingCalls, connectCalls } = harness({
+      accessToken,
+    });
+    const pending = service.start("general");
+    // App quit while sign-in is still resolving: the stale startup must not
+    // write a meeting row for a call that can never happen.
+    service.dispose();
+    resolveToken("token-1");
+    const result = await pending;
+    expect(result).toEqual({
+      ok: false,
+      message: "The live session was cancelled.",
+    });
+    expect(meetingCalls()).toBe(0);
+    expect(connectCalls()).toBe(0);
+    expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
+  });
+
+  it("a stale startup failing late cannot clear a NEWER session", async () => {
+    let firstCall = true;
+    let resolveFirstInsert!: (result: CreateMeetingResult) => void;
+    const firstInsert = new Promise<CreateMeetingResult>((resolve) => {
+      resolveFirstInsert = resolve;
+    });
+    const { events, service, meetingCalls } = harness({
+      meeting: () => {
+        if (firstCall) {
+          firstCall = false;
+          return firstInsert;
+        }
+        return {
+          ok: true,
+          meetingId: "11111111-2222-4333-8444-555555555555",
+        };
+      },
+    });
+
+    const stale = service.start("general");
+    // Let startup #1 get INTO the hanging insert before the user cancels —
+    // cancelling any earlier would (correctly) skip the insert entirely.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(meetingCalls()).toBe(1);
+
+    service.dispose(); // the user cancels while insert #1 hangs…
+    const second = await service.start("general"); // …and starts fresh
+    expect(second.ok).toBe(true);
+
+    resolveFirstInsert({ ok: false, message: "boom" }); // insert #1 fails LATE
+    await expect(stale).resolves.toEqual({
+      ok: false,
+      message: "The live session was cancelled.",
+    });
+    // The newer session is untouched: no error status followed its
+    // "connecting", and it still owns the running-guard.
+    expect(events.at(-1)).toEqual({ kind: "status", state: "connecting" });
+    const third = await service.start("general");
+    expect(third).toEqual({
+      ok: false,
+      message: "A live session is already running.",
+    });
   });
 
   it("a throwing connect fails typed and releases the running-guard", async () => {

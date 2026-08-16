@@ -75,9 +75,14 @@ export function createLiveSessionService(
 ): LiveSessionService {
   let active: ActiveSession | null = null;
 
-  function fail(message: string): LiveActionResult {
-    deps.emit({ kind: "status", state: "error", message });
-    active = null;
+  function fail(session: ActiveSession, message: string): LiveActionResult {
+    // Only the session that still owns the claim may release it: a STALE
+    // start unwinding late must not clear a newer session, nor talk over the
+    // "ended" status its own teardown already emitted.
+    if (active === session) {
+      active = null;
+      deps.emit({ kind: "status", state: "error", message });
+    }
     return { ok: false, message };
   }
 
@@ -125,38 +130,49 @@ export function createLiveSessionService(
     active = session;
     deps.emit({ kind: "status", state: "connecting" });
 
+    // stop()/dispose() can land during any await below; past that point this
+    // startup must go inert — no meeting row written, no socket opened, no
+    // claim stolen back from a newer session.
+    const cancelled = (): boolean => session.finished || active !== session;
+    const wasCancelled: LiveActionResult = {
+      ok: false,
+      message: "The live session was cancelled.",
+    };
+
     const accessToken = await deps.getAccessToken();
+    if (cancelled()) {
+      return wasCancelled;
+    }
     if (accessToken === null) {
-      return fail("You are not signed in.");
+      return fail(session, "You are not signed in.");
     }
     const userId = deps.getUserId();
     if (userId === null) {
-      return fail("You are not signed in.");
+      return fail(session, "You are not signed in.");
     }
 
     const meeting = await deps.createMeeting(accessToken, userId);
+    if (cancelled()) {
+      return wasCancelled;
+    }
     if (!meeting.ok) {
-      return fail(meeting.message);
+      return fail(session, meeting.message);
     }
 
     const engine = deps.loadEngine();
     if (!engine.ok) {
-      return fail(engine.message);
+      return fail(session, engine.message);
     }
 
-    // stop()/dispose() can land during any await above. Opening a socket for a
-    // session already torn down would leak it: `active` is null by then, so
-    // nothing could ever close it.
-    if (session.finished || active !== session) {
-      return { ok: false, message: "The live session was cancelled." };
-    }
-
+    // A socket opened for a torn-down session would leak — `active` is null by
+    // then, so nothing could ever close it. (loadEngine is synchronous, so the
+    // post-meeting cancellation check still covers this point.)
     let socket: LiveSocket;
     try {
       socket = deps.connect(liveUrl(deps.apiBaseUrl), accessToken);
     } catch (error: unknown) {
       const reason = error instanceof Error ? error.message : String(error);
-      return fail(`Could not open the live connection (${reason}).`);
+      return fail(session, `Could not open the live connection (${reason}).`);
     }
     session.socket = socket;
 

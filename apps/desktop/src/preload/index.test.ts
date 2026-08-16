@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { IpcChannel } from "../main/ipc/channels";
 import { INVALID_BRIDGE_RESPONSE_MESSAGE } from "../main/ipc/contract";
 import type { NovaBridge } from "./index";
 
@@ -11,7 +12,11 @@ import type { NovaBridge } from "./index";
  */
 const h = vi.hoisted(() => {
   const exposed: { bridge?: unknown } = {};
-  return { invoke: vi.fn(), exposed };
+  const channelListeners = new Map<
+    string,
+    (event: unknown, raw: unknown) => void
+  >();
+  return { invoke: vi.fn(), exposed, channelListeners };
 });
 
 vi.mock("electron", () => ({
@@ -22,8 +27,12 @@ vi.mock("electron", () => ({
   },
   ipcRenderer: {
     invoke: h.invoke,
-    on: vi.fn(),
-    removeListener: vi.fn(),
+    on: (channel: string, listener: (event: unknown, raw: unknown) => void) => {
+      h.channelListeners.set(channel, listener);
+    },
+    removeListener: (channel: string) => {
+      h.channelListeners.delete(channel);
+    },
     send: vi.fn(),
   },
 }));
@@ -64,5 +73,29 @@ describe("the live-session bridge methods", () => {
       ok: false,
       message: INVALID_BRIDGE_RESPONSE_MESSAGE,
     });
+  });
+});
+
+describe("onLiveEvent", () => {
+  it("forwards valid events, logs + suppresses malformed ones, unsubscribes", () => {
+    const received: unknown[] = [];
+    const unsubscribe = bridge.onLiveEvent((event) => received.push(event));
+    const forward = h.channelListeners.get(IpcChannel.liveEvent);
+    if (forward === undefined) throw new Error("no live listener registered");
+
+    forward({}, { kind: "status", state: "live" });
+    expect(received).toEqual([{ kind: "status", state: "live" }]);
+
+    const errorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    forward({}, { kind: "transcript", text: 7 });
+    // Suppressed but never silent: an off-contract event here means the
+    // preload and main bundles disagree about the schema.
+    expect(received).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalled();
+
+    unsubscribe();
+    expect(h.channelListeners.has(IpcChannel.liveEvent)).toBe(false);
   });
 });

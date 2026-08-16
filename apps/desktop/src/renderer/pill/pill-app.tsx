@@ -27,11 +27,11 @@ export function PillApp(): JSX.Element {
   const live = useLiveSession();
   const stageRef = useRef<HTMLDivElement>(null);
 
-  // Main owns the session; if it dies out from under us (server gone,
-  // connection dropped), the pill's controls must fall back to "stopped"
-  // instead of showing a ticking clock over a dead call.
+  // Main owns the session; when it terminates out from under us — an error,
+  // or a clean server-side end the user never clicked — the pill's controls
+  // must fall back to "stopped" instead of ticking a clock over a dead call.
   useEffect(() => {
-    if (live.state === "error") {
+    if (live.state === "error" || live.state === "ended") {
       setAudio(AUDIO_OFF);
     }
   }, [live.state]);
