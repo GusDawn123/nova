@@ -136,6 +136,8 @@ export class LiveSession {
   private startedAtMs: number | null = null;
   /** The meeting this socket is tied to (from `session.start`); null until start. */
   private meetingId: string | null = null;
+  /** Audio channel count (from `session.start`); the desktop sends stereo. */
+  private channels: 1 | 2 = 1;
   /** The live STT relay handle for this call; null until start (or in echo mode). */
   private stt: SttSessionHandle | null = null;
   /** STT usage accounting + quota cadence; null until start (or unmetered). */
@@ -236,6 +238,7 @@ export class LiveSession {
           event.meeting_id,
           event.echo ?? false,
           event.mode ?? "general",
+          event.channels ?? 1,
         );
         return;
       case "session.end":
@@ -313,6 +316,7 @@ export class LiveSession {
     meetingId: string,
     echo: boolean,
     mode: LiveMode,
+    channels: 1 | 2,
   ): Promise<void> {
     if (this.started) {
       // One live session per socket; a second start is a client protocol bug.
@@ -322,6 +326,7 @@ export class LiveSession {
     this.started = true;
     this.echo = this.allowEcho && echo;
     this.meetingId = meetingId;
+    this.channels = channels;
 
     // Concurrency cap (Phase 6, adr-0007 §6) — the CHEAPEST check, first:
     // synchronous, no DB, so two simultaneous starts resolve deterministically
@@ -505,7 +510,11 @@ export class LiveSession {
     // phone must abort the vendor socket — the money-leak rule, design doc).
     if (this.sttEngine !== null && !this.echo) {
       const stt = this.sttEngine.startSession(
-        { sessionId: this.sessionId, sampleRateHz: STT_SAMPLE_RATE_HZ },
+        {
+          sessionId: this.sessionId,
+          sampleRateHz: STT_SAMPLE_RATE_HZ,
+          channels: this.channels,
+        },
         this.onServerEvent,
       );
       this.stt = stt;

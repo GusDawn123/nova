@@ -1,7 +1,7 @@
-/*
+﻿/*
  * The pill window's stylesheet. Every value is transcribed from the ratified
  * mockups (docs/superpowers/mockups/2026-08-14-app-design/project/
- * "Nova Settings.dc.html", the interactive pill) — treat that file as the
+ * "Nova Settings.dc.html", the interactive pill) â€” treat that file as the
  * source of truth before "improving" anything here.
  */
 
@@ -25,7 +25,7 @@ body {
 /*
  * The stage is the window: 40px side gutters and a deep bottom gutter so the
  * pill's drop shadow (and the tooltips above it) render inside the transparent
- * window instead of clipping at its edge. 100vw, not a fixed width — the MAIN
+ * window instead of clipping at its edge. 100vw, not a fixed width â€” the MAIN
  * process decides how long the pill is (a fraction of the screen,
  * windows/pill-window.ts) and the shell stretches to fill; the side padding
  * here must equal SHADOW_GUTTERS there. Row thickness, fonts and icons are
@@ -579,16 +579,87 @@ body {
   flex: 1;
 }
 
+/* The wrapper exists so the "↓ Latest" button can float over the scroll area
+   without scrolling away with the rows. */
+.transcript__view {
+  position: relative;
+}
+
+/* Grows with the call up to its inline max-height (half the screen, set from
+   TranscriptPanel), then scrolls inside itself; no-drag so the wheel and the
+   scrollbar belong to the reader, not to window-dragging. */
 .transcript__body {
   padding: 22px 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 22px;
   min-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.transcript__body::-webkit-scrollbar {
+  width: 8px;
+}
+.transcript__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.transcript__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.transcript__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes transcript-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .transcript__row {
   display: flex;
+}
+
+/* Only rows ARRIVING while the panel is open animate in — rows restored on
+   reopen render still (TranscriptPanel decides which is which). */
+.transcript__row--in {
+  animation: transcript-row-in 240ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transcript__row--in,
+  .transcript__latest {
+    animation: none;
+  }
+  .transcript__text {
+    transition: none;
+  }
+}
+
+.transcript__latest {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 28, 42, 0.88);
+  color: rgba(255, 255, 255, 0.9);
+  font: 500 12.5px var(--sg);
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  animation: transcript-row-in 200ms ease-out;
+}
+
+.transcript__latest:hover {
+  background: rgba(40, 52, 72, 0.95);
 }
 
 .transcript__ts {
@@ -610,9 +681,24 @@ body {
   color: rgba(255, 255, 255, 0.45);
 }
 
+/* The color transition is the partial→final commit: the row keeps its DOM
+   identity (stable keys in use-live-session), so the grey hypothesis eases
+   into the white record in place instead of remounting. */
 .transcript__text {
   font: 400 16px/1.35 var(--sg);
   color: rgba(255, 255, 255, 0.92);
+  transition: color 320ms ease;
+}
+/* A partial is a hypothesis still forming; a hint is not a transcript at all.
+   Dimmed via a solid-enough color, not opacity: the translucent pill can sit
+   over a white desktop, where 0.55 opacity fell below WCAG AA (4.5:1). */
+.transcript__text--partial {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.transcript__text--hint {
+  opacity: 0.55;
+  font-style: italic;
 }
 
 .transcript__foot {

@@ -4,12 +4,17 @@ import type { z } from "zod";
 import type { ApiClient } from "../api/client";
 import type { AuthActionResult } from "../auth/errors";
 import type { AuthService } from "../auth/service";
+import type { LiveSessionService } from "../live/session";
 import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { IpcChannel } from "./channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
   credentialsSchema,
+  liveActionResultSchema,
+  livePausedMessageSchema,
+  liveSessionEventSchema,
+  liveStartMessageSchema,
   meResultMessageSchema,
   pillClickThroughMessageSchema,
   pillResizeMessageSchema,
@@ -17,6 +22,8 @@ import {
   INVALID_BRIDGE_RESPONSE_MESSAGE,
   INVALID_CREDENTIALS_PAYLOAD_MESSAGE,
   type AuthStateMessage,
+  type LiveActionResult,
+  type LiveSessionEvent,
   type MeResultMessage,
   type PrivacyStateMessage,
 } from "./contract";
@@ -41,6 +48,9 @@ export interface IpcDeps {
   auth: AuthService;
   api: ApiClient;
   privacy: ScreenPrivacyService;
+  /** The live-call orchestrator (start/stop/pause); its events arrive via
+   * {@link pushLiveEvent}, which main wires as the service's emit. */
+  live: LiveSessionService;
   /** Open (or focus) the settings window. Injected so this file stays wiring. */
   openSettings: () => void;
   /** Resize the pill window to its content height, already bounds-checked. */
@@ -65,6 +75,11 @@ const OFF_CONTRACT_AUTH_RESULT: AuthActionResult = {
 const OFF_CONTRACT_ME_RESULT: MeResultMessage = {
   ok: false,
   kind: "schema",
+  message: INVALID_BRIDGE_RESPONSE_MESSAGE,
+};
+
+const OFF_CONTRACT_LIVE_RESULT: LiveActionResult = {
+  ok: false,
   message: INVALID_BRIDGE_RESPONSE_MESSAGE,
 };
 
@@ -105,7 +120,7 @@ function outbound<T>(
   return fallback;
 }
 
-/** Broadcast one payload to every live window — the pattern both pushes use. */
+/** Broadcast one payload to every live window — the pattern every push uses. */
 function broadcast(channel: string, payload: unknown): void {
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) {
@@ -114,10 +129,33 @@ function broadcast(channel: string, payload: unknown): void {
   }
 }
 
+/**
+ * The live session's emit sink: contract-checked, then broadcast. Exported so
+ * the composition root can hand it to the service at construction — the
+ * service and this file never import each other's internals.
+ */
+export function pushLiveEvent(event: LiveSessionEvent): void {
+  const parsed = liveSessionEventSchema.safeParse(event);
+  if (!parsed.success) {
+    // Skipped rather than substituted: a mis-shaped transcript line is our
+    // bug, and inventing a replacement would put words on the user's screen.
+    reportOffContract(IpcChannel.liveEvent, parsed.error);
+    return;
+  }
+  broadcast(IpcChannel.liveEvent, parsed.data);
+}
+
 /** Registers every handler and the auth push. Returns its own teardown. */
 export function registerIpcHandlers(deps: IpcDeps): () => void {
-  const { auth, api, privacy, openSettings, resizePill, setPillClickThrough } =
-    deps;
+  const {
+    auth,
+    api,
+    privacy,
+    live,
+    openSettings,
+    resizePill,
+    setPillClickThrough,
+  } = deps;
 
   ipcMain.handle(IpcChannel.authGetState, () =>
     outbound(
@@ -204,6 +242,40 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     return state;
   });
 
+  ipcMain.handle(IpcChannel.liveStart, async (_event, payload: unknown) => {
+    const parsed = liveStartMessageSchema.safeParse(payload);
+    const result: LiveActionResult = parsed.success
+      ? await live.start(parsed.data.mode)
+      : { ok: false, message: "That is not a mode this build knows." };
+    return outbound(
+      IpcChannel.liveStart,
+      liveActionResultSchema,
+      result,
+      OFF_CONTRACT_LIVE_RESULT,
+    );
+  });
+
+  ipcMain.handle(IpcChannel.liveStop, () => {
+    live.stop();
+    return outbound(
+      IpcChannel.liveStop,
+      liveActionResultSchema,
+      { ok: true },
+      OFF_CONTRACT_LIVE_RESULT,
+    );
+  });
+
+  const onLiveSetPaused = (_event: unknown, payload: unknown): void => {
+    const parsed = livePausedMessageSchema.safeParse(payload);
+    if (!parsed.success) {
+      // Dropped: a garbled payload must not decide whether a call records.
+      reportOffContract(IpcChannel.liveSetPaused, parsed.error);
+      return;
+    }
+    live.setPaused(parsed.data.paused);
+  };
+  ipcMain.on(IpcChannel.liveSetPaused, onLiveSetPaused);
+
   const onSettingsOpen = (): void => {
     openSettings();
   };
@@ -252,6 +324,7 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     ipcMain.removeListener(IpcChannel.settingsOpen, onSettingsOpen);
     ipcMain.removeListener(IpcChannel.pillResize, onPillResize);
     ipcMain.removeListener(IpcChannel.pillClickThrough, onPillClickThrough);
+    ipcMain.removeListener(IpcChannel.liveSetPaused, onLiveSetPaused);
     for (const channel of [
       IpcChannel.authGetState,
       IpcChannel.authSignIn,
@@ -260,6 +333,8 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
       IpcChannel.apiGetMe,
       IpcChannel.privacyGetState,
       IpcChannel.privacySetState,
+      IpcChannel.liveStart,
+      IpcChannel.liveStop,
     ]) {
       ipcMain.removeHandler(channel);
     }

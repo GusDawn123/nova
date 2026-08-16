@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ServerLiveEvent } from "@nova/shared";
 
-import type { SttEmit, SttEngine } from "../stt/ports.js";
+import type { SttEmit, SttEngine, SttSessionInfo } from "../stt/ports.js";
 
 import type {
   LiveLogger,
@@ -751,5 +751,63 @@ describe("LiveSession teardown (exactly-once)", () => {
 
     expect(cleanup).toHaveBeenCalledTimes(1);
     expect(session.disposer.disposed).toBe(true);
+  });
+});
+
+describe("LiveSession channel propagation to the STT engine", () => {
+  function makeCapturingEngine(): {
+    engine: SttEngine;
+    infos: SttSessionInfo[];
+  } {
+    const infos: SttSessionInfo[] = [];
+    const engine: SttEngine = {
+      startSession(info) {
+        infos.push(info);
+        return {
+          onAudioFrame() {
+            /* not exercised here */
+          },
+          stop() {
+            /* not exercised here */
+          },
+        };
+      },
+    };
+    return { engine, infos };
+  }
+
+  it("passes channels: 2 through to startSession (the desktop's stereo start)", async () => {
+    const { engine, infos } = makeCapturingEngine();
+    const { session } = makeSession({
+      sttEngine: engine,
+      persister: new FakePersister(),
+      userId: USER_ID,
+    });
+    session.handleTextMessage(
+      JSON.stringify({
+        v: 1,
+        type: "session.start",
+        meeting_id: MEETING_ID,
+        channels: 2,
+      }),
+    );
+    await flush(); // the async ownership guard resolves before the engine starts
+
+    expect(infos).toHaveLength(1);
+    expect(infos[0]?.channels).toBe(2);
+  });
+
+  it("defaults an OMITTED channels to 1 (an old mono client)", async () => {
+    const { engine, infos } = makeCapturingEngine();
+    const { session } = makeSession({
+      sttEngine: engine,
+      persister: new FakePersister(),
+      userId: USER_ID,
+    });
+    session.handleTextMessage(startFrame());
+    await flush();
+
+    expect(infos).toHaveLength(1);
+    expect(infos[0]?.channels).toBe(1);
   });
 });

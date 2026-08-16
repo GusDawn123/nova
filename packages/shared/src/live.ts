@@ -78,6 +78,15 @@ export const sessionStartSchema = z.object({
   meeting_id: z.string().uuid(),
   echo: z.boolean().optional(),
   mode: liveModeSchema.optional(),
+  /**
+   * How many PCM channels the binary audio frames carry (additive, desktop
+   * pivot chunk 3 — no `v` bump). Omitted = 1, the phone's mono mic feed.
+   * 2 = the desktop's interleaved stereo, where THE CHANNELS ARE THE SPEAKER
+   * LABELS: channel 0 is the near end ("me", the mic), channel 1 the far end
+   * ("them", system loopback). No diarization is involved in the 2-channel
+   * case — that is the pivot design's ratified decision 3, made physical.
+   */
+  channels: z.union([z.literal(1), z.literal(2)]).optional(),
 });
 
 /**

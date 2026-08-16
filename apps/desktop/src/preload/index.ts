@@ -6,9 +6,13 @@ import { IpcChannel, type IpcChannelName } from "../main/ipc/channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
+  liveActionResultSchema,
+  liveSessionEventSchema,
   meResultMessageSchema,
   privacyStateMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
+  type LiveActionResult,
+  type LiveSessionEvent,
   type MeResultMessage,
   type PrivacyStateMessage,
 } from "../main/ipc/contract";
@@ -53,6 +57,18 @@ export interface NovaBridge {
   readonly setScreenPrivacy: (enabled: boolean) => Promise<PrivacyStateMessage>;
   readonly onScreenPrivacyChange: (
     listener: (state: PrivacyStateMessage) => void,
+  ) => () => void;
+  /**
+   * The live call. Start/stop are asks — main owns the session, the engine,
+   * and the socket; the renderer only ever hears what happened via
+   * `onLiveEvent`. `mode` is a plain string here so the UI's menu ids pass
+   * through; main validates it against the shared protocol's mode vocabulary.
+   */
+  readonly startLiveSession: (mode: string) => Promise<LiveActionResult>;
+  readonly stopLiveSession: () => Promise<LiveActionResult>;
+  readonly setLiveSessionPaused: (paused: boolean) => void;
+  readonly onLiveEvent: (
+    listener: (event: LiveSessionEvent) => void,
   ) => () => void;
   /** Ask main to open (or focus) the settings window. Fire-and-forget. */
   readonly openSettings: () => void;
@@ -182,6 +198,46 @@ const novaBridge: NovaBridge = {
     ipcRenderer.on(IpcChannel.privacyStateChanged, forward);
     return () => {
       ipcRenderer.removeListener(IpcChannel.privacyStateChanged, forward);
+    };
+  },
+
+  startLiveSession: async (mode) => {
+    const parsed = liveActionResultSchema.safeParse(
+      await invoke(IpcChannel.liveStart, { mode }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  stopLiveSession: async () => {
+    const parsed = liveActionResultSchema.safeParse(
+      await invoke(IpcChannel.liveStop),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  setLiveSessionPaused: (paused) => {
+    ipcRenderer.send(IpcChannel.liveSetPaused, { paused });
+  },
+
+  onLiveEvent: (listener) => {
+    const forward = (_event: unknown, raw: unknown): void => {
+      const parsed = liveSessionEventSchema.safeParse(raw);
+      if (!parsed.success) {
+        // Main validates before broadcasting, so a failure here means the
+        // preload and main bundles disagree about the schema — silence would
+        // present as a transcript that simply stops.
+        console.error("[bridge] off-contract live event", parsed.error.issues);
+        return;
+      }
+      listener(parsed.data);
+    };
+    ipcRenderer.on(IpcChannel.liveEvent, forward);
+    return () => {
+      ipcRenderer.removeListener(IpcChannel.liveEvent, forward);
     };
   },
 

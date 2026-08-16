@@ -87,6 +87,41 @@ describe("clientLiveEventSchema", () => {
     ]);
   });
 
+  it("accepts session.start with channels 1 or 2 (the desktop's stereo start)", () => {
+    for (const channels of [1, 2]) {
+      const result = parseClientEvent({
+        v: 1,
+        type: "session.start",
+        meeting_id: MEETING_ID,
+        channels,
+      });
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it("treats an OMITTED channels as absent — an old mono client still starts", () => {
+    const result = parseClientEvent({
+      v: 1,
+      type: "session.start",
+      meeting_id: MEETING_ID,
+    });
+    if (!result.success) throw new Error("expected success");
+    if (result.data.type !== "session.start") throw new Error("wrong type");
+    expect(result.data.channels).toBeUndefined();
+  });
+
+  it("rejects channels outside {1, 2} — numbers and strings alike", () => {
+    for (const channels of [0, 3, -1, 1.5, "2", "stereo"]) {
+      const result = parseClientEvent({
+        v: 1,
+        type: "session.start",
+        meeting_id: MEETING_ID,
+        channels,
+      });
+      expect(result.success).toBe(false);
+    }
+  });
+
   it("accepts the audio.frame marker, session.end and ping", () => {
     for (const type of ["audio.frame", "session.end", "ping"] as const) {
       expect(parseClientEvent({ v: 1, type }).success).toBe(true);

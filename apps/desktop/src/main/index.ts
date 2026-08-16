@@ -1,10 +1,15 @@
 import { app, BrowserWindow } from "electron";
+import WebSocket from "ws";
+import { z } from "zod";
 
 import { createApiClient } from "./api/client";
 import { API_BASE_URL } from "./api/config";
 import { createAuthService } from "./auth/service";
 import type { AuthState } from "./auth/state";
-import { registerIpcHandlers } from "./ipc/handlers";
+import { pushLiveEvent, registerIpcHandlers } from "./ipc/handlers";
+import { loadAudioEngine } from "./live/audio-engine";
+import { createMeetingRow } from "./live/meeting";
+import { createLiveSessionService, type LiveSocket } from "./live/session";
 import { createScreenPrivacy } from "./privacy/screen-privacy";
 import { closeLoginWindow, openLoginWindow } from "./windows/login-window";
 import {
@@ -55,10 +60,53 @@ async function bootstrap(): Promise<void> {
     getAccessToken: () => auth.getAccessToken(),
   });
 
+  // Meeting rows are the user's own data: created straight against Supabase
+  // with the user's JWT (the path the mobile app takes; RLS enforces
+  // ownership). Missing env means a typed failure when the user clicks start —
+  // never a boot crash.
+  const supabaseEnv = z
+    .object({ url: z.string().url(), anonKey: z.string().min(1) })
+    .safeParse({
+      url: import.meta.env.NOVA_SUPABASE_URL,
+      anonKey: import.meta.env.NOVA_SUPABASE_ANON_KEY,
+    });
+
+  const live = createLiveSessionService({
+    apiBaseUrl: API_BASE_URL,
+    loadEngine: loadAudioEngine,
+    // `ws` rather than the global WebSocket for one reason: it can carry the
+    // Authorization header, the server's primary documented auth path.
+    connect: (url, accessToken): LiveSocket =>
+      new WebSocket(url, {
+        headers: { authorization: `Bearer ${accessToken}` },
+      }),
+    getAccessToken: () => auth.getAccessToken(),
+    getUserId: () => {
+      const state = auth.getState();
+      return state.status === "signed-in" ? state.user.id : null;
+    },
+    createMeeting: (accessToken, userId) =>
+      supabaseEnv.success
+        ? createMeetingRow({
+            supabaseUrl: supabaseEnv.data.url,
+            anonKey: supabaseEnv.data.anonKey,
+            accessToken,
+            userId,
+            fetch: globalThis.fetch,
+          })
+        : Promise.resolve({
+            ok: false,
+            message:
+              "Supabase is not configured, so the call could not be set up.",
+          }),
+    emit: pushLiveEvent,
+  });
+
   const disposeIpc = registerIpcHandlers({
     auth,
     api,
     privacy,
+    live,
     openSettings: () => {
       openSettingsWindow(privacy).catch((error: unknown) => {
         console.error("[main] failed to open the settings window:", error);
@@ -68,6 +116,7 @@ async function bootstrap(): Promise<void> {
     setPillClickThrough,
   });
   app.on("will-quit", () => {
+    live.dispose();
     disposeIpc();
     auth.dispose();
   });

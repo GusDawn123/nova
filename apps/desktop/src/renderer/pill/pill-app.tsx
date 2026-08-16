@@ -5,6 +5,7 @@ import { AUDIO_OFF, type AudioSession } from "./audio-session";
 import { HistoryPanel } from "./history-panel";
 import { PillBar } from "./pill-bar";
 import { TranscriptPanel } from "./transcript-panel";
+import { useLiveSession } from "./use-live-session";
 
 type PillView = "pill" | "history" | "transcript";
 
@@ -23,7 +24,17 @@ export function PillApp(): JSX.Element {
   const [activeMode, setActiveMode] = useState("general");
   const [audio, setAudio] = useState<AudioSession>(AUDIO_OFF);
   const { enabled: undetectable, request } = useScreenPrivacy();
+  const live = useLiveSession();
   const stageRef = useRef<HTMLDivElement>(null);
+
+  // Main owns the session; when it terminates out from under us — an error,
+  // or a clean server-side end the user never clicked — the pill's controls
+  // must fall back to "stopped" instead of ticking a clock over a dead call.
+  useEffect(() => {
+    if (live.state === "error" || live.state === "ended") {
+      setAudio(AUDIO_OFF);
+    }
+  }, [live.state]);
 
   // Tab summons the ask field, exactly like the mockup — while this window has
   // OS focus. A global hotkey that works with the meeting app frontmost is
@@ -106,11 +117,32 @@ export function PillApp(): JSX.Element {
   }, []);
 
   const togglePause = (): void => {
-    setAudio((current) => ({ ...current, paused: !current.paused }));
+    const paused = !audio.paused;
+    window.novaBridge.setLiveSessionPaused(paused);
+    setAudio((current) => ({ ...current, paused }));
   };
   const stopAudio = (): void => {
+    void window.novaBridge.stopLiveSession();
     setAudio(AUDIO_OFF);
     setView("pill");
+  };
+  const startAudio = (): void => {
+    setAudio({ on: true, paused: false, seconds: 0 });
+    void (async (): Promise<void> => {
+      try {
+        const result = await window.novaBridge.startLiveSession(activeMode);
+        if (!result.ok) {
+          // The typed reason lands in the transcript panel via the status push;
+          // here the controls just refuse to pretend a session is running.
+          setAudio(AUDIO_OFF);
+        }
+      } catch (error: unknown) {
+        // A rejected invoke pushes no status event, so nothing else would ever
+        // clear the optimistic clock.
+        console.error("[pill] live start failed:", error);
+        setAudio(AUDIO_OFF);
+      }
+    })();
   };
 
   return (
@@ -146,9 +178,7 @@ export function PillApp(): JSX.Element {
               setModeMenu(false);
             }}
             audio={audio}
-            onStartAudio={() => {
-              setAudio({ on: true, paused: false, seconds: 0 });
-            }}
+            onStartAudio={startAudio}
             onTogglePause={togglePause}
             onStopAudio={stopAudio}
             onOpenHistory={() => {
@@ -170,6 +200,7 @@ export function PillApp(): JSX.Element {
         {view === "transcript" && (
           <TranscriptPanel
             audio={audio}
+            live={live}
             onTogglePause={togglePause}
             onStopAudio={stopAudio}
             onBack={() => {

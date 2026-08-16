@@ -60,9 +60,11 @@ vi.mock("electron", () => ({
   },
 }));
 
-const { registerIpcHandlers } = await import("./handlers");
+const { pushLiveEvent, registerIpcHandlers } = await import("./handlers");
 const { IpcChannel } = await import("./channels");
 const { INVALID_BRIDGE_RESPONSE_MESSAGE } = await import("./contract");
+
+type LiveSessionEvent = import("./contract").LiveSessionEvent;
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
@@ -91,6 +93,9 @@ interface Stubs {
   openSettings: ReturnType<typeof vi.fn>;
   resizePill: ReturnType<typeof vi.fn>;
   setPillClickThrough: ReturnType<typeof vi.fn>;
+  liveStart: ReturnType<typeof vi.fn>;
+  liveStop: ReturnType<typeof vi.fn>;
+  liveSetPaused: ReturnType<typeof vi.fn>;
   emit: (state: unknown) => void;
   dispose: () => void;
 }
@@ -129,6 +134,9 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
   const openSettings = vi.fn();
   const resizePill = vi.fn();
   const setPillClickThrough = vi.fn();
+  const liveStart = vi.fn().mockResolvedValue({ ok: true });
+  const liveStop = vi.fn();
+  const liveSetPaused = vi.fn();
 
   const dispose = registerIpcHandlers({
     auth,
@@ -137,6 +145,12 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
       attach: vi.fn(),
       set: privacySet,
       get: () => privacyEnabled,
+    },
+    live: {
+      start: liveStart,
+      stop: liveStop,
+      setPaused: liveSetPaused,
+      dispose: vi.fn(),
     },
     openSettings,
     resizePill,
@@ -151,6 +165,9 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     openSettings,
     resizePill,
     setPillClickThrough,
+    liveStart,
+    liveStop,
+    liveSetPaused,
     dispose,
     emit: (state) => {
       // Cast because one test pushes a state the contract forbids, which is
@@ -408,10 +425,10 @@ describe("teardown", () => {
 
     dispose();
 
-    // Seven request/response channels. Leaving one behind would make a second
+    // Nine request/response channels. Leaving one behind would make a second
     // `registerIpcHandlers` throw on a duplicate handler, which is exactly what
     // a window reopening on macOS would do.
-    expect(registered).toHaveLength(7);
+    expect(registered).toHaveLength(9);
     // Copied before sorting — `toSorted` is ES2023 and the lib target is ES2022.
     expect([...removedChannels].sort()).toEqual([...registered].sort());
     expect(handlers.size).toBe(0);
@@ -436,5 +453,87 @@ describe("teardown", () => {
     emit({ status: "signed-out" });
 
     expect(sentToWindows).toEqual([]);
+  });
+});
+
+describe("the live session channels", () => {
+  it("starts a session with the parsed mode", async () => {
+    const { liveStart } = register();
+
+    const result = await invoke(IpcChannel.liveStart, { mode: "technical" });
+
+    expect(liveStart).toHaveBeenCalledWith("technical");
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("refuses a mode outside the shared vocabulary without reaching the service", async () => {
+    const { liveStart } = register();
+
+    const result = await invoke(IpcChannel.liveStart, { mode: "yolo" });
+
+    expect(liveStart).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false });
+  });
+
+  it("stops the session and answers ok", async () => {
+    const { liveStop } = register();
+
+    const result = await invoke(IpcChannel.liveStop);
+
+    expect(liveStop).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("flips pause as asked and drops a malformed pause payload", () => {
+    const { liveSetPaused } = register();
+
+    send(IpcChannel.liveSetPaused, { paused: true });
+    expect(liveSetPaused).toHaveBeenCalledWith(true);
+
+    send(IpcChannel.liveSetPaused, { paused: "yes" });
+    expect(liveSetPaused).toHaveBeenCalledTimes(1);
+  });
+
+  it("broadcasts a valid live event and drops a mis-shaped one", () => {
+    windows = [
+      {
+        isDestroyed: () => false,
+        webContents: {
+          send: (channel: string, payload: unknown) => {
+            sentToWindows.push({ channel, payload });
+          },
+        },
+      },
+    ];
+
+    pushLiveEvent({
+      kind: "transcript",
+      final: true,
+      speaker: "me",
+      text: "hello there",
+      ts_ms: 900,
+    });
+    expect(sentToWindows).toEqual([
+      {
+        channel: IpcChannel.liveEvent,
+        payload: {
+          kind: "transcript",
+          final: true,
+          speaker: "me",
+          text: "hello there",
+          ts_ms: 900,
+        },
+      },
+    ]);
+
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    // Cast because the contract makes this value unconstructable by design.
+    pushLiveEvent({
+      kind: "transcript",
+      text: 7,
+    } as unknown as LiveSessionEvent);
+    // Dropped, not substituted: a mis-shaped line must never put invented
+    // words on the user's screen — nothing new reached any window.
+    expect(sentToWindows).toHaveLength(1);
   });
 });
