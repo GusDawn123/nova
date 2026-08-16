@@ -63,6 +63,38 @@ export const meResultMessageSchema = z.discriminatedUnion("ok", [
 ]);
 export type MeResultMessage = z.infer<typeof meResultMessageSchema>;
 
+/**
+ * Both directions of the undetectability toggle. One boolean, strict both
+ * ways: `privacySetState`'s payload in, and the answer to `privacyGetState` /
+ * `privacySetState` plus the `privacyStateChanged` push out. `enabled: true`
+ * means the windows are excluded from screen capture.
+ */
+export const privacyStateMessageSchema = z
+  .object({ enabled: z.boolean() })
+  .strict();
+export type PrivacyStateMessage = z.infer<typeof privacyStateMessageSchema>;
+
+/**
+ * renderer → main: the pill window's content height, so main can size the
+ * frameless window to it. Bounded because this number becomes OS window
+ * geometry — a renderer bug (or a hostile renderer) must not be able to ask
+ * for a zero-height or screen-swallowing window.
+ */
+export const pillResizeMessageSchema = z
+  .object({ height: z.number().int().min(60).max(1200) })
+  .strict();
+
+/**
+ * renderer → main: whether the pill window should let mouse clicks fall
+ * through to whatever sits underneath it. The window is larger than the
+ * visible pill (shadow and tooltip gutters), and a transparent window still
+ * eats clicks in its invisible parts — so the renderer reports which region
+ * the pointer is over and main flips `setIgnoreMouseEvents` to match.
+ */
+export const pillClickThroughMessageSchema = z
+  .object({ clickThrough: z.boolean() })
+  .strict();
+
 /** The sentence a renderer gets when what it sent did not parse. */
 export const INVALID_CREDENTIALS_PAYLOAD_MESSAGE =
   "Enter an email address and a password.";

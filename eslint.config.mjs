@@ -36,6 +36,11 @@ export default tseslint.config(
       // for the TypeScript we author (server + shared); do not run it over the
       // generated React Native template rather than hand-editing every file.
       "apps/mobile/**",
+      // Design artifacts, not code we author: the Claude Design handoff bundles
+      // under docs/ ship their own support.js runtime, which is browser-global
+      // JS that fails every node-tuned rule here. They are mockups to read, not
+      // modules to lint.
+      "docs/**",
     ],
   },
   js.configs.recommended,

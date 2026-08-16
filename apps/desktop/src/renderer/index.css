@@ -1,60 +1,74 @@
-/**
- * Nova desktop — sign-in surface.
- *
- * Every value here is a custom property set by `design/theme.ts` from
- * `design/tokens.ts`. No literal colour appears below, which is the mechanical
- * form of the duotone rule: one blue, one white, everything else an opacity of
- * the theme's ink. Errors are said in WORDS, never in red
- * (`docs/superpowers/specs/2026-08-02-nova-ui-design.md` §11).
- *
- * The chamfer is here too, at the one place the language asks for it: chamfered
- * means actionable (spec §3), so the primary key is cut and everything readable
- * keeps a soft radius. The mobile app draws that cut with an SVG polygon because
- * React Native has no `clip-path`; a Chromium renderer does, so it is four
- * lines instead of a component.
+/*
+ * The login window's stylesheet, in the settings window's vocabulary
+ * (settings.css) — same palette, same fonts, same title strip — so the front
+ * door and the settings read as one app. The login VISUALS are a stand-in
+ * until sign-in gets its own design pass; the class names are kept from the
+ * original sign-in surface so the form components did not have to change.
  */
+
+:root {
+  --sg: "Space Grotesk", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
 
 * {
   box-sizing: border-box;
 }
 
-html,
-body,
-#root {
-  height: 100%;
-}
-
 body {
   margin: 0;
-  background: var(--nova-canvas);
-  color: var(--nova-ink);
-  font-family: var(--nova-font-body);
-  font-size: var(--nova-text-body);
-  line-height: 1.45;
-  -webkit-font-smoothing: antialiased;
+  background: #0c0c0e;
+  color: #f0f0f2;
+  font-family: var(--sg);
+  overflow: hidden;
+  user-select: none;
 }
 
-/* The window is the app's chrome; nothing here should feel like a web page. */
 ::selection {
-  background: var(--nova-ink);
-  color: var(--nova-on-ink);
+  background: rgba(255, 255, 255, 0.85);
+  color: #0c0c0e;
 }
 
-.screen {
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The title strip: the native Windows controls ride its right edge
+   (titleBarOverlay), the whole strip is the drag handle — settings.css'
+   .settings__titlebar, verbatim. */
+.login__titlebar {
+  flex: none;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 100%;
-  padding: var(--nova-space-xxl);
+  -webkit-app-region: drag;
 }
 
+.login__title {
+  font: 600 15.5px var(--sg);
+  color: #ececef;
+}
+
+.screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+/* The dark card frame, from settings.css. */
 .card {
   width: 100%;
-  max-width: 420px;
-  padding: var(--nova-space-xxl);
-  border: 1px solid var(--nova-ink-hairline);
-  border-radius: var(--nova-radius-card);
-  background: var(--nova-ink-fill);
+  max-width: 440px;
+  background: #131316;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  padding: 34px 42px;
 }
 
 .card--wide {
@@ -63,192 +77,148 @@ body {
 
 .wordmark {
   margin: 0;
-  font-family: var(--nova-font-display);
-  font-size: var(--nova-text-display-lg);
-  font-weight: 900;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  font: 600 24px var(--sg);
+  color: #fff;
 }
 
 .eyebrow {
   display: block;
-  font-family: var(--nova-font-mono);
-  font-size: var(--nova-text-mono-sm);
+  font: 500 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--nova-ink-soft);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .lede {
-  margin: var(--nova-space-sm2) 0 var(--nova-space-xl);
-  color: var(--nova-ink-soft);
-  font-size: var(--nova-text-body-sm);
+  margin: 8px 0 24px;
+  font: 400 13.5px/1.5 var(--sg);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 /* ---------------------------------------------------------------- form ---- */
 
 .field {
   display: block;
-  margin-bottom: var(--nova-space-lg);
+  margin-bottom: 18px;
 }
 
 .field__label {
   display: block;
-  margin-bottom: var(--nova-space-xs2);
-  font-family: var(--nova-font-mono);
-  font-size: var(--nova-text-mono-sm);
+  margin-bottom: 8px;
+  font: 500 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--nova-ink-soft);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .field__input {
   width: 100%;
-  min-height: var(--nova-tap-target);
-  padding: 0 var(--nova-space-lg);
-  border: 1px solid var(--nova-ink-hairline);
-  border-radius: var(--nova-radius-panel);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 10px;
+  padding: 11px 14px;
   background: transparent;
-  color: var(--nova-ink);
-  font-family: var(--nova-font-body);
-  font-size: var(--nova-text-body);
+  color: #f0f0f2;
+  font: 400 14.5px var(--sg);
 }
 
 .field__input::placeholder {
-  color: var(--nova-ink-faint);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .field__input:focus-visible {
   outline: none;
-  border-color: var(--nova-ink);
-  box-shadow: 0 0 0 1px var(--nova-ink);
+  border-color: rgba(255, 255, 255, 0.85);
 }
 
 .field__input:disabled {
-  color: var(--nova-ink-faint);
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .actions {
   display: flex;
-  gap: var(--nova-space-md);
-  margin-top: var(--nova-space-xl);
+  gap: 12px;
+  margin-top: 24px;
 }
 
 /* ------------------------------------------------------------- controls ---- */
 
+/* Primary: filled white, like the mockup's stop button. Quiet: the settings
+   .btn-outline. */
 .key {
   flex: 1;
-  min-height: var(--nova-tap-target);
-  padding: 0 var(--nova-space-xl);
-  border: 1px solid var(--nova-ink);
-  background: var(--nova-ink);
-  color: var(--nova-on-ink);
-  font-family: var(--nova-font-body);
-  font-size: var(--nova-text-body-sm);
-  font-weight: 600;
-  letter-spacing: 0.5px;
+  border: 1px solid #fff;
+  border-radius: 10px;
+  padding: 11px 20px;
+  background: #fff;
+  color: #0c0c0e;
+  font: 600 14.5px var(--sg);
   cursor: pointer;
-  /* Chamfered = actionable. 8px matches `Chamfer.control` in tokens.ts. */
-  clip-path: polygon(
-    8px 0,
-    100% 0,
-    100% calc(100% - 8px),
-    calc(100% - 8px) 100%,
-    0 100%,
-    0 8px
-  );
 }
 
-/* An outline would be clipped away with the corners, so the focus ring is drawn
-   INSIDE the shape instead — visible, and still the cut silhouette. */
 .key:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--nova-canvas);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
 }
 
 .key--quiet {
   background: transparent;
-  color: var(--nova-ink);
-  border-color: var(--nova-ink-hairline);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #f0f0f2;
+  font-weight: 500;
 }
 
-.key--quiet:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--nova-ink);
+.key--quiet:hover:enabled {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .key:disabled {
   cursor: default;
-  background: var(--nova-ink-fill);
-  border-color: var(--nova-ink-hairline);
-  color: var(--nova-ink-faint);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: transparent;
+  color: rgba(255, 255, 255, 0.4);
 }
 
 /* ----------------------------------------------------------- messaging ---- */
 
-/*
- * A failure is a labelled block of text, not a colour. The mono eyebrow does the
- * work a red border would do elsewhere, and it survives being read aloud.
- */
+/* A failure is a labelled block of text, not a colour. */
 .notice {
-  margin-top: var(--nova-space-lg);
-  padding: var(--nova-space-lg);
-  border: 1px solid var(--nova-ink-hairline);
-  border-radius: var(--nova-radius-panel);
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: #0c0c0e;
 }
 
 .notice__body {
-  margin: var(--nova-space-xs2) 0 0;
-  font-size: var(--nova-text-body-sm);
-  color: var(--nova-ink-soft);
-}
-
-/* ------------------------------------------------------------ identity ---- */
-
-.identity {
-  margin: var(--nova-space-xl) 0 0;
-  border-top: 1px solid var(--nova-ink-hairline);
-}
-
-.identity__row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--nova-space-lg);
-  padding: var(--nova-space-lg) 0;
-  border-bottom: 1px solid var(--nova-ink-hairline);
-}
-
-.identity__value {
-  font-family: var(--nova-font-mono);
-  font-size: var(--nova-text-mono);
-  text-align: right;
-  overflow-wrap: anywhere;
-}
-
-.identity__value--absent {
-  color: var(--nova-ink-faint);
+  margin: 6px 0 0;
+  font: 400 13.5px/1.5 var(--sg);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .status-line {
   display: flex;
   align-items: center;
-  gap: var(--nova-space-xs2);
-  margin-top: var(--nova-space-xl);
-  font-family: var(--nova-font-mono);
-  font-size: var(--nova-text-mono-sm);
+  gap: 8px;
+  margin-top: 24px;
+  font: 500 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--nova-ink-soft);
+  color: rgba(255, 255, 255, 0.55);
 }
 
 .status-line__dot {
-  width: var(--nova-dot);
-  height: var(--nova-dot);
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  background: var(--nova-ink);
+  background: #fff;
 }
 
 .status-line__dot--hollow {
   background: transparent;
-  border: 1px solid var(--nova-ink-hairline);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+code {
+  font: 400 12.5px var(--mono);
+  color: rgba(255, 255, 255, 0.8);
 }

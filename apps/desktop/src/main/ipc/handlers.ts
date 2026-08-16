@@ -4,16 +4,21 @@ import type { z } from "zod";
 import type { ApiClient } from "../api/client";
 import type { AuthActionResult } from "../auth/errors";
 import type { AuthService } from "../auth/service";
+import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { IpcChannel } from "./channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
   credentialsSchema,
   meResultMessageSchema,
+  pillClickThroughMessageSchema,
+  pillResizeMessageSchema,
+  privacyStateMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
   INVALID_CREDENTIALS_PAYLOAD_MESSAGE,
   type AuthStateMessage,
   type MeResultMessage,
+  type PrivacyStateMessage,
 } from "./contract";
 
 /**
@@ -35,6 +40,13 @@ import {
 export interface IpcDeps {
   auth: AuthService;
   api: ApiClient;
+  privacy: ScreenPrivacyService;
+  /** Open (or focus) the settings window. Injected so this file stays wiring. */
+  openSettings: () => void;
+  /** Resize the pill window to its content height, already bounds-checked. */
+  resizePill: (height: number) => void;
+  /** Let clicks fall through the pill window's invisible gutters (or stop). */
+  setPillClickThrough: (clickThrough: boolean) => void;
 }
 
 const INVALID_CREDENTIALS_RESULT: AuthActionResult = {
@@ -55,6 +67,14 @@ const OFF_CONTRACT_ME_RESULT: MeResultMessage = {
   kind: "schema",
   message: INVALID_BRIDGE_RESPONSE_MESSAGE,
 };
+
+/**
+ * The safe direction when a privacy answer cannot be shaped: report
+ * DETECTABLE. A user who wrongly believes they are visible double-checks; a
+ * user who wrongly believes they are hidden shares their copilot with a
+ * prospect.
+ */
+const DETECTABLE_FALLBACK: PrivacyStateMessage = { enabled: false };
 
 /**
  * Paths and codes only. A rejected payload can contain an email or a token, and
@@ -85,9 +105,19 @@ function outbound<T>(
   return fallback;
 }
 
+/** Broadcast one payload to every live window — the pattern both pushes use. */
+function broadcast(channel: string, payload: unknown): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) {
+      window.webContents.send(channel, payload);
+    }
+  }
+}
+
 /** Registers every handler and the auth push. Returns its own teardown. */
 export function registerIpcHandlers(deps: IpcDeps): () => void {
-  const { auth, api } = deps;
+  const { auth, api, privacy, openSettings, resizePill, setPillClickThrough } =
+    deps;
 
   ipcMain.handle(IpcChannel.authGetState, () =>
     outbound(
@@ -144,6 +174,65 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     ),
   );
 
+  ipcMain.handle(IpcChannel.privacyGetState, () =>
+    outbound(
+      IpcChannel.privacyGetState,
+      privacyStateMessageSchema,
+      { enabled: privacy.get() },
+      DETECTABLE_FALLBACK,
+    ),
+  );
+
+  ipcMain.handle(IpcChannel.privacySetState, (_event, payload: unknown) => {
+    const parsed = privacyStateMessageSchema.safeParse(payload);
+    // A payload that does not parse changes NOTHING — the current state is
+    // returned so the asking UI snaps back to reality instead of latching a
+    // toggle the OS never saw.
+    const enabled = parsed.success
+      ? privacy.set(parsed.data.enabled)
+      : privacy.get();
+    const state = outbound(
+      IpcChannel.privacySetState,
+      privacyStateMessageSchema,
+      { enabled },
+      DETECTABLE_FALLBACK,
+    );
+    // Every window hears about it, including the one that asked — the pill's
+    // eye and the settings toggle must never disagree about whether the user
+    // is visible in a share.
+    broadcast(IpcChannel.privacyStateChanged, state);
+    return state;
+  });
+
+  const onSettingsOpen = (): void => {
+    openSettings();
+  };
+  ipcMain.on(IpcChannel.settingsOpen, onSettingsOpen);
+
+  const onPillResize = (_event: unknown, payload: unknown): void => {
+    const parsed = pillResizeMessageSchema.safeParse(payload);
+    if (!parsed.success) {
+      // Dropped, not clamped: this number becomes OS window geometry, and a
+      // renderer sending garbage geometry is a bug to surface, not smooth over.
+      reportOffContract(IpcChannel.pillResize, parsed.error);
+      return;
+    }
+    resizePill(parsed.data.height);
+  };
+  ipcMain.on(IpcChannel.pillResize, onPillResize);
+
+  const onPillClickThrough = (_event: unknown, payload: unknown): void => {
+    const parsed = pillClickThroughMessageSchema.safeParse(payload);
+    if (!parsed.success) {
+      // Dropped: a garbled payload must not decide whether the window takes
+      // clicks — the pointer's next move over a valid region re-sends it.
+      reportOffContract(IpcChannel.pillClickThrough, parsed.error);
+      return;
+    }
+    setPillClickThrough(parsed.data.clickThrough);
+  };
+  ipcMain.on(IpcChannel.pillClickThrough, onPillClickThrough);
+
   const unsubscribe = auth.subscribe((state) => {
     const parsed = authStateMessageSchema.safeParse(state);
     if (!parsed.success) {
@@ -153,23 +242,24 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
       reportOffContract(IpcChannel.authStateChanged, parsed.error);
       return;
     }
-    // Broadcast rather than tracked per window: this app has one window today
-    // and gains an overlay in chunk 4, and both want the same answer.
-    for (const window of BrowserWindow.getAllWindows()) {
-      if (!window.isDestroyed()) {
-        window.webContents.send(IpcChannel.authStateChanged, parsed.data);
-      }
-    }
+    // Broadcast rather than tracked per window: every window wants the same
+    // answer.
+    broadcast(IpcChannel.authStateChanged, parsed.data);
   });
 
   return () => {
     unsubscribe();
+    ipcMain.removeListener(IpcChannel.settingsOpen, onSettingsOpen);
+    ipcMain.removeListener(IpcChannel.pillResize, onPillResize);
+    ipcMain.removeListener(IpcChannel.pillClickThrough, onPillClickThrough);
     for (const channel of [
       IpcChannel.authGetState,
       IpcChannel.authSignIn,
       IpcChannel.authSignUp,
       IpcChannel.authSignOut,
       IpcChannel.apiGetMe,
+      IpcChannel.privacyGetState,
+      IpcChannel.privacySetState,
     ]) {
       ipcMain.removeHandler(channel);
     }

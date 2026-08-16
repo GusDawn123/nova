@@ -3,8 +3,20 @@ import { app, BrowserWindow } from "electron";
 import { createApiClient } from "./api/client";
 import { API_BASE_URL } from "./api/config";
 import { createAuthService } from "./auth/service";
+import type { AuthState } from "./auth/state";
 import { registerIpcHandlers } from "./ipc/handlers";
-import { createMainWindow } from "./windows/main-window";
+import { createScreenPrivacy } from "./privacy/screen-privacy";
+import { closeLoginWindow, openLoginWindow } from "./windows/login-window";
+import {
+  closePillWindow,
+  createPillWindow,
+  resizePillWindow,
+  setPillClickThrough,
+} from "./windows/pill-window";
+import {
+  closeSettingsWindow,
+  openSettingsWindow,
+} from "./windows/settings-window";
 
 /**
  * Composition root. Everything with a dependency is built here and injected;
@@ -19,6 +31,13 @@ import { createMainWindow } from "./windows/main-window";
  * also where the later chunks need this to be: audio capture is a main-process
  * concern, and an overlay renderer cannot be trusted to hold state at all.
  */
+// One owner for the undetectability flag, module-scoped because macOS's
+// `activate` can rebuild the pill after bootstrap finished and the new window
+// must attach to the SAME state, not a fresh one. It starts DETECTABLE
+// (Gustavo's call for the first Windows test: launch visible, toggle live);
+// every window attaches at creation and is born wearing the current state.
+const privacy = createScreenPrivacy();
+
 async function bootstrap(): Promise<void> {
   await app.whenReady();
 
@@ -36,13 +55,80 @@ async function bootstrap(): Promise<void> {
     getAccessToken: () => auth.getAccessToken(),
   });
 
-  const disposeIpc = registerIpcHandlers({ auth, api });
+  const disposeIpc = registerIpcHandlers({
+    auth,
+    api,
+    privacy,
+    openSettings: () => {
+      openSettingsWindow(privacy).catch((error: unknown) => {
+        console.error("[main] failed to open the settings window:", error);
+      });
+    },
+    resizePill: resizePillWindow,
+    setPillClickThrough,
+  });
   app.on("will-quit", () => {
     disposeIpc();
     auth.dispose();
   });
 
-  await createMainWindow();
+  // The boot gate: which windows exist is a function of auth state, nothing
+  // else. `loading` builds nothing — supabase resolves it from disk in a
+  // moment, and waiting is what lets a remembered session boot straight into
+  // the pill with no sign-in flash.
+  //
+  // Ordering inside each branch matters: the replacement window is CREATED
+  // before the old ones close, so the window count never touches zero — on
+  // Windows, zero windows is `window-all-closed`, which quits the app.
+  const syncWindowsToAuth = (state: AuthState): void => {
+    if (state.status === "loading") {
+      return;
+    }
+    if (state.status === "signed-in") {
+      createPillWindow(privacy)
+        .then(() => {
+          // Re-checked: auth may have flipped while the pill loaded, and a
+          // stale continuation must not close the login window a NEWER
+          // sign-out just opened. If it flipped, undo this branch's window
+          // instead — the newer sync already put the right one up.
+          if (auth.getState().status === "signed-in") {
+            closeLoginWindow();
+          } else {
+            closePillWindow();
+          }
+        })
+        .catch((error: unknown) => {
+          console.error("[main] failed to open the pill window:", error);
+        });
+      return;
+    }
+    // signed-out and unavailable both mean "the front door": the login window
+    // renders the right screen for each.
+    openLoginWindow(privacy)
+      .then(() => {
+        // Same staleness check, mirrored.
+        if (auth.getState().status !== "signed-in") {
+          closePillWindow();
+          closeSettingsWindow();
+        } else {
+          closeLoginWindow();
+        }
+      })
+      .catch((error: unknown) => {
+        console.error("[main] failed to open the login window:", error);
+      });
+  };
+  auth.subscribe(syncWindowsToAuth);
+  syncWindowsToAuth(auth.getState());
+
+  // macOS: a dock-icon click while the app has no windows must rebuild the
+  // right one for the current auth state. Registered here because it needs
+  // `auth`; Windows never reaches it (the app quits with its last window).
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      syncWindowsToAuth(auth.getState());
+    }
+  });
 }
 
 // Windows and Linux expect a desktop app to exit with its last window. macOS
@@ -52,18 +138,6 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
-});
-
-// The other half of that bargain — on macOS the dock icon can be clicked while
-// the app is running with no windows at all, and that click has to be able to
-// build one again.
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length > 0) {
-    return;
-  }
-  createMainWindow().catch((error: unknown) => {
-    console.error("[main] failed to reopen the main window:", error);
-  });
 });
 
 bootstrap().catch((error: unknown) => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isSameDocumentNavigation } from "./main-window";
+import { isSameDocumentNavigation } from "./navigation";
 
 /**
  * The navigation guard is a security boundary: a renderer that can navigate

@@ -21,6 +21,11 @@ const handlers = new Map<
   string,
   (event: unknown, ...args: unknown[]) => unknown
 >();
+/** Same idea for the one-way `ipcMain.on` channels, so a test can send. */
+const listeners = new Map<
+  string,
+  (event: unknown, ...args: unknown[]) => void
+>();
 const removedChannels: string[] = [];
 const sentToWindows: { channel: string; payload: unknown }[] = [];
 let windows: {
@@ -39,6 +44,15 @@ vi.mock("electron", () => ({
     removeHandler: (channel: string) => {
       removedChannels.push(channel);
       handlers.delete(channel);
+    },
+    on: (
+      channel: string,
+      listener: (event: unknown, ...args: unknown[]) => void,
+    ) => {
+      listeners.set(channel, listener);
+    },
+    removeListener: (channel: string) => {
+      listeners.delete(channel);
     },
   },
   BrowserWindow: {
@@ -60,10 +74,23 @@ function invoke(channel: string, ...args: unknown[]): Promise<unknown> {
   return Promise.resolve(handler({}, ...args));
 }
 
+/** Fire a one-way channel the way `ipcRenderer.send` would. */
+function send(channel: string, ...args: unknown[]): void {
+  const listener = listeners.get(channel);
+  if (listener === undefined) {
+    throw new Error(`no listener registered for ${channel}`);
+  }
+  listener({}, ...args);
+}
+
 interface Stubs {
   signIn: ReturnType<typeof vi.fn>;
   signUp: ReturnType<typeof vi.fn>;
   getMe: ReturnType<typeof vi.fn>;
+  privacySet: ReturnType<typeof vi.fn>;
+  openSettings: ReturnType<typeof vi.fn>;
+  resizePill: ReturnType<typeof vi.fn>;
+  setPillClickThrough: ReturnType<typeof vi.fn>;
   emit: (state: unknown) => void;
   dispose: () => void;
 }
@@ -92,12 +119,38 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     ...overrides,
   };
 
-  const dispose = registerIpcHandlers({ auth, api: { getMe } });
+  // A real-enough privacy stub: set() latches, get() reads back — the handler
+  // tests care that the wiring calls it and echoes what it returned.
+  let privacyEnabled = false;
+  const privacySet = vi.fn((enabled: boolean) => {
+    privacyEnabled = enabled;
+    return privacyEnabled;
+  });
+  const openSettings = vi.fn();
+  const resizePill = vi.fn();
+  const setPillClickThrough = vi.fn();
+
+  const dispose = registerIpcHandlers({
+    auth,
+    api: { getMe },
+    privacy: {
+      attach: vi.fn(),
+      set: privacySet,
+      get: () => privacyEnabled,
+    },
+    openSettings,
+    resizePill,
+    setPillClickThrough,
+  });
 
   return {
     signIn,
     signUp,
     getMe,
+    privacySet,
+    openSettings,
+    resizePill,
+    setPillClickThrough,
     dispose,
     emit: (state) => {
       // Cast because one test pushes a state the contract forbids, which is
@@ -110,6 +163,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
 
 beforeEach(() => {
   handlers.clear();
+  listeners.clear();
   removedChannels.length = 0;
   sentToWindows.length = 0;
   windows = [];
@@ -239,6 +293,114 @@ describe("the auth state push", () => {
   });
 });
 
+describe("the undetectability toggle", () => {
+  function windowStub() {
+    return {
+      isDestroyed: () => false,
+      webContents: {
+        send: (channel: string, payload: unknown) => {
+          sentToWindows.push({ channel, payload });
+        },
+      },
+    };
+  }
+
+  it("answers get-state from the service", async () => {
+    register();
+
+    expect(await invoke(IpcChannel.privacyGetState)).toEqual({
+      enabled: false,
+    });
+  });
+
+  it("applies a valid change, broadcasts it, and echoes the new state", async () => {
+    windows = [windowStub(), windowStub()];
+    const { privacySet } = register();
+
+    const result = await invoke(IpcChannel.privacySetState, { enabled: true });
+
+    expect(privacySet).toHaveBeenCalledTimes(1);
+    expect(privacySet).toHaveBeenCalledWith(true);
+    expect(result).toEqual({ enabled: true });
+    // Both windows hear it — the pill's eye and the settings toggle must never
+    // disagree about whether the user is visible in a share.
+    expect(sentToWindows).toEqual([
+      { channel: IpcChannel.privacyStateChanged, payload: { enabled: true } },
+      { channel: IpcChannel.privacyStateChanged, payload: { enabled: true } },
+    ]);
+  });
+
+  it.each([
+    ["a bare boolean", true],
+    ["an extra key", { enabled: true, mode: "extra" }],
+    ["a stringy boolean", { enabled: "true" }],
+  ])("leaves the state alone when sent %s", async (_label, payload) => {
+    const { privacySet } = register();
+
+    const result = await invoke(IpcChannel.privacySetState, payload);
+
+    expect(privacySet).not.toHaveBeenCalled();
+    // The asking UI snaps back to reality instead of latching a toggle the OS
+    // never saw.
+    expect(result).toEqual({ enabled: false });
+  });
+});
+
+describe("one-way window management", () => {
+  it("opens the settings window on request", () => {
+    const { openSettings } = register();
+
+    send(IpcChannel.settingsOpen);
+
+    expect(openSettings).toHaveBeenCalledOnce();
+  });
+
+  it("resizes the pill to a sane height", () => {
+    const { resizePill } = register();
+
+    send(IpcChannel.pillResize, { height: 480 });
+
+    expect(resizePill).toHaveBeenCalledTimes(1);
+    expect(resizePill).toHaveBeenCalledWith(480);
+  });
+
+  it.each([
+    ["a zero height", { height: 0 }],
+    ["a screen-swallowing height", { height: 99999 }],
+    ["a fractional height", { height: 120.5 }],
+    ["no payload at all", undefined],
+  ])("drops %s instead of resizing", (_label, payload) => {
+    const { resizePill } = register();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    send(IpcChannel.pillResize, payload);
+
+    expect(resizePill).not.toHaveBeenCalled();
+  });
+
+  it("flips the pill's click-through as asked", () => {
+    const { setPillClickThrough } = register();
+
+    send(IpcChannel.pillClickThrough, { clickThrough: true });
+
+    expect(setPillClickThrough).toHaveBeenCalledTimes(1);
+    expect(setPillClickThrough).toHaveBeenCalledWith(true);
+  });
+
+  it.each([
+    ["a bare boolean", true],
+    ["an extra key", { clickThrough: true, mode: "extra" }],
+    ["a stringy boolean", { clickThrough: "true" }],
+  ])("drops %s instead of flipping click-through", (_label, payload) => {
+    const { setPillClickThrough } = register();
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    send(IpcChannel.pillClickThrough, payload);
+
+    expect(setPillClickThrough).not.toHaveBeenCalled();
+  });
+});
+
 describe("teardown", () => {
   it("removes every channel it registered", () => {
     const { dispose } = register();
@@ -246,13 +408,15 @@ describe("teardown", () => {
 
     dispose();
 
-    // Five request/response channels. Leaving one behind would make a second
+    // Seven request/response channels. Leaving one behind would make a second
     // `registerIpcHandlers` throw on a duplicate handler, which is exactly what
     // a window reopening on macOS would do.
-    expect(registered).toHaveLength(5);
+    expect(registered).toHaveLength(7);
     // Copied before sorting — `toSorted` is ES2023 and the lib target is ES2022.
     expect([...removedChannels].sort()).toEqual([...registered].sort());
     expect(handlers.size).toBe(0);
+    // The one-way listeners go with them.
+    expect(listeners.size).toBe(0);
   });
 
   it("stops pushing state after teardown", () => {
