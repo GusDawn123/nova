@@ -1,4 +1,4 @@
-import { useEffect, useRef, type JSX } from "react";
+import { memo, useEffect, useRef, useState, type JSX } from "react";
 
 import novaLogo from "../assets/nova-logo-transparent.png";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../design/icons";
 import type { AudioSession } from "./audio-session";
 import { formatSeconds } from "./pill-bar";
-import type { LiveSessionView } from "./use-live-session";
+import type { LiveSessionView, TranscriptRow } from "./use-live-session";
 
 interface TranscriptPanelProps {
   readonly audio: AudioSession;
@@ -25,8 +25,48 @@ function formatTs(tsMs: number): string {
   return formatSeconds(Math.max(0, Math.floor(tsMs / 1000)));
 }
 
-/** Within this many pixels of the bottom, the user is following, not reading. */
-const STICK_TO_BOTTOM_PX = 48;
+/** Within this many pixels of the bottom, the user is following the call. */
+const FOLLOW_STICK_PX = 48;
+/** Only past this distance has the user deliberately scrolled up to read.
+ * The band between the two is hysteresis: the smooth-scroll animation passes
+ * through intermediate positions, and those must not break the follow. */
+const FOLLOW_BREAK_PX = 160;
+
+/** The panel's growth cap: half the screen tall, then it scrolls inside
+ * itself instead of growing the window further. */
+function transcriptMaxHeight(): number {
+  return Math.max(320, Math.round(window.screen.height / 2));
+}
+
+/**
+ * One transcript line, memoized on its (immutable) row object: an in-flight
+ * partial re-rendering several times a second must not repaint the whole
+ * call above it — with no retention limit, that history can be hours long.
+ */
+const TranscriptLine = memo(function TranscriptLine(props: {
+  readonly row: TranscriptRow;
+}): JSX.Element {
+  const { row } = props;
+  return (
+    <div className="transcript__row">
+      <span className="transcript__ts">{formatTs(row.tsMs)}</span>
+      <div className="transcript__turn">
+        <span className="transcript__who">
+          {row.speaker === "me" ? "ME" : row.speaker === "them" ? "THEM" : "—"}
+        </span>
+        <span
+          className={
+            row.final
+              ? "transcript__text"
+              : "transcript__text transcript__text--partial"
+          }
+        >
+          {row.text}
+        </span>
+      </div>
+    </div>
+  );
+});
 
 /** What an empty transcript should say for each session state. */
 function emptyText(live: LiveSessionView): string {
@@ -49,21 +89,57 @@ function emptyText(live: LiveSessionView): string {
  */
 export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const following = useRef(true);
+  const lastScrollTop = useRef(0);
+  const firstScroll = useRef(true);
+  const [showLatest, setShowLatest] = useState(false);
+  const [maxHeight] = useState(transcriptMaxHeight);
 
-  // Follow the conversation: a transcript that doesn't keep the newest line
-  // in view is a transcript the user has to chase mid-call. But a user who has
-  // scrolled up is reading — partials arrive several times a second, and
-  // yanking them back down every time makes scrollback impossible.
-  useEffect(() => {
+  // Following is broken only by an UPWARD move past the break distance —
+  // programmatic scrolls only ever move down, so the smooth animation can
+  // never break its own follow — and restored by reaching the bottom again.
+  const onScroll = (): void => {
     const body = bodyRef.current;
     if (body === null) {
       return;
     }
-    const distanceFromBottom =
-      body.scrollHeight - body.scrollTop - body.clientHeight;
-    if (distanceFromBottom <= STICK_TO_BOTTOM_PX) {
-      body.scrollTop = body.scrollHeight;
+    const distance = body.scrollHeight - body.scrollTop - body.clientHeight;
+    const movedUp = body.scrollTop < lastScrollTop.current;
+    lastScrollTop.current = body.scrollTop;
+    if (distance <= FOLLOW_STICK_PX) {
+      following.current = true;
+      setShowLatest(false);
+    } else if (movedUp && distance > FOLLOW_BREAK_PX) {
+      following.current = false;
+      setShowLatest(true);
     }
+  };
+
+  const jumpToLatest = (): void => {
+    const body = bodyRef.current;
+    if (body === null) {
+      return;
+    }
+    following.current = true;
+    setShowLatest(false);
+    body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+  };
+
+  // Follow the conversation: while the user is at the bottom, each new line
+  // scrolls smoothly into view. A user who scrolled up is reading — partials
+  // arrive several times a second, and yanking them back down every time
+  // would make scrollback impossible. The first scroll after opening the
+  // panel is instant: animating through an hour of history would be noise.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (body === null || !following.current) {
+      return;
+    }
+    body.scrollTo({
+      top: body.scrollHeight,
+      behavior: firstScroll.current ? "auto" : "smooth",
+    });
+    firstScroll.current = false;
   }, [props.live.rows]);
 
   return (
@@ -87,37 +163,33 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
         </span>
       </div>
 
-      <div className="transcript__body" ref={bodyRef}>
-        {props.live.rows.length === 0 ? (
-          <div className="transcript__row">
-            <span className="transcript__text transcript__text--hint">
-              {emptyText(props.live)}
-            </span>
-          </div>
-        ) : (
-          props.live.rows.map((row) => (
-            <div key={row.key} className="transcript__row">
-              <span className="transcript__ts">{formatTs(row.tsMs)}</span>
-              <div className="transcript__turn">
-                <span className="transcript__who">
-                  {row.speaker === "me"
-                    ? "ME"
-                    : row.speaker === "them"
-                      ? "THEM"
-                      : "—"}
-                </span>
-                <span
-                  className={
-                    row.final
-                      ? "transcript__text"
-                      : "transcript__text transcript__text--partial"
-                  }
-                >
-                  {row.text}
-                </span>
-              </div>
+      <div className="transcript__view">
+        <div
+          className="transcript__body nd"
+          ref={bodyRef}
+          onScroll={onScroll}
+          style={{ maxHeight }}
+        >
+          {props.live.rows.length === 0 ? (
+            <div className="transcript__row">
+              <span className="transcript__text transcript__text--hint">
+                {emptyText(props.live)}
+              </span>
             </div>
-          ))
+          ) : (
+            props.live.rows.map((row) => (
+              <TranscriptLine key={row.key} row={row} />
+            ))
+          )}
+        </div>
+        {showLatest && (
+          <button
+            type="button"
+            className="transcript__latest nd"
+            onClick={jumpToLatest}
+          >
+            ↓ Latest
+          </button>
         )}
       </div>
 

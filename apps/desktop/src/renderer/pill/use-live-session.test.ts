@@ -68,6 +68,19 @@ describe("useLiveSession", () => {
     expect(result.current.rows).toHaveLength(2);
   });
 
+  it("a final adopts its in-flight partial's key — the row commits in place", () => {
+    const { result } = renderHook(() => useLiveSession());
+    push(partial("me", "hel", 100));
+    const partialKey = result.current.rows[0]?.key;
+    push(final("me", "hello there", 200));
+    // Same key = same DOM row: the grey hypothesis eases into the record
+    // instead of remounting (and replaying the entrance animation).
+    expect(result.current.rows[0]?.key).toBe(partialKey);
+    // The speaker's NEXT partial is a new row with a new key.
+    push(partial("me", "and next", 300));
+    expect(result.current.rows[1]?.key).not.toBe(partialKey);
+  });
+
   it("a final appends and evicts only its OWN speaker's partial", () => {
     const { result } = renderHook(() => useLiveSession());
     push(partial("me", "hel", 100));

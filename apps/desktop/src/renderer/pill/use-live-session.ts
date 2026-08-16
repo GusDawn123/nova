@@ -30,8 +30,13 @@ export function useLiveSession(): LiveSessionView {
   const [view, setView] = useState<LiveSessionView>(IDLE);
   const finals = useRef<TranscriptRow[]>([]);
   const partials = useRef(new Map<string, TranscriptRow>());
+  const nextKey = useRef(0);
 
   useEffect(() => {
+    const freshKey = (): string => {
+      nextKey.current += 1;
+      return `row-${String(nextKey.current)}`;
+    };
     const rowsNow = (): TranscriptRow[] =>
       // Sorted rather than concatenated: a partial from one speaker can be
       // OLDER than a final from the other, and bucket order would draw it below.
@@ -64,10 +69,14 @@ export function useLiveSession(): LiveSessionView {
       }
       const speakerKey = event.speaker ?? "unknown";
       if (event.final) {
+        // The final ADOPTS its in-flight partial's key, so committing is the
+        // same DOM row easing from hypothesis to record — not a remount that
+        // flickers and replays the entrance animation.
+        const inFlight = partials.current.get(speakerKey);
         finals.current = [
           ...finals.current,
           {
-            key: `final-${String(finals.current.length)}`,
+            key: inFlight?.key ?? freshKey(),
             speaker: event.speaker,
             text: event.text,
             tsMs: event.ts_ms,
@@ -76,8 +85,9 @@ export function useLiveSession(): LiveSessionView {
         ];
         partials.current.delete(speakerKey);
       } else {
+        const existing = partials.current.get(speakerKey);
         partials.current.set(speakerKey, {
-          key: `partial-${speakerKey}`,
+          key: existing?.key ?? freshKey(),
           speaker: event.speaker,
           text: event.text,
           tsMs: event.ts_ms,

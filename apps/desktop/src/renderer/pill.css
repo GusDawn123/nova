@@ -579,16 +579,72 @@ body {
   flex: 1;
 }
 
+/* The wrapper exists so the "↓ Latest" button can float over the scroll area
+   without scrolling away with the rows. */
+.transcript__view {
+  position: relative;
+}
+
+/* Grows with the call up to its inline max-height (half the screen, set from
+   TranscriptPanel), then scrolls inside itself; no-drag so the wheel and the
+   scrollbar belong to the reader, not to window-dragging. */
 .transcript__body {
   padding: 22px 18px 20px;
   display: flex;
   flex-direction: column;
   gap: 22px;
   min-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.transcript__body::-webkit-scrollbar {
+  width: 8px;
+}
+.transcript__body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.transcript__body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.transcript__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes transcript-row-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .transcript__row {
   display: flex;
+  animation: transcript-row-in 240ms ease-out;
+}
+
+.transcript__latest {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(20, 28, 42, 0.88);
+  color: rgba(255, 255, 255, 0.9);
+  font: 500 12.5px var(--sg);
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  animation: transcript-row-in 200ms ease-out;
+}
+
+.transcript__latest:hover {
+  background: rgba(40, 52, 72, 0.95);
 }
 
 .transcript__ts {
@@ -610,9 +666,13 @@ body {
   color: rgba(255, 255, 255, 0.45);
 }
 
+/* The color transition is the partial→final commit: the row keeps its DOM
+   identity (stable keys in use-live-session), so the grey hypothesis eases
+   into the white record in place instead of remounting. */
 .transcript__text {
   font: 400 16px/1.35 var(--sg);
   color: rgba(255, 255, 255, 0.92);
+  transition: color 320ms ease;
 }
 /* A partial is a hypothesis still forming; a hint is not a transcript at all.
    Dimmed via a solid-enough color, not opacity: the translucent pill can sit
