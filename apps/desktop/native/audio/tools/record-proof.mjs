@@ -23,17 +23,45 @@ if (!Number.isFinite(seconds) || seconds < 1 || seconds > 3600) {
 const { sampleRateHz } = addon.wireFormat;
 const captured = { me: [], them: [] };
 
+// Live meter state: loudness accumulated per stream since the last print.
+const meter = { me: { sum: 0, n: 0 }, them: { sum: 0, n: 0 } };
+
 addon.start(
   (batch) => {
     captured[batch.stream].push(batch.pcm);
+    const m = meter[batch.stream];
+    for (let i = 0; i < batch.pcm.length; i += 2) {
+      const v = batch.pcm.readInt16LE(i);
+      m.sum += v * v;
+      m.n += 1;
+    }
   },
   (event) => {
     console.log(`[${event.type}] ${event.detail}`);
   },
 );
-console.log(
-  `Recording for ${String(seconds)}s — speak (me) and play far-end audio (them)…`,
-);
+console.log(`Recording for ${String(seconds)}s.`);
+console.log("Speak for 'me'; play any sound on this PC for 'them'.");
+console.log("The bars below move when audio is actually being captured:");
+
+function bar(rms) {
+  const filled = Math.min(20, Math.round(rms / 250));
+  const level = String(Math.round(rms)).padStart(5);
+  return `[${"#".repeat(filled)}${"-".repeat(20 - filled)}]${level}`;
+}
+
+let elapsedSeconds = 0;
+const meterTimer = setInterval(() => {
+  elapsedSeconds += 1;
+  const columns = ["me", "them"].map((stream) => {
+    const m = meter[stream];
+    const rms = m.n === 0 ? 0 : Math.sqrt(m.sum / m.n);
+    m.sum = 0;
+    m.n = 0;
+    return `${stream} ${bar(rms)}`;
+  });
+  console.log(`${String(elapsedSeconds).padStart(3)}s  ${columns.join("   ")}`);
+}, 1000);
 
 function wavFile(data) {
   const header = Buffer.alloc(44);
@@ -66,6 +94,7 @@ function rms(data) {
 }
 
 function finish() {
+  clearInterval(meterTimer);
   const { droppedBatches } = addon.stop();
   const outDir = fileURLToPath(new URL("../.tmp/", import.meta.url));
   mkdirSync(outDir, { recursive: true });
@@ -75,7 +104,7 @@ function finish() {
     writeFileSync(file, wavFile(data));
     const duration = (data.length / 2 / sampleRateHz).toFixed(1);
     console.log(
-      `${stream}: ${duration}s of audio, RMS ${rms(data).toFixed(0)} → ${file}`,
+      `${stream}: ${duration}s of audio, RMS ${rms(data).toFixed(0)} -> ${file}`,
     );
   }
   if (droppedBatches > 0) {
