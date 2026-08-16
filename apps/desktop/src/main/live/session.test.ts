@@ -424,7 +424,12 @@ describe("live session service", () => {
     expect(events.at(-1)).toEqual({ kind: "status", state: "ended" });
   });
 
-  it("a stale startup failing late cannot clear a NEWER session", async () => {
+  // What this proves observably: the stale start goes inert via the
+  // cancellation check, emitting nothing and leaving the newer session's
+  // claim untouched. fail()'s own `active === session` guard is a backstop
+  // for future code where a fail site follows an await without a preceding
+  // cancellation check; no such path exists today, so no test can reach it.
+  it("a stale startup resolving late goes inert without touching the newer session", async () => {
     let firstCall = true;
     let resolveFirstInsert!: (result: CreateMeetingResult) => void;
     const firstInsert = new Promise<CreateMeetingResult>((resolve) => {

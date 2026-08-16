@@ -27,10 +27,13 @@ function formatTs(tsMs: number): string {
 
 /** Within this many pixels of the bottom, the user is following the call. */
 const FOLLOW_STICK_PX = 48;
-/** Only past this distance has the user deliberately scrolled up to read.
- * The band between the two is hysteresis: the smooth-scroll animation passes
- * through intermediate positions, and those must not break the follow. */
-const FOLLOW_BREAK_PX = 160;
+
+/** Smooth only for people who asked for motion. */
+function scrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ? "auto"
+    : "smooth";
+}
 
 /** The panel's growth cap: half the screen tall, then it scrolls inside
  * itself instead of growing the window further. */
@@ -45,10 +48,18 @@ function transcriptMaxHeight(): number {
  */
 const TranscriptLine = memo(function TranscriptLine(props: {
   readonly row: TranscriptRow;
+  /** Entrance animation — only for rows that ARRIVE while the panel is open.
+   * Rows already present when it opens render still: replaying hundreds of
+   * entrances in one frame on reopen is noise, not motion. */
+  readonly animate: boolean;
 }): JSX.Element {
   const { row } = props;
   return (
-    <div className="transcript__row">
+    <div
+      className={
+        props.animate ? "transcript__row transcript__row--in" : "transcript__row"
+      }
+    >
       <span className="transcript__ts">{formatTs(row.tsMs)}</span>
       <div className="transcript__turn">
         <span className="transcript__who">
@@ -95,9 +106,10 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
   const [showLatest, setShowLatest] = useState(false);
   const [maxHeight] = useState(transcriptMaxHeight);
 
-  // Following is broken only by an UPWARD move past the break distance —
-  // programmatic scrolls only ever move down, so the smooth animation can
-  // never break its own follow — and restored by reaching the bottom again.
+  // Following is broken by any UPWARD move out of the stick zone — even a
+  // short scroll-back to the previous line is deliberate reading. It cannot
+  // be broken by the auto-scroll itself: programmatic scrolls only ever move
+  // DOWN. Reaching the bottom again (or the button) restores it.
   const onScroll = (): void => {
     const body = bodyRef.current;
     if (body === null) {
@@ -109,7 +121,7 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
     if (distance <= FOLLOW_STICK_PX) {
       following.current = true;
       setShowLatest(false);
-    } else if (movedUp && distance > FOLLOW_BREAK_PX) {
+    } else if (movedUp) {
       following.current = false;
       setShowLatest(true);
     }
@@ -122,7 +134,7 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
     }
     following.current = true;
     setShowLatest(false);
-    body.scrollTo({ top: body.scrollHeight, behavior: "smooth" });
+    body.scrollTo({ top: body.scrollHeight, behavior: scrollBehavior() });
   };
 
   // Follow the conversation: while the user is at the bottom, each new line
@@ -137,10 +149,16 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
     }
     body.scrollTo({
       top: body.scrollHeight,
-      behavior: firstScroll.current ? "auto" : "smooth",
+      behavior: firstScroll.current ? "auto" : scrollBehavior(),
     });
     firstScroll.current = false;
   }, [props.live.rows]);
+
+  // The rows already on screen when the panel opens: they render without the
+  // entrance animation (see TranscriptLine). Snapshotted once so the class
+  // set never flips on a mounted row — changing `animation` replays it.
+  const initialKeys = useRef<ReadonlySet<string> | null>(null);
+  initialKeys.current ??= new Set(props.live.rows.map((row) => row.key));
 
   return (
     <div className="panel">
@@ -178,7 +196,11 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
             </div>
           ) : (
             props.live.rows.map((row) => (
-              <TranscriptLine key={row.key} row={row} />
+              <TranscriptLine
+                key={row.key}
+                row={row}
+                animate={initialKeys.current?.has(row.key) !== true}
+              />
             ))
           )}
         </div>

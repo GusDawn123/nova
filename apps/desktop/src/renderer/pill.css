@@ -625,7 +625,22 @@ body {
 
 .transcript__row {
   display: flex;
+}
+
+/* Only rows ARRIVING while the panel is open animate in — rows restored on
+   reopen render still (TranscriptPanel decides which is which). */
+.transcript__row--in {
   animation: transcript-row-in 240ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .transcript__row--in,
+  .transcript__latest {
+    animation: none;
+  }
+  .transcript__text {
+    transition: none;
+  }
 }
 
 .transcript__latest {

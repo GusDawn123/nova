@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { IpcChannel } from "../main/ipc/channels";
 import { INVALID_BRIDGE_RESPONSE_MESSAGE } from "../main/ipc/contract";
@@ -30,8 +30,15 @@ vi.mock("electron", () => ({
     on: (channel: string, listener: (event: unknown, raw: unknown) => void) => {
       h.channelListeners.set(channel, listener);
     },
-    removeListener: (channel: string) => {
-      h.channelListeners.delete(channel);
+    // Reference-checked like the real ipcRenderer: unsubscribing with the
+    // wrong function must leave the original listener attached.
+    removeListener: (
+      channel: string,
+      listener: (event: unknown, raw: unknown) => void,
+    ) => {
+      if (h.channelListeners.get(channel) === listener) {
+        h.channelListeners.delete(channel);
+      }
     },
     send: vi.fn(),
   },
@@ -41,6 +48,11 @@ await import("./index");
 // Cast because the bridge crosses exposeInMainWorld as `unknown` — this file
 // imports the NovaBridge type from the very module that built the object.
 const bridge = h.exposed.bridge as NovaBridge;
+
+afterEach(() => {
+  // console.error spies must not outlive their test and eat diagnostics.
+  vi.restoreAllMocks();
+});
 
 describe("the live-session bridge methods", () => {
   it("startLiveSession passes a valid result through", async () => {

@@ -71,13 +71,20 @@ describe("useLiveSession", () => {
   it("a final adopts its in-flight partial's key — the row commits in place", () => {
     const { result } = renderHook(() => useLiveSession());
     push(partial("me", "hel", 100));
+    // The shape is pinned FIRST: with optional chaining alone, an empty rows
+    // array would sail through both key assertions as undefined === undefined.
+    expect(result.current.rows).toHaveLength(1);
     const partialKey = result.current.rows[0]?.key;
+    expect(partialKey).toBeDefined();
     push(final("me", "hello there", 200));
     // Same key = same DOM row: the grey hypothesis eases into the record
     // instead of remounting (and replaying the entrance animation).
+    expect(result.current.rows).toHaveLength(1);
     expect(result.current.rows[0]?.key).toBe(partialKey);
     // The speaker's NEXT partial is a new row with a new key.
     push(partial("me", "and next", 300));
+    expect(result.current.rows).toHaveLength(2);
+    expect(result.current.rows[1]?.key).toBeDefined();
     expect(result.current.rows[1]?.key).not.toBe(partialKey);
   });
 
