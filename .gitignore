@@ -38,6 +38,9 @@ supabase/.temp/
 # agent scratch — never committed
 .superpowers/
 
+# local intermediates (e.g. the audio proof recordings) — regenerated on demand
+.tmp/
+
 # strip_mascot_bg.sh fallback venv (used only when uvx is unavailable)
 scripts/.venv-mascot/
 

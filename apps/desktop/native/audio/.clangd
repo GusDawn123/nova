@@ -1,0 +1,5 @@
+# Editor-side clangd config only (the CMake build states C++20 itself):
+# without it, clangd falls back to an old default standard and flags C++17/20
+# code as errors that the real compilers never see.
+CompileFlags:
+  Add: [-std=c++20]
