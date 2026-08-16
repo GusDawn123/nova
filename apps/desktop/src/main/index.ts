@@ -87,7 +87,15 @@ async function bootstrap(): Promise<void> {
     if (state.status === "signed-in") {
       createPillWindow(privacy)
         .then(() => {
-          closeLoginWindow();
+          // Re-checked: auth may have flipped while the pill loaded, and a
+          // stale continuation must not close the login window a NEWER
+          // sign-out just opened. If it flipped, undo this branch's window
+          // instead — the newer sync already put the right one up.
+          if (auth.getState().status === "signed-in") {
+            closeLoginWindow();
+          } else {
+            closePillWindow();
+          }
         })
         .catch((error: unknown) => {
           console.error("[main] failed to open the pill window:", error);
@@ -98,8 +106,13 @@ async function bootstrap(): Promise<void> {
     // renders the right screen for each.
     openLoginWindow(privacy)
       .then(() => {
-        closePillWindow();
-        closeSettingsWindow();
+        // Same staleness check, mirrored.
+        if (auth.getState().status !== "signed-in") {
+          closePillWindow();
+          closeSettingsWindow();
+        } else {
+          closeLoginWindow();
+        }
       })
       .catch((error: unknown) => {
         console.error("[main] failed to open the login window:", error);

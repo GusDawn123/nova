@@ -29,12 +29,24 @@ export function settingsZoom(windowWidth: number): number {
   return windowWidth / SETTINGS_DESIGN_WIDTH;
 }
 
-/** The window's content size for a given screen width. */
-export function settingsWindowSize(screenWidth: number): {
+/** The window's content size for a given screen (work area) size. */
+export function settingsWindowSize(
+  screenWidth: number,
+  screenHeight: number,
+): {
   width: number;
   height: number;
 } {
-  const width = Math.round(screenWidth * SETTINGS_SCREEN_FRACTION);
+  const widthFromFraction = Math.round(screenWidth * SETTINGS_SCREEN_FRACTION);
+  // On an ultrawide display, 2/3 of the width computes a window taller than
+  // the screen (the design is taller than it is wide, proportionally). The
+  // window then takes the widest size whose height still fits instead.
+  const widthThatFitsHeight = Math.floor(
+    ((screenHeight - SETTINGS_TITLE_BAR_HEIGHT) /
+      SETTINGS_CONTENT_DESIGN_HEIGHT) *
+      SETTINGS_DESIGN_WIDTH,
+  );
+  const width = Math.min(widthFromFraction, widthThatFitsHeight);
   return {
     width,
     height:

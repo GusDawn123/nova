@@ -29,9 +29,8 @@ export async function openLoginWindow(
     return;
   }
 
-  const { width, height } = settingsWindowSize(
-    screen.getPrimaryDisplay().workArea.width,
-  );
+  const { workArea } = screen.getPrimaryDisplay();
+  const { width, height } = settingsWindowSize(workArea.width, workArea.height);
 
   const window = new BrowserWindow({
     width,
@@ -68,7 +67,17 @@ export async function openLoginWindow(
   // Assigned before the page loads so a second call during the load is a
   // no-op instead of a second window — auth pushes can arrive in bursts.
   loginWindow = window;
-  await loadRendererPage(window, "index.html");
+  try {
+    await loadRendererPage(window, "index.html");
+  } catch (error) {
+    // A window that failed to load must not stay latched as "the login
+    // window" — the next open would show/focus a blank shell forever.
+    loginWindow = null;
+    if (!window.isDestroyed()) {
+      window.destroy();
+    }
+    throw error;
+  }
 }
 
 export function closeLoginWindow(): void {

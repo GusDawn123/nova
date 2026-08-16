@@ -18,7 +18,7 @@ our own, reproduced from scratch.
 - **Windows: PROVEN.** On Windows 11 (build 10.0.26200, Electron 43.4.0) both
   Nova windows disappear from a live screen share when the toggle is on and
   return when it is off — toggled live over IPC, both directions. See
-  [Windows](#windows--still-to-test).
+  [Windows](#windows--tested-and-proven).
 - Screen-capture exclusion lives in **main**; the React renderer can only *ask*
   main to toggle it over IPC. Putting it in the renderer is impossible and would
   be a security hole.
@@ -34,7 +34,7 @@ one OS flag per platform:
 | Platform | Under the hood | Status |
 |---|---|---|
 | macOS | `NSWindowSharingNone` (the window's `sharingType`) | **Proven working, macOS 26.5.2** |
-| Windows | `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)` (Win10 2004+) | **Untested — see below** |
+| Windows | `SetWindowDisplayAffinity(hwnd, WDA_EXCLUDEFROMCAPTURE)` (Win10 2004+) | **Proven working, Windows 11 build 10.0.26200 — see below** |
 
 There is **no** app-accessible GPU/Metal hardware overlay plane on macOS. Screen
 capture happens in the **WindowServer**, from the same composited buffer that
@@ -143,7 +143,7 @@ Screen-capture exclusion is one piece. The rest is a small set of
 
 ---
 
-## Windows — still to test
+## Windows — tested and proven
 
 `setContentProtection(true)` maps to `SetWindowDisplayAffinity(hwnd,
 WDA_EXCLUDEFROMCAPTURE)`, real and documented on Windows 10 version 2004+.

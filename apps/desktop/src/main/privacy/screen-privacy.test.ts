@@ -50,17 +50,33 @@ describe("createScreenPrivacy", () => {
     expect(privacy.get()).toBe(true);
   });
 
-  it("drops a destroyed window instead of calling into it", () => {
+  it("refuses to attach a window that is already destroyed", () => {
     const privacy = createScreenPrivacy();
-    const closed = stubWindow(true);
-    // attach() applied the initial state while the window was alive; it was
-    // destroyed afterwards. set() must neither call it nor keep it.
-    privacy.attach(closed);
-    closed.setContentProtection.mockClear();
+    const dead = stubWindow(true);
+
+    privacy.attach(dead);
+    privacy.set(true);
+
+    // Never called — neither at attach nor on the later change.
+    expect(dead.setContentProtection).not.toHaveBeenCalled();
+  });
+
+  it("drops a window destroyed after attaching instead of calling into it", () => {
+    const privacy = createScreenPrivacy();
+    let destroyed = false;
+    const window: ProtectableWindow & {
+      setContentProtection: ReturnType<typeof vi.fn>;
+    } = {
+      isDestroyed: () => destroyed,
+      setContentProtection: vi.fn(),
+    };
+    privacy.attach(window);
+    destroyed = true;
+    window.setContentProtection.mockClear();
 
     privacy.set(true);
     privacy.set(false);
 
-    expect(closed.setContentProtection).not.toHaveBeenCalled();
+    expect(window.setContentProtection).not.toHaveBeenCalled();
   });
 });

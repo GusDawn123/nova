@@ -31,9 +31,8 @@ export async function openSettingsWindow(
 
   // Sized to the screen, not the design: the renderer zooms the fixed-size
   // design to fit (settings-layout.ts owns the law for both sides).
-  const { width, height } = settingsWindowSize(
-    screen.getPrimaryDisplay().workArea.width,
-  );
+  const { workArea } = screen.getPrimaryDisplay();
+  const { width, height } = settingsWindowSize(workArea.width, workArea.height);
 
   const window = new BrowserWindow({
     width,
@@ -68,7 +67,17 @@ export async function openSettingsWindow(
 
   hardenNavigation(window);
   settingsWindow = window;
-  await loadRendererPage(window, "settings.html");
+  try {
+    await loadRendererPage(window, "settings.html");
+  } catch (error) {
+    // A window that failed to load must not stay latched as "the settings
+    // window" — the next open would show/focus a blank shell forever.
+    settingsWindow = null;
+    if (!window.isDestroyed()) {
+      window.destroy();
+    }
+    throw error;
+  }
 }
 
 export function closeSettingsWindow(): void {

@@ -81,7 +81,17 @@ export async function createPillWindow(
   // Assigned before the page loads so a second call during the load returns
   // this window instead of building another one.
   pillWindow = window;
-  await loadRendererPage(window, "pill.html");
+  try {
+    await loadRendererPage(window, "pill.html");
+  } catch (error) {
+    // A window that failed to load must not stay latched as "the pill" — the
+    // next create would return a blank shell forever.
+    pillWindow = null;
+    if (!window.isDestroyed()) {
+      window.destroy();
+    }
+    throw error;
+  }
 
   return window;
 }
