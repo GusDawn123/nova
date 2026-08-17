@@ -348,8 +348,9 @@ body {
   margin: 8px 0;
 }
 
-/* Rendered for screen readers only — the standard clip-rect hiding, which
-   keeps the element in the accessibility tree where display:none would not. */
+/* Rendered for screen readers only — the standard visually-hidden pattern,
+   which keeps the element in the accessibility tree where display:none
+   would not. */
 .visually-hidden {
   position: absolute;
   width: 1px;
@@ -357,7 +358,7 @@ body {
   margin: -1px;
   padding: 0;
   overflow: hidden;
-  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
 }

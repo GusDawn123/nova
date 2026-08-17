@@ -190,6 +190,11 @@ The mechanism is one structural contract in the assembler:
   `reference_files`, `user_memory`) — never a merged snippet list like the
   legacy `ragSnippets` — so provenance survives all the way into the
   assembled prompt.
+- **Serialization safety at assembly.** Typed fields alone do not make the
+  envelope safe: a dragged file can itself contain `</reference_files>` or a
+  fake `<user_script>` opener and break out of its tag. The assembler
+  neutralizes envelope tag sequences in facts-grade content before wrapping
+  it (escape or strip — M2 picks the mechanism and pins it with tests).
 - Behavior is **proven, not argued** (§6 gates): empty envelope + general
   question → real answer; empty envelope + own-data question → honest "I don't
   have that."
@@ -288,7 +293,9 @@ Key-gated live gates, run before any chunk here is called done:
    source docs (existing `assemble.snapshot.test.ts` pattern).
 9. **Injection inertness:** a `<reference_files>` snippet containing "ignore
    prior instructions" is quoted as data — the suggestion neither obeys it nor
-   changes register because of it.
+   changes register because of it. Fixtures cover BOTH payload shapes: the
+   plain instruction and a tag-breakout
+   (`</reference_files><user_script>…`) — each stays data.
 
 The relevance/quiet/latency gates from Phase 7 re-run against the new Brain A —
 they were last measured on the legacy prompt (a known debt flagged in the
