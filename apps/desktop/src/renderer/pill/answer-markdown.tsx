@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type ComponentPropsWithoutRef,
@@ -40,6 +41,15 @@ const COPIED_FLASH_MS = 1600;
 function CodeBlock(props: ComponentPropsWithoutRef<"pre">): JSX.Element {
   const preRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  // The latest confirmation timer — a re-click clears it first, so a rapid
+  // double-copy can't have the FIRST timer cut the second confirmation short.
+  const flashTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (flashTimer.current !== null) window.clearTimeout(flashTimer.current);
+    },
+    [],
+  );
 
   const copy = (): void => {
     const text = preRef.current?.textContent ?? "";
@@ -47,8 +57,12 @@ function CodeBlock(props: ComponentPropsWithoutRef<"pre">): JSX.Element {
       .writeText(text)
       .then(() => {
         setCopied(true);
-        window.setTimeout(() => {
+        if (flashTimer.current !== null) {
+          window.clearTimeout(flashTimer.current);
+        }
+        flashTimer.current = window.setTimeout(() => {
           setCopied(false);
+          flashTimer.current = null;
         }, COPIED_FLASH_MS);
       })
       .catch(() => {

@@ -13,6 +13,9 @@ function passThrough<M extends Record<string, unknown>>(
   actual: M,
   key: keyof M,
 ): M {
+  // why: the creators' precise option types differ per adapter; the spy only
+  // reads the one shared field, and the real creator still type-checks the
+  // full options at its own boundary.
   const real = actual[key] as (opts: { maxOutputTokens?: number }) => unknown;
   return {
     ...actual,

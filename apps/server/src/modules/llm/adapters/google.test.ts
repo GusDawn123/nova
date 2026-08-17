@@ -31,4 +31,38 @@ describe("adapters/google — translation", () => {
   it("builds a provider with the google id", () => {
     expect(createGoogleProvider({ apiKey: "test-key" }).id).toBe("google");
   });
+
+  it("sends the configured output ceiling on the wire request", async () => {
+    // The behavior the factory threading exists for: the ceiling must land in
+    // the vendor request body, not merely in a constructor argument. The fetch
+    // stub answers 500 — the REQUEST is captured either way, and the stream's
+    // failure is expected and irrelevant to the assertion.
+    const captured: { body?: unknown } = {};
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      captured.body =
+        typeof init?.body === "string" ? JSON.parse(init.body) : null;
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const provider = createGoogleProvider({
+        apiKey: "test-key",
+        maxOutputTokens: 4096,
+      });
+      const drain = async (): Promise<void> => {
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      expect(captured.body).toMatchObject({
+        generationConfig: { maxOutputTokens: 4096 },
+      });
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
 });

@@ -92,6 +92,9 @@ describe("modules/live [conductor-mode] every session sends Brain A (M2)", () =>
       firstTokenDelayMs: 10,
       events: [tok("Answer"), DONE],
     });
+    // why: the conductor only ever calls `rag.query` and only reads
+    // `snippets[].header/content` off the result — a full typed RagService
+    // fake (ingest, embeddings, stores) would be pages of dead weight here.
     const rag = {
       query: () =>
         Promise.resolve({
