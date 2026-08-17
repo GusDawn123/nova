@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, Menu } from "electron";
 import WebSocket from "ws";
 import { z } from "zod";
 
@@ -45,6 +45,12 @@ const privacy = createScreenPrivacy();
 
 async function bootstrap(): Promise<void> {
   await app.whenReady();
+
+  // No application menu: Nova's windows are frameless and the DEFAULT menu's
+  // accelerators shadow the product's own keybinds — its `reload` role owns
+  // Ctrl+R, so New Chat (Keybinds tab) would reload the pill instead of ever
+  // reaching the renderer.
+  Menu.setApplicationMenu(null);
 
   const auth = createAuthService();
   const api = createApiClient({

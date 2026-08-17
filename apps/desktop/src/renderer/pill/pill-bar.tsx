@@ -26,6 +26,8 @@ interface PillBarProps {
    * null = the empty-handed Answer press ("respond to what was just said").
    */
   readonly onAsk: (text: string | null) => void;
+  /** Asks only mean something mid-call; the Answer chip reflects that. */
+  readonly canAsk: boolean;
   readonly usesScreen: boolean;
   readonly onToggleScreen: () => void;
   readonly undetectable: boolean;
@@ -81,7 +83,10 @@ export function PillBar(props: PillBarProps): JSX.Element {
           <button
             type="button"
             className="corner-box corner-box--click nd"
-            title="Answer (Ctrl+↵)"
+            title={
+              props.canAsk ? "Answer (Ctrl+↵)" : "Start a session to ask Nova"
+            }
+            disabled={!props.canAsk}
             onClick={() => {
               props.onAsk(null);
             }}
@@ -277,6 +282,11 @@ function AskInput({
       onBlur={onBlur}
       onKeyDown={(event) => {
         if (event.key !== "Enter") {
+          return;
+        }
+        // An IME confirming a composition also presses Enter; that is text
+        // entry, not a submit.
+        if (event.nativeEvent.isComposing) {
           return;
         }
         event.preventDefault();

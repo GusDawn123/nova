@@ -128,17 +128,33 @@ export function PillApp(): JSX.Element {
     }
     const lastTs = live.rows.at(-1)?.tsMs;
     live.clearSuggestion();
-    setAsk({
+    const context: AskContext = {
       question: text,
       heardLabel:
         lastTs !== undefined
           ? formatSeconds(Math.max(0, Math.floor(lastTs / 1000)))
           : null,
-    });
+      error: null,
+    };
+    setAsk(context);
     setFocusMode(false);
     setModeMenu(false);
     setView("answering");
-    void window.novaBridge.askLive(text);
+    void (async (): Promise<void> => {
+      const result = await window.novaBridge.askLive(text);
+      if (!result.ok) {
+        // Identity-guarded: a newer ask owns the panel by now; a stale
+        // failure must not stamp its message onto someone else's question.
+        setAsk((current) =>
+          current === context
+            ? {
+                ...context,
+                error: result.message ?? "The ask could not be sent.",
+              }
+            : current,
+        );
+      }
+    })();
   };
 
   const newChat = (): void => {
@@ -151,7 +167,8 @@ export function PillApp(): JSX.Element {
   // Ctrl+↵ = the Answer key ("Ask Nova about your screen or audio", Keybinds
   // tab) — anywhere in the pill window except inside the ask input, which owns
   // its own Enter handling. Ctrl+R = New Chat, from the answering panel.
-  // Registered every render on purpose: the handlers close over live state.
+  // (Main sets no application menu, so no `reload` accelerator shadows Ctrl+R.)
+  // Deps are the state the handlers read — askNova/newChat close over it.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
       if (event.target instanceof HTMLInputElement) {
@@ -173,16 +190,17 @@ export function PillApp(): JSX.Element {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
-  });
+  }, [view, live.state, live.rows]);
 
-  // In the answering panel, Tab returns to the pill with the ask field open —
-  // the panel's own "Tab to focus" hint kept honest.
+  // Escape leaves the answering panel for the pill with the ask field open.
+  // NOT Tab: the panel has focusable controls (Back, footer, New Chat), and
+  // stealing Tab would make every one of them unreachable by keyboard.
   useEffect(() => {
     if (view !== "answering") {
       return;
     }
     const onKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Tab") {
+      if (event.key === "Escape") {
         event.preventDefault();
         setView("pill");
         setFocusMode(true);
@@ -239,6 +257,7 @@ export function PillApp(): JSX.Element {
               setFocusMode(false);
             }}
             onAsk={askNova}
+            canAsk={live.state === "live"}
             usesScreen={usesScreen}
             onToggleScreen={() => {
               setUsesScreen((current) => !current);

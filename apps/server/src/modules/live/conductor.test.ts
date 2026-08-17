@@ -287,7 +287,14 @@ describe("modules/live [conductor] manual-only posture (autoSuggest: false)", ()
   });
 
   it("[conductor] answerNow fires an answer off the transcript tail", async () => {
-    const c = makeConductor({ autoSuggest: false });
+    const provider = makeMockProvider("google", {
+      firstTokenDelayMs: 20,
+      events: [tok("Answer"), tok(" here"), DONE],
+    });
+    const c = makeConductor({
+      autoSuggest: false,
+      router: makeRouter([provider], liveLlmConfig()),
+    });
     c.onFinal("Honestly it's more than we planned to spend.", "them");
     c.answerNow();
     await vi.advanceTimersByTimeAsync(1000);
@@ -295,6 +302,15 @@ describe("modules/live [conductor] manual-only posture (autoSuggest: false)", ()
     expect(events.find((e) => e.type === "suggestion.done")).toMatchObject({
       text: "Answer here",
     });
+    // The moment genuinely reached the model: the assembled request carries
+    // the utterance answerNow is answering. Fails if answerNow fires before
+    // (or without) the conductor's transcript window.
+    const call = provider.calls[0];
+    expect(call, "the conductor never called the provider").toBeDefined();
+    const user = call?.request.messages.find((m) => m.role === "user");
+    expect(user?.content).toContain(
+      "Honestly it's more than we planned to spend.",
+    );
   });
 
   it("[conductor] answerNow with an empty transcript still answers (no dead key)", async () => {

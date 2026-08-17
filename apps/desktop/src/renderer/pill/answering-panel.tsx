@@ -26,6 +26,8 @@ export interface AskContext {
   readonly question: string | null;
   /** Call-clock label of the last transcript line at ask time ("14:22"). */
   readonly heardLabel: string | null;
+  /** The transport's refusal, when the ask never reached the server. */
+  readonly error: string | null;
 }
 
 interface AnsweringPanelProps {
@@ -65,6 +67,39 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
   const [showJump, setShowJump] = useState(false);
   const [maxHeight] = useState(answerMaxHeight);
   const suggestion = props.live.suggestion;
+
+  // What stands in the answer's place while there is none. A failed ask and a
+  // dead session must not look like a slow answer, forever.
+  const emptyState: { text: string; failed: boolean } =
+    props.ask.error !== null
+      ? { text: props.ask.error, failed: true }
+      : props.live.state === "error"
+        ? {
+            text: props.live.message ?? "The live session hit an error.",
+            failed: true,
+          }
+        : props.live.state === "ended"
+          ? {
+              text: "The session ended before Nova could answer.",
+              failed: true,
+            }
+          : { text: "Nova is thinking…", failed: false };
+
+  // Screen readers ignore a live region's INITIAL content — only changes
+  // announce. Mounting empty and setting the label post-mount makes the first
+  // state a change too.
+  const statusLabel =
+    suggestion === null
+      ? emptyState.failed
+        ? "Nova could not answer"
+        : "Nova is thinking"
+      : suggestion.done
+        ? "Nova answer ready"
+        : "Nova is answering";
+  const [announced, setAnnounced] = useState("");
+  useEffect(() => {
+    setAnnounced(statusLabel);
+  }, [statusLabel]);
 
   // Same follow contract as the transcript: only an UPWARD move breaks
   // following (programmatic scrolls only ever move down); the bottom restores it.
@@ -154,14 +189,10 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
           onScroll={onScroll}
           style={{ maxHeight }}
         >
-          {/* Announces state changes (thinking / ready) without narrating
-              every streamed delta. */}
+          {/* Announces state changes (thinking / ready / failed) without
+              narrating every streamed delta. */}
           <span className="visually-hidden" role="status">
-            {suggestion === null
-              ? "Nova is thinking"
-              : suggestion.done
-                ? "Nova answer ready"
-                : "Nova is answering"}
+            {announced}
           </span>
           {props.ask.question !== null && (
             <div className="answer__bubble">{props.ask.question}</div>
@@ -173,7 +204,15 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
               </span>
             )}
             {suggestion === null ? (
-              <span className="answer__hint">Nova is thinking…</span>
+              <span
+                className={
+                  emptyState.failed
+                    ? "answer__hint answer__hint--failed"
+                    : "answer__hint"
+                }
+              >
+                {emptyState.text}
+              </span>
             ) : (
               <div
                 className={

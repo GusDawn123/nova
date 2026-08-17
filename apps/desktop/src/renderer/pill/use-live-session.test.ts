@@ -282,6 +282,14 @@ describe("useLiveSession", () => {
       push(suggest("delta", "s-1", "wer"));
       push(suggest("done", "s-1", "full body"));
       expect(result.current.suggestion).toBeNull();
+      // But the pane is only cleared, never latched shut: the NEXT ask's
+      // stream must still paint.
+      push(suggest("start", "s-2"));
+      push(suggest("delta", "s-2", "the new answer"));
+      expect(result.current.suggestion).toMatchObject({
+        id: "s-2",
+        text: "the new answer",
+      });
     });
   });
 });

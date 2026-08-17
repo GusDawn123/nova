@@ -488,14 +488,26 @@ describe("the live session channels", () => {
     expect(result).toEqual({ ok: true });
   });
 
-  it("routes a typed ask and the null Answer press to the service", async () => {
+  it("routes a typed ask and the null Answer press, answering the service's result", async () => {
     const { liveAsk } = register();
 
-    await invoke(IpcChannel.liveAsk, { text: "how do I price this?" });
+    const first = await invoke(IpcChannel.liveAsk, {
+      text: "how do I price this?",
+    });
     expect(liveAsk).toHaveBeenCalledWith("how do I price this?");
+    expect(first).toEqual({ ok: true });
 
-    await invoke(IpcChannel.liveAsk, { text: null });
+    liveAsk.mockReturnValueOnce({
+      ok: false,
+      message: "No live session is running.",
+    });
+    const second = await invoke(IpcChannel.liveAsk, { text: null });
     expect(liveAsk).toHaveBeenLastCalledWith(null);
+    // The service's refusal reaches the renderer verbatim, not a hollow ok.
+    expect(second).toEqual({
+      ok: false,
+      message: "No live session is running.",
+    });
   });
 
   it("refuses a malformed ask without reaching the service", async () => {

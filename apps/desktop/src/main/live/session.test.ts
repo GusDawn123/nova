@@ -325,6 +325,36 @@ describe("live session service", () => {
     expect(socket.jsonSent()).toHaveLength(1);
   });
 
+  it("ask refuses once stop() queued session.end — no ok for a dead answer", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    service.stop();
+    const result = service.ask(null);
+    expect(result).toEqual({
+      ok: false,
+      message: "No live session is running.",
+    });
+    // session.start + session.end and nothing behind them.
+    expect(socket.jsonSent().at(-1)).toMatchObject({ type: "session.end" });
+  });
+
+  it("ask fails typed when the socket throws mid-send", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    socket.send = () => {
+      throw new Error("socket buried");
+    };
+    const result = service.ask("still there?");
+    expect(result).toEqual({
+      ok: false,
+      message: "The ask could not be sent (socket buried).",
+    });
+  });
+
   it("forwards a discard so the pill can clear the pane", async () => {
     const { socket, events, service } = harness();
     await service.start("general");

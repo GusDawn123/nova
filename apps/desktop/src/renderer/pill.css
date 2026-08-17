@@ -122,8 +122,13 @@ body {
   cursor: pointer;
 }
 
-.corner-box--click:hover {
+.corner-box--click:hover:not(:disabled) {
   background: rgba(238, 240, 255, 0.22);
+}
+
+.corner-box--click:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 
 /* ---- the icon bar ---- */
@@ -448,6 +453,12 @@ body {
   color: #fff;
   opacity: 0.55;
   font-style: italic;
+}
+
+/* A refusal is a fact, not a mood — plain, readable, no italics. */
+.answer__hint--failed {
+  font-style: normal;
+  opacity: 0.8;
 }
 
 .answer__scroll {

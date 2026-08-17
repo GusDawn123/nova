@@ -78,6 +78,30 @@ describe("the live-session bridge methods", () => {
     });
   });
 
+  it("askLive sends the payload and passes a valid result through", async () => {
+    h.invoke.mockResolvedValueOnce({ ok: true });
+    await expect(bridge.askLive("how do I price this?")).resolves.toEqual({
+      ok: true,
+    });
+    expect(h.invoke).toHaveBeenLastCalledWith(IpcChannel.liveAsk, {
+      text: "how do I price this?",
+    });
+
+    h.invoke.mockResolvedValueOnce({ ok: true });
+    await expect(bridge.askLive(null)).resolves.toEqual({ ok: true });
+    expect(h.invoke).toHaveBeenLastCalledWith(IpcChannel.liveAsk, {
+      text: null,
+    });
+  });
+
+  it("askLive falls back typed on an off-contract answer", async () => {
+    h.invoke.mockResolvedValueOnce({ nonsense: true });
+    await expect(bridge.askLive(null)).resolves.toEqual({
+      ok: false,
+      message: INVALID_BRIDGE_RESPONSE_MESSAGE,
+    });
+  });
+
   it("a REJECTED invoke degrades to the same typed fallback (never a throw)", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     h.invoke.mockRejectedValueOnce(new Error("main handler threw"));

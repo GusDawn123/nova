@@ -368,8 +368,15 @@ export function createLiveSessionService(
       const session = active;
       // Gated on `ready`, not just on a claim: before `session.ready` the
       // server would refuse the ask anyway (`input_before_start`), so the
-      // refusal happens here with a sentence instead of over the wire.
-      if (session === null || session.finished || !session.ready) {
+      // refusal happens here with a sentence instead of over the wire. And on
+      // `stopping`: session.end is already queued, so an ask behind it would
+      // report ok for an answer that can never arrive.
+      if (
+        session === null ||
+        session.finished ||
+        session.stopping ||
+        !session.ready
+      ) {
         return { ok: false, message: "No live session is running." };
       }
       try {
