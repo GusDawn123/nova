@@ -142,6 +142,21 @@ export const transcriptInputSchema = z.object({
   origin: transcriptInputOriginSchema.optional(),
 });
 
+/**
+ * "Answer this moment" (2026-08-17, Gustavo's no-auto-response decision): the
+ * user pressed the Answer key (Ctrl+↵ per the Keybinds tab) without typing a
+ * question, asking the copilot to respond to whatever was just said. Carries no
+ * payload — the server's conductor already holds the rolling transcript; the
+ * tail IS the question. Additive, no `v` bump. Only valid after `session.start`
+ * (else the existing `input_before_start` error, mirroring `transcript.input`).
+ * Typed questions keep using `transcript.input` with `origin: "copilot_question"`;
+ * this event exists so an empty-handed Answer press needs no fake typed text.
+ */
+export const suggestNowSchema = z.object({
+  v: version,
+  type: z.literal("suggest.now"),
+});
+
 /** Gracefully end the session; triggers server-side teardown. */
 export const sessionEndSchema = z.object({
   v: version,
@@ -159,6 +174,7 @@ export const clientLiveEventSchema = z.discriminatedUnion("type", [
   sessionStartSchema,
   audioFrameMarkerSchema,
   transcriptInputSchema,
+  suggestNowSchema,
   sessionEndSchema,
   pingSchema,
 ]);

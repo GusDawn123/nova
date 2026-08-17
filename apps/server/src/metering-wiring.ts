@@ -202,6 +202,10 @@ export function maybeCreateLiveConductorFactory(
       // The per-call meter (adr-0007 §2): attribution travels with the call while
       // the router's breaker/bench state stays process-global.
       meter: metering.meterFor(userId, meetingId),
+      // Gustavo's 2026-08-17 decision: the copilot never speaks unprompted.
+      // Suggestions fire only from a user ask (typed question / Answer key);
+      // the trigger-gate machinery stays intact behind this flag.
+      autoSuggest: false,
     });
 }
 

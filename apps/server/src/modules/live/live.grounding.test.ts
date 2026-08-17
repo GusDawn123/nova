@@ -91,6 +91,7 @@ function runQuestion(
         firstTokenDeadlineMs: 30_000,
         ragDeadlineMs: 5_000, // real Voyage query-embed budget for the gate
       }),
+      autoSuggest: true,
     });
     conductor.onFinal(question, "them");
     setTimeout(done, 60_000);

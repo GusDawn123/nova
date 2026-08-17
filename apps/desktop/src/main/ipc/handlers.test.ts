@@ -96,6 +96,7 @@ interface Stubs {
   liveStart: ReturnType<typeof vi.fn>;
   liveStop: ReturnType<typeof vi.fn>;
   liveSetPaused: ReturnType<typeof vi.fn>;
+  liveAsk: ReturnType<typeof vi.fn>;
   emit: (state: unknown) => void;
   dispose: () => void;
 }
@@ -137,6 +138,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
   const liveStart = vi.fn().mockResolvedValue({ ok: true });
   const liveStop = vi.fn();
   const liveSetPaused = vi.fn();
+  const liveAsk = vi.fn().mockReturnValue({ ok: true });
 
   const dispose = registerIpcHandlers({
     auth,
@@ -150,6 +152,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
       start: liveStart,
       stop: liveStop,
       setPaused: liveSetPaused,
+      ask: liveAsk,
       dispose: vi.fn(),
     },
     openSettings,
@@ -168,6 +171,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     liveStart,
     liveStop,
     liveSetPaused,
+    liveAsk,
     dispose,
     emit: (state) => {
       // Cast because one test pushes a state the contract forbids, which is
@@ -425,10 +429,10 @@ describe("teardown", () => {
 
     dispose();
 
-    // Nine request/response channels. Leaving one behind would make a second
+    // Ten request/response channels. Leaving one behind would make a second
     // `registerIpcHandlers` throw on a duplicate handler, which is exactly what
     // a window reopening on macOS would do.
-    expect(registered).toHaveLength(9);
+    expect(registered).toHaveLength(10);
     // Copied before sorting — `toSorted` is ES2023 and the lib target is ES2022.
     expect([...removedChannels].sort()).toEqual([...registered].sort());
     expect(handlers.size).toBe(0);
@@ -482,6 +486,25 @@ describe("the live session channels", () => {
 
     expect(liveStop).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ ok: true });
+  });
+
+  it("routes a typed ask and the null Answer press to the service", async () => {
+    const { liveAsk } = register();
+
+    await invoke(IpcChannel.liveAsk, { text: "how do I price this?" });
+    expect(liveAsk).toHaveBeenCalledWith("how do I price this?");
+
+    await invoke(IpcChannel.liveAsk, { text: null });
+    expect(liveAsk).toHaveBeenLastCalledWith(null);
+  });
+
+  it("refuses a malformed ask without reaching the service", async () => {
+    const { liveAsk } = register();
+
+    const result = await invoke(IpcChannel.liveAsk, { text: "" });
+
+    expect(liveAsk).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false });
   });
 
   it("flips pause as asked and drops a malformed pause payload", () => {

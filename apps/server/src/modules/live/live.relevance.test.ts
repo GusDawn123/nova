@@ -110,6 +110,7 @@ function runMoment(
         speculationEnabled: false,
         firstTokenDeadlineMs: 30_000,
       }),
+      autoSuggest: true,
     });
     conductor.onFinal(question, "them");
     // Safety net so a hung provider never wedges the suite.

@@ -33,7 +33,8 @@ describe("createMeetingRow", () => {
     expect(headers.get("apikey")).toBe("anon-key");
     expect(headers.get("authorization")).toBe("Bearer token-1");
     expect(headers.get("prefer")).toBe("return=representation");
-    if (typeof init?.body !== "string") throw new Error("expected a string body");
+    if (typeof init?.body !== "string")
+      throw new Error("expected a string body");
     const body: unknown = JSON.parse(init.body);
     expect(body).toMatchObject({ user_id: "user-1" });
   });

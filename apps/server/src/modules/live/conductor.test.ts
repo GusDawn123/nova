@@ -60,6 +60,10 @@ function makeConductor(
     router: router({ firstTokenDelayMs: 100, interTokenDelayMs: 10 }),
     config: CONFIG,
     generateSuggestionId: idFactory(),
+    // Most of these suites exercise the trigger gate + speculation — the auto
+    // path. The product ships autoSuggest:false; that posture has its own
+    // describe at the bottom.
+    autoSuggest: true,
     ...overrides,
   });
 }
@@ -261,5 +265,65 @@ describe("modules/live [conductor] onDirectQuestion (Phase 8 typed-input fix)", 
     // The conductor speaks only in suggestion.* — nothing it emits can be
     // mistaken for an utterance by the other party.
     expect(types().every((t) => !t.startsWith("transcript."))).toBe(true);
+  });
+});
+
+describe("modules/live [conductor] manual-only posture (autoSuggest: false)", () => {
+  // The product wiring (metering-wiring.ts) ships this posture — Gustavo's
+  // 2026-08-17 decision: the copilot never speaks unprompted.
+
+  it("[conductor] a question final fires NOTHING on its own", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.onFinal("What is your pricing model exactly?", "them");
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(events).toHaveLength(0);
+  });
+
+  it("[conductor] a confident partial never speculates", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.onPartial("what's your approach to handling data consistency", "them");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(events).toHaveLength(0);
+  });
+
+  it("[conductor] answerNow fires an answer off the transcript tail", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.onFinal("Honestly it's more than we planned to spend.", "them");
+    c.answerNow();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(types()).toContain("suggestion.start");
+    expect(events.find((e) => e.type === "suggestion.done")).toMatchObject({
+      text: "Answer here",
+    });
+  });
+
+  it("[conductor] answerNow with an empty transcript still answers (no dead key)", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.answerNow();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(types()).toContain("suggestion.start");
+    expect(types()).toContain("suggestion.done");
+  });
+
+  it("[conductor] a typed question still answers (user-initiated, not auto)", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.onDirectQuestion("how do I answer the budget pushback?");
+    await vi.advanceTimersByTimeAsync(500);
+    expect(types()).toContain("suggestion.start");
+    expect(types()).toContain("suggestion.done");
+  });
+
+  it("[conductor] a second answerNow supersedes the first (one focal pane)", async () => {
+    const c = makeConductor({
+      autoSuggest: false,
+      router: router({ firstTokenDelayMs: 300, interTokenDelayMs: 50 }),
+    });
+    c.onFinal("So walk me through the rollout timeline again?", "them");
+    c.answerNow();
+    await vi.advanceTimersByTimeAsync(50); // start emitted, mid-generation
+    c.answerNow();
+    await vi.advanceTimersByTimeAsync(1500);
+    expect(types()).toContain("suggestion.discard");
+    expect(types().filter((t) => t === "suggestion.start")).toHaveLength(2);
   });
 });

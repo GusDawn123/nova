@@ -18,6 +18,7 @@ export const IpcChannel = {
   apiGetMe: "nova:api:get-me",
   liveStart: "nova:live:start",
   liveStop: "nova:live:stop",
+  liveAsk: "nova:live:ask",
   privacyGetState: "nova:privacy:get-state",
   privacySetState: "nova:privacy:set-state",
   /**

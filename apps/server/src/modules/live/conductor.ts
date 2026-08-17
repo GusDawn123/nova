@@ -40,6 +40,14 @@ export interface LiveConductor {
    * recorded as the USER's own, never as the other party's.
    */
   onDirectQuestion(text: string): void;
+  /**
+   * The user pressed Answer with nothing typed (`suggest.now`, 2026-08-17
+   * no-auto-response decision): respond to whatever was just said. Bypasses the
+   * trigger gate for the same reason `onDirectQuestion` does — the user pressing
+   * the key IS the decision to spend. Adds no turn: the moment already sits at
+   * the transcript tail, which becomes the trigger text.
+   */
+  answerNow(): void;
   /** Abort any in-flight generation (teardown). No discard — the socket closes. */
   dispose(): void;
 }
@@ -98,6 +106,16 @@ export interface LiveConductorDeps {
   now?: () => number;
   /** Suggestion-id factory; overridable for deterministic tests. */
   generateSuggestionId?: () => string;
+  /**
+   * Whether the conductor may fire suggestions ON ITS OWN off the transcript
+   * (the Phase-7 trigger gate + speculation). REQUIRED, not defaulted, so every
+   * construction site states its policy — the product wiring passes `false`
+   * (Gustavo, 2026-08-17: no auto-responses; the copilot speaks only when asked
+   * via `onDirectQuestion` / `answerNow`). The gate machinery stays intact
+   * behind this flag: turning insight-style auto-fire back on later is a
+   * one-line policy change, not an engine rebuild.
+   */
+  autoSuggest: boolean;
 }
 
 /**
@@ -341,6 +359,9 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
 
   return {
     onPartial(text, speaker) {
+      // Speculation is an auto-fire mechanism; with autoSuggest off it would
+      // spend on utterances nobody asked about.
+      if (!deps.autoSuggest) return;
       if (disposed || !config.speculationEnabled) return;
       // One pane, one outstanding speculation: don't stack on a live suggestion
       // or a speculation still awaiting its final.
@@ -355,6 +376,11 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       if (disposed) return;
       const finalText = text.trim();
       pushTurn(finalText, speaker);
+
+      // With autoSuggest off, a final only feeds the rolling transcript window
+      // (answerNow / onDirectQuestion read it). No speculation can be
+      // outstanding — onPartial never ran — so skipping the reconcile is safe.
+      if (!deps.autoSuggest) return;
 
       // Reconcile an outstanding speculation against its final utterance — even
       // if the speculative answer already finished streaming (the common case).
@@ -405,6 +431,20 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       startGeneration(
         { fire: true, kind: "answer", reason: "direct_question" },
         asked,
+        false,
+      );
+    },
+
+    answerNow() {
+      if (disposed) return;
+      // No new turn: the moment is already the transcript tail. An empty
+      // transcript still fires — Brain's own rules own the thin-input case,
+      // and refusing here would make the Answer key feel dead.
+      const tail = transcript.at(-1)?.text ?? "";
+      speculation = null;
+      startGeneration(
+        { fire: true, kind: "answer", reason: "answer_now" },
+        tail,
         false,
       );
     },

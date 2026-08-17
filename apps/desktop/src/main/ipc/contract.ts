@@ -116,6 +116,17 @@ export const livePausedMessageSchema = z
   .strict();
 
 /**
+ * renderer → main: ask the copilot mid-call (2026-08-17, no-auto-response
+ * decision — the copilot only speaks when asked). `text` is a typed question;
+ * `null` is the empty-handed Answer press ("respond to what was just said").
+ * The bound mirrors the wire's own `transcript.input` cap so a payload main
+ * accepts can never be one the server refuses.
+ */
+export const liveAskMessageSchema = z
+  .object({ text: z.string().min(1).max(2000).nullable() })
+  .strict();
+
+/**
  * main → renderer: the `liveEvent` push — everything the pill needs to render
  * a live call. Deliberately smaller than the server's wire protocol: the
  * renderer gets transcript rows and human-readable states, never vendor

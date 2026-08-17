@@ -245,7 +245,7 @@ send. That something is almost entirely the UI state the pill already exposes
 | # | Situation | Route | Grounding |
 |---|---|---|---|
 | R1 | No meeting session running; user asks (Answer key / ask box) | **B**, frame attached if toggle on | Nova outside a call IS the problem solver; the pill's own label reads "Ask anything about your screen." |
-| R2 | Meeting running; suggestion auto-fires off the transcript | **A**, always | §1.1(3): B always acts, so auto-triggers must never reach it. |
+| R2 | Meeting running; transcript flows on its own | **no route — auto-fire is REMOVED** (Gustavo, 2026-08-17: the copilot never speaks unprompted). The trigger gate survives behind the conductor's `autoSuggest` flag, which the product wiring pins to `false`; every suggestion is user-initiated (the Answer key Ctrl+↵ / `suggest.now`, or a typed ask). | Were auto-fire ever revived (an "insights" setting), it may only route to A — §1.1(3): B always acts, so auto-triggers must never reach it. |
 | R3 | Meeting running; user asks, toggle OFF | **A**, frameless | No frame can exist; it is a conversation question. |
 | R4 | Meeting running; user asks, toggle ON | **the one ambiguous cell:** tier-1 regex over the ask text — solve/act-on-artifact intent ("solve this," "what's the answer," code/math phrasings, "where do I click") → **B** with frame; otherwise → **A** (screen-gated frame per §4) | The pill's own label biases this cell to "about the meeting"; A is the safe default because its ladder includes casual screen help. |
 
@@ -316,6 +316,17 @@ library README).
 - Routing by UI state + one regex cell; no intent-classifier model in v1
   (tier-3 seam reserved); force-B hotkey lands with chunk 5.
 - B visible over A; drop-not-queue; meeting engine never pauses.
+
+**Ratified (Gustavo, 2026-08-17):**
+- **No auto-responses, ever.** The copilot speaks only when asked: the Answer
+  key (Ctrl+↵ per the Keybinds tab → `suggest.now`) or a typed ask
+  (`transcript.input`, origin `copilot_question`). The Phase-7 trigger gate
+  stays in the engine behind the conductor's required `autoSuggest` flag
+  (product wiring: `false`).
+- **Answers render in the pill's "answering" state** (mockup
+  `Nova Pill.dc.html` 3a): the pill transforms into a scrollable panel —
+  question bubble, heard-at caption, streaming answer, New Chat (Ctrl+R),
+  Shift+Ctrl+↑/↓ scroll — never a floating card.
 
 **Open (small, non-blocking):**
 1. **Multi-monitor:** which display does capture-on-ask grab? Default proposal:

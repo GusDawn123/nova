@@ -268,5 +268,20 @@ describe("useLiveSession", () => {
       expect(result.current.rows).toHaveLength(1);
       expect(result.current.rows[0]).toMatchObject({ text: "line" });
     });
+
+    it("clearSuggestion wipes the pane and ignores the dead stream's rest", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "half an ans"));
+      act(() => {
+        result.current.clearSuggestion();
+      });
+      expect(result.current.suggestion).toBeNull();
+      // New Chat cleared it locally; whatever the dead stream still sends
+      // must not repaint the pane.
+      push(suggest("delta", "s-1", "wer"));
+      push(suggest("done", "s-1", "full body"));
+      expect(result.current.suggestion).toBeNull();
+    });
   });
 });

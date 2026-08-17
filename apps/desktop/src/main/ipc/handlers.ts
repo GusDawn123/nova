@@ -12,6 +12,7 @@ import {
   authStateMessageSchema,
   credentialsSchema,
   liveActionResultSchema,
+  liveAskMessageSchema,
   livePausedMessageSchema,
   liveSessionEventSchema,
   liveStartMessageSchema,
@@ -265,6 +266,19 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     );
   });
 
+  ipcMain.handle(IpcChannel.liveAsk, (_event, payload: unknown) => {
+    const parsed = liveAskMessageSchema.safeParse(payload);
+    const result: LiveActionResult = parsed.success
+      ? live.ask(parsed.data.text)
+      : { ok: false, message: "That is not an ask this build knows." };
+    return outbound(
+      IpcChannel.liveAsk,
+      liveActionResultSchema,
+      result,
+      OFF_CONTRACT_LIVE_RESULT,
+    );
+  });
+
   const onLiveSetPaused = (_event: unknown, payload: unknown): void => {
     const parsed = livePausedMessageSchema.safeParse(payload);
     if (!parsed.success) {
@@ -335,6 +349,7 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
       IpcChannel.privacySetState,
       IpcChannel.liveStart,
       IpcChannel.liveStop,
+      IpcChannel.liveAsk,
     ]) {
       ipcMain.removeHandler(channel);
     }

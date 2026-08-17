@@ -468,6 +468,7 @@ interface FakeConductor {
   partials: string[];
   finals: string[];
   directQuestions: string[];
+  answerNows: number;
   disposed: number;
 }
 
@@ -480,6 +481,7 @@ function makeFakeConductor(): {
     partials: [],
     finals: [],
     directQuestions: [],
+    answerNows: 0,
     disposed: 0,
   };
   const calls: { userId: string; meetingId: string }[] = [];
@@ -489,6 +491,9 @@ function makeFakeConductor(): {
       onPartial: (text) => conductor.partials.push(text),
       onFinal: (text) => conductor.finals.push(text),
       onDirectQuestion: (text) => conductor.directQuestions.push(text),
+      answerNow: () => {
+        conductor.answerNows += 1;
+      },
       dispose: () => {
         conductor.disposed += 1;
       },
@@ -564,6 +569,33 @@ describe("LiveSession typed input (transcript.input, Phase 7)", () => {
       type: "error",
       code: "input_before_start",
     });
+  });
+
+  it("refuses suggest.now before session.start with input_before_start", () => {
+    const { session, sent } = makeSession();
+    session.handleTextMessage(JSON.stringify({ v: 1, type: "suggest.now" }));
+    expect(sent[0]).toMatchObject({
+      type: "error",
+      code: "input_before_start",
+    });
+  });
+
+  it("suggest.now reaches the conductor's answerNow and echoes nothing", async () => {
+    const fake = makeFakeEngine();
+    const c = makeFakeConductor();
+    const { session, sent } = makeSession({
+      sttEngine: fake.engine,
+      userId: USER_ID,
+      createConductor: c.factory,
+    });
+
+    session.handleTextMessage(startFrame());
+    await flush();
+    session.handleTextMessage(JSON.stringify({ v: 1, type: "suggest.now" }));
+
+    expect(c.conductor.answerNows).toBe(1);
+    // No turn, no echo: the Answer press asks about what was ALREADY said.
+    expect(sent.filter((e) => e.type === "transcript.final")).toHaveLength(0);
   });
 
   it("echoes a transcript.final (speaker them) and feeds the conductor", async () => {

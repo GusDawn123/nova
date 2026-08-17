@@ -254,7 +254,29 @@ export class LiveSession {
       case "transcript.input":
         this.onTranscriptInput(event.text, event.origin);
         return;
+      case "suggest.now":
+        this.onSuggestNow();
+        return;
     }
+  }
+
+  /**
+   * The empty-handed Answer press (2026-08-17, no-auto-response decision):
+   * respond to whatever was just said. Same session guard as the typed channel
+   * (and the same reused error code — additive, no new vocabulary); the
+   * conductor turns the transcript tail into the trigger. Keyless boots have no
+   * conductor, so the press is silently inert there — exactly like every other
+   * suggestion path.
+   */
+  private onSuggestNow(): void {
+    if (this.sessionId === null || this.disposer.disposed) {
+      this.sendError(
+        "input_before_start",
+        "answer requires an active session (send session.start first)",
+      );
+      return;
+    }
+    this.conductor?.answerNow();
   }
 
   /**

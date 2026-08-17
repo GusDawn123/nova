@@ -72,7 +72,8 @@ export function App(): JSX.Element {
           <span className="eyebrow">Nova</span>
           <p className="status-line">
             <span className="status-line__dot" />
-            Signed in{state.user.email !== undefined && ` as ${state.user.email}`}
+            Signed in
+            {state.user.email !== undefined && ` as ${state.user.email}`}
             {" — opening Nova"}
           </p>
         </Screen>
