@@ -71,7 +71,7 @@ describe("router [tier] — latency-tier order selection", () => {
 
   it("[tier] liveLlmConfig has a tight TTFT and the cheapest-first default liveOrder", () => {
     const config = liveLlmConfig();
-    expect(config.ttftTimeoutMs).toBe(1500);
+    expect(config.ttftTimeoutMs).toBe(5000);
     // Post-M2: long commented-code answers gap >8s mid-stream legitimately, so
     // the live stall window matches the schema default (only TTFT stays tight).
     expect(config.stallTimeoutMs).toBe(20000);

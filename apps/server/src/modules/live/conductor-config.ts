@@ -10,9 +10,14 @@ export const conductorConfigSchema = z.object({
   /**
    * Hard deadline from generation start to the FIRST suggestion token. If the
    * router yields nothing by here, the attempt is actively aborted (the deadline
-   * ladder). Sized to the playbook gate (question moment → first token p95 < 4s).
+   * ladder). Re-sized 2026-08-17 for the thinking-model era (Gustavo's pick:
+   * gemini-3.7-flash / gpt-5.6-terra at LOW effort — they legitimately think
+   * 2-6s before the first token; the old 4s gate assumed a non-thinking lite
+   * model and aborted BOTH cascade rungs, killing the whole answer). Sized to
+   * cover the router's per-provider TTFT window twice (primary + one
+   * failover) plus slack.
    */
-  firstTokenDeadlineMs: z.number().int().positive().default(4000),
+  firstTokenDeadlineMs: z.number().int().positive().default(12000),
   /**
    * How long RAG grounding may take before the conductor proceeds WITHOUT
    * snippets. Retrieval shrinks the prompt; it must never delay first token
