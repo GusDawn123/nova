@@ -474,6 +474,41 @@ body {
   color: rgba(255, 255, 255, 0.78);
 }
 
+/* The streaming caret rides the LAST rendered element as CSS, never as a
+   character inside the markdown source (a text caret can land on a closing
+   ``` line and un-close the fence mid-stream). */
+.md--streaming > :last-child::after {
+  content: "▍";
+  margin-left: 2px;
+  opacity: 0.7;
+  animation: caret-blink 1s steps(2, start) infinite;
+}
+
+@keyframes caret-blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .md--streaming > :last-child::after {
+    animation: none;
+  }
+}
+
+/* KaTeX inside the translucent panel: inherit the answer's ink; display math
+   scrolls sideways instead of widening the pill. */
+.md .katex {
+  color: inherit;
+  font-size: 1.05em;
+}
+.md .katex-display {
+  margin: 0 0 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+}
+
 .md p {
   margin: 0 0 10px;
 }

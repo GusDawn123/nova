@@ -4,7 +4,7 @@ import { LIVE_PROTOCOL_VERSION, type ServerLiveEvent } from "@nova/shared";
 
 import { type LlmRouter, type Meter } from "../llm/index.js";
 import {
-  assemble,
+  assembleMeeting,
   type PromptMode,
   type PromptTranscriptTurn,
 } from "../prompt/index.js";
@@ -93,11 +93,11 @@ export interface LiveConductorDeps {
   /** User-provided context (profile / scripts); hard-guarded in the suffix. */
   userContext?: string;
   /**
-   * The mode this session picked; fixed for the conductor's whole life, which is
-   * what keeps its assembled prefix byte-stable (and the vendor cache warm).
-   * Omitted → `general`, matching the wire rule for a `session.start` with no
-   * mode. Held per conductor — never module state — so one call's pick can never
-   * be read by another's.
+   * The mode this session picked. Accepted for wire compatibility, but as of
+   * M2 it no longer shapes the prompt: every meeting request assembles on
+   * Brain A (the authored enterprise prompt), one byte-stable prefix for all
+   * calls. M3 retires this enum for `mode_id` + the mode's own script text
+   * (which lands in the envelope's `userScript`, not the prefix).
    */
   mode?: PromptMode;
   logger?: LiveLogger;
@@ -137,7 +137,6 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
   const now = deps.now ?? Date.now;
   const newId = deps.generateSuggestionId ?? randomUUID;
   const logger = deps.logger;
-  const mode = deps.mode ?? "general";
 
   const transcript: PromptTranscriptTurn[] = [];
   let active: ActiveGeneration | null = null;
@@ -258,11 +257,13 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
     const snippets = await groundingSnippets(gen.triggerText);
     if (!isCurrent(gen)) return;
 
-    const { stablePrefix, dynamicSuffix } = assemble(mode, {
+    // Brain A for every meeting request (M2). RAG grounding rides facts-grade
+    // (`userMemory`); the user's own context is script-grade (`userScript`).
+    const { stablePrefix, dynamicSuffix } = assembleMeeting({
       transcript,
-      ...(snippets.length > 0 ? { ragSnippets: snippets } : {}),
+      ...(snippets.length > 0 ? { userMemory: snippets } : {}),
       ...(deps.userContext !== undefined
-        ? { userContext: deps.userContext }
+        ? { userScript: deps.userContext }
         : {}),
     });
 

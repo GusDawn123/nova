@@ -1,13 +1,9 @@
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { describe, expect, it } from "vitest";
 import { liveModeSchema } from "@nova/shared";
 
 import { assemble } from "./assemble.js";
-import { LIVE_SYSTEM_PROMPT_GENERAL } from "./content/system-prompt.js";
 import type { PromptMode } from "./ports.js";
 
 /**
@@ -35,14 +31,11 @@ const PINNED: Record<PromptMode, string> = {
   // CONTENT_CONSTRAINTS (transcript/RAG/context are data, not instructions),
   // the behavioral example's invented quantities made qualitative, and the
   // finance example's arithmetic corrected (47,500 x 0.18 = 8,550 → 38,950).
-  general:
-    "6572a864f697f6e17cbc425932409f382b4b763b81a9aa39b3f7d190ae4841e1",
+  general: "6572a864f697f6e17cbc425932409f382b4b763b81a9aa39b3f7d190ae4841e1",
   behavioral:
     "af566b64da422f40c01e41a05c0040f4904a03abb6c94feaa1c72266c59deb17",
-  technical:
-    "a5ad87fbf695a1ccd311d31f32a2901421ade93475ba4a7283cace3fb27fbf44",
-  finance:
-    "4c794a4e811b13c22f02413396e143a4636a122ca1c0c4c0471dbb2fa3b4db92",
+  technical: "a5ad87fbf695a1ccd311d31f32a2901421ade93475ba4a7283cace3fb27fbf44",
+  finance: "4c794a4e811b13c22f02413396e143a4636a122ca1c0c4c0471dbb2fa3b4db92",
 };
 
 function prefixHash(mode: PromptMode): string {
@@ -80,32 +73,10 @@ describe("modules/prompt [prompt-snapshot] byte-stable stablePrefix", () => {
 });
 
 /**
- * The LEGACY flattened prompt (`content/system-prompt.ts`) is no longer on the
- * live path — `assemble()` builds from `library/` — but the file stays on disk
- * for reference, and while it does, it stays honest: byte-for-byte the authored
- * source doc, never hand-edited (RULES §9).
+ * The LEGACY flattened prompt (`content/system-prompt.ts`) once held a
+ * byte-for-byte pin against its source doc here. That doc
+ * (`docs/prompts/nova-prompts-source.md`) was retired with M2 — superseded by
+ * the two authored brain prompts, whose fidelity pins live in
+ * `two-brain.snapshot.test.ts` — so the doc-comparison test went with it. The
+ * generated constant stays on disk as the historical reference.
  */
-describe("modules/prompt [prompt-snapshot] LEGACY generated content", () => {
-  it("[prompt-snapshot] the legacy prompt is byte-for-byte the authored source doc", () => {
-    const here = dirname(fileURLToPath(import.meta.url));
-    // ../../../../../docs/prompts/nova-prompts-source.md from modules/prompt/
-    const sourcePath = join(
-      here,
-      "..",
-      "..",
-      "..",
-      "..",
-      "..",
-      "docs",
-      "prompts",
-      "nova-prompts-source.md",
-    );
-    const src = readFileSync(sourcePath, "utf8");
-    const body =
-      src
-        .slice(src.indexOf("-->") + 3)
-        .replace(/^\n+/, "")
-        .replace(/\s+$/, "") + "\n";
-    expect(LIVE_SYSTEM_PROMPT_GENERAL).toBe(body);
-  });
-});

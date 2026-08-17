@@ -47,16 +47,17 @@ function speakerLabel(speaker: string | null): string {
 }
 
 /** Render one transcript turn as `label: text`. */
-function renderTurn(turn: PromptTranscriptTurn): string {
+export function renderTurn(turn: PromptTranscriptTurn): string {
   return `${speakerLabel(turn.speaker)}: ${turn.text}`;
 }
 
 /**
  * Keep the most-recent transcript turns whose cumulative tokens stay within
  * `budget` (oldest dropped first — the tail is the current moment). Returns the
- * kept turns in chronological order.
+ * kept turns in chronological order. Exported for `two-brain.ts` (M2), which
+ * shares the windowing/budget mechanics while owning its own prompt bases.
  */
-function windowTranscript(
+export function windowTranscript(
   turns: PromptTranscriptTurn[],
   budget: number,
 ): PromptTranscriptTurn[] {
@@ -77,7 +78,7 @@ function windowTranscript(
 }
 
 /** Keep leading snippets whose cumulative tokens fit `budget` (ranked best-first). */
-function trimSnippets(
+export function trimSnippets(
   snippets: PromptRagSnippet[],
   budget: number,
 ): PromptRagSnippet[] {
@@ -93,7 +94,7 @@ function trimSnippets(
 }
 
 /** Truncate user context to a token budget (chars), never dropping it whole. */
-function trimUserContext(text: string, budget: number): string {
+export function trimUserContext(text: string, budget: number): string {
   const maxChars = budget * 4;
   return text.length <= maxChars ? text : text.slice(0, maxChars);
 }
