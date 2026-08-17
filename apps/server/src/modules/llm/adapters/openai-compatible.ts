@@ -26,13 +26,11 @@ export interface OpenAiCompatibleOptions {
   baseURL?: string;
   maxOutputTokens?: number;
   /**
-   * Reasoning-effort floor for reasoning-capable models (gpt-5.x family).
-   * adr-0004 §4: reasoning OFF at the adapter layer is the single biggest TTFT
-   * lever, and reasoning tokens count against `max_completion_tokens` (a small
-   * cap could be consumed entirely by reasoning — the Gemini thinking trap).
-   * Omit for endpoints/models without the param (Groq passes nothing).
+   * Reasoning-effort setting for reasoning-capable models (gpt-5.x family).
+   * adr-0004 §4: low/none at the adapter layer is the single biggest TTFT
+   * lever. Omit for endpoints/models without the param (Groq passes nothing).
    */
-  reasoningEffort?: "none" | "minimal";
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 }
 
 /**

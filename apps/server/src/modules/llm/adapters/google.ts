@@ -1,4 +1,8 @@
-import { type GenerateContentConfig, GoogleGenAI } from "@google/genai";
+import {
+  type GenerateContentConfig,
+  GoogleGenAI,
+  ThinkingLevel,
+} from "@google/genai";
 
 import type {
   ChatMessage,
@@ -15,13 +19,19 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  * the streamed chunks into {@link LlmStreamEvent}s.
  */
 
-/** A cheap/fast current model — see docs before changing (do not guess IDs).
- * Lineage: gemini-2.0-flash (retired mid-2026, 404 "no longer available") →
- * gemini-2.5-flash (its GA flash successor) → gemini-3.5-flash-lite (2026-07-23
- * refresh; $0.30/$2.50 per 1M verified — the price book moves in lockstep,
- * adr-0004 addendum). The lite model REJECTS thinkingConfig (probed: 400), so
- * the knob is OMITTED below — lite is non-thinking by default. */
-const DEFAULT_MODEL = "gemini-3.5-flash-lite";
+/** The current model — see docs before changing (do not guess IDs).
+ * Lineage: gemini-2.0-flash (retired mid-2026) → gemini-2.5-flash →
+ * gemini-3.5-flash-lite (2026-07-23 refresh) → gemini-3.7-flash (2026-08-17,
+ * Gustavo's pick: the lite tier ignored Brain A's register rules; 3.7-flash is
+ * the newest flash, released 2026-08-13, $0.75/$3.75 per 1M intro pricing
+ * verified against the model list on our key + current pricing docs — the
+ * price book moves in lockstep, adr-0004 addendum).
+ *
+ * THINKING: 3.7-flash defaults to MEDIUM and bills thinking tokens as output,
+ * so the stream call pins `thinkingLevel: "low"` (Gustavo: decently smart,
+ * reasoning low). Lite-lineage models REJECT thinkingConfig outright (probed
+ * 2026-07-23: 400), so the knob is skipped when a lite model is configured. */
+const DEFAULT_MODEL = "gemini-3.7-flash";
 
 export interface GoogleProviderOptions {
   apiKey: string;
@@ -84,15 +94,15 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
       try {
         const config: GenerateContentConfig = {
           ...(maxTokens !== undefined ? { maxOutputTokens: maxTokens } : {}),
-          // Reasoning/thinking OFF (adr-0004 §4). PROBED 2026-07-23:
-          // gemini-3.5-flash-lite REJECTS a thinkingConfig (400
-          // INVALID_ARGUMENT for both thinkingBudget: 0 and thinkingLevel) —
-          // the LITE lineage is non-thinking BY DEFAULT (thinking is opt-in),
-          // so OMITTING the knob IS the off state. The 2.5-flash era needed
-          // `thinkingConfig: { thinkingBudget: 0 }` here; restore it (or make
-          // it model-conditional) if the default model ever moves back to a
-          // thinking-by-default variant.
-          //
+          // Thinking LOW (Gustavo, 2026-08-17: decently smart, reasoning low).
+          // 3.7-flash defaults to MEDIUM and bills thinking tokens as OUTPUT,
+          // so leaving the knob off silently costs money and first-token
+          // latency. Lite-lineage models REJECT thinkingConfig (probed
+          // 2026-07-23: 400 INVALID_ARGUMENT — that lineage is non-thinking by
+          // default), so the knob is skipped for them.
+          ...(model.includes("lite")
+            ? {}
+            : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,

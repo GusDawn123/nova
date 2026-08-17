@@ -66,6 +66,40 @@ describe("adapters/google — translation", () => {
     }
   });
 
+  it("pins thinking LOW on the wire — and skips the knob for lite models", async () => {
+    // 3.7-flash defaults to MEDIUM thinking and bills thinking tokens as
+    // output; the adapter must pin low (Gustavo, 2026-08-17). Lite-lineage
+    // models 400 on any thinkingConfig, so the knob must vanish for them.
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      bodies.push(typeof init?.body === "string" ? init.body : "");
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const drain = async (model?: string): Promise<void> => {
+        const provider = createGoogleProvider({
+          apiKey: "test-key",
+          ...(model !== undefined ? { model } : {}),
+        });
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      // The SDK enum serializes as "LOW" on the wire.
+      expect(bodies[0]).toContain('"thinkingLevel":"LOW"');
+
+      await expect(drain("gemini-3.5-flash-lite")).rejects.toThrow();
+      expect(bodies[1]).not.toContain("thinkingLevel");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it("sends NO output ceiling when none is configured (answers uncapped)", async () => {
     // The production posture (Gustavo, 2026-08-17): no product cap — the wire
     // request must not carry maxOutputTokens at all.
