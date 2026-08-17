@@ -4,6 +4,7 @@ import { liveLlmConfig } from "../llm/index.js";
 import { makeMockProvider } from "../llm/testing/mock-provider.js";
 import { DONE, makeRouter, tok } from "../llm/testing/router-harness.js";
 import { BRAIN_A_MEETING_PROMPT } from "../prompt/content/meeting-enterprise.js";
+import type { RagService } from "../rag/index.js";
 
 import { conductorConfigSchema } from "./conductor-config.js";
 import { createLiveConductor } from "./conductor.js";
@@ -81,5 +82,44 @@ describe("modules/live [conductor-mode] every session sends Brain A (M2)", () =>
     const { user } = await messagesFor("general");
     expect(user.startsWith("<user_provided_context>")).toBe(true);
     expect(user).toContain("So how would you price this for us?");
+  });
+
+  it("[conductor-mode] user context rides <user_script>; RAG grounding rides <user_memory>", async () => {
+    // The trust-grade mapping at the conductor seam: deps.userContext is the
+    // user's own instructions (script-grade), RAG snippets are facts-grade —
+    // proven on the recorded request, not on an argument being passed along.
+    const provider = makeMockProvider("google", {
+      firstTokenDelayMs: 10,
+      events: [tok("Answer"), DONE],
+    });
+    const rag = {
+      query: () =>
+        Promise.resolve({
+          snippets: [
+            { header: "2026-08-02 call", content: "They pushed on timeline." },
+          ],
+        }),
+    } as unknown as RagService;
+    const conductor = createLiveConductor({
+      send: () => undefined,
+      router: makeRouter([provider], liveLlmConfig()),
+      config: CONFIG,
+      autoSuggest: true,
+      userId: "user-1",
+      userContext: "Always anchor on the rollout.",
+      rag,
+    });
+    conductor.onFinal("So how would you price this for us?", "them");
+    await vi.advanceTimersByTimeAsync(500);
+
+    const user =
+      provider.calls[0]?.request.messages.find((m) => m.role === "user")
+        ?.content ?? "";
+    expect(user).toContain(
+      "<user_script>\nAlways anchor on the rollout.\n</user_script>",
+    );
+    expect(user).toContain(
+      "<user_memory>\n2026-08-02 call\nThey pushed on timeline.\n</user_memory>",
+    );
   });
 });

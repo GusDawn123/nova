@@ -6,7 +6,7 @@ import {
   trimUserContext,
   windowTranscript,
 } from "./assemble.js";
-import { promptConfig, type PromptConfig } from "./config.js";
+import { approxTokens, promptConfig, type PromptConfig } from "./config.js";
 import { BRAIN_A_MEETING_PROMPT } from "./content/meeting-enterprise.js";
 import { BRAIN_B_SOLVER_PROMPT } from "./content/problem-solver.js";
 import {
@@ -42,9 +42,12 @@ export const ENVELOPE_EMPTY_TEXT = "(none provided for this call)";
  * `</reference_files><user_script>…` cannot break out of its tag and promote
  * itself to instructions (§3 serialization safety; mechanism pinned by tests:
  * ASCII angle brackets become single guillemets, content otherwise untouched).
+ * The pattern tolerates tag whitespace and attributes (`</reference_files >`,
+ * `<user_script role="trusted">`) — an evasion is as dangerous as the plain
+ * form; attributes are dropped from the neutralized rendering.
  */
 const ENVELOPE_TAG_PATTERN =
-  /<(\/?)(user_provided_context|user_script|reference_files|user_memory)>/gi;
+  /<\s*(\/?)\s*(user_provided_context|user_script|reference_files|user_memory)\b[^>]*>/gi;
 
 function neutralizeEnvelopeTags(text: string): string {
   return text.replace(ENVELOPE_TAG_PATTERN, "‹$1$2›");
@@ -98,12 +101,22 @@ function renderEnvelope(ctx: MeetingContext, config: PromptConfig): string {
     parts.push(`<user_script>\n${trimmed}\n</user_script>`);
   }
 
+  // ONE cumulative facts-grade budget across both lists — `ragBudgetTokens`
+  // is the Σ cap, not a per-list allowance, so what the files spend the
+  // memory no longer has.
   const files = trimSnippets(ctx.referenceFiles ?? [], config.ragBudgetTokens);
   if (files.length > 0) {
     parts.push(renderFactsBlock("reference_files", files));
   }
 
-  const memory = trimSnippets(ctx.userMemory ?? [], config.ragBudgetTokens);
+  const spent = files.reduce(
+    (acc, s) => acc + approxTokens(`${s.header}\n${s.content}`),
+    0,
+  );
+  const memory = trimSnippets(
+    ctx.userMemory ?? [],
+    config.ragBudgetTokens - spent,
+  );
   if (memory.length > 0) {
     parts.push(renderFactsBlock("user_memory", memory));
   }

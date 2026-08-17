@@ -43,7 +43,7 @@ mic (16kHz PCM, 40–80ms frames)
   never transcript content (RULES §6). Motivated by a live repro where the client saw
   "all STT vendors exhausted" while the server log stayed blank on why.
 
-### modules/prompt (built when prompts land — Phases 5/7)
+### modules/prompt — LEGACY as of M2 (originally Phases 5/7)
 
 > **Superseded on the live path by M2 (2026-08-16,
 > `docs/superpowers/specs/2026-08-16-modes-context-engine-design.md`):** the
