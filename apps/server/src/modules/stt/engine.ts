@@ -402,7 +402,7 @@ function messageOf(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   return message.length <= LOG_ERROR_MAX_CHARS
     ? message
-    : `${message.slice(0, LOG_ERROR_MAX_CHARS)}…`;
+    : `${message.slice(0, LOG_ERROR_MAX_CHARS - 1)}…`;
 }
 
 export const createSttEngine: CreateSttEngine = (

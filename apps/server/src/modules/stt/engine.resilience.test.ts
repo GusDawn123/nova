@@ -375,8 +375,7 @@ describe("STT engine — failure logging", () => {
     const logged = lines.find((l) => l.msg === "stt.vendor_error")?.fields[
       "error"
     ];
-    expect(typeof logged).toBe("string");
-    expect((logged as string).length).toBeLessThanOrEqual(201); // cap + ellipsis
+    expect(logged).toBe(`${"x".repeat(199)}…`); // exactly the cap, prefix kept
     handle.stop();
   });
 
