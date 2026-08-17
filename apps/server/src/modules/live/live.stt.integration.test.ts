@@ -6,7 +6,7 @@ import { WebSocket } from "ws";
 import type { ServerLiveEvent } from "@nova/shared";
 
 import { buildApp } from "../../app.js";
-import type { SttVendor } from "../stt/ports.js";
+import { SttTransientError, type SttVendor } from "../stt/ports.js";
 import { MockVendor } from "../stt/testing/mock-vendor.js";
 
 /**
@@ -282,5 +282,37 @@ describe("GET /live STT relay", () => {
     // The disposer must abort the vendor socket, not leak it.
     await until(() => vendor.connections[0]?.isClosed === true);
     expect(vendor.connections[0]?.isClosed).toBe(true);
+  });
+
+  it("wires app.log into the engine: vendor exhaustion says why in the server log", async () => {
+    // Every connect fails; the default failover threshold (2) benches the only
+    // vendor and the lineup exhausts in ~300ms of real backoff time.
+    const vendor = new MockVendor({
+      id: "assemblyai",
+      connections: [
+        { connectError: new SttTransientError("simulated outage") },
+        { connectError: new SttTransientError("simulated outage") },
+        { connectError: new SttTransientError("simulated outage") },
+      ],
+    });
+    await boot([vendor]);
+    const warns = vi.spyOn(app.log, "warn");
+
+    const ws = await connect();
+    const { waitFor } = collect(ws);
+    try {
+      ws.send(startFrame);
+      await waitFor("session.ready");
+      await waitFor("error", 5000); // exhaustion reached the client...
+
+      // ...and the same failure reached the server log with its reason. What
+      // this pins is the WIRING: routes.ts passing app.log to createSttEngine —
+      // drop that argument and these warn calls never happen.
+      const messages = warns.mock.calls.map((call) => call[1]);
+      expect(messages).toContain("stt.connect_failed");
+      expect(messages).toContain("stt.exhausted");
+    } finally {
+      ws.terminate();
+    }
   });
 });

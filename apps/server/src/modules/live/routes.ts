@@ -86,7 +86,10 @@ export async function liveRoutes(app: FastifyInstance): Promise<void> {
   // started session emits a single typed `error` instead of hanging. The lineup
   // HEAD also seeds the session's pre-failover usage attribution (Phase 6).
   const sttVendors = createSttVendorsFromEnv(process.env);
-  const sttEngine = createSttEngine(defaultSttConfig, sttVendors);
+  // app.log so vendor failures (connect refusals, mid-stream errors, silence
+  // aborts, exhaustion) land in the server log — without it, "all STT vendors
+  // exhausted" reaches the client while the log stays blank on why.
+  const sttEngine = createSttEngine(defaultSttConfig, sttVendors, app.log);
   const initialSttVendor = sttVendors[0]?.id;
 
   // Metering + quota seam (Phase 6, adr-0007 §3/§4). Wired only when the DB is
