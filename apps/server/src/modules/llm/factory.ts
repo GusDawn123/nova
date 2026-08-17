@@ -23,23 +23,49 @@ export interface LlmProviderEnv {
   GROQ_API_KEY?: string;
 }
 
+/** Per-call-site knobs applied to every provider the factory builds. */
+export interface LlmProviderOptions {
+  /**
+   * Output-token ceiling for every provider built here. OMITTED in production
+   * — no product cap on answer length (Gustavo, 2026-08-17: a 1024 cap
+   * silently squeezed the mandated comments out of code answers); adapters
+   * send no ceiling unless one is configured (Anthropic's vendor-required
+   * `max_tokens` field aside). The seam stays for tests/smoke tools that
+   * WANT tiny outputs.
+   */
+  maxOutputTokens?: number;
+}
+
 /**
  * Build the providers whose keys are present. Absent keys are silently skipped;
  * the returned list is in config default order and may be empty.
  */
-export function createProvidersFromEnv(env: LlmProviderEnv): LlmProvider[] {
+export function createProvidersFromEnv(
+  env: LlmProviderEnv,
+  options: LlmProviderOptions = {},
+): LlmProvider[] {
+  const shared =
+    options.maxOutputTokens !== undefined
+      ? { maxOutputTokens: options.maxOutputTokens }
+      : {};
   const providers: LlmProvider[] = [];
   if (env.ANTHROPIC_API_KEY) {
-    providers.push(createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY }));
+    providers.push(
+      createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY, ...shared }),
+    );
   }
   if (env.OPENAI_API_KEY) {
-    providers.push(createOpenAiProvider({ apiKey: env.OPENAI_API_KEY }));
+    providers.push(
+      createOpenAiProvider({ apiKey: env.OPENAI_API_KEY, ...shared }),
+    );
   }
   if (env.GOOGLE_API_KEY) {
-    providers.push(createGoogleProvider({ apiKey: env.GOOGLE_API_KEY }));
+    providers.push(
+      createGoogleProvider({ apiKey: env.GOOGLE_API_KEY, ...shared }),
+    );
   }
   if (env.GROQ_API_KEY) {
-    providers.push(createGroqProvider({ apiKey: env.GROQ_API_KEY }));
+    providers.push(createGroqProvider({ apiKey: env.GROQ_API_KEY, ...shared }));
   }
   return providers;
 }

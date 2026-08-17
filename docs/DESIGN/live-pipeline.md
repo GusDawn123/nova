@@ -43,7 +43,19 @@ mic (16kHz PCM, 40–80ms frames)
   never transcript content (RULES §6). Motivated by a live repro where the client saw
   "all STT vendors exhausted" while the server log stayed blank on why.
 
-### modules/prompt (built when prompts land — Phases 5/7)
+### modules/prompt — LEGACY as of M2 (originally Phases 5/7)
+
+> **Superseded on the live path by M2 (2026-08-16,
+> `docs/superpowers/specs/2026-08-16-modes-context-engine-design.md`):** the
+> conductor now assembles every meeting request with `assembleMeeting` — Brain A
+> (`docs/prompts/nova-meeting-enterprise.md`, byte-for-byte via
+> `content/meeting-enterprise.ts`) plus the always-present context envelope
+> (`user_script` / `reference_files` / `user_memory`, facts-grade tag-neutralized)
+> and the windowed transcript. `assembleSolver` (Brain B,
+> `docs/prompts/problem-solver-screen.md`) is the second, never-both entry point,
+> routed in M5. The `assemble(mode, context)` machinery below is retired but kept
+> on disk; the wire `mode` enum is accepted and ignored until M3's `mode_id`.
+
 - Prompts are **authored content files**, word-for-word from
   `docs/prompts/nova-prompts-source.md` (Gustavo's text; never paraphrased) — plus his
   separately authored Sales prompts. Code assembles, code never writes prose.

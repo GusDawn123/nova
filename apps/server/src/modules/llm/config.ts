@@ -58,11 +58,19 @@ export function liveLlmConfig(
   overrides: Partial<z.input<typeof llmConfigSchema>> = {},
 ): LlmConfig {
   return llmConfigSchema.parse({
-    // Move off a stalled first provider quickly — the cascade's whole point on
-    // the live path. Still generous enough not to abandon a warming vendor.
-    ttftTimeoutMs: 1500,
-    // A live suggestion is short; a committed stream going quiet for 8s is dead.
-    stallTimeoutMs: 8000,
+    // Per-provider first-token window. 1500ms served the non-thinking lite
+    // era; the 2026-08-17 model refresh (gemini-3.7-flash / gpt-5.6-terra at
+    // LOW effort) thinks 2-6s before the first token, and 1500ms aborted a
+    // HEALTHY primary on every ask (live repro: all providers "aborted").
+    // 5s tolerates low-effort thinking; a truly dead vendor still fails over
+    // well inside the conductor's 12s overall deadline.
+    ttftTimeoutMs: 5000,
+    // The stall window matches the schema default: since M2 (Brain A + no
+    // output caps), live answers include long commented code, and vendors
+    // legitimately gap >8s mid-generation on those — an 8s window truncated a
+    // real answer mid-code (2026-08-17 live repro). TTFT above still guards
+    // the fast-failover moment; this only governs an already-committed stream.
+    stallTimeoutMs: 20000,
     ...overrides,
   });
 }

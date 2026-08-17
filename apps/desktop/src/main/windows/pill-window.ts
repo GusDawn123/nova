@@ -75,6 +75,13 @@ export async function createPillWindow(
   });
   window.on("closed", () => {
     pillWindow = null;
+    stopIgnoreHeartbeat();
+  });
+  // EVERY page load starts clickable — a reloading renderer must never
+  // inherit an ignore state it no longer knows about (dev reloads mid-hover;
+  // pairs with the renderer's own mount-time reset).
+  window.webContents.on("did-finish-load", () => {
+    setPillClickThrough(false);
   });
 
   hardenNavigation(window);
@@ -121,10 +128,38 @@ export function resizePillWindow(height: number): void {
  * window still eats every click inside its rectangle, shadow padding included.
  * `forward: true` keeps mouse-move events flowing to the page while ignored,
  * so the renderer can see the pointer return to real content and flip back.
+ *
+ * The forward hook is attached per page load and can silently die across a
+ * renderer reload (Windows; live repro 2026-08-17: after a dev reload, the
+ * first trip through the gutter left the window ignoring clicks FOREVER —
+ * no mouse-moves arrived, so the renderer could never flip it back). While
+ * ignoring, a heartbeat re-asserts the call every second to re-attach the
+ * hook — ignoring can be wrong for at most a beat, never permanently.
  */
+const IGNORE_HEARTBEAT_MS = 1000;
+let ignoreHeartbeat: ReturnType<typeof setInterval> | null = null;
+
+function stopIgnoreHeartbeat(): void {
+  if (ignoreHeartbeat !== null) {
+    clearInterval(ignoreHeartbeat);
+    ignoreHeartbeat = null;
+  }
+}
+
 export function setPillClickThrough(clickThrough: boolean): void {
   if (pillWindow === null || pillWindow.isDestroyed()) {
+    stopIgnoreHeartbeat();
     return;
   }
   pillWindow.setIgnoreMouseEvents(clickThrough, { forward: true });
+  stopIgnoreHeartbeat();
+  if (clickThrough) {
+    ignoreHeartbeat = setInterval(() => {
+      if (pillWindow === null || pillWindow.isDestroyed()) {
+        stopIgnoreHeartbeat();
+        return;
+      }
+      pillWindow.setIgnoreMouseEvents(true, { forward: true });
+    }, IGNORE_HEARTBEAT_MS);
+  }
 }

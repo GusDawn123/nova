@@ -119,6 +119,13 @@ export function PillApp(): JSX.Element {
       return;
     }
     let clickThrough = false;
+    // A reloaded renderer (HMR, dev full-reload) resets this variable while
+    // main may still be ignoring clicks from before the reload. From that
+    // mismatch the toggle below is unreachable — over content, `overContent`
+    // never equals a stale `false` — and every click falls through the window
+    // forever (live repro 2026-08-17). Re-asserting "take clicks" on mount
+    // makes both sides start agreed on every load.
+    window.novaBridge.setPillClickThrough(false);
     const onMouseMove = (event: MouseEvent): void => {
       const overContent =
         event.target instanceof Node &&

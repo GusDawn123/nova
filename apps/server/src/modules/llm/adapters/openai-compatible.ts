@@ -18,9 +18,6 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  * near-identical adapters.
  */
 
-/** OpenAI requires a token cap; kept small — smoke output is trivial. */
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
-
 export interface OpenAiCompatibleOptions {
   id: ProviderId;
   apiKey: string;
@@ -29,13 +26,11 @@ export interface OpenAiCompatibleOptions {
   baseURL?: string;
   maxOutputTokens?: number;
   /**
-   * Reasoning-effort floor for reasoning-capable models (gpt-5.x family).
-   * adr-0004 §4: reasoning OFF at the adapter layer is the single biggest TTFT
-   * lever, and reasoning tokens count against `max_completion_tokens` (a small
-   * cap could be consumed entirely by reasoning — the Gemini thinking trap).
-   * Omit for endpoints/models without the param (Groq passes nothing).
+   * Reasoning-effort setting for reasoning-capable models (gpt-5.x family).
+   * adr-0004 §4: low/none at the adapter layer is the single biggest TTFT
+   * lever. Omit for endpoints/models without the param (Groq passes nothing).
    */
-  reasoningEffort?: "none" | "minimal";
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
 }
 
 /**
@@ -65,7 +60,8 @@ export function createOpenAiCompatibleProvider(
     clientOptions.baseURL = opts.baseURL;
   }
   const client = new OpenAI(clientOptions);
-  const maxTokens = opts.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  // No default output cap (Gustavo, 2026-08-17) — only an explicit option caps.
+  const maxTokens = opts.maxOutputTokens;
 
   return {
     id: opts.id,
@@ -80,7 +76,9 @@ export function createOpenAiCompatibleProvider(
           {
             model: opts.model,
             messages: toOpenAiMessages(req.messages),
-            max_completion_tokens: maxTokens,
+            ...(maxTokens !== undefined
+              ? { max_completion_tokens: maxTokens }
+              : {}),
             stream: true,
             // Usage arrives in a final chunk (after `[DONE]`-adjacent deltas);
             // without this it is omitted from streamed responses.

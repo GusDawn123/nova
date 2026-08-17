@@ -7,11 +7,13 @@ import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
  * cheap/fast default model.
  */
 
-/** A cheap/fast current model — see docs before changing (do not guess IDs).
+/** The current model — see docs before changing (do not guess IDs).
  * Lineage: gpt-4o-mini (2024, Phase 2 default) → gpt-5.4-mini (2026-07-23
- * refresh; released 2026-03; $0.75/$4.50 per 1M verified on OpenAI's pricing
- * page — the price book must move in lockstep, adr-0004 addendum). */
-const DEFAULT_MODEL = "gpt-5.4-mini";
+ * refresh) → gpt-5.6-terra (2026-08-17, Gustavo's pick: "decently smart,
+ * reasoning low" — Terra is the balanced GPT-5.6 tier, ~GPT-5.5 quality at
+ * $2/$12 per 1M, GA 2026-07-09; id verified against the model list on our
+ * key — the price book must move in lockstep, adr-0004 addendum). */
+const DEFAULT_MODEL = "gpt-5.6-terra";
 
 export interface OpenAiProviderOptions {
   apiKey: string;
@@ -24,12 +26,11 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): LlmProvider {
     id: "openai",
     apiKey: opts.apiKey,
     model: opts.model ?? DEFAULT_MODEL,
-    // gpt-5.x minis are reasoning-capable; pin reasoning OFF (adr-0004 §4 —
-    // the TTFT lever, and reasoning tokens would eat the small
-    // max_completion_tokens cap). PROBED 2026-07-23: gpt-5.4-mini accepts
-    // 'none'|'low'|'medium'|'high'|'xhigh' and REJECTS 'minimal' with a 400;
-    // "none" verified to yield reasoning_tokens: 0.
-    reasoningEffort: "none",
+    // Reasoning LOW (Gustavo, 2026-08-17: decently smart, reasoning low) —
+    // enough to plan an answer, cheap enough for the live loop. The gpt-5.x
+    // effort ladder is 'none'|'low'|'medium'|'high'(|'xhigh'); 'minimal' was
+    // probed REJECTED (400) on this family 2026-07-23.
+    reasoningEffort: "low",
     ...(opts.maxOutputTokens !== undefined
       ? { maxOutputTokens: opts.maxOutputTokens }
       : {}),

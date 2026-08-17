@@ -1,6 +1,25 @@
 import Fastify, { type FastifyInstance } from "fastify";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { maybeCreateLiveConductorFactory } from "./metering-wiring.js";
+
+// Pass-through spy on the provider factory so the wiring test can assert the
+// OPTIONS the production call supplies (the live 4096 ceiling) — the providers
+// themselves are still real constructions (no vendor call happens at build).
+const factorySpy = vi.hoisted(() => ({
+  calls: [] as unknown[][],
+}));
+vi.mock("./modules/llm/index.js", async (importActual) => {
+  const actual = await importActual<typeof import("./modules/llm/index.js")>();
+  return {
+    ...actual,
+    createProvidersFromEnv: (
+      ...args: Parameters<typeof actual.createProvidersFromEnv>
+    ) => {
+      factorySpy.calls.push(args);
+      return actual.createProvidersFromEnv(...args);
+    },
+  };
+});
 
 /**
  * [metering-wiring] The fail-CLOSED posture of the live conductor factory.
@@ -57,5 +76,20 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
 
   it("is undefined with no LLM key at all (the keyless posture)", () => {
     expect(maybeCreateLiveConductorFactory(app)).toBeUndefined();
+  });
+
+  it("hands the live provider factory NO output cap (answers uncapped)", () => {
+    // Gustavo, 2026-08-17: no product caps on answer length — caps squeezed
+    // the mandated comments/detail out of code answers. Even on the
+    // fail-closed path (no DB), provider construction happens first, which is
+    // exactly the call whose options this pins: reintroduce a
+    // `maxOutputTokens` here and this test fails.
+    factorySpy.calls.length = 0;
+    process.env.GOOGLE_API_KEY = "test-not-a-real-key";
+
+    maybeCreateLiveConductorFactory(app);
+
+    expect(factorySpy.calls).toHaveLength(1);
+    expect(factorySpy.calls[0]?.[1]).toBeUndefined();
   });
 });
