@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
 import { createPlanReader, createPlanWriter } from "./db/plans.js";
+import { createRoleReader } from "./db/roles.js";
 import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
@@ -92,6 +93,7 @@ export function maybeCreateQuotaChecker(
   return createQuotaChecker({
     usedInPeriod: (userId, kind) => metering.usedInPeriod(userId, kind),
     plans: createPlanReader(pool),
+    roles: createRoleReader(pool),
     logger: app.log,
   });
 }

@@ -22,6 +22,14 @@ export interface PlanReader {
   getPlan(userId: string): Promise<PlanId>;
 }
 
+/**
+ * User-scoped role lookup — implemented by `db/roles.ts` (the adr-0008 seam),
+ * declared locally like {@link PlanReader} so the module owns its ports.
+ */
+export interface QuotaRoleReader {
+  getRole(userId: string): Promise<string>;
+}
+
 export interface QuotaChecker {
   /** true = the user is AT or OVER their plan's limit for `kind`. */
   isOverQuota(userId: string, kind: QuotaKind): Promise<boolean>;
@@ -31,6 +39,13 @@ export interface QuotaCheckerDeps {
   /** The rolling-window amount sum — `MeteringService.usedInPeriod`. */
   readonly usedInPeriod: MeteringService["usedInPeriod"];
   readonly plans: PlanReader;
+  /**
+   * The `profiles.role` seam (db/roles.ts). Developers are METERED but never
+   * REFUSED (Gustavo, 2026-08-17): every unit still lands in the ledger —
+   * adr-0007's no-unmetered-path holds — only the refusal is waived, so a dev
+   * account testing all day never walls itself out of its own product.
+   */
+  readonly roles: QuotaRoleReader;
   readonly config?: MeteringConfig;
   readonly logger: MeteringLogger;
 }
@@ -48,16 +63,22 @@ function limitFor(
 }
 
 export function createQuotaChecker(deps: QuotaCheckerDeps): QuotaChecker {
-  const { usedInPeriod, plans, logger } = deps;
+  const { usedInPeriod, plans, roles, logger } = deps;
   const config = deps.config ?? meteringConfig;
 
   return {
     async isOverQuota(userId: string, kind: QuotaKind): Promise<boolean> {
       try {
-        const [plan, used] = await Promise.all([
+        const [plan, role, used] = await Promise.all([
           plans.getPlan(userId),
+          roles.getRole(userId),
           usedInPeriod(userId, kind),
         ]);
+        // Developer exemption: metered, never refused (see QuotaCheckerDeps).
+        // Exactly `developer` — admins keep customer limits until decided.
+        if (role === "developer") {
+          return false;
+        }
         return used >= limitFor(config, plan, kind);
       } catch (err) {
         // Fail OPEN (see module header). Ids/kind only — never content (RULES §6).
