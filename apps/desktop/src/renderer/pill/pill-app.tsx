@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
 import { useScreenPrivacy } from "../hooks/use-screen-privacy";
-import { AnsweringPanel, type AskContext } from "./answering-panel";
+import {
+  AnsweringPanel,
+  type AskContext,
+  type ThreadTurn,
+} from "./answering-panel";
 import { AUDIO_OFF, type AudioSession } from "./audio-session";
 import { HistoryPanel } from "./history-panel";
 import { formatSeconds, PillBar } from "./pill-bar";
@@ -25,9 +29,16 @@ export function PillApp(): JSX.Element {
   const [activeMode, setActiveMode] = useState("general");
   const [audio, setAudio] = useState<AudioSession>(AUDIO_OFF);
   const [ask, setAsk] = useState<AskContext | null>(null);
+  const [thread, setThread] = useState<readonly ThreadTurn[]>([]);
   const { enabled: undetectable, request } = useScreenPrivacy();
   const live = useLiveSession();
   const stageRef = useRef<HTMLDivElement>(null);
+  // Latest-value refs so the archive read inside askNova stays fresh without
+  // the Ctrl+Enter listener rebinding on every streamed token.
+  const askRef = useRef<AskContext | null>(null);
+  askRef.current = ask;
+  const suggestionRef = useRef(live.suggestion);
+  suggestionRef.current = live.suggestion;
 
   // Main owns the session; when it terminates out from under us — an error,
   // or a clean server-side end the user never clicked — the pill's controls
@@ -35,6 +46,12 @@ export function PillApp(): JSX.Element {
   useEffect(() => {
     if (live.state === "error" || live.state === "ended") {
       setAudio(AUDIO_OFF);
+    }
+    // A fresh call is a fresh chat: nothing from the previous call may leak
+    // into it (Gustavo, 2026-08-17) — same boundary the transcript keeps.
+    if (live.state === "connecting") {
+      setThread([]);
+      setAsk(null);
     }
   }, [live.state]);
 
@@ -127,6 +144,19 @@ export function PillApp(): JSX.Element {
       return; // asks only mean something mid-call (pre-call asks are M5)
     }
     const lastTs = live.rows.at(-1)?.tsMs;
+    // The finished Q/A joins the thread before the pane is cleared for the
+    // new one; a half-streamed answer was superseded — not archived. Read
+    // through the latest-refs: this closure may be the keydown listener's.
+    const priorAsk = askRef.current;
+    const priorAnswer = suggestionRef.current;
+    if (priorAsk !== null && priorAnswer !== null && priorAnswer.done) {
+      const finished: ThreadTurn = {
+        question: priorAsk.question,
+        heardLabel: priorAsk.heardLabel,
+        answer: priorAnswer.text,
+      };
+      setThread((current) => [...current, finished]);
+    }
     live.clearSuggestion();
     const context: AskContext = {
       question: text,
@@ -140,25 +170,31 @@ export function PillApp(): JSX.Element {
     setFocusMode(false);
     setModeMenu(false);
     setView("answering");
+    // Identity-guarded either way: a newer ask owns the panel by now; a
+    // stale failure must not stamp its message onto someone else's question.
+    const failWith = (message: string): void => {
+      setAsk((current) =>
+        current === context ? { ...context, error: message } : current,
+      );
+    };
     void (async (): Promise<void> => {
-      const result = await window.novaBridge.askLive(text);
-      if (!result.ok) {
-        // Identity-guarded: a newer ask owns the panel by now; a stale
-        // failure must not stamp its message onto someone else's question.
-        setAsk((current) =>
-          current === context
-            ? {
-                ...context,
-                error: result.message ?? "The ask could not be sent.",
-              }
-            : current,
-        );
+      try {
+        const result = await window.novaBridge.askLive(text);
+        if (!result.ok) {
+          failWith(result.message ?? "The ask could not be sent.");
+        }
+      } catch (error: unknown) {
+        // The bridge is written to resolve typed, but the panel must not
+        // think forever if that promise is ever broken.
+        const reason = error instanceof Error ? error.message : String(error);
+        failWith(`The ask could not be sent (${reason}).`);
       }
     })();
   };
 
   const newChat = (): void => {
     live.clearSuggestion();
+    setThread([]);
     setAsk(null);
     setView("pill");
     setFocusMode(true);
@@ -292,6 +328,7 @@ export function PillApp(): JSX.Element {
           <AnsweringPanel
             live={live}
             ask={ask}
+            thread={thread}
             usesScreen={usesScreen}
             onToggleScreen={() => {
               setUsesScreen((current) => !current);

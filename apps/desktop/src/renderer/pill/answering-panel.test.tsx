@@ -10,7 +10,7 @@ import {
   vi,
 } from "vitest";
 
-import { AnsweringPanel } from "./answering-panel";
+import { AnsweringPanel, type ThreadTurn } from "./answering-panel";
 import type { LiveSessionView } from "./use-live-session";
 
 /**
@@ -64,6 +64,7 @@ function renderPanel(overrides?: {
   question?: string | null;
   heardLabel?: string | null;
   error?: string | null;
+  thread?: readonly ThreadTurn[];
   onNewChat?: () => void;
   onBack?: () => void;
 }) {
@@ -75,6 +76,7 @@ function renderPanel(overrides?: {
         heardLabel: overrides?.heardLabel ?? null,
         error: overrides?.error ?? null,
       }}
+      thread={overrides?.thread ?? []}
       usesScreen={false}
       onToggleScreen={() => undefined}
       undetectable={false}
@@ -132,8 +134,9 @@ describe("AnsweringPanel", () => {
       }),
     });
     expect(container.querySelector(".answer__bubble")).toBeNull();
-    expect(screen.getByText("Get her approved number first.")).toBeTruthy();
-    expect(container.querySelector(".answer__text--streaming")).not.toBeNull();
+    // Streaming text carries the inline caret character at its tail.
+    expect(screen.getByText(/Get her approved number first\./)).toBeTruthy();
+    expect(container.querySelector(".md--streaming")).not.toBeNull();
   });
 
   it("a started-but-empty stream shows the placeholder, and no caption without a heard label", () => {
@@ -154,7 +157,54 @@ describe("AnsweringPanel", () => {
     const { container } = renderPanel({
       live: liveWith({ id: "s-1", text: "Done body.", done: true }),
     });
-    expect(container.querySelector(".answer__text--streaming")).toBeNull();
+    expect(container.querySelector(".md--streaming")).toBeNull();
+  });
+
+  it("renders markdown as a product, not asterisks", () => {
+    const { container } = renderPanel({
+      live: liveWith({
+        id: "s-1",
+        text: "Use **exactly** the `useRef` hook:\n\n```js\nconst x = useRef(null);\n```",
+        done: true,
+      }),
+    });
+    // Bold became an element; the literal asterisks are gone from the text.
+    const strong = container.querySelector(".md strong");
+    expect(strong?.textContent).toBe("exactly");
+    expect(container.textContent).not.toContain("**");
+    // Inline syntax chip + the darker fenced block.
+    expect(container.querySelector(".md code")?.textContent).toBe("useRef");
+    expect(container.querySelector(".md pre code")?.textContent).toContain(
+      "const x = useRef(null);",
+    );
+  });
+
+  it("keeps finished Q/As above the current one — the thread", () => {
+    const { container } = renderPanel({
+      thread: [
+        {
+          question: "What did they push back on?",
+          heardLabel: "3:02",
+          answer: "The rollout **timeline**.",
+        },
+        { question: null, heardLabel: "5:40", answer: "Anchor on scope." },
+      ],
+      question: "And the budget?",
+      live: liveWith({ id: "s-3", text: "Get her number first.", done: false }),
+    });
+    const turns = container.querySelectorAll(".answer__turn");
+    expect(turns).toHaveLength(3); // two archived + the current
+    expect(screen.getByText("What did they push back on?")).toBeTruthy();
+    expect(screen.getByText("Anchor on scope.")).toBeTruthy();
+    expect(screen.getByText("And the budget?")).toBeTruthy();
+    // Archived markdown renders too — no asterisks in the thread.
+    expect(screen.getByText("timeline")).toBeTruthy();
+    expect(container.textContent).not.toContain("**");
+  });
+
+  it("a dead session with no message still explains itself", () => {
+    renderPanel({ live: liveWith(null, "error", null) });
+    expect(screen.getByText("The live session hit an error.")).toBeTruthy();
   });
 
   it("a failed ask reads as a refusal, never as thinking", () => {

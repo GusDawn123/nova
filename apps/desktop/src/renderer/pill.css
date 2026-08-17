@@ -411,6 +411,31 @@ body {
   background: transparent;
 }
 
+/* One Q/A of the thread. Past turns keep a hairline below; each new turn
+   animates in as it joins. */
+@keyframes answer-turn-in {
+  from {
+    opacity: 0;
+    transform: translateY(7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.answer__turn {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  animation: answer-turn-in 240ms ease-out;
+}
+
+.answer__turn:not(.answer__turn--current) {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* The user's question, right-aligned — mockup values verbatim. */
 .answer__bubble {
   align-self: flex-end;
@@ -434,18 +459,109 @@ body {
   color: rgba(255, 255, 255, 0.45);
 }
 
-/* Dimmed while streaming, easing to full strength on done — the same
-   hypothesis→record language the transcript rows speak. */
-.answer__text {
+/* ---- rendered answer markdown ----
+   The model speaks markdown; `.md` makes it read like a product instead of
+   raw asterisks. Dimmed while streaming, easing to full strength on done —
+   the same hypothesis→record language the transcript rows speak. */
+.md {
   font: 400 15px/1.6 var(--sg);
   color: rgba(255, 255, 255, 0.92);
   text-wrap: pretty;
-  white-space: pre-wrap;
   transition: color 320ms ease;
 }
 
-.answer__text--streaming {
+.md--streaming {
   color: rgba(255, 255, 255, 0.78);
+}
+
+.md p {
+  margin: 0 0 10px;
+}
+
+.md > :last-child,
+.md p:last-child {
+  margin-bottom: 0;
+}
+
+/* Code fences: the darker translucent square (Gustavo, 2026-08-17). */
+.md pre {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  background: rgba(6, 9, 14, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.md pre::-webkit-scrollbar {
+  height: 8px;
+}
+.md pre::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 4px;
+}
+.md pre::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.md pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font: 400 13px/1.5 var(--mono);
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre;
+}
+
+/* Inline syntax: a small darker chip, mono. */
+.md code {
+  background: rgba(6, 9, 14, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 5px;
+  padding: 1px 6px;
+  font: 500 13px var(--mono);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.md ul,
+.md ol {
+  margin: 0 0 10px;
+  padding-left: 20px;
+}
+
+.md li {
+  margin: 3px 0;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 0 0 8px;
+  font: 600 15.5px/1.4 var(--sg);
+  color: #fff;
+}
+
+.md strong {
+  font-weight: 600;
+  color: #fff;
+}
+
+.md blockquote {
+  margin: 0 0 10px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.md a {
+  color: #9db8ff;
+}
+
+.md hr {
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 12px 0;
 }
 
 .answer__hint {
@@ -522,8 +638,11 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .answer__text {
+  .md {
     transition: none;
+  }
+  .answer__turn {
+    animation: none;
   }
 }
 

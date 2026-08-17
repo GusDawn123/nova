@@ -10,14 +10,17 @@ import {
   ScreenIcon,
   SquaresIcon,
 } from "../design/icons";
+import { AnswerMarkdown } from "./answer-markdown";
 import type { LiveSessionView } from "./use-live-session";
 
 /**
  * The pill's "answering" state (mockup `Nova Pill.dc.html`, state 3a): the pill
- * transforms into a panel — the user's question as a right-hand bubble, the
- * answer streaming below it, a scroll-down float when the reader leaves the
- * bottom, and a New Chat footer (Ctrl+R per the Keybinds tab). One Q/A at a
- * time: a new ask replaces the pane, mirroring the server's one-focal-pane law.
+ * transforms into a scrollable THREAD — completed Q/As stack oldest-first, the
+ * current answer streams at the bottom as rendered markdown, a scroll-down
+ * float appears when the reader leaves the bottom, and New Chat (Ctrl+R) wipes
+ * the chat. The panel grows with content up to half the screen (measured, not
+ * hard-coded), then scrolls inside itself. One GENERATION at a time still —
+ * the thread is renderer memory; the server keeps its one-focal-pane law.
  */
 
 /** What the user asked, captured by pill-app at the moment the ask fired. */
@@ -30,9 +33,18 @@ export interface AskContext {
   readonly error: string | null;
 }
 
+/** A finished Q/A the thread keeps above the current one (New Chat wipes it). */
+export interface ThreadTurn {
+  readonly question: string | null;
+  readonly heardLabel: string | null;
+  readonly answer: string;
+}
+
 interface AnsweringPanelProps {
   readonly live: LiveSessionView;
   readonly ask: AskContext;
+  /** Completed Q/As from earlier asks in this chat, oldest first. */
+  readonly thread: readonly ThreadTurn[];
   readonly usesScreen: boolean;
   readonly onToggleScreen: () => void;
   readonly undetectable: boolean;
@@ -130,14 +142,15 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
     body.scrollTo({ top: body.scrollHeight, behavior: scrollBehavior() });
   };
 
-  // Keep the streaming tail in view while the reader is following.
+  // Keep the streaming tail in view while the reader is following — and jump
+  // when a new turn joins the thread (an ask just fired).
   useEffect(() => {
     const body = bodyRef.current;
     if (body === null || !following.current) {
       return;
     }
     body.scrollTo({ top: body.scrollHeight, behavior: "auto" });
-  }, [suggestion?.text]);
+  }, [suggestion?.text, props.thread.length]);
 
   // Shift+Ctrl+↑/↓ — "Scroll the response window", exactly as the Keybinds tab
   // promises. Window-level so it works without the body being focused.
@@ -194,36 +207,52 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
           <span className="visually-hidden" role="status">
             {announced}
           </span>
-          {props.ask.question !== null && (
-            <div className="answer__bubble">{props.ask.question}</div>
-          )}
-          <div className="answer__block">
-            {props.ask.heardLabel !== null && (
-              <span className="answer__caption">
-                Heard on call · {props.ask.heardLabel}
-              </span>
-            )}
-            {suggestion === null ? (
-              <span
-                className={
-                  emptyState.failed
-                    ? "answer__hint answer__hint--failed"
-                    : "answer__hint"
-                }
-              >
-                {emptyState.text}
-              </span>
-            ) : (
-              <div
-                className={
-                  suggestion.done
-                    ? "answer__text"
-                    : "answer__text answer__text--streaming"
-                }
-              >
-                {suggestion.text === "" ? "…" : suggestion.text}
+          {props.thread.map((turn, index) => (
+            // Index keys are safe here: the thread is append-only and only
+            // ever wiped whole (New Chat / a fresh call).
+            <div className="answer__turn" key={index}>
+              {turn.question !== null && (
+                <div className="answer__bubble">{turn.question}</div>
+              )}
+              <div className="answer__block">
+                {turn.heardLabel !== null && (
+                  <span className="answer__caption">
+                    Heard on call · {turn.heardLabel}
+                  </span>
+                )}
+                <AnswerMarkdown text={turn.answer} streaming={false} />
               </div>
+            </div>
+          ))}
+          <div className="answer__turn answer__turn--current">
+            {props.ask.question !== null && (
+              <div className="answer__bubble">{props.ask.question}</div>
             )}
+            <div className="answer__block">
+              {props.ask.heardLabel !== null && (
+                <span className="answer__caption">
+                  Heard on call · {props.ask.heardLabel}
+                </span>
+              )}
+              {suggestion === null ? (
+                <span
+                  className={
+                    emptyState.failed
+                      ? "answer__hint answer__hint--failed"
+                      : "answer__hint"
+                  }
+                >
+                  {emptyState.text}
+                </span>
+              ) : suggestion.text === "" ? (
+                <span className="answer__hint">…</span>
+              ) : (
+                <AnswerMarkdown
+                  text={suggestion.text}
+                  streaming={!suggestion.done}
+                />
+              )}
+            </div>
           </div>
         </div>
         {showJump && (
