@@ -35,6 +35,13 @@ mic (16kHz PCM, 40–80ms frames)
   conversation (~300ms).
 - Failover = active abort + `provider_switched` event; vendor reconnect with backoff
   is invisible to the client socket. Raw audio is **never written to disk** (RULES §3).
+- **Failure diagnostics (2026-08-16):** the engine takes an optional `SttLogger` port
+  (Fastify `app.log` shape, declared locally in `ports.ts` — the module still imports
+  nothing from its neighbors) and `warn`-logs every failure seam: `stt.connect_failed`,
+  `stt.vendor_error`, `stt.stream_ended`, `stt.silence_abort`, `stt.vendor_benched`,
+  `stt.exhausted`. Ids, error kinds, and capped adapter-authored messages only —
+  never transcript content (RULES §6). Motivated by a live repro where the client saw
+  "all STT vendors exhausted" while the server log stayed blank on why.
 
 ### modules/prompt (built when prompts land — Phases 5/7)
 - Prompts are **authored content files**, word-for-word from

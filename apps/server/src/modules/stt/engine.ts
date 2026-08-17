@@ -224,7 +224,7 @@ class SttSession implements SttSessionHandle {
           this.warn("stt.vendor_error", {
             vendor: vendorId,
             kind: ev.error.kind,
-            error: ev.error.message,
+            error: messageOf(ev.error),
           });
           // Auth is pointless to retry on the same vendor — bench + fail over.
           if (ev.error.kind === "auth") sawAuthError = true;
@@ -388,9 +388,21 @@ function kindOf(err: unknown): "transient" | "auth" | "protocol" {
   return err instanceof SttError ? err.kind : "transient";
 }
 
-/** A thrown value's human-readable message, for the diagnostics log. */
+/**
+ * Hard cap on logged error text. Adapters author every {@link SttError} message
+ * (templates + zod schema descriptions + WS close reasons — transcript text
+ * flows through `partial`/`final` events, never error messages), so the
+ * messages are already curated; the cap is defense-in-depth so a pathological
+ * vendor reason can never dump an unbounded blob into the log.
+ */
+const LOG_ERROR_MAX_CHARS = 200;
+
+/** A thrown value's human-readable message, capped, for the diagnostics log. */
 function messageOf(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  const message = err instanceof Error ? err.message : String(err);
+  return message.length <= LOG_ERROR_MAX_CHARS
+    ? message
+    : `${message.slice(0, LOG_ERROR_MAX_CHARS)}…`;
 }
 
 export const createSttEngine: CreateSttEngine = (

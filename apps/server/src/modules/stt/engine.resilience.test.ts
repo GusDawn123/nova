@@ -325,10 +325,58 @@ describe("STT engine — failure logging", () => {
       await vi.advanceTimersByTimeAsync(5000);
     }
 
-    expect(lines.some((l) => l.msg === "stt.silence_abort")).toBe(true);
-    expect(
-      lines.find((l) => l.msg === "stt.stream_ended")?.fields,
-    ).toMatchObject({ vendor: "assemblyai", reason: "died" });
+    const silenceAbortIndex = lines.findIndex(
+      (l) => l.msg === "stt.silence_abort",
+    );
+    const streamEndedIndex = lines.findIndex(
+      (l) => l.msg === "stt.stream_ended",
+    );
+    expect(lines[silenceAbortIndex]?.fields).toMatchObject({
+      session_id: "sess-A",
+      timeout_ms: 30000,
+    });
+    // The abort log is the CAUSE line; it must precede the death it triggers.
+    expect(silenceAbortIndex).toBeLessThan(streamEndedIndex);
+    expect(lines[streamEndedIndex]?.fields).toMatchObject({
+      vendor: "assemblyai",
+      reason: "died",
+    });
+    handle.stop();
+  });
+
+  it("[logging] an unbounded vendor error message is capped, never dumped whole", async () => {
+    const blob = "x".repeat(5000);
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: [
+        {
+          events: [
+            {
+              afterMs: 5,
+              event: { type: "error", error: new SttTransientError(blob) },
+            },
+          ],
+          terminal: "close",
+        },
+        { events: [], terminal: "hang" },
+      ],
+    });
+    const { logger, lines } = fakeLogger();
+    const engine = createSttEngine(
+      cfg({ reconnectBackoffMs: [0] }),
+      [primary],
+      logger,
+    );
+    const { emit } = capture();
+
+    const handle = engine.startSession(INFO, emit);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const logged = lines.find((l) => l.msg === "stt.vendor_error")?.fields[
+      "error"
+    ];
+    expect(typeof logged).toBe("string");
+    expect((logged as string).length).toBeLessThanOrEqual(201); // cap + ellipsis
     handle.stop();
   });
 
