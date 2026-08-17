@@ -171,7 +171,13 @@ function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
 export function maybeCreateLiveConductorFactory(
   app: FastifyInstance,
 ): LiveConductorFactory | undefined {
-  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
+  // 4096 output tokens for the live copilot: Brain A mandates fully-commented
+  // code + detailed explanations, which the adapters' 1024 default silently
+  // squeezed out of answers (2026-08-17 live repro — code arrived stripped of
+  // its comments). Paid per token generated, so short answers cost the same.
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
+    maxOutputTokens: 4096,
+  });
   if (providers.length === 0) return undefined;
 
   // FAIL CLOSED.

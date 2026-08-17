@@ -43,6 +43,16 @@ export function Svg({
   );
 }
 
+/** Two stacked rounded squares — copy to clipboard. */
+export function CopyIcon({ size = 14 }: IconProps): JSX.Element {
+  return (
+    <Svg size={size} strokeWidth={1.5}>
+      <rect x="7" y="7" width="9.5" height="9.5" rx="2" />
+      <path d="M13 3.5H5.5A2 2 0 0 0 3.5 5.5V13" />
+    </Svg>
+  );
+}
+
 /** The screen/camera glyph — "Uses Screen". */
 export function ScreenIcon({ size = 18 }: IconProps): JSX.Element {
   return (

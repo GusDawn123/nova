@@ -1,8 +1,18 @@
 /** @vitest-environment jsdom */
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AnswerMarkdown } from "./answer-markdown";
+
+// jsdom has no clipboard; the copy control needs a spyable one.
+const writeText = vi.fn(() => Promise.resolve());
+beforeEach(() => {
+  writeText.mockClear();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText },
+  });
+});
 
 /**
  * The answer body's rendering contract, pinned against the output grammar the
@@ -67,6 +77,43 @@ describe("AnswerMarkdown", () => {
     expect(container.querySelector(".md pre code")?.textContent).toBe(
       "const x = 1;\n",
     );
+  });
+
+  it("puts a copy control on the whole fence and copies its full text", async () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={"```python\ndef solve():\n    return 42\n```"}
+        streaming={false}
+      />,
+    );
+    const button = screen.getByTitle("Copy code");
+    fireEvent.click(button);
+    expect(writeText).toHaveBeenCalledWith("def solve():\n    return 42\n");
+    // The confirmation flips the control's face.
+    expect(await screen.findByTitle("Copied")).toBeTruthy();
+    expect(container.querySelectorAll(".codebox__copy")).toHaveLength(1);
+  });
+
+  it("never puts a copy control on inline code chips", () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={"Use the `useRef` hook and the `useState` hook."}
+        streaming={false}
+      />,
+    );
+    expect(container.querySelector(".codebox__copy")).toBeNull();
+  });
+
+  it("colors code tokens via highlight classes", () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={'```js\nconst greeting = "hello";\nreturn greeting;\n```'}
+        streaming={false}
+      />,
+    );
+    // rehype-highlight stamps hljs token spans the pill.css palette colors.
+    expect(container.querySelector(".hljs-keyword")).not.toBeNull();
+    expect(container.querySelector(".hljs-string")).not.toBeNull();
   });
 
   it("still renders bold and inline code as elements, never literal asterisks", () => {
