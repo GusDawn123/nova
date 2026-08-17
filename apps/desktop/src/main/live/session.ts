@@ -15,7 +15,8 @@ import { StereoInterleaver } from "./stereo";
  *   start(mode) → create the meeting row → open the authed `/live` socket →
  *   `session.start` (stereo) → on `session.ready`, start the native engine →
  *   me/them batches interleave to stereo frames and go up as binary →
- *   `transcript.*` events come down and are pushed to the renderer.
+ *   `transcript.*` and `suggestion.*` events come down and are pushed to the
+ *   renderer.
  *
  * One session at a time, mirroring the server's own one-per-user cap. Every
  * transport/vendor/engine failure lands on the emit channel as a typed event —
@@ -232,8 +233,40 @@ export function createLiveSessionService(
             message: `transcription switched from ${event.from} to ${event.to}`,
           });
           return;
+        case "suggestion.start":
+          deps.emit({
+            kind: "suggestion",
+            phase: "start",
+            id: event.suggestion_id,
+            text: "",
+          });
+          return;
+        case "suggestion.delta":
+          deps.emit({
+            kind: "suggestion",
+            phase: "delta",
+            id: event.suggestion_id,
+            text: event.text,
+          });
+          return;
+        case "suggestion.done":
+          deps.emit({
+            kind: "suggestion",
+            phase: "done",
+            id: event.suggestion_id,
+            text: event.text,
+          });
+          return;
+        case "suggestion.discard":
+          deps.emit({
+            kind: "suggestion",
+            phase: "discard",
+            id: event.suggestion_id,
+            text: "",
+          });
+          return;
         default:
-          // pong / audio.echo / suggestion.* — suggestions are a later chunk.
+          // pong / audio.echo — diagnostics the pill has no use for.
           return;
       }
     });

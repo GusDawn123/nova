@@ -10,6 +10,7 @@ import {
 } from "../design/icons";
 import type { AudioSession } from "./audio-session";
 import { formatSeconds } from "./pill-bar";
+import { SuggestionCard } from "./suggestion-card";
 import type { LiveSessionView, TranscriptRow } from "./use-live-session";
 
 interface TranscriptPanelProps {
@@ -57,7 +58,9 @@ const TranscriptLine = memo(function TranscriptLine(props: {
   return (
     <div
       className={
-        props.animate ? "transcript__row transcript__row--in" : "transcript__row"
+        props.animate
+          ? "transcript__row transcript__row--in"
+          : "transcript__row"
       }
     >
       <span className="transcript__ts">{formatTs(row.tsMs)}</span>
@@ -214,6 +217,14 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
           </button>
         )}
       </div>
+
+      {props.live.suggestion !== null && (
+        <SuggestionCard
+          key={props.live.suggestion.id}
+          suggestion={props.live.suggestion}
+          variant="inset"
+        />
+      )}
 
       <div className="transcript__foot">
         <button

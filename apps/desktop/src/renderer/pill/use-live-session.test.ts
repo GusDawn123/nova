@@ -41,13 +41,31 @@ const partial = (
   speaker: string | null,
   text: string,
   ts_ms: number,
-): LiveSessionEvent => ({ kind: "transcript", final: false, speaker, text, ts_ms });
+): LiveSessionEvent => ({
+  kind: "transcript",
+  final: false,
+  speaker,
+  text,
+  ts_ms,
+});
 
 const final = (
   speaker: string | null,
   text: string,
   ts_ms: number,
-): LiveSessionEvent => ({ kind: "transcript", final: true, speaker, text, ts_ms });
+): LiveSessionEvent => ({
+  kind: "transcript",
+  final: true,
+  speaker,
+  text,
+  ts_ms,
+});
+
+const suggest = (
+  phase: "start" | "delta" | "done" | "discard",
+  id: string,
+  text = "",
+): LiveSessionEvent => ({ kind: "suggestion", phase, id, text });
 
 describe("useLiveSession", () => {
   it("replaces a speaker's previous partial instead of appending", () => {
@@ -143,5 +161,111 @@ describe("useLiveSession", () => {
     const { unmount } = renderHook(() => useLiveSession());
     unmount();
     expect(unsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  describe("the suggestion pane", () => {
+    it("starts empty and appends deltas in order", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      expect(result.current.suggestion).toEqual({
+        id: "s-1",
+        text: "",
+        done: false,
+      });
+      push(suggest("delta", "s-1", "Short answer."));
+      push(suggest("delta", "s-1", " More detail."));
+      expect(result.current.suggestion).toMatchObject({
+        text: "Short answer. More detail.",
+        done: false,
+      });
+    });
+
+    it("done REPLACES the streamed text with the final body", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "raw streamed"));
+      push(suggest("done", "s-1", "The format-upgraded final body."));
+      expect(result.current.suggestion).toEqual({
+        id: "s-1",
+        text: "The format-upgraded final body.",
+        done: true,
+      });
+    });
+
+    it("done stands alone — a body with no witnessed stream still renders", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("done", "s-1", "complete answer"));
+      expect(result.current.suggestion).toEqual({
+        id: "s-1",
+        text: "complete answer",
+        done: true,
+      });
+    });
+
+    it("discard clears the pane", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "half a tho"));
+      push(suggest("discard", "s-1"));
+      expect(result.current.suggestion).toBeNull();
+    });
+
+    it("a superseding start owns the pane; the old stream's stragglers are ignored", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "old"));
+      // The server's supersede order: discard the old, then start the new.
+      push(suggest("discard", "s-1"));
+      push(suggest("start", "s-2"));
+      push(suggest("delta", "s-2", "new"));
+      // A straggler from the dead stream must not splice into the new one.
+      push(suggest("delta", "s-1", " ZOMBIE"));
+      push(suggest("done", "s-1", "ZOMBIE BODY"));
+      push(suggest("discard", "s-1"));
+      expect(result.current.suggestion).toEqual({
+        id: "s-2",
+        text: "new",
+        done: false,
+      });
+    });
+
+    it("a connecting status clears the previous call's suggestion", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("done", "s-1", "from the last call"));
+      push({ kind: "status", state: "connecting" });
+      expect(result.current.suggestion).toBeNull();
+    });
+
+    it.each(["ended", "error"] as const)(
+      "%s clears an unfinished suggestion — its stream can never finish",
+      (state) => {
+        const { result } = renderHook(() => useLiveSession());
+        push(suggest("start", "s-1"));
+        push(suggest("delta", "s-1", "half"));
+        push({ kind: "status", state });
+        expect(result.current.suggestion).toBeNull();
+      },
+    );
+
+    it("ended keeps a completed suggestion — it is a record, like a final row", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("done", "s-1", "kept"));
+      push({ kind: "status", state: "ended" });
+      expect(result.current.suggestion).toEqual({
+        id: "s-1",
+        text: "kept",
+        done: true,
+      });
+    });
+
+    it("suggestion events leave the transcript rows untouched", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(final("me", "line", 100));
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "answer"));
+      expect(result.current.rows).toHaveLength(1);
+      expect(result.current.rows[0]).toMatchObject({ text: "line" });
+    });
   });
 });

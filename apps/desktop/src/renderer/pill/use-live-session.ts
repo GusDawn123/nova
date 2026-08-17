@@ -8,6 +8,11 @@ import { useEffect, useRef, useState } from "react";
  * Transcript model: FINAL lines accumulate; each speaker has at most ONE
  * in-flight partial that later events replace (a partial is a hypothesis, and
  * stacking hypotheses would render every sentence three times as it forms).
+ *
+ * Suggestion model: ONE focal pane, mirroring the server's own arbitration
+ * (the conductor discards the old suggestion before starting a new one).
+ * Deltas append to the in-flight text; `done` REPLACES it with the server's
+ * complete, format-upgraded body; `discard` clears the pane.
  */
 
 export interface TranscriptRow {
@@ -18,18 +23,32 @@ export interface TranscriptRow {
   readonly final: boolean;
 }
 
+export interface SuggestionView {
+  readonly id: string;
+  readonly text: string;
+  /** True once `suggestion.done` landed — the body below is the final one. */
+  readonly done: boolean;
+}
+
 export interface LiveSessionView {
   readonly state: "idle" | "connecting" | "live" | "ended" | "error";
   readonly message: string | null;
   readonly rows: readonly TranscriptRow[];
+  readonly suggestion: SuggestionView | null;
 }
 
-const IDLE: LiveSessionView = { state: "idle", message: null, rows: [] };
+const IDLE: LiveSessionView = {
+  state: "idle",
+  message: null,
+  rows: [],
+  suggestion: null,
+};
 
 export function useLiveSession(): LiveSessionView {
   const [view, setView] = useState<LiveSessionView>(IDLE);
   const finals = useRef<TranscriptRow[]>([]);
   const partials = useRef(new Map<string, TranscriptRow>());
+  const suggestion = useRef<SuggestionView | null>(null);
   const nextKey = useRef(0);
 
   useEffect(() => {
@@ -46,25 +65,68 @@ export function useLiveSession(): LiveSessionView {
     return window.novaBridge.onLiveEvent((event) => {
       if (event.kind === "status") {
         if (event.state === "connecting") {
-          // A new session starts a new transcript.
+          // A new session starts a new transcript and a clean pane.
           finals.current = [];
           partials.current.clear();
+          suggestion.current = null;
         }
         if (event.state === "ended" || event.state === "error") {
           // A partial is a hypothesis the vendor never confirmed; leaving it
           // rendered would present unverified text as the record of the call.
           partials.current.clear();
+          // Same for a suggestion whose stream can never finish now — but a
+          // COMPLETED one stays visible: it is a record, like a final row.
+          if (suggestion.current !== null && !suggestion.current.done) {
+            suggestion.current = null;
+          }
         }
         setView({
           state: event.state,
           message: event.message ?? null,
           rows: rowsNow(),
+          suggestion: suggestion.current,
         });
         return;
       }
       if (event.kind === "notice") {
         // Advisory (device switched, provider failover): logged, not rendered.
         console.info(`[live] ${event.message}`);
+        return;
+      }
+      if (event.kind === "suggestion") {
+        const current = suggestion.current;
+        switch (event.phase) {
+          case "start":
+            suggestion.current = { id: event.id, text: "", done: false };
+            break;
+          case "delta":
+            // A delta for anything but the current in-flight suggestion is
+            // stale — its own discard already cleared (or replaced) the pane.
+            if (current === null || current.id !== event.id || current.done) {
+              return;
+            }
+            suggestion.current = {
+              ...current,
+              text: current.text + event.text,
+            };
+            break;
+          case "done":
+            // `done` carries the complete body, so it stands alone (it renders
+            // even if the pill missed the stream); it only yields to a NEWER
+            // suggestion already occupying the pane.
+            if (current !== null && current.id !== event.id) {
+              return;
+            }
+            suggestion.current = { id: event.id, text: event.text, done: true };
+            break;
+          case "discard":
+            if (current === null || current.id !== event.id) {
+              return;
+            }
+            suggestion.current = null;
+            break;
+        }
+        setView((v) => ({ ...v, suggestion: suggestion.current }));
         return;
       }
       const speakerKey = event.speaker ?? "unknown";

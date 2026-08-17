@@ -4,6 +4,7 @@ import { useScreenPrivacy } from "../hooks/use-screen-privacy";
 import { AUDIO_OFF, type AudioSession } from "./audio-session";
 import { HistoryPanel } from "./history-panel";
 import { PillBar } from "./pill-bar";
+import { SuggestionCard } from "./suggestion-card";
 import { TranscriptPanel } from "./transcript-panel";
 import { useLiveSession } from "./use-live-session";
 
@@ -152,43 +153,52 @@ export function PillApp(): JSX.Element {
     >
       <div className="pill-shell">
         {view === "pill" && (
-          <PillBar
-            focusMode={focusMode}
-            onFocusAsk={() => {
-              setFocusMode(true);
-            }}
-            onBlurAsk={() => {
-              setFocusMode(false);
-            }}
-            usesScreen={usesScreen}
-            onToggleScreen={() => {
-              setUsesScreen((current) => !current);
-            }}
-            undetectable={undetectable}
-            onToggleUndetectable={() => {
-              request(!undetectable);
-            }}
-            modeMenuOpen={modeMenu}
-            onToggleModeMenu={() => {
-              setModeMenu((current) => !current);
-            }}
-            activeMode={activeMode}
-            onPickMode={(id) => {
-              setActiveMode(id);
-              setModeMenu(false);
-            }}
-            audio={audio}
-            onStartAudio={startAudio}
-            onTogglePause={togglePause}
-            onStopAudio={stopAudio}
-            onOpenHistory={() => {
-              setView("history");
-              setModeMenu(false);
-            }}
-            onOpenTranscript={() => {
-              setView("transcript");
-            }}
-          />
+          <>
+            <PillBar
+              focusMode={focusMode}
+              onFocusAsk={() => {
+                setFocusMode(true);
+              }}
+              onBlurAsk={() => {
+                setFocusMode(false);
+              }}
+              usesScreen={usesScreen}
+              onToggleScreen={() => {
+                setUsesScreen((current) => !current);
+              }}
+              undetectable={undetectable}
+              onToggleUndetectable={() => {
+                request(!undetectable);
+              }}
+              modeMenuOpen={modeMenu}
+              onToggleModeMenu={() => {
+                setModeMenu((current) => !current);
+              }}
+              activeMode={activeMode}
+              onPickMode={(id) => {
+                setActiveMode(id);
+                setModeMenu(false);
+              }}
+              audio={audio}
+              onStartAudio={startAudio}
+              onTogglePause={togglePause}
+              onStopAudio={stopAudio}
+              onOpenHistory={() => {
+                setView("history");
+                setModeMenu(false);
+              }}
+              onOpenTranscript={() => {
+                setView("transcript");
+              }}
+            />
+            {live.suggestion !== null && (
+              <SuggestionCard
+                key={live.suggestion.id}
+                suggestion={live.suggestion}
+                variant="floating"
+              />
+            )}
+          </>
         )}
         {view === "history" && (
           <HistoryPanel
