@@ -19,6 +19,12 @@ export function SuggestionCard(props: {
   const { suggestion } = props;
   return (
     <div className={`suggestion suggestion--${props.variant}`}>
+      {/* Announces the two state CHANGES (started, ready) to screen readers.
+          The visible text below is deliberately NOT live — announcing every
+          streamed delta would be noise, not access. */}
+      <span className="visually-hidden" role="status">
+        {suggestion.done ? "Nova suggestion ready" : "Nova is suggesting"}
+      </span>
       <div className="suggestion__head">
         <span className="suggestion__who">NOVA</span>
         {!suggestion.done && <span className="suggestion__live-dot" />}

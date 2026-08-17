@@ -192,14 +192,15 @@ describe("useLiveSession", () => {
       });
     });
 
-    it("done stands alone — a body with no witnessed stream still renders", () => {
+    it("a late done for a discarded suggestion does not resurrect the pane", () => {
       const { result } = renderHook(() => useLiveSession());
-      push(suggest("done", "s-1", "complete answer"));
-      expect(result.current.suggestion).toEqual({
-        id: "s-1",
-        text: "complete answer",
-        done: true,
-      });
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "half a tho"));
+      push(suggest("discard", "s-1"));
+      // The server cleared the pane on purpose; a straggling done for the
+      // same id must not bring the body back from the dead.
+      push(suggest("done", "s-1", "ZOMBIE BODY"));
+      expect(result.current.suggestion).toBeNull();
     });
 
     it("discard clears the pane", () => {

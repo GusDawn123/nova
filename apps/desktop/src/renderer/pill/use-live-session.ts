@@ -111,10 +111,11 @@ export function useLiveSession(): LiveSessionView {
             };
             break;
           case "done":
-            // `done` carries the complete body, so it stands alone (it renders
-            // even if the pill missed the stream); it only yields to a NEWER
-            // suggestion already occupying the pane.
-            if (current !== null && current.id !== event.id) {
+            // A done always follows its own start on this socket, so it must
+            // match the pane like a delta does — otherwise a late done for a
+            // DISCARDED suggestion would resurrect a pane the server
+            // intentionally cleared.
+            if (current === null || current.id !== event.id) {
               return;
             }
             suggestion.current = { id: event.id, text: event.text, done: true };

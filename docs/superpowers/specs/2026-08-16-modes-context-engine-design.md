@@ -1,6 +1,8 @@
 # Modes, Context & the Two-Brain Prompt Engine — design
 
-**Date:** 2026-08-16 · **Status:** DRAFT — awaiting Gustavo's ratification
+**Date:** 2026-08-16 · **Status:** RATIFIED — Gustavo approved the design and
+ordered implementation to begin (2026-08-16). §7's "Open" list is what
+ratification deliberately left open; everything else is in force.
 **Scope:** the modes/prompts/context/RAG system (engine + wiring), the two-base
 prompt architecture, screen capture, and request routing. UI visuals for the
 Modes tab arrive as a separate Gustavo-authored UI spec; this doc defines the
@@ -26,9 +28,12 @@ Code assembles them; code never rewrites, paraphrases, or "improves" them
 
 **The never-both law.** A single LLM request contains exactly one brain. They are
 never concatenated, never both present, never merged into a conditional
-mega-prompt. This is enforced structurally: the assembler exposes two entry
-points (`assembleMeeting`, `assembleSolver`), each hard-wired to its own base,
-and a unit test proves no code path can compose a request with two identities.
+mega-prompt. Enforcement is structural and lands with **M2**: the assembler
+exposes two entry points (`assembleMeeting`, `assembleSolver`), each hard-wired
+to its own base, and a unit test proves no code path can compose a request with
+two identities. (Until M2, the only wired assembler is the legacy
+`assemble(mode, context)`, which knows neither brain — the law binds the new
+code, it does not describe today's.)
 
 ### 1.1 What the prompt texts themselves dictate to the architecture
 
@@ -68,10 +73,9 @@ These constraints come out of the prompts as written and bind the implementation
    frameless A requests hallucinate screen references, the fix is one ratified
    line in the dynamic suffix noting no screen is shared this moment — never an
    edit to the authored text.
-9. **Stale banners:** both files still carry pre-rename HTML comment banners
-   (the meeting file says "DRAFT / screen assumptions removed"; the solver file
-   says "copied 2026-07-20"). Banners are metadata, not prompt text; they get
-   corrected when this spec is ratified.
+9. **Banners:** corrected in the M0 commit alongside this doc — HTML comments
+   only, prompt text byte-untouched. (The solver file's historical
+   "copied 2026-07-20" note stays; it is still true.)
 
 ---
 
@@ -84,7 +88,7 @@ retire.
 
 **A mode is a row, not an enum:**
 
-```
+```text
 modes
   id            uuid PK
   user_id       uuid → auth.users (RLS: owner only)
@@ -100,17 +104,28 @@ profiles.active_mode_id  uuid NULL → modes.id   -- the checkmark; NULL = Gener
   matching the reference UI's promise, "leave it blank to use the default
   prompt." A mode whose `prompt_text` is blank and has no files behaves
   identically to General.
-- **Starter modes ship as seed templates**, visible to every account and
-  copied into the user's own rows on first edit (copy-on-edit; empty states sell
-  badly). Their text is Gustavo-authored seed content — the current library
-  blocks (`behavioral` / `technical` / `finance`) are raw material he can adapt
-  or discard, not code anymore.
+- **Starter modes ship as seed templates in their own read-only relation**
+  (`mode_templates`: global read policy, no user-owned rows exposed through
+  it), listed alongside the user's modes and copied into the user's own
+  `modes` rows in one transaction on first edit (copy-on-edit; empty states
+  sell badly). Owner-only RLS on `modes` stays intact — templates are never
+  rows in that table. Their text is Gustavo-authored seed content — the
+  current library blocks (`behavioral` / `technical` / `finance`) are raw
+  material he can adapt or discard, not code anymore. M3's proof includes a
+  fresh account seeing the templates and a first edit landing in its own rows.
 - **Wire change:** `session.start.mode` goes from the closed enum to
   `mode_id: uuid | null`. The server loads the row at session start and **locks
   a copy for the call** — mid-call edits or deletion of the mode never disturb a
   running session (value semantics), and the assembled prefix stays byte-stable
   per (brain, mode revision), which is what keeps the vendor prompt cache warm.
-  Deleting the active mode clears `active_mode_id` → General on the next call.
+- **Same-owner invariant, enforced — never assumed:** `profiles.active_mode_id`
+  may only ever point at a mode the same user owns. The FK to `modes.id` alone
+  does not say that, so the schema backs it (composite FK on
+  `(user_id, id)` or an equivalent trigger), set-active validates owner match
+  under RLS, and the session-start load re-checks owner even where server code
+  runs with elevated access. Soft-deleting a mode clears any
+  `active_mode_id` pointing at it in the same transaction → General on the
+  next call.
 - **Brain B is mode-less.** Modes, envelopes, and RAG are Brain-A concepts. B
   gets the frame, the ask, and (decision §7) a short labeled transcript tail.
 
@@ -123,10 +138,18 @@ is the doorway:
 - **Upload endpoint** per mode: extract text (v1: PDF, txt, md; reject anything
   else with a visible per-file `failed` status — never silently half-indexed),
   then ingest through the existing pipeline with a `mode_id` tag on the doc.
-- **Retrieval scoping:** at suggestion time, the active mode's docs rank first,
-  the user's global docs second (a filter/boost on the existing hybrid search).
-  Whole files are never injected — retrieval picks moment-relevant snippets, so
-  context stays bounded no matter what a user drags in. A 200-page PDF is fine.
+  V1 resource limits, enforced and surfaced in the UI when hit: **20 MB per
+  file, 300 PDF pages, a 60 s extraction timeout, 3 concurrent uploads per
+  user**. Oversize and timed-out files land in the same terminal `failed`
+  status — a bounded 200-page PDF is fine; an unbounded anything is not.
+- **Retrieval scoping is a hard filter, then ranking:** candidates are limited
+  to `user_id = current_user AND (mode_id = active_mode_id OR mode_id IS NULL)`
+  BEFORE hybrid ranking — an inactive mode's documents can never leak into a
+  live request, however well they score. Within the candidates, the active
+  mode's docs rank ahead of the global ones. (M4 gate fixture: a distinctive
+  fact planted in an INACTIVE mode's doc must not be retrievable.) Whole files
+  are never injected — retrieval picks moment-relevant snippets, so context
+  stays bounded no matter what a user drags in.
 - **Mid-call file adds take effect immediately** (retrieval is per-moment; only
   the mode's `prompt_text` is start-locked).
 
@@ -138,7 +161,7 @@ Gustavo's ruling: the enterprise prompt is good as written; the **backend** must
 make "context/user history" unambiguously mean *the data the user provided*.
 The mechanism is one structural contract in the assembler:
 
-```
+```text
 [Brain A, byte-for-byte, ending with its user-context anchor line]
 
 <user_provided_context>
@@ -157,11 +180,16 @@ The mechanism is one structural contract in the assembler:
   introduces; Gustavo ratifies them once and they freeze like everything else.
   An explicitly-empty envelope is what flips the model to its general-knowledge
   baseline instead of deflecting ("is context supposed to be here?" is answered).
-- **Two trust grades, one envelope.** `<user_script>` is the user's own typed
-  instructions — the "specific script/desired responses" the anchor line says to
-  prioritize. `<reference_files>` and `<user_memory>` are **facts-grade**: a
-  dragged PDF may contain a third party's text ("ignore your instructions"), so
-  file content informs answers but is never treated as instructions.
+- **Two trust grades, one envelope — and the typed contract keeps them apart.**
+  `<user_script>` is the user's own typed instructions — the "specific
+  script/desired responses" the anchor line says to prioritize.
+  `<reference_files>` and `<user_memory>` are **facts-grade**: a dragged PDF
+  may contain a third party's text ("ignore your instructions"), so file
+  content informs answers but is never treated as instructions. M2's context
+  schema therefore carries three SEPARATE fields (`user_script`,
+  `reference_files`, `user_memory`) — never a merged snippet list like the
+  legacy `ragSnippets` — so provenance survives all the way into the
+  assembled prompt.
 - Behavior is **proven, not argued** (§6 gates): empty envelope + general
   question → real answer; empty envelope + own-data question → honest "I don't
   have that."
@@ -181,10 +209,10 @@ audio, or chat"; capture is implicit in the ask):
   no timer, no disk writes, nothing to expire. The frame lives in memory for the
   lifetime of one request. This extends the "transcript-only storage" trust
   stance to pixels.
-- **One-frame law, enforced structurally:** the assembler accepts a single
-  optional frame; a request with two images cannot be constructed (typed +
-  tested), so "never feed multiple pictures" is not a model instruction — it is
-  physics.
+- **One-frame law, enforced structurally (built in M5):** the assembler accepts
+  a single optional frame; a request with two images cannot be constructed
+  (typed + tested), so "never feed multiple pictures" is not a model
+  instruction — it is physics.
 - **The screen toggle is consent.** Toggle off → no capture can occur, ever.
 - Capture failure (locked screen, permission) → the request proceeds frameless
   with a small UI note; Brain B's own `<unclear_or_empty_screen>` text handles
@@ -258,6 +286,9 @@ Key-gated live gates, run before any chunk here is called done:
    screen (guards §1.1(8)).
 8. **Prompt fidelity:** snapshot tests hold both brains byte-for-byte to their
    source docs (existing `assemble.snapshot.test.ts` pattern).
+9. **Injection inertness:** a `<reference_files>` snippet containing "ignore
+   prior instructions" is quoted as data — the suggestion neither obeys it nor
+   changes register because of it.
 
 The relevance/quiet/latency gates from Phase 7 re-run against the new Brain A —
 they were last measured on the legacy prompt (a known debt flagged in the
@@ -302,7 +333,7 @@ visible or load-bearing, and no chunk depends on an unratified decision.
 
 | # | Chunk | Deliverable | How we prove it |
 |---|---|---|---|
-| M0 | **This design doc** | decisions written down; prompt banners corrected | Gustavo reviews and ratifies |
+| M0 | **This design doc** | decisions written down; prompt banners corrected | landed with this doc's PR (banners: HTML comments only); ratified 2026-08-16 |
 | M1 | **Suggestions reach the pill** | the desktop stops dropping `suggestion.*`; the conductor's stream renders live in the pill (the engine's voice becomes visible; every later chunk gets a living testbed) | live call: a real suggestion streams into the pill unprompted; supersede/discard honored |
 | M2 | **The two-brain prompt engine** (server) | both authored prompts wired as the two assembler bases; envelope contract incl. empty form; never-both + fidelity enforcement; old library modes unwired | gates 1, 2, 4, 7, 8 green; Phase-7 relevance/quiet gates re-run on the new Brain A |
 | M3 | **Modes as data** | `modes` table + RLS, CRUD + set-active REST, `mode_id` on the wire, start-locked mode copy, seed templates; pill mode menu reads the real list (today 4 of its 5 entries are server-rejected) | gate 3 green vs a mode's planted fact; RLS A/B isolation; pick seeded mode → its script provably shapes a live suggestion |
