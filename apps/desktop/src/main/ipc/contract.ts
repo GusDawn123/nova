@@ -140,6 +140,23 @@ export const liveSessionEventSchema = z.discriminatedUnion("kind", [
     .strict(),
   /** Advisory only (device changes, provider failover) — never state. */
   z.object({ kind: z.literal("notice"), message: z.string() }).strict(),
+  /**
+   * One step of the focal suggestion's lifecycle, translated from the server's
+   * `suggestion.*` events. `delta` APPENDS to the in-flight text; `done`
+   * carries the complete final body (it REPLACES what streamed — the server
+   * format-upgrades it); `discard` clears the pane (superseded, speculation
+   * lost, or no response). `id` correlates the steps; the server discards the
+   * old suggestion before starting a new one, so at most one is in flight.
+   * The server's trigger-kind vocabulary is deliberately not forwarded.
+   */
+  z
+    .object({
+      kind: z.literal("suggestion"),
+      phase: z.enum(["start", "delta", "done", "discard"]),
+      id: z.string(),
+      text: z.string(),
+    })
+    .strict(),
 ]);
 export type LiveSessionEvent = z.infer<typeof liveSessionEventSchema>;
 

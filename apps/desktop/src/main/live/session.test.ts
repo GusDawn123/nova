@@ -229,6 +229,82 @@ describe("live session service", () => {
     });
   });
 
+  it("forwards the suggestion lifecycle to the emit channel", async () => {
+    const { socket, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    const sid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "suggestion.start",
+        suggestion_id: sid,
+        kind: "answer",
+      }),
+    );
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "suggestion.delta",
+        suggestion_id: sid,
+        text: "Short answer",
+      }),
+    );
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "suggestion.done",
+        suggestion_id: sid,
+        text: "Short answer, upgraded.",
+      }),
+    );
+    expect(events).toContainEqual({
+      kind: "suggestion",
+      phase: "start",
+      id: sid,
+      text: "",
+    });
+    expect(events).toContainEqual({
+      kind: "suggestion",
+      phase: "delta",
+      id: sid,
+      text: "Short answer",
+    });
+    expect(events).toContainEqual({
+      kind: "suggestion",
+      phase: "done",
+      id: sid,
+      text: "Short answer, upgraded.",
+    });
+  });
+
+  it("forwards a discard so the pill can clear the pane", async () => {
+    const { socket, events, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    const sid = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+    socket.fire(
+      "message",
+      JSON.stringify({
+        v: 1,
+        type: "suggestion.discard",
+        suggestion_id: sid,
+        reason: "superseded",
+      }),
+    );
+    expect(events).toContainEqual({
+      kind: "suggestion",
+      phase: "discard",
+      id: sid,
+      text: "",
+    });
+  });
+
   it("pauses by gating intake so both channels stay aligned", async () => {
     const { socket, engine, service } = harness();
     await service.start("general");

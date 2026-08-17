@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   authStateMessageSchema,
   credentialsSchema,
+  liveSessionEventSchema,
   meResultMessageSchema,
 } from "./contract";
 
@@ -84,6 +85,36 @@ describe("authStateMessageSchema", () => {
     });
 
     expect(JSON.stringify(parsed)).not.toContain("should-be-stripped");
+  });
+});
+
+describe("liveSessionEventSchema — the suggestion variant", () => {
+  it.each(["start", "delta", "done", "discard"] as const)(
+    "accepts phase %s",
+    (phase) => {
+      const parsed = liveSessionEventSchema.safeParse({
+        kind: "suggestion",
+        phase,
+        id: "s-1",
+        text: "body",
+      });
+      expect(parsed.success).toBe(true);
+    },
+  );
+
+  it.each([
+    [
+      "an unknown phase",
+      { kind: "suggestion", phase: "pause", id: "s", text: "" },
+    ],
+    ["a missing id", { kind: "suggestion", phase: "delta", text: "x" }],
+    ["a missing text", { kind: "suggestion", phase: "delta", id: "s" }],
+    [
+      "an unexpected key",
+      { kind: "suggestion", phase: "start", id: "s", text: "", zombie: true },
+    ],
+  ])("rejects %s", (_label, payload) => {
+    expect(liveSessionEventSchema.safeParse(payload).success).toBe(false);
   });
 });
 
