@@ -21,6 +21,13 @@ interface PillBarProps {
   readonly focusMode: boolean;
   readonly onFocusAsk: () => void;
   readonly onBlurAsk: () => void;
+  /**
+   * The ask (2026-08-17 no-auto-response posture): text = a typed question,
+   * null = the empty-handed Answer press ("respond to what was just said").
+   */
+  readonly onAsk: (text: string | null) => void;
+  /** Asks only mean something mid-call; the Answer chip reflects that. */
+  readonly canAsk: boolean;
   readonly usesScreen: boolean;
   readonly onToggleScreen: () => void;
   readonly undetectable: boolean;
@@ -57,7 +64,11 @@ export function PillBar(props: PillBarProps): JSX.Element {
       <div className="pill">
         <div className="pill__ask">
           {props.focusMode ? (
-            <AskInput placeholder={askLabel} onBlur={props.onBlurAsk} />
+            <AskInput
+              placeholder={askLabel}
+              onBlur={props.onBlurAsk}
+              onSubmit={props.onAsk}
+            />
           ) : (
             <span
               className="pill__tab-hint nd"
@@ -69,9 +80,19 @@ export function PillBar(props: PillBarProps): JSX.Element {
               <span className="pill__tab-label">to focus</span>
             </span>
           )}
-          <span className="corner-box">
+          <button
+            type="button"
+            className="corner-box corner-box--click nd"
+            title={
+              props.canAsk ? "Answer (Ctrl+↵)" : "Start a session to ask Nova"
+            }
+            disabled={!props.canAsk}
+            onClick={() => {
+              props.onAsk(null);
+            }}
+          >
             <ReturnIcon />
-          </span>
+          </button>
         </div>
 
         <div className="pill__bar">
@@ -243,9 +264,11 @@ export function formatSeconds(total: number): string {
 function AskInput({
   placeholder,
   onBlur,
+  onSubmit,
 }: {
   readonly placeholder: string;
   readonly onBlur: () => void;
+  readonly onSubmit: (text: string | null) => void;
 }): JSX.Element {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
@@ -257,6 +280,28 @@ function AskInput({
       className="pill__input nd"
       placeholder={placeholder}
       onBlur={onBlur}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter") {
+          return;
+        }
+        // An IME confirming a composition also presses Enter; that is text
+        // entry, not a submit.
+        if (event.nativeEvent.isComposing) {
+          return;
+        }
+        event.preventDefault();
+        const text = event.currentTarget.value.trim();
+        if (text !== "") {
+          event.currentTarget.value = "";
+          onSubmit(text);
+          return;
+        }
+        // Ctrl+↵ with nothing typed is the Answer key ("answer what was just
+        // said"); a bare Enter on an empty field stays inert — nobody means it.
+        if (event.ctrlKey) {
+          onSubmit(null);
+        }
+      }}
     />
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * The renderer's picture of the live call, built entirely from main's
@@ -37,6 +37,12 @@ export interface LiveSessionView {
   readonly suggestion: SuggestionView | null;
 }
 
+/** The view plus the one renderer-owned act: wiping the pane (New Chat, or a
+ * fresh ask claiming it before its own stream arrives). */
+export interface LiveSessionHandle extends LiveSessionView {
+  readonly clearSuggestion: () => void;
+}
+
 const IDLE: LiveSessionView = {
   state: "idle",
   message: null,
@@ -44,7 +50,7 @@ const IDLE: LiveSessionView = {
   suggestion: null,
 };
 
-export function useLiveSession(): LiveSessionView {
+export function useLiveSession(): LiveSessionHandle {
   const [view, setView] = useState<LiveSessionView>(IDLE);
   const finals = useRef<TranscriptRow[]>([]);
   const partials = useRef(new Map<string, TranscriptRow>());
@@ -161,5 +167,10 @@ export function useLiveSession(): LiveSessionView {
     });
   }, []);
 
-  return view;
+  const clearSuggestion = useCallback((): void => {
+    suggestion.current = null;
+    setView((current) => ({ ...current, suggestion: null }));
+  }, []);
+
+  return { ...view, clearSuggestion };
 }

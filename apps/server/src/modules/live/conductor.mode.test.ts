@@ -35,6 +35,7 @@ async function systemPromptFor(
     send: () => undefined,
     router: makeRouter([provider], liveLlmConfig()),
     config: CONFIG,
+    autoSuggest: true,
     ...(mode !== undefined ? { mode } : {}),
   });
   conductor.onFinal("So how would you price this for us?", "them");

@@ -184,6 +184,24 @@ describe("clientLiveEventSchema", () => {
     ).toBe(false);
   });
 
+  it("accepts suggest.now — the empty-handed Answer press (2026-08-17)", () => {
+    expect(parseClientEvent({ v: 1, type: "suggest.now" }).success).toBe(true);
+  });
+
+  it("rejects suggest.now carrying a payload it does not define", () => {
+    // Not `.strict()` — zod objects strip unknown keys — but text must not
+    // sneak through as data: the parsed event carries only v + type.
+    const result = parseClientEvent({
+      v: 1,
+      type: "suggest.now",
+      text: "smuggled",
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect("text" in result.data).toBe(false);
+    }
+  });
+
   it("rejects an unknown event type", () => {
     expect(parseClientEvent({ v: 1, type: "nope" }).success).toBe(false);
   });

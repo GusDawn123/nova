@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   authStateMessageSchema,
   credentialsSchema,
+  liveAskMessageSchema,
   liveSessionEventSchema,
   meResultMessageSchema,
 } from "./contract";
@@ -115,6 +116,26 @@ describe("liveSessionEventSchema — the suggestion variant", () => {
     ],
   ])("rejects %s", (_label, payload) => {
     expect(liveSessionEventSchema.safeParse(payload).success).toBe(false);
+  });
+});
+
+describe("liveAskMessageSchema", () => {
+  it("accepts a typed question and the null Answer press", () => {
+    expect(
+      liveAskMessageSchema.safeParse({ text: "what did we quote them?" })
+        .success,
+    ).toBe(true);
+    expect(liveAskMessageSchema.safeParse({ text: null }).success).toBe(true);
+  });
+
+  it.each([
+    ["an empty question", { text: "" }],
+    ["an oversized question", { text: "x".repeat(2001) }],
+    ["a missing text field", {}],
+    ["a non-string text", { text: 42 }],
+    ["an unexpected key", { text: null, mode: "general" }],
+  ])("rejects %s", (_label, payload) => {
+    expect(liveAskMessageSchema.safeParse(payload).success).toBe(false);
   });
 });
 

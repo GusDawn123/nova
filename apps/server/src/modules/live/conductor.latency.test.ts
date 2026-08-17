@@ -73,6 +73,7 @@ describe("modules/live [latency] tested contract", () => {
         send: capture(),
         router: routerWith(ttft),
         config: conductorConfigSchema.parse({ speculationEnabled: false }),
+        autoSuggest: true,
       });
       const t0 = Date.now();
       conductor.onFinal("What is your pricing model exactly?", "them");
@@ -101,6 +102,7 @@ describe("modules/live [latency] tested contract", () => {
         send: capture(),
         router: routerWith(ttft),
         config: conductorConfigSchema.parse({ speculationEnabled: true }),
+        autoSuggest: true,
       });
       const t0 = Date.now();
       // Fire on the confident partial, let it stream during the speech tail…

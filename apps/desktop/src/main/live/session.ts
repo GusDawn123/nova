@@ -55,6 +55,13 @@ export interface LiveSessionService {
   start(mode: LiveMode): Promise<LiveActionResult>;
   stop(): void;
   setPaused(paused: boolean): void;
+  /**
+   * Ask the copilot mid-call (the no-auto-response posture: suggestions fire
+   * only from these). A string is a typed question (`transcript.input`,
+   * origin `copilot_question`); null is the empty-handed Answer press
+   * (`suggest.now` — answer whatever was just said).
+   */
+  ask(text: string | null): LiveActionResult;
   dispose(): void;
 }
 
@@ -355,6 +362,41 @@ export function createLiveSessionService(
       if (active !== null) {
         active.paused = paused;
       }
+    },
+
+    ask(text) {
+      const session = active;
+      // Gated on `ready`, not just on a claim: before `session.ready` the
+      // server would refuse the ask anyway (`input_before_start`), so the
+      // refusal happens here with a sentence instead of over the wire. And on
+      // `stopping`: session.end is already queued, so an ask behind it would
+      // report ok for an answer that can never arrive.
+      if (
+        session === null ||
+        session.finished ||
+        session.stopping ||
+        !session.ready
+      ) {
+        return { ok: false, message: "No live session is running." };
+      }
+      try {
+        session.socket?.send(
+          JSON.stringify(
+            text === null
+              ? { v: LIVE_PROTOCOL_VERSION, type: "suggest.now" }
+              : {
+                  v: LIVE_PROTOCOL_VERSION,
+                  type: "transcript.input",
+                  text,
+                  origin: "copilot_question",
+                },
+          ),
+        );
+      } catch (error: unknown) {
+        const reason = error instanceof Error ? error.message : String(error);
+        return { ok: false, message: `The ask could not be sent (${reason}).` };
+      }
+      return { ok: true };
     },
 
     dispose() {

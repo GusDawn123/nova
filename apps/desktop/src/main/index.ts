@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from "electron";
+import { app, BrowserWindow, Menu } from "electron";
 import WebSocket from "ws";
 import { z } from "zod";
 
@@ -45,6 +45,12 @@ const privacy = createScreenPrivacy();
 
 async function bootstrap(): Promise<void> {
   await app.whenReady();
+
+  // No application menu: Nova's windows are frameless and the DEFAULT menu's
+  // accelerators shadow the product's own keybinds — its `reload` role owns
+  // Ctrl+R, so New Chat (Keybinds tab) would reload the pill instead of ever
+  // reaching the renderer.
+  Menu.setApplicationMenu(null);
 
   const auth = createAuthService();
   const api = createApiClient({
@@ -99,7 +105,16 @@ async function bootstrap(): Promise<void> {
             message:
               "Supabase is not configured, so the call could not be set up.",
           }),
-    emit: pushLiveEvent,
+    emit: (event) => {
+      // Errors and notices also land on stdout: the pill renders them, but a
+      // terminal (or a log file) is what a debugging session can actually read.
+      if (event.kind === "status" && event.state === "error") {
+        console.error(`[live] error: ${event.message ?? "(no message)"}`);
+      } else if (event.kind === "notice") {
+        console.warn(`[live] notice: ${event.message}`);
+      }
+      pushLiveEvent(event);
+    },
   });
 
   const disposeIpc = registerIpcHandlers({

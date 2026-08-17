@@ -282,6 +282,79 @@ describe("live session service", () => {
     });
   });
 
+  it("ask(text) sends a typed copilot question up the socket", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    const result = service.ask("how do I answer the budget pushback?");
+    expect(result).toEqual({ ok: true });
+    expect(socket.jsonSent().at(-1)).toEqual({
+      v: 1,
+      type: "transcript.input",
+      text: "how do I answer the budget pushback?",
+      origin: "copilot_question",
+    });
+  });
+
+  it("ask(null) sends the empty-handed Answer press as suggest.now", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    const result = service.ask(null);
+    expect(result).toEqual({ ok: true });
+    expect(socket.jsonSent().at(-1)).toEqual({ v: 1, type: "suggest.now" });
+  });
+
+  it("ask refuses typed when no session is running", () => {
+    const { service } = harness();
+    expect(service.ask("anyone there?")).toEqual({
+      ok: false,
+      message: "No live session is running.",
+    });
+  });
+
+  it("ask refuses before session.ready — the server would too", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open"); // connected, but session.ready never arrived
+    const result = service.ask(null);
+    expect(result.ok).toBe(false);
+    // Nothing but the session.start went up.
+    expect(socket.jsonSent()).toHaveLength(1);
+  });
+
+  it("ask refuses once stop() queued session.end — no ok for a dead answer", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    service.stop();
+    const result = service.ask(null);
+    expect(result).toEqual({
+      ok: false,
+      message: "No live session is running.",
+    });
+    // session.start + session.end and nothing behind them.
+    expect(socket.jsonSent().at(-1)).toMatchObject({ type: "session.end" });
+  });
+
+  it("ask fails typed when the socket throws mid-send", async () => {
+    const { socket, service } = harness();
+    await service.start("general");
+    socket.fire("open");
+    socket.fire("message", ready);
+    socket.send = () => {
+      throw new Error("socket buried");
+    };
+    const result = service.ask("still there?");
+    expect(result).toEqual({
+      ok: false,
+      message: "The ask could not be sent (socket buried).",
+    });
+  });
+
   it("forwards a discard so the pill can clear the pane", async () => {
     const { socket, events, service } = harness();
     await service.start("general");

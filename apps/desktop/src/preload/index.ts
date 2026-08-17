@@ -67,6 +67,13 @@ export interface NovaBridge {
   readonly startLiveSession: (mode: string) => Promise<LiveActionResult>;
   readonly stopLiveSession: () => Promise<LiveActionResult>;
   readonly setLiveSessionPaused: (paused: boolean) => void;
+  /**
+   * Ask the copilot mid-call (no-auto-response posture — suggestions fire only
+   * from these). A string is a typed question; null is the empty-handed Answer
+   * press ("respond to what was just said"). The answer streams back through
+   * `onLiveEvent` as `suggestion.*`.
+   */
+  readonly askLive: (text: string | null) => Promise<LiveActionResult>;
   readonly onLiveEvent: (
     listener: (event: LiveSessionEvent) => void,
   ) => () => void;
@@ -221,6 +228,15 @@ const novaBridge: NovaBridge = {
 
   setLiveSessionPaused: (paused) => {
     ipcRenderer.send(IpcChannel.liveSetPaused, { paused });
+  },
+
+  askLive: async (text) => {
+    const parsed = liveActionResultSchema.safeParse(
+      await invoke(IpcChannel.liveAsk, { text }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, message: INVALID_BRIDGE_RESPONSE_MESSAGE };
   },
 
   onLiveEvent: (listener) => {

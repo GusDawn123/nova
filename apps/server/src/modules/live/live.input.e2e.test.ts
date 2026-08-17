@@ -55,11 +55,14 @@ type Database = {
  * decision 2026-07-22): a REAL authed WebSocket against the REAL app — real
  * Supabase JWT, real session gates, real conductor, real live-tier router
  * (OpenAI + Google keys; anthropic stays disabled) — sends `transcript.input`
- * with a question and asserts the REAL streamed answer:
+ * with a question and asserts the REAL streamed answer under the manual
+ * posture (2026-08-17, no auto-response — the utterance alone fires nothing;
+ * the Answer key is what spends):
  *   transcript.input → transcript.final echo (speaker "them") →
- *   suggestion.start → suggestion.delta+ → suggestion.done (non-empty).
- * This is exactly what the mobile "ask a question" box drives. Runs ONLY with
- * the local stack + an LLM key (`describe.skipIf`); keyless CI skips cleanly.
+ *   suggest.now → suggestion.start → suggestion.delta+ → suggestion.done.
+ * This is exactly what the pill's typed-utterance + Answer-key flow drives.
+ * Runs ONLY with the local stack + an LLM key (`describe.skipIf`); keyless CI
+ * skips cleanly.
  */
 
 vi.setConfig({ testTimeout: 120_000, hookTimeout: 60_000 });
@@ -177,6 +180,8 @@ describe.skipIf(!canRun)(
           }
           if (event.type === "transcript.final" && event.text === QUESTION) {
             echoed = event.speaker === "them";
+            // The utterance fires nothing on its own now — press Answer.
+            ws.send(JSON.stringify({ v: 1, type: "suggest.now" }));
           }
           if (event.type === "suggestion.delta") {
             deltas += 1;

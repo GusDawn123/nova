@@ -268,5 +268,28 @@ describe("useLiveSession", () => {
       expect(result.current.rows).toHaveLength(1);
       expect(result.current.rows[0]).toMatchObject({ text: "line" });
     });
+
+    it("clearSuggestion wipes the pane and ignores the dead stream's rest", () => {
+      const { result } = renderHook(() => useLiveSession());
+      push(suggest("start", "s-1"));
+      push(suggest("delta", "s-1", "half an ans"));
+      act(() => {
+        result.current.clearSuggestion();
+      });
+      expect(result.current.suggestion).toBeNull();
+      // New Chat cleared it locally; whatever the dead stream still sends
+      // must not repaint the pane.
+      push(suggest("delta", "s-1", "wer"));
+      push(suggest("done", "s-1", "full body"));
+      expect(result.current.suggestion).toBeNull();
+      // But the pane is only cleared, never latched shut: the NEXT ask's
+      // stream must still paint.
+      push(suggest("start", "s-2"));
+      push(suggest("delta", "s-2", "the new answer"));
+      expect(result.current.suggestion).toMatchObject({
+        id: "s-2",
+        text: "the new answer",
+      });
+    });
   });
 });

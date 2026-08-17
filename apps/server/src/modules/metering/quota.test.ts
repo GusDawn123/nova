@@ -22,6 +22,10 @@ function plans(plan: "free" | "pro"): PlanReader {
   return { getPlan: () => Promise.resolve(plan) };
 }
 
+function roles(role: "developer" | "admin" | "customer" = "customer") {
+  return { getRole: () => Promise.resolve(role) };
+}
+
 /** Tiny injected limits so the arithmetic is obvious. */
 const config = meteringConfigSchema.parse({
   plans: {
@@ -40,6 +44,7 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: usedInPeriod(59),
       plans: plans("free"),
+      roles: roles(),
       config,
       logger,
     });
@@ -51,6 +56,7 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: usedInPeriod(60),
       plans: plans("free"),
+      roles: roles(),
       config,
       logger,
     });
@@ -62,6 +68,7 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: usedInPeriod(599),
       plans: plans("pro"),
+      roles: roles(),
       config,
       logger,
     });
@@ -74,6 +81,7 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: used,
       plans: plans("free"),
+      roles: roles(),
       config,
       logger,
     });
@@ -86,6 +94,7 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: usedInPeriod(999_999),
       plans: { getPlan: () => Promise.reject(new Error("db down")) },
+      roles: roles(),
       config,
       logger,
     });
@@ -98,10 +107,53 @@ describe("createQuotaChecker", () => {
     const checker = createQuotaChecker({
       usedInPeriod: vi.fn(() => Promise.reject(new Error("sum failed"))),
       plans: plans("free"),
+      roles: roles(),
       config,
       logger,
     });
     await expect(checker.isOverQuota("u1", "llm_tokens")).resolves.toBe(false);
+    expect(error).toHaveBeenCalledTimes(1);
+  });
+
+  it("a developer is metered but never refused, however far past the limit", async () => {
+    // Gustavo, 2026-08-17: a dev account testing all day must not wall itself
+    // out of its own product. The ledger still records (usedInPeriod is still
+    // consulted); only the refusal is waived.
+    const { logger } = spyLogger();
+    const used = usedInPeriod(999_999);
+    const checker = createQuotaChecker({
+      usedInPeriod: used,
+      plans: plans("free"),
+      roles: roles("developer"),
+      config,
+      logger,
+    });
+    await expect(checker.isOverQuota("u1", "stt_seconds")).resolves.toBe(false);
+    await expect(checker.isOverQuota("u1", "llm_tokens")).resolves.toBe(false);
+  });
+
+  it("an admin gets NO exemption — customer limits bind until decided otherwise", async () => {
+    const { logger } = spyLogger();
+    const checker = createQuotaChecker({
+      usedInPeriod: usedInPeriod(60),
+      plans: plans("free"),
+      roles: roles("admin"),
+      config,
+      logger,
+    });
+    await expect(checker.isOverQuota("u1", "stt_seconds")).resolves.toBe(true);
+  });
+
+  it("a role-read failure keeps quota's fail-open posture", async () => {
+    const { logger, error } = spyLogger();
+    const checker = createQuotaChecker({
+      usedInPeriod: usedInPeriod(999_999),
+      plans: plans("free"),
+      roles: { getRole: () => Promise.reject(new Error("db down")) },
+      config,
+      logger,
+    });
+    await expect(checker.isOverQuota("u1", "stt_seconds")).resolves.toBe(false);
     expect(error).toHaveBeenCalledTimes(1);
   });
 });

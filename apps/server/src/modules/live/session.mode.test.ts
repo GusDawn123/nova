@@ -31,6 +31,7 @@ function recordingFactory(): {
       onPartial: () => undefined,
       onFinal: () => undefined,
       onDirectQuestion: () => undefined,
+      answerNow: () => undefined,
       dispose: () => undefined,
     };
   };
@@ -50,10 +51,7 @@ function makeSession(overrides: Partial<LiveSessionDeps> = {}): {
   return { session, sent };
 }
 
-const startFrame = (
-  mode?: string,
-  meetingId: string = MEETING_ID,
-): string =>
+const startFrame = (mode?: string, meetingId: string = MEETING_ID): string =>
   JSON.stringify({
     v: 1,
     type: "session.start",
