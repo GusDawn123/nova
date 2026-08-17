@@ -4,8 +4,10 @@ import type { ServerLiveEvent } from "@nova/shared";
 import { sttConfigSchema, type SttConfigInput } from "./config.js";
 import { createSttEngine } from "./engine.js";
 import {
+  SttAuthError,
   SttTransientError,
   type SttEmit,
+  type SttLogger,
   type SttSessionInfo,
 } from "./ports.js";
 import {
@@ -189,6 +191,183 @@ describe("STT engine — reconnect", () => {
     expect(() => {
       handle.stop();
     }).not.toThrow();
+  });
+});
+
+describe("STT engine — failure logging", () => {
+  // The 2026-08-16 live repro: "all STT vendors exhausted" reached the client
+  // while the server log stayed blank on why. Every failure seam must now say
+  // what happened — with ids, kinds, and error messages ONLY (RULES §6).
+  function fakeLogger(): {
+    logger: SttLogger;
+    lines: Array<{ msg: string; fields: Record<string, unknown> }>;
+  } {
+    const lines: Array<{ msg: string; fields: Record<string, unknown> }> = [];
+    return {
+      logger: {
+        warn: (fields, msg) => {
+          lines.push({ msg, fields });
+        },
+      },
+      lines,
+    };
+  }
+
+  it("[logging] connect failures, benching, and exhaustion land in the log with vendor + reason", async () => {
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: failing(8),
+    });
+    const fallback = new MockVendor({
+      id: "deepgram",
+      connections: failing(8),
+    });
+    const { logger, lines } = fakeLogger();
+    const engine = createSttEngine(
+      cfg({
+        maxReconnects: 2,
+        failoverThreshold: 2,
+        reconnectBackoffMs: [0],
+        connectTimeoutMs: 200,
+      }),
+      [primary, fallback],
+      logger,
+    );
+    const { emit } = capture();
+
+    engine.startSession(INFO, emit);
+    await vi.advanceTimersByTimeAsync(20000);
+
+    const connectFails = lines.filter((l) => l.msg === "stt.connect_failed");
+    expect(connectFails.length).toBeGreaterThanOrEqual(4); // both vendors' attempts
+    expect(connectFails[0]?.fields).toMatchObject({
+      session_id: "sess-A",
+      vendor: "assemblyai",
+      kind: "transient",
+      error: "vendor unreachable",
+    });
+    expect(
+      lines
+        .filter((l) => l.msg === "stt.vendor_benched")
+        .map((l) => l.fields["vendor"]),
+    ).toEqual(["assemblyai", "deepgram"]);
+    const exhausted = lines.filter((l) => l.msg === "stt.exhausted");
+    expect(exhausted).toHaveLength(1);
+    expect(exhausted[0]?.fields["vendors"]).toEqual(["assemblyai", "deepgram"]);
+  });
+
+  it("[logging] a mid-stream vendor error logs its kind and message; the stream's death logs its reason", async () => {
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: [
+        {
+          events: [
+            {
+              afterMs: 10,
+              event: {
+                type: "error",
+                error: new SttAuthError("credentials rejected"),
+              },
+            },
+          ],
+          terminal: "close",
+        },
+      ],
+    });
+    const fallback = new MockVendor({
+      id: "deepgram",
+      connections: [{ events: [], terminal: "hang" }],
+    });
+    const { logger, lines } = fakeLogger();
+    const engine = createSttEngine(
+      cfg({ reconnectBackoffMs: [0] }),
+      [primary, fallback],
+      logger,
+    );
+    const { emit } = capture();
+
+    const handle = engine.startSession(INFO, emit);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(
+      lines.find((l) => l.msg === "stt.vendor_error")?.fields,
+    ).toMatchObject({
+      vendor: "assemblyai",
+      kind: "auth",
+      error: "credentials rejected",
+    });
+    expect(
+      lines.find((l) => l.msg === "stt.stream_ended")?.fields,
+    ).toMatchObject({ vendor: "assemblyai", reason: "auth" });
+    handle.stop();
+  });
+
+  it("[logging] a silence abort says so before the reconnect", async () => {
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: [
+        { events: [], terminal: "hang" },
+        { events: [], terminal: "hang" },
+      ],
+    });
+    const { logger, lines } = fakeLogger();
+    const engine = createSttEngine(
+      cfg({ vendorSilenceTimeoutMs: 30000, reconnectBackoffMs: [0] }),
+      [primary],
+      logger,
+    );
+    const { emit } = capture();
+
+    const handle = engine.startSession(INFO, emit);
+    await vi.advanceTimersByTimeAsync(0);
+    for (let i = 0; i < 7; i += 1) {
+      handle.onAudioFrame(Buffer.from([i]));
+      await vi.advanceTimersByTimeAsync(5000);
+    }
+
+    expect(lines.some((l) => l.msg === "stt.silence_abort")).toBe(true);
+    expect(
+      lines.find((l) => l.msg === "stt.stream_ended")?.fields,
+    ).toMatchObject({ vendor: "assemblyai", reason: "died" });
+    handle.stop();
+  });
+
+  it("[logging] transcript content never reaches the log", async () => {
+    const primary = new MockVendor({
+      id: "assemblyai",
+      connections: [
+        {
+          events: [
+            {
+              afterMs: 5,
+              event: {
+                type: "partial",
+                text: "the confidential words",
+                speaker: "them",
+                ts_ms: 1,
+              },
+            },
+            { afterMs: 5, event: { type: "closed" } },
+          ],
+          terminal: "close",
+        },
+        { events: [], terminal: "hang" },
+      ],
+    });
+    const { logger, lines } = fakeLogger();
+    const engine = createSttEngine(
+      cfg({ reconnectBackoffMs: [0] }),
+      [primary],
+      logger,
+    );
+    const { emit } = capture();
+
+    const handle = engine.startSession(INFO, emit);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(lines.length).toBeGreaterThan(0); // the death itself was logged
+    expect(JSON.stringify(lines)).not.toContain("the confidential words");
+    handle.stop();
   });
 });
 

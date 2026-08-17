@@ -157,6 +157,18 @@ export interface SttSessionHandle {
   stop(): void;
 }
 
+/**
+ * Minimal structured log sink (Fastify `app.log` shape), declared locally so the
+ * module keeps importing nothing from its neighbors. The engine reports vendor
+ * failures through it — connect refusals, mid-stream errors, silence aborts,
+ * failovers, exhaustion — with ids and error kinds only, NEVER transcript
+ * content (RULES §6). Without it, "all STT vendors exhausted" reaches the
+ * client while the server log stays blank on why (2026-08-16 live repro).
+ */
+export interface SttLogger {
+  warn(fields: Record<string, unknown>, msg: string): void;
+}
+
 /** The engine: a factory of per-session handles over a fixed vendor lineup. */
 export interface SttEngine {
   /**
@@ -175,4 +187,5 @@ export interface SttEngine {
 export type CreateSttEngine = (
   config: SttConfig,
   vendors: readonly SttVendor[],
+  logger?: SttLogger,
 ) => SttEngine;

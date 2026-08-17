@@ -7,6 +7,7 @@ import {
   type CreateSttEngine,
   type SttEmit,
   type SttEngine,
+  type SttLogger,
   type SttSessionHandle,
   type SttSessionInfo,
   type SttVendor,
@@ -60,6 +61,7 @@ class SttSession implements SttSessionHandle {
     private readonly vendors: readonly SttVendor[],
     private readonly info: SttSessionInfo,
     private readonly emit: SttEmit,
+    private readonly logger: SttLogger | null,
   ) {
     // Pre-warm: kick the control loop off at session start (design doc). It never
     // rejects, but a defensive catch keeps a stray failure from going unhandled.
@@ -122,6 +124,11 @@ class SttSession implements SttSessionHandle {
           conn = await this.connect(vendor);
         } catch (err) {
           if (this.isStopped()) return;
+          this.warn("stt.connect_failed", {
+            vendor: vendor.id,
+            kind: kindOf(err),
+            error: messageOf(err),
+          });
           if (kindOf(err) === "auth") break vendorLoop; // bench → fail over now
           if (!everEstablished) {
             preFailures += 1;
@@ -151,9 +158,10 @@ class SttSession implements SttSessionHandle {
         }
         this.activate(conn);
 
-        const reason = await this.consume(conn);
+        const reason = await this.consume(conn, vendor.id);
         this.deactivate();
         if (reason === "stopped") return;
+        this.warn("stt.stream_ended", { vendor: vendor.id, reason });
         if (reason === "auth") break vendorLoop; // bench → fail over
 
         reconnects += 1;
@@ -163,11 +171,15 @@ class SttSession implements SttSessionHandle {
 
       // Fell out of the vendor loop → fail over to the next vendor. The switch
       // only becomes visible once that vendor actually establishes.
+      this.warn("stt.vendor_benched", { vendor: vendor.id });
       pendingFrom = vendor.id;
     }
 
     // Every vendor exhausted: one typed error, then tear down (never hang).
     if (this.isStopped()) return;
+    this.warn("stt.exhausted", {
+      vendors: this.vendors.map((vendor) => vendor.id),
+    });
     this.emitEvent({
       v: LIVE_PROTOCOL_VERSION,
       type: "error",
@@ -178,7 +190,10 @@ class SttSession implements SttSessionHandle {
   }
 
   /** Consume a live connection's events until it dies, errors, or we stop. */
-  private async consume(conn: SttVendorConnection): Promise<ConsumeReason> {
+  private async consume(
+    conn: SttVendorConnection,
+    vendorId: string,
+  ): Promise<ConsumeReason> {
     let sawAuthError = false;
     for await (const ev of conn.events) {
       if (this.stopped) return "stopped";
@@ -206,6 +221,11 @@ class SttSession implements SttSessionHandle {
           break;
         case "error":
           this.clearSilence();
+          this.warn("stt.vendor_error", {
+            vendor: vendorId,
+            kind: ev.error.kind,
+            error: ev.error.message,
+          });
           // Auth is pointless to retry on the same vendor — bench + fail over.
           if (ev.error.kind === "auth") sawAuthError = true;
           break;
@@ -298,7 +318,11 @@ class SttSession implements SttSessionHandle {
       this.timers.delete(id);
       this.silenceTimer = null;
       // A silent-but-open socket is worse than a dropped one: abort it so the
-      // consume loop completes and takes the reconnect path.
+      // consume loop completes and takes the reconnect path. (The vendor lands
+      // in the stream_ended line this abort triggers.)
+      this.warn("stt.silence_abort", {
+        timeout_ms: this.config.vendorSilenceTimeoutMs,
+      });
       this.activeConnection?.abort();
     }, this.config.vendorSilenceTimeoutMs);
     this.silenceTimer = id;
@@ -343,6 +367,11 @@ class SttSession implements SttSessionHandle {
     this.emit(event);
   }
 
+  /** Failure diagnostics — ids, kinds, and error messages only (RULES §6). */
+  private warn(msg: string, fields: Record<string, unknown>): void {
+    this.logger?.warn({ session_id: this.info.sessionId, ...fields }, msg);
+  }
+
   /**
    * Read the stop flag through a call. `stop()` can flip `this.stopped` while the
    * control loop is suspended at an `await`; a bare field read would be
@@ -359,9 +388,15 @@ function kindOf(err: unknown): "transient" | "auth" | "protocol" {
   return err instanceof SttError ? err.kind : "transient";
 }
 
+/** A thrown value's human-readable message, for the diagnostics log. */
+function messageOf(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
 export const createSttEngine: CreateSttEngine = (
   config: SttConfig,
   vendors: readonly SttVendor[],
+  logger?: SttLogger,
 ): SttEngine => ({
   startSession(info: SttSessionInfo, emit: SttEmit): SttSessionHandle {
     // Only vendors that can attribute every channel the session sends. An
@@ -370,6 +405,6 @@ export const createSttEngine: CreateSttEngine = (
     const capable = vendors.filter(
       (vendor) => (vendor.maxChannels ?? 1) >= (info.channels ?? 1),
     );
-    return new SttSession(config, capable, info, emit);
+    return new SttSession(config, capable, info, emit, logger ?? null);
   },
 });
