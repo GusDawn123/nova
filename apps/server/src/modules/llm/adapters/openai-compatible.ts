@@ -18,9 +18,6 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  * near-identical adapters.
  */
 
-/** OpenAI requires a token cap; kept small — smoke output is trivial. */
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
-
 export interface OpenAiCompatibleOptions {
   id: ProviderId;
   apiKey: string;
@@ -65,7 +62,8 @@ export function createOpenAiCompatibleProvider(
     clientOptions.baseURL = opts.baseURL;
   }
   const client = new OpenAI(clientOptions);
-  const maxTokens = opts.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  // No default output cap (Gustavo, 2026-08-17) — only an explicit option caps.
+  const maxTokens = opts.maxOutputTokens;
 
   return {
     id: opts.id,
@@ -80,7 +78,9 @@ export function createOpenAiCompatibleProvider(
           {
             model: opts.model,
             messages: toOpenAiMessages(req.messages),
-            max_completion_tokens: maxTokens,
+            ...(maxTokens !== undefined
+              ? { max_completion_tokens: maxTokens }
+              : {}),
             stream: true,
             // Usage arrives in a final chunk (after `[DONE]`-adjacent deltas);
             // without this it is omitted from streamed responses.

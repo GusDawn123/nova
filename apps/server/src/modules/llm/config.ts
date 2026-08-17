@@ -61,8 +61,12 @@ export function liveLlmConfig(
     // Move off a stalled first provider quickly — the cascade's whole point on
     // the live path. Still generous enough not to abandon a warming vendor.
     ttftTimeoutMs: 1500,
-    // A live suggestion is short; a committed stream going quiet for 8s is dead.
-    stallTimeoutMs: 8000,
+    // The stall window matches the schema default: since M2 (Brain A + no
+    // output caps), live answers include long commented code, and vendors
+    // legitimately gap >8s mid-generation on those — an 8s window truncated a
+    // real answer mid-code (2026-08-17 live repro). TTFT above still guards
+    // the fast-failover moment; this only governs an already-committed stream.
+    stallTimeoutMs: 20000,
     ...overrides,
   });
 }

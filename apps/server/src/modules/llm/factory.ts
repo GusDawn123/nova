@@ -26,12 +26,12 @@ export interface LlmProviderEnv {
 /** Per-call-site knobs applied to every provider the factory builds. */
 export interface LlmProviderOptions {
   /**
-   * Output-token ceiling for every provider built here. Omitted → each
-   * adapter's own default (1024). The live wiring RAISES this: the authored
-   * Brain A prompt mandates fully-commented code + detailed explanations,
-   * which a 1024-token ceiling silently squeezes out of the answer — the
-   * model compresses to fit its budget (live repro 2026-08-17). Cost is per
-   * token actually generated, so a higher ceiling on short answers is free.
+   * Output-token ceiling for every provider built here. OMITTED in production
+   * — no product cap on answer length (Gustavo, 2026-08-17: a 1024 cap
+   * silently squeezed the mandated comments out of code answers); adapters
+   * send no ceiling unless one is configured (Anthropic's vendor-required
+   * `max_tokens` field aside). The seam stays for tests/smoke tools that
+   * WANT tiny outputs.
    */
   maxOutputTokens?: number;
 }

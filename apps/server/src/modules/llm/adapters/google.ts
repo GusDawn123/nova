@@ -22,11 +22,15 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
  * adr-0004 addendum). The lite model REJECTS thinkingConfig (probed: 400), so
  * the knob is OMITTED below — lite is non-thinking by default. */
 const DEFAULT_MODEL = "gemini-3.5-flash-lite";
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
 
 export interface GoogleProviderOptions {
   apiKey: string;
   model?: string;
+  /**
+   * Optional output ceiling. OMITTED by default — no product cap on answer
+   * length (Gustavo, 2026-08-17: caps silently squeezed the comments out of
+   * code answers); the model's own vendor limit is the only bound.
+   */
   maxOutputTokens?: number;
 }
 
@@ -66,7 +70,7 @@ export function toGoogleContents(
 export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
   const client = new GoogleGenAI({ apiKey: opts.apiKey });
   const model = opts.model ?? DEFAULT_MODEL;
-  const maxTokens = opts.maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  const maxTokens = opts.maxOutputTokens;
 
   return {
     id: "google",
@@ -79,7 +83,7 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
       let outputTokens: number | undefined;
       try {
         const config: GenerateContentConfig = {
-          maxOutputTokens: maxTokens,
+          ...(maxTokens !== undefined ? { maxOutputTokens: maxTokens } : {}),
           // Reasoning/thinking OFF (adr-0004 §4). PROBED 2026-07-23:
           // gemini-3.5-flash-lite REJECTS a thinkingConfig (400
           // INVALID_ARGUMENT for both thinkingBudget: 0 and thinkingLevel) —

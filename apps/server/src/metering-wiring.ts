@@ -171,13 +171,12 @@ function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
 export function maybeCreateLiveConductorFactory(
   app: FastifyInstance,
 ): LiveConductorFactory | undefined {
-  // 4096 output tokens for the live copilot: Brain A mandates fully-commented
-  // code + detailed explanations, which the adapters' 1024 default silently
-  // squeezed out of answers (2026-08-17 live repro — code arrived stripped of
-  // its comments). Paid per token generated, so short answers cost the same.
-  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
-    maxOutputTokens: 4096,
-  });
+  // NO output cap (Gustavo, 2026-08-17): caps silently squeezed the mandated
+  // comments/detail out of code answers, so answer length is bounded only by
+  // the models' own vendor limits. Spend is still governed end-to-end — the
+  // quota checker, the meter, and the daily kill-switch, all per token
+  // actually generated.
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
   if (providers.length === 0) return undefined;
 
   // FAIL CLOSED.

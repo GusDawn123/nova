@@ -69,10 +69,12 @@ describe("router [tier] — latency-tier order selection", () => {
     expect(google.calls).toHaveLength(0);
   });
 
-  it("[tier] liveLlmConfig has tight budgets and the cheapest-first default liveOrder", () => {
+  it("[tier] liveLlmConfig has a tight TTFT and the cheapest-first default liveOrder", () => {
     const config = liveLlmConfig();
     expect(config.ttftTimeoutMs).toBe(1500);
-    expect(config.stallTimeoutMs).toBe(8000);
+    // Post-M2: long commented-code answers gap >8s mid-stream legitimately, so
+    // the live stall window matches the schema default (only TTFT stays tight).
+    expect(config.stallTimeoutMs).toBe(20000);
     expect(config.liveOrder[0]).toBe("google");
   });
 });

@@ -78,16 +78,18 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
     expect(maybeCreateLiveConductorFactory(app)).toBeUndefined();
   });
 
-  it("hands the live provider factory the 4096 output ceiling", () => {
-    // Even on the fail-closed path (no DB), the provider construction happens
-    // first — which is exactly the call whose options this pins: drop the
-    // `maxOutputTokens: 4096` from metering-wiring and this test fails.
+  it("hands the live provider factory NO output cap (answers uncapped)", () => {
+    // Gustavo, 2026-08-17: no product caps on answer length — caps squeezed
+    // the mandated comments/detail out of code answers. Even on the
+    // fail-closed path (no DB), provider construction happens first, which is
+    // exactly the call whose options this pins: reintroduce a
+    // `maxOutputTokens` here and this test fails.
     factorySpy.calls.length = 0;
     process.env.GOOGLE_API_KEY = "test-not-a-real-key";
 
     maybeCreateLiveConductorFactory(app);
 
     expect(factorySpy.calls).toHaveLength(1);
-    expect(factorySpy.calls[0]?.[1]).toEqual({ maxOutputTokens: 4096 });
+    expect(factorySpy.calls[0]?.[1]).toBeUndefined();
   });
 });

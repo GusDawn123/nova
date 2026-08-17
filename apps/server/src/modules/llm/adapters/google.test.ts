@@ -65,4 +65,34 @@ describe("adapters/google — translation", () => {
       globalThis.fetch = realFetch;
     }
   });
+
+  it("sends NO output ceiling when none is configured (answers uncapped)", async () => {
+    // The production posture (Gustavo, 2026-08-17): no product cap — the wire
+    // request must not carry maxOutputTokens at all.
+    const captured: { body?: unknown } = {};
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      captured.body =
+        typeof init?.body === "string" ? JSON.parse(init.body) : null;
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const provider = createGoogleProvider({ apiKey: "test-key" });
+      const drain = async (): Promise<void> => {
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      const body = captured.body as {
+        generationConfig?: Record<string, unknown>;
+      };
+      expect(body.generationConfig ?? {}).not.toHaveProperty("maxOutputTokens");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
 });

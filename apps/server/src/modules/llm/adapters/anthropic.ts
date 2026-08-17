@@ -18,14 +18,18 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
 
 /** A cheap/fast current model — see docs before changing (do not guess IDs). */
 const DEFAULT_MODEL = "claude-haiku-4-5";
-/** Anthropic requires `max_tokens`; kept small — smoke output is trivial. */
-const DEFAULT_MAX_OUTPUT_TOKENS = 1024;
+/**
+ * Anthropic's API REQUIRES `max_tokens` — this is the vendor-mandated field,
+ * not a product cap (Gustavo, 2026-08-17: no output caps). Set to the model
+ * family's ceiling so it never truncates a real answer.
+ */
+const DEFAULT_MAX_OUTPUT_TOKENS = 8192;
 
 export interface AnthropicProviderOptions {
   apiKey: string;
   /** Overrides {@link DEFAULT_MODEL}. */
   model?: string;
-  /** Overrides {@link DEFAULT_MAX_OUTPUT_TOKENS}. */
+  /** Overrides {@link DEFAULT_MAX_OUTPUT_TOKENS} (the vendor-required field). */
   maxOutputTokens?: number;
 }
 
