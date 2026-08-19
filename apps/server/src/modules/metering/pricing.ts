@@ -29,15 +29,15 @@ const llmRateSchema = z
 export const priceBookSchema = z
   .object({
     llm: z.record(z.string(), llmRateSchema).default({
-      // 2026-08-17 model refresh (adr-0004 addendum; Gustavo's pick: smarter
-      // models, reasoning low). Rates verified at swap time:
-      // gemini-3.7-flash $0.75/$3.75 per 1M (intro pricing through 2026-12-31
-      // — REVISIT: standard $1.50/$7.50 applies 2027-01-01), gpt-5.6-terra
-      // $2/$12 per 1M. Old model ids are DROPPED — costs stamp at write time,
-      // so historical usage_events keep the price they were written with;
-      // only NEW calls need current rates.
-      "gpt-5.6-terra": { inputPer1MUsd: 2.0, outputPer1MUsd: 12.0 },
-      "gemini-3.7-flash": { inputPer1MUsd: 0.75, outputPer1MUsd: 3.75 },
+      // 2026-08-19 model revert (adr-0004 addendum; Gustavo: keep the old
+      // models — the 2026-08-17 refresh is rolled back, both ids re-probed
+      // live at revert time). Rates are the 2026-07-23 verified ones:
+      // gpt-5.4-mini $0.75/$4.50 per 1M, gemini-3.5-flash-lite $0.30/$2.50
+      // per 1M. The 2026-08-17 ids (gpt-5.6-terra, gemini-3.7-flash) are
+      // DROPPED — costs stamp at write time, so historical usage_events keep
+      // the price they were written with; only NEW calls need current rates.
+      "gpt-5.4-mini": { inputPer1MUsd: 0.75, outputPer1MUsd: 4.5 },
+      "gemini-3.5-flash-lite": { inputPer1MUsd: 0.3, outputPer1MUsd: 2.5 },
       "llama-3.1-8b-instant": { inputPer1MUsd: 0.05, outputPer1MUsd: 0.08 },
       // Kept priced though Anthropic is disabled (adr-0007 §1).
       "claude-haiku-4-5": { inputPer1MUsd: 1.0, outputPer1MUsd: 5.0 },

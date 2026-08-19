@@ -80,7 +80,7 @@ export type LiveConductorFactory = (
 export interface LiveConductorDeps {
   /** Emit a typed event down the socket (the session's own `send`). */
   send: (event: ServerLiveEvent) => void;
-  /** A LIVE-tuned llm router (cheapest-first cascade, tight budgets). */
+  /** A LIVE-tuned llm router (the `liveOrder` cascade, live budgets). */
   router: LlmRouter;
   /** Per-user RAG memory for grounding. Omitted → suggestions are ungrounded. */
   rag?: RagService;

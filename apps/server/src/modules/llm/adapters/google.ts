@@ -22,16 +22,18 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
 /** The current model — see docs before changing (do not guess IDs).
  * Lineage: gemini-2.0-flash (retired mid-2026) → gemini-2.5-flash →
  * gemini-3.5-flash-lite (2026-07-23 refresh) → gemini-3.7-flash (2026-08-17,
- * Gustavo's pick: the lite tier ignored Brain A's register rules; 3.7-flash is
- * the newest flash, released 2026-08-13, $0.75/$3.75 per 1M intro pricing
- * verified against the model list on our key + current pricing docs — the
- * price book moves in lockstep, adr-0004 addendum).
+ * Gustavo's pick: the lite tier ignored Brain A's register rules; $0.75/$3.75
+ * per 1M intro pricing) → REVERTED to gemini-3.5-flash-lite (2026-08-19,
+ * Gustavo: keep the old models; id re-probed LIVE on our key the same day and
+ * answering — $0.30/$2.50 per 1M, the price book moves in lockstep, adr-0004
+ * addendum).
  *
- * THINKING: 3.7-flash defaults to MEDIUM and bills thinking tokens as output,
- * so the stream call pins `thinkingLevel: "low"` (Gustavo: decently smart,
- * reasoning low). Lite-lineage models REJECT thinkingConfig outright (probed
- * 2026-07-23: 400), so the knob is skipped when a lite model is configured. */
-const DEFAULT_MODEL = "gemini-3.7-flash";
+ * THINKING: the knob below is model-conditional and stays that way — the lite
+ * default is non-thinking (lite-lineage models REJECT thinkingConfig outright;
+ * probed 2026-07-23: 400), so the knob is skipped for it, while an explicit
+ * non-lite override (e.g. 3.7-flash, which defaults to MEDIUM and bills
+ * thinking tokens as output) still gets `thinkingLevel: "low"` pinned. */
+const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 export interface GoogleProviderOptions {
   apiKey: string;

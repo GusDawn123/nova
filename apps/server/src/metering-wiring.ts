@@ -159,8 +159,8 @@ function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
 /**
  * Build the live copilot conductor factory (Phase 7) — the LLM-suggestion path
  * of the live session, wired THROUGH the metering seam (adr-0007: no unmetered
- * vendor call). Constructs ONE live-tuned failover router (cheapest-first
- * cascade, tight TTFT/stall budgets) shared across sessions, the per-user RAG
+ * vendor call). Constructs ONE live-tuned failover router (the `liveOrder`
+ * cascade, live TTFT/stall budgets) shared across sessions, the per-user RAG
  * service for grounding (its Voyage usage lands on the ledger via the same sink
  * as the notes/indexer paths), and threads `metering.meterFor(userId, meetingId)`
  * into every suggestion call so each streamed token is attributed.

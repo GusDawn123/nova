@@ -66,10 +66,12 @@ describe("adapters/google — translation", () => {
     }
   });
 
-  it("pins thinking LOW on the wire — and skips the knob for lite models", async () => {
-    // 3.7-flash defaults to MEDIUM thinking and bills thinking tokens as
-    // output; the adapter must pin low (Gustavo, 2026-08-17). Lite-lineage
-    // models 400 on any thinkingConfig, so the knob must vanish for them.
+  it("skips the thinking knob for the lite default — and pins LOW for non-lite", async () => {
+    // The default is lite again (2026-08-19 revert) and lite-lineage models
+    // 400 on any thinkingConfig, so the knob must be ABSENT by default. An
+    // explicit non-lite override (e.g. 3.7-flash, which defaults to MEDIUM and
+    // bills thinking tokens as output) must still get thinkingLevel LOW
+    // pinned (Gustavo, 2026-08-17).
     const bodies: string[] = [];
     const realFetch = globalThis.fetch;
     globalThis.fetch = (_url, init) => {
@@ -90,11 +92,11 @@ describe("adapters/google — translation", () => {
         }
       };
       await expect(drain()).rejects.toThrow();
-      // The SDK enum serializes as "LOW" on the wire.
-      expect(bodies[0]).toContain('"thinkingLevel":"LOW"');
+      expect(bodies[0]).not.toContain("thinkingLevel");
 
-      await expect(drain("gemini-3.5-flash-lite")).rejects.toThrow();
-      expect(bodies[1]).not.toContain("thinkingLevel");
+      await expect(drain("gemini-3.7-flash")).rejects.toThrow();
+      // The SDK enum serializes as "LOW" on the wire.
+      expect(bodies[1]).toContain('"thinkingLevel":"LOW"');
     } finally {
       globalThis.fetch = realFetch;
     }

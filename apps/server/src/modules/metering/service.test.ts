@@ -66,7 +66,7 @@ describe("record()", () => {
       meetingId: "m1",
       vendor: "openai",
       kind: "llm_tokens",
-      model: "gpt-5.6-terra",
+      model: "gpt-5.4-mini",
       amount: 1500,
       inputAmount: 1000,
       outputAmount: 500,
@@ -76,8 +76,8 @@ describe("record()", () => {
     const row = inserts[0];
     expect(row?.vendor).toBe("openai");
     expect(row?.userId).toBe("u1");
-    // 1000/1e6*2.00 + 500/1e6*12.00 = 0.00800
-    expect(row?.costEstimateUsd).toBeCloseTo(0.008, 10);
+    // 1000/1e6*0.75 + 500/1e6*4.50 = 0.00300
+    expect(row?.costEstimateUsd).toBeCloseTo(0.003, 10);
     expect(error).not.toHaveBeenCalled();
   });
 
@@ -116,7 +116,7 @@ describe("meterFor()", () => {
     const meter = svc.meterFor("user-42", "meeting-7");
     meter.recordUsage({
       provider: "openai",
-      model: "gpt-5.6-terra",
+      model: "gpt-5.4-mini",
       inputTokens: 1000,
       outputTokens: 500,
     });
@@ -134,9 +134,9 @@ describe("meterFor()", () => {
       amount: 1500,
       inputAmount: 1000,
       outputAmount: 500,
-      model: "gpt-5.6-terra",
+      model: "gpt-5.4-mini",
     });
-    expect(row?.costEstimateUsd).toBeCloseTo(0.008, 10);
+    expect(row?.costEstimateUsd).toBeCloseTo(0.003, 10);
   });
 
   it("does not throw when the DB throws inside a fire-and-forget record", async () => {
