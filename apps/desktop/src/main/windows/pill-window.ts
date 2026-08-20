@@ -142,7 +142,15 @@ function movePill(direction: MoveDirection): void {
   }
   const tentative = nudgeRect(pillWindow.getBounds(), direction);
   const { workArea } = screen.getDisplayMatching(tentative);
-  pillWindow.setBounds(clampRectToArea(tentative, workArea));
+  const clamped = clampRectToArea(tentative, workArea);
+  // Windows DPI quirk (live repro 2026-08-19: every press STRETCHED the
+  // pill on a scaled display): moving a non-resizable window re-rounds its
+  // size through DIP↔pixel conversion. The known workaround: lift the
+  // resizable lock, set ONLY the position — never width/height — then lock
+  // again. resizePillWindow stays the one place that sizes this window.
+  pillWindow.setResizable(true);
+  pillWindow.setPosition(clamped.x, clamped.y);
+  pillWindow.setResizable(false);
 }
 
 function registerMoveShortcuts(): void {
