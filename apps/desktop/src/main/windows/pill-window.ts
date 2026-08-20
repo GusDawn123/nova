@@ -1,9 +1,10 @@
 import { join } from "node:path";
 
-import { BrowserWindow, screen } from "electron";
+import { BrowserWindow, globalShortcut, screen } from "electron";
 
 import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { hardenNavigation, loadRendererPage } from "./navigation";
+import { clampRectToArea, nudgeRect, type MoveDirection } from "./pill-move";
 
 /**
  * How long the pill is: a fraction of the screen's width, per Gustavo's
@@ -73,9 +74,18 @@ export async function createPillWindow(
   window.on("ready-to-show", () => {
     window.show();
   });
+  // Move-the-pill hotkeys (Ctrl+Arrows — Gustavo's 2026-08-19 pick, matching
+  // the reference app's muscle memory). Global by necessity: the pill is an
+  // overlay that is almost never the focused window. Scoped to visibility so
+  // the theft of Ctrl+Left/Right (word-jump in every text field) lasts only
+  // while the pill is actually on screen — hidden or closed, typing gets its
+  // keys back. ONLY the pill moves; the settings window never registers these.
+  window.on("show", registerMoveShortcuts);
+  window.on("hide", unregisterMoveShortcuts);
   window.on("closed", () => {
     pillWindow = null;
     stopIgnoreHeartbeat();
+    unregisterMoveShortcuts();
   });
   // EVERY page load starts clickable — a reloading renderer must never
   // inherit an ignore state it no longer knows about (dev reloads mid-hover;
@@ -106,6 +116,46 @@ export async function createPillWindow(
 export function closePillWindow(): void {
   if (pillWindow !== null && !pillWindow.isDestroyed()) {
     pillWindow.close();
+  }
+}
+
+/** Accelerator → direction for the pill-mover (all four register together). */
+const MOVE_ACCELERATORS: Record<string, MoveDirection> = {
+  "CommandOrControl+Up": "up",
+  "CommandOrControl+Down": "down",
+  "CommandOrControl+Left": "left",
+  "CommandOrControl+Right": "right",
+};
+
+/**
+ * Nudge the pill one step, clamped into the work area of whichever display
+ * the nudged rectangle lands on — free to cross onto a second monitor, never
+ * able to strand off-screen.
+ */
+function movePill(direction: MoveDirection): void {
+  if (
+    pillWindow === null ||
+    pillWindow.isDestroyed() ||
+    !pillWindow.isVisible()
+  ) {
+    return;
+  }
+  const tentative = nudgeRect(pillWindow.getBounds(), direction);
+  const { workArea } = screen.getDisplayMatching(tentative);
+  pillWindow.setBounds(clampRectToArea(tentative, workArea));
+}
+
+function registerMoveShortcuts(): void {
+  for (const [accelerator, direction] of Object.entries(MOVE_ACCELERATORS)) {
+    globalShortcut.register(accelerator, () => {
+      movePill(direction);
+    });
+  }
+}
+
+function unregisterMoveShortcuts(): void {
+  for (const accelerator of Object.keys(MOVE_ACCELERATORS)) {
+    globalShortcut.unregister(accelerator);
   }
 }
 
