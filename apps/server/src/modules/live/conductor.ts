@@ -11,7 +11,7 @@ import {
 import type { RagService } from "../rag/index.js";
 
 import { conductorConfig, type ConductorConfig } from "./conductor-config.js";
-import type { LiveLogger } from "./ports.js";
+import type { LiveLogger, LlmDebugSink } from "./ports.js";
 import { isConfidentPartial, reconcile } from "./speculation.js";
 import { evaluateTrigger, type TriggerDecision } from "./trigger.js";
 
@@ -102,6 +102,12 @@ export interface LiveConductorDeps {
   mode?: PromptMode;
   logger?: LiveLogger;
   config?: ConductorConfig;
+  /**
+   * Dev-only answer ledger (debug-transcript.ts). When wired, every generation
+   * that reaches a terminal wire event also lands one JSONL entry — trigger,
+   * full answer, outcome, timing. Absent in production (the env-gated seam).
+   */
+  debug?: LlmDebugSink;
   /** Injected clock (fake-timer tests); defaults to Date.now. */
   now?: () => number;
   /** Suggestion-id factory; overridable for deterministic tests. */
@@ -262,6 +268,12 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
   }
 
   async function generate(gen: ActiveGeneration): Promise<void> {
+    const startedAt = now();
+    let usage: {
+      inputTokens?: number | undefined;
+      outputTokens?: number | undefined;
+      cachedInputTokens?: number | undefined;
+    } | null = null;
     const snippets = await groundingSnippets(gen.triggerText);
     if (!isCurrent(gen)) return;
 
@@ -295,6 +307,22 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       lastFlush = now();
     };
 
+    // One ledger line per terminal wire event (dev-only seam; no-op unwired).
+    const emitDebug = (outcome: string): void => {
+      deps.debug?.({
+        at: new Date().toISOString(),
+        user_id: deps.userId ?? null,
+        meeting_id: deps.meetingId ?? null,
+        suggestion_id: gen.id,
+        trigger_text: gen.triggerText,
+        answer_text: full,
+        outcome,
+        duration_ms: now() - startedAt,
+        input_tokens: usage?.inputTokens ?? null,
+        cached_input_tokens: usage?.cachedInputTokens ?? null,
+      });
+    };
+
     try {
       const stream = deps.router.stream(
         {
@@ -320,17 +348,20 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           batch += event.text;
           if (now() - lastFlush >= config.coalesceMs) flush();
         }
-        if (event.type === "done" && !cacheLogged) {
-          cacheLogged = true;
-          logger?.info?.(
-            {
-              user_id: deps.userId ?? null,
-              meeting_id: deps.meetingId ?? null,
-              input_tokens: event.usage?.inputTokens ?? null,
-              cached_input_tokens: event.usage?.cachedInputTokens ?? null,
-            },
-            "live.llm_cache",
-          );
+        if (event.type === "done") {
+          usage = event.usage;
+          if (!cacheLogged) {
+            cacheLogged = true;
+            logger?.info?.(
+              {
+                user_id: deps.userId ?? null,
+                meeting_id: deps.meetingId ?? null,
+                input_tokens: event.usage?.inputTokens ?? null,
+                cached_input_tokens: event.usage?.cachedInputTokens ?? null,
+              },
+              "live.llm_cache",
+            );
+          }
         }
       }
       clearTimeout(deadline);
@@ -342,6 +373,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
         suggestion_id: gen.id,
         text: full,
       });
+      emitDebug("done");
       active = null;
     } catch (err: unknown) {
       clearTimeout(deadline);
@@ -354,6 +386,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           suggestion_id: gen.id,
           reason: "no_response",
         });
+        emitDebug("discard:no_response");
         // A failed speculation has nothing to reconcile against later.
         if (speculation?.id === gen.id) speculation = null;
       } else {
@@ -365,6 +398,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           suggestion_id: gen.id,
           text: full,
         });
+        emitDebug("done_after_error");
       }
       active = null;
       logger?.error(

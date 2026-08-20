@@ -12,6 +12,8 @@ import {
 } from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
 import { prewarmPromptCache } from "./modules/live/prewarm.js";
+
+import { createLlmDebugLedger } from "./debug-transcript.js";
 import {
   createLlmRouter,
   createProvidersFromEnv,
@@ -200,6 +202,9 @@ export function maybeCreateLiveConductorFactory(
     logger: app.log,
     logUsage: voyageMeteringSink(metering, app),
   });
+  // Dev-only answer ledger (env-gated, hard-off by default — see
+  // debug-transcript.ts for the RULES §6 exception rationale).
+  const debug = createLlmDebugLedger(process.env, app.log);
 
   return ({ send, userId, meetingId, mode }) => {
     // Prompt-cache pre-warm (Natively reference §4/§6): one tiny metered
@@ -232,6 +237,7 @@ export function maybeCreateLiveConductorFactory(
       // Suggestions fire only from a user ask (typed question / Answer key);
       // the trigger-gate machinery stays intact behind this flag.
       autoSuggest: false,
+      ...(debug !== undefined ? { debug } : {}),
     });
   };
 }

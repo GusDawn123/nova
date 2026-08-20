@@ -387,3 +387,27 @@ describe("conductor [cache-telemetry] — the once-per-session cache log line", 
     });
   });
 });
+
+describe("conductor [debug-ledger] — the dev-only answer ledger seam", () => {
+  it("emits one entry with the full answer text when a generation completes", async () => {
+    const entries: unknown[] = [];
+    const c = makeConductor({
+      autoSuggest: false,
+      userId: "user-1",
+      meetingId: "meeting-1",
+      debug: (entry) => entries.push(entry),
+    });
+
+    c.onDirectQuestion("what is the price?");
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      user_id: "user-1",
+      meeting_id: "meeting-1",
+      trigger_text: "what is the price?",
+      answer_text: "Answer here",
+      outcome: "done",
+    });
+  });
+});

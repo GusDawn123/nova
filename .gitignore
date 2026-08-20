@@ -41,6 +41,10 @@ supabase/.temp/
 # local intermediates (e.g. the audio proof recordings) — regenerated on demand
 .tmp/
 
+# dev-only LLM answer ledger (LLM_DEBUG_TRANSCRIPT) — raw conversation content,
+# local diagnosis only, never committed
+.dev/
+
 # strip_mascot_bg.sh fallback venv (used only when uvx is unavailable)
 scripts/.venv-mascot/
 
