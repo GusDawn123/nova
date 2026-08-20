@@ -16,6 +16,8 @@ export interface GroqProviderOptions {
   apiKey: string;
   model?: string;
   maxOutputTokens?: number;
+  /** Sampling temperature; omitted = vendor default (see openai-compatible). */
+  temperature?: number;
 }
 
 export function createGroqProvider(opts: GroqProviderOptions): LlmProvider {
@@ -26,6 +28,9 @@ export function createGroqProvider(opts: GroqProviderOptions): LlmProvider {
     baseURL: GROQ_BASE_URL,
     ...(opts.maxOutputTokens !== undefined
       ? { maxOutputTokens: opts.maxOutputTokens }
+      : {}),
+    ...(opts.temperature !== undefined
+      ? { temperature: opts.temperature }
       : {}),
   });
 }

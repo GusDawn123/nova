@@ -148,6 +148,14 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
    */
   let speculation: { id: string; triggerText: string } | null = null;
   let disposed = false;
+  /**
+   * Cache telemetry latch (Natively reference §4/§6): the FIRST completed
+   * generation logs how much of the prompt the vendor served from cache — a
+   * silent miss looks identical from outside (same answer, same latency shape)
+   * but bills the full input rate, and the first ask is where the pre-warm's
+   * payoff (or its absence) shows. One line per session, not per ask.
+   */
+  let cacheLogged = false;
 
   function send(event: ServerLiveEvent): void {
     deps.send(event);
@@ -311,6 +319,18 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           full += event.text;
           batch += event.text;
           if (now() - lastFlush >= config.coalesceMs) flush();
+        }
+        if (event.type === "done" && !cacheLogged) {
+          cacheLogged = true;
+          logger?.info?.(
+            {
+              user_id: deps.userId ?? null,
+              meeting_id: deps.meetingId ?? null,
+              input_tokens: event.usage?.inputTokens ?? null,
+              cached_input_tokens: event.usage?.cachedInputTokens ?? null,
+            },
+            "live.llm_cache",
+          );
         }
       }
       clearTimeout(deadline);

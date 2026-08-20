@@ -21,6 +21,18 @@ vi.mock("./modules/llm/index.js", async (importActual) => {
   };
 });
 
+// The pre-warm is a REAL router call in production — mocked here so the wiring
+// test can assert the per-session fire without any network attempt.
+const prewarmSpy = vi.hoisted(() => ({
+  calls: [] as unknown[],
+}));
+vi.mock("./modules/live/prewarm.js", () => ({
+  prewarmPromptCache: (deps: unknown) => {
+    prewarmSpy.calls.push(deps);
+    return Promise.resolve();
+  },
+}));
+
 /**
  * [metering-wiring] The fail-CLOSED posture of the live conductor factory.
  *
@@ -78,18 +90,49 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
     expect(maybeCreateLiveConductorFactory(app)).toBeUndefined();
   });
 
-  it("hands the live provider factory NO output cap (answers uncapped)", () => {
+  it("hands the live provider factory temperature 0.3 and NO output cap", () => {
     // Gustavo, 2026-08-17: no product caps on answer length — caps squeezed
     // the mandated comments/detail out of code answers. Even on the
     // fail-closed path (no DB), provider construction happens first, which is
     // exactly the call whose options this pins: reintroduce a
-    // `maxOutputTokens` here and this test fails.
+    // `maxOutputTokens` here and this test fails. Temperature 0.3 is the
+    // Natively-reference live setting (2026-08-19) — the ONLY option passed.
     factorySpy.calls.length = 0;
     process.env.GOOGLE_API_KEY = "test-not-a-real-key";
 
     maybeCreateLiveConductorFactory(app);
 
     expect(factorySpy.calls).toHaveLength(1);
-    expect(factorySpy.calls[0]?.[1]).toBeUndefined();
+    expect(factorySpy.calls[0]?.[1]).toEqual({ temperature: 0.3 });
+  });
+
+  it("fires ONE metered prompt-cache pre-warm per session build", () => {
+    // The Natively-reference pre-warm (2026-08-19): every conductor build —
+    // one per accepted `session.start` — kicks off exactly one warm carrying
+    // the live router and the per-call meter, so the first real ask lands on
+    // a written prefix cache and the warm itself is billed like any call.
+    prewarmSpy.calls.length = 0;
+    process.env.OPENAI_API_KEY = "sk-test-not-a-real-key";
+    process.env.SUPABASE_DB_URL =
+      "postgresql://nova:nova@127.0.0.1:54322/postgres";
+
+    const factory = maybeCreateLiveConductorFactory(app);
+    expect(factory).toBeDefined();
+    const conductor = factory?.({
+      send: () => undefined,
+      userId: "user-1",
+      meetingId: "meeting-1",
+      mode: "general",
+    });
+    conductor?.dispose();
+
+    expect(prewarmSpy.calls).toHaveLength(1);
+    expect(prewarmSpy.calls[0]).toMatchObject({
+      userId: "user-1",
+      meetingId: "meeting-1",
+    });
+    const deps = prewarmSpy.calls[0] as { router?: unknown; meter?: unknown };
+    expect(deps.router).toBeDefined();
+    expect(deps.meter).toBeDefined();
   });
 });

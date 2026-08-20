@@ -34,6 +34,13 @@ export interface LlmProviderOptions {
    * WANT tiny outputs.
    */
   maxOutputTokens?: number;
+  /**
+   * Sampling temperature applied to every provider built here. The live
+   * wiring passes 0.3 (Natively reference, 2026-08-18 doc: answer paths at
+   * 0.25–0.4 — "lower = faster, more focused"); omitted elsewhere so the
+   * deliberate tier keeps each vendor's own default.
+   */
+  temperature?: number;
 }
 
 /**
@@ -44,10 +51,14 @@ export function createProvidersFromEnv(
   env: LlmProviderEnv,
   options: LlmProviderOptions = {},
 ): LlmProvider[] {
-  const shared =
-    options.maxOutputTokens !== undefined
+  const shared = {
+    ...(options.maxOutputTokens !== undefined
       ? { maxOutputTokens: options.maxOutputTokens }
-      : {};
+      : {}),
+    ...(options.temperature !== undefined
+      ? { temperature: options.temperature }
+      : {}),
+  };
   const providers: LlmProvider[] = [];
   if (env.ANTHROPIC_API_KEY) {
     providers.push(

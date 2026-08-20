@@ -5,7 +5,7 @@ import type { ServerLiveEvent } from "@nova/shared";
 import { liveLlmConfig, type Meter, type UsageEntry } from "../llm/index.js";
 import { makeMockProvider } from "../llm/testing/mock-provider.js";
 import { makeRouter } from "../llm/testing/router-harness.js";
-import { DONE, tok } from "../llm/testing/router-harness.js";
+import { DONE, doneWith, tok } from "../llm/testing/router-harness.js";
 
 import { conductorConfigSchema } from "./conductor-config.js";
 import { createLiveConductor, type LiveConductor } from "./conductor.js";
@@ -341,5 +341,49 @@ describe("modules/live [conductor] manual-only posture (autoSuggest: false)", ()
     await vi.advanceTimersByTimeAsync(1500);
     expect(types()).toContain("suggestion.discard");
     expect(types().filter((t) => t === "suggestion.start")).toHaveLength(2);
+  });
+});
+
+describe("conductor [cache-telemetry] — the once-per-session cache log line", () => {
+  it("logs live.llm_cache with the done event's counts, on the FIRST completion only", async () => {
+    // Natively reference §4/§6: a silent cache miss looks identical from
+    // outside but bills the full input rate — the first completed ask logs
+    // what the vendor reported so a cold prefix is visible in the server log.
+    const info = vi.fn();
+    const provider = makeMockProvider("google", {
+      firstTokenDelayMs: 10,
+      interTokenDelayMs: 5,
+      events: [
+        tok("ok"),
+        doneWith({
+          inputTokens: 5000,
+          outputTokens: 2,
+          cachedInputTokens: 4800,
+        }),
+      ],
+    });
+    const c = makeConductor({
+      autoSuggest: false,
+      router: makeRouter([provider], liveLlmConfig()),
+      logger: { error: vi.fn(), info },
+      userId: "user-1",
+      meetingId: "meeting-1",
+    });
+
+    c.onDirectQuestion("what is the price?");
+    await vi.advanceTimersByTimeAsync(500);
+    c.onDirectQuestion("and the total?");
+    await vi.advanceTimersByTimeAsync(500);
+
+    const cacheLines = info.mock.calls.filter(
+      (call) => call[1] === "live.llm_cache",
+    );
+    expect(cacheLines).toHaveLength(1);
+    expect(cacheLines[0]?.[0]).toMatchObject({
+      user_id: "user-1",
+      meeting_id: "meeting-1",
+      input_tokens: 5000,
+      cached_input_tokens: 4800,
+    });
   });
 });

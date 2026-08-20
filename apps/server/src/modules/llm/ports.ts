@@ -56,6 +56,13 @@ export const llmStreamEventSchema = z.discriminatedUnion("type", [
       .object({
         inputTokens: z.number().int().nonnegative().optional(),
         outputTokens: z.number().int().nonnegative().optional(),
+        /**
+         * Input tokens the vendor served from its prompt cache (Natively
+         * reference §4/§6: a silent cache miss looks identical from outside
+         * but bills the full input rate — the count must surface so a log
+         * line can catch it). Telemetry only; the meter ignores it.
+         */
+        cachedInputTokens: z.number().int().nonnegative().optional(),
       })
       .nullable(),
   }),

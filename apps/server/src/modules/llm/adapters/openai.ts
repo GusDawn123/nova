@@ -21,6 +21,8 @@ export interface OpenAiProviderOptions {
   apiKey: string;
   model?: string;
   maxOutputTokens?: number;
+  /** Sampling temperature; omitted = vendor default (see openai-compatible). */
+  temperature?: number;
 }
 
 export function createOpenAiProvider(opts: OpenAiProviderOptions): LlmProvider {
@@ -37,6 +39,9 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): LlmProvider {
     reasoningEffort: "none",
     ...(opts.maxOutputTokens !== undefined
       ? { maxOutputTokens: opts.maxOutputTokens }
+      : {}),
+    ...(opts.temperature !== undefined
+      ? { temperature: opts.temperature }
       : {}),
   });
 }

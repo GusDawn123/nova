@@ -11,6 +11,7 @@ import {
   type LiveConductorFactory,
 } from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
+import { prewarmPromptCache } from "./modules/live/prewarm.js";
 import {
   createLlmRouter,
   createProvidersFromEnv,
@@ -176,7 +177,13 @@ export function maybeCreateLiveConductorFactory(
   // the models' own vendor limits. Spend is still governed end-to-end — the
   // quota checker, the meter, and the daily kill-switch, all per token
   // actually generated.
-  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
+  // Temperature 0.3 on every live provider (Natively reference, 2026-08-18
+  // doc §6: their answer paths run 0.25–0.4 — "lower = faster, more focused";
+  // both live models probed accepting it 2026-08-19). Still NO output cap —
+  // that posture is unchanged.
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
+    temperature: 0.3,
+  });
   if (providers.length === 0) return undefined;
 
   // FAIL CLOSED.
@@ -194,8 +201,20 @@ export function maybeCreateLiveConductorFactory(
     logUsage: voyageMeteringSink(metering, app),
   });
 
-  return ({ send, userId, meetingId, mode }) =>
-    createLiveConductor({
+  return ({ send, userId, meetingId, mode }) => {
+    // Prompt-cache pre-warm (Natively reference §4/§6): one tiny metered
+    // request per session start writes Brain A's stablePrefix into the
+    // vendor's prefix cache BEFORE the first real ask — otherwise the first
+    // question pays the cold TTFT the cache exists to remove. Fire-and-forget
+    // off the start path; it rides the same router and meter as real asks.
+    void prewarmPromptCache({
+      router,
+      meter: metering.meterFor(userId, meetingId),
+      logger: app.log,
+      userId,
+      meetingId,
+    });
+    return createLiveConductor({
       send,
       router,
       rag,
@@ -214,6 +233,7 @@ export function maybeCreateLiveConductorFactory(
       // the trigger-gate machinery stays intact behind this flag.
       autoSuggest: false,
     });
+  };
 }
 
 /**

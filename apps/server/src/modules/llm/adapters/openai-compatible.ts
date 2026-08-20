@@ -31,6 +31,13 @@ export interface OpenAiCompatibleOptions {
    * lever. Omit for endpoints/models without the param (Groq passes nothing).
    */
   reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
+  /**
+   * Sampling temperature. OMITTED by default (the vendor's own default); the
+   * live wiring passes a low value (Natively reference, 2026-08-18 doc: their
+   * answer paths run 0.25–0.4 — "lower = faster, more focused"). Probed
+   * 2026-08-19: gpt-5.4-mini accepts the param alongside reasoning_effort.
+   */
+  temperature?: number;
 }
 
 /**
@@ -71,6 +78,7 @@ export function createOpenAiCompatibleProvider(
     ): AsyncGenerator<LlmStreamEvent> {
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let cachedInputTokens: number | undefined;
       try {
         const stream = await client.chat.completions.create(
           {
@@ -86,6 +94,9 @@ export function createOpenAiCompatibleProvider(
             ...(opts.reasoningEffort !== undefined
               ? { reasoning_effort: opts.reasoningEffort }
               : {}),
+            ...(opts.temperature !== undefined
+              ? { temperature: opts.temperature }
+              : {}),
           },
           { signal },
         );
@@ -99,9 +110,17 @@ export function createOpenAiCompatibleProvider(
           if (chunk.usage) {
             inputTokens = chunk.usage.prompt_tokens;
             outputTokens = chunk.usage.completion_tokens;
+            // Prefix-cache telemetry (Natively reference §4/§6): how much of
+            // the prompt was served from the vendor's cache. A silent cache
+            // miss looks identical from outside — same answer, same shape —
+            // but bills the full input rate, so the count must surface.
+            cachedInputTokens =
+              chunk.usage.prompt_tokens_details?.cached_tokens;
           }
         }
-        yield doneEvent(parseVendorUsage({ inputTokens, outputTokens }));
+        yield doneEvent(
+          parseVendorUsage({ inputTokens, outputTokens, cachedInputTokens }),
+        );
       } catch (error) {
         throw toLlmError(error, signal);
       }

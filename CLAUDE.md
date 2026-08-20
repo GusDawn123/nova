@@ -211,6 +211,29 @@ Supabase cloud + EAS APK sideload on Android = staging; store checklists), `art/
 (the ratified mockup HTMLs — moved out of the gitignored brainstorm dir), and
 `docs/superpowers/journal/2026-08-02-ui-redesign/` (the build ledger with the
 next-branch work list, final review, CodeRabbit reports).**
+**NATIVELY ADOPTIONS + MODEL REVERT (2026-08-19, `dev-nova-natively-latency`,
+Gustavo-ratified): the 2026-08-17 model refresh is ROLLED BACK — live models are
+`gpt-5.4-mini` (reasoning_effort "none") and `gemini-3.5-flash-lite` (non-thinking;
+both ids re-probed live at revert time), price book in lockstep — and the live
+cascade is the OWNER'S PICK: `liveOrder` openai→google→groq→anthropic (GPT default,
+Gemini fallback; supersedes every earlier "cheapest-first google-first" claim in this
+file). Adopted from the Natively reference doc
+(`docs/superpowers/specs/2026-08-18-natively-llm-reference.md`): (1) temperature 0.3
+on every live provider (a `createProvidersFromEnv` option threaded to all four
+adapters; wire-pinned in tests), (2) prompt-cache PRE-WARM at `session.start`
+(`modules/live/prewarm.ts` — one tiny metered request carrying Brain A's byte-stable
+stablePrefix through the SAME live router + per-call meter, fire-and-forget, never
+rejects), (3) cache-hit telemetry — `done` usage now carries optional
+`cachedInputTokens` (openai `prompt_tokens_details.cached_tokens` / gemini
+`cachedContentTokenCount` / anthropic `cache_read_input_tokens`); the conductor logs
+`live.llm_cache` once per session on the first completed ask, the pre-warm logs
+`live.prewarm_done`. NOT adopted (deliberate): TTFT-EMA fastest-first reordering
+(fights the pinned GPT-first order), the Gemini explicit context cache (Gemini is
+fallback-only now), anti-AI-tell prompt bans (Gustavo authors those, RULES §9). The
+widened first-token windows (5s/12s) are KEPT — they only slow the failure path.
+KNOWN STALE (pre-existing, follow-up cleanup): ARCHITECTURE §modules/llm, PARITY,
+and adr-0004's status section still describe the google-first cheapest-first order
+and the old 1.5s/8s windows.**
 
 ## Working agreements (Gustavo)
 

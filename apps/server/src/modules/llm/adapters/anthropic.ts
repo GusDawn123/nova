@@ -31,6 +31,8 @@ export interface AnthropicProviderOptions {
   model?: string;
   /** Overrides {@link DEFAULT_MAX_OUTPUT_TOKENS} (the vendor-required field). */
   maxOutputTokens?: number;
+  /** Sampling temperature; omitted = vendor default (see openai-compatible). */
+  temperature?: number;
 }
 
 /** Anthropic's message shape: a top-level `system` string + user/assistant turns. */
@@ -81,12 +83,16 @@ export function createAnthropicProvider(
       const { system, messages } = toAnthropicMessages(req.messages);
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let cachedInputTokens: number | undefined;
       try {
         const params: Anthropic.MessageCreateParamsStreaming = {
           model,
           max_tokens: maxTokens,
           messages,
           stream: true,
+          ...(opts.temperature !== undefined
+            ? { temperature: opts.temperature }
+            : {}),
         };
         if (system !== undefined) {
           params.system = system;
@@ -97,6 +103,10 @@ export function createAnthropicProvider(
         for await (const event of events) {
           if (event.type === "message_start") {
             inputTokens = event.message.usage.input_tokens;
+            // Prefix-cache telemetry (Natively reference §4/§6): Anthropic
+            // reports cache reads separately from fresh input tokens.
+            cachedInputTokens =
+              event.message.usage.cache_read_input_tokens ?? undefined;
           } else if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
@@ -111,7 +121,9 @@ export function createAnthropicProvider(
             outputTokens = event.usage.output_tokens;
           }
         }
-        yield doneEvent(parseVendorUsage({ inputTokens, outputTokens }));
+        yield doneEvent(
+          parseVendorUsage({ inputTokens, outputTokens, cachedInputTokens }),
+        );
       } catch (error) {
         throw toLlmError(error, signal);
       }

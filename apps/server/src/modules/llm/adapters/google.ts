@@ -44,6 +44,13 @@ export interface GoogleProviderOptions {
    * code answers); the model's own vendor limit is the only bound.
    */
   maxOutputTokens?: number;
+  /**
+   * Sampling temperature. OMITTED by default (the vendor's own default); the
+   * live wiring passes a low value (Natively reference, 2026-08-18 doc: their
+   * answer paths run 0.25–0.4 — "lower = faster, more focused"). Probed
+   * 2026-08-19: gemini-3.5-flash-lite accepts it.
+   */
+  temperature?: number;
 }
 
 /** Gemini's request shape: a `systemInstruction` string + role-tagged contents. */
@@ -93,9 +100,13 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
       const { systemInstruction, contents } = toGoogleContents(req.messages);
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let cachedInputTokens: number | undefined;
       try {
         const config: GenerateContentConfig = {
           ...(maxTokens !== undefined ? { maxOutputTokens: maxTokens } : {}),
+          ...(opts.temperature !== undefined
+            ? { temperature: opts.temperature }
+            : {}),
           // Thinking LOW (Gustavo, 2026-08-17: decently smart, reasoning low).
           // 3.7-flash defaults to MEDIUM and bills thinking tokens as OUTPUT,
           // so leaving the knob off silently costs money and first-token
@@ -128,9 +139,14 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
           if (usage) {
             inputTokens = usage.promptTokenCount;
             outputTokens = usage.candidatesTokenCount;
+            // Prefix-cache telemetry (Natively reference §4/§6): implicit-cache
+            // hits surface here; a silent miss bills the full input rate.
+            cachedInputTokens = usage.cachedContentTokenCount;
           }
         }
-        yield doneEvent(parseVendorUsage({ inputTokens, outputTokens }));
+        yield doneEvent(
+          parseVendorUsage({ inputTokens, outputTokens, cachedInputTokens }),
+        );
       } catch (error) {
         throw toLlmError(error, signal);
       }

@@ -102,6 +102,39 @@ describe("adapters/google — translation", () => {
     }
   });
 
+  it("sends the configured temperature on the wire — and omits it by default", async () => {
+    // The live wiring passes 0.3 (Natively reference: 0.25–0.4 on answer
+    // paths); everything else must keep the vendor's own default, so the
+    // param must not exist on the wire unless configured.
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      bodies.push(typeof init?.body === "string" ? init.body : "");
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const drain = async (temperature?: number): Promise<void> => {
+        const provider = createGoogleProvider({
+          apiKey: "test-key",
+          ...(temperature !== undefined ? { temperature } : {}),
+        });
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain(0.3)).rejects.toThrow();
+      expect(bodies[0]).toContain('"temperature":0.3');
+
+      await expect(drain()).rejects.toThrow();
+      expect(bodies[1]).not.toContain("temperature");
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it("sends NO output ceiling when none is configured (answers uncapped)", async () => {
     // The production posture (Gustavo, 2026-08-17): no product cap — the wire
     // request must not carry maxOutputTokens at all.
