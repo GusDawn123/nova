@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 
-import { isPromptComposerEnabled } from "./env.js";
 
 import { createPlanReader, createPlanWriter } from "./db/plans.js";
 import { createRoleReader } from "./db/roles.js";
@@ -8,15 +7,15 @@ import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
 } from "./db/usage-events.js";
+import { createLlmDebugLedger } from "./debug-transcript.js";
+import { isPromptComposerEnabled } from "./env.js";
 import {
   createLiveConductor,
   type LiveConductorFactory,
 } from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
 import { prewarmPromptCache } from "./modules/live/prewarm.js";
-import { buildSystemPrompt, composeSay } from "./modules/prompt/index.js";
 
-import { createLlmDebugLedger } from "./debug-transcript.js";
 import {
   createLlmRouter,
   createProvidersFromEnv,
@@ -32,6 +31,7 @@ import {
   type MeteringService,
   type QuotaChecker,
 } from "./modules/metering/index.js";
+import { buildSystemPrompt, composeSay } from "./modules/prompt/index.js";
 import { createRagFromEnv, type VoyageUsageLog } from "./modules/rag/index.js";
 
 /**
