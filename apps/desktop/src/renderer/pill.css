@@ -642,13 +642,28 @@ body {
    scrolling behavior above. */
 .md pre:has(> code.language-text),
 .md pre:has(> code:not([class])) {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  border-radius: 0;
   overflow-x: visible;
 }
 
+/* The speakable text is a HIGHLIGHT, not a box (Gustavo, 2026-08-20 v2 — the
+   reference look): the code renders INLINE so its background paints per
+   wrapped line — each line wears its own dark mark with a visible gap — and
+   box-decoration-break keeps the padding on every line of the wrap. */
 .md pre code.language-text,
 .md pre code:not([class]) {
+  display: inline;
   white-space: pre-wrap;
   overflow-wrap: break-word;
+  background: rgba(6, 9, 14, 0.75);
+  padding: 3px 7px;
+  border-radius: 4px;
+  line-height: 2.1;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 /* Inline syntax: a small darker chip, mono. */
