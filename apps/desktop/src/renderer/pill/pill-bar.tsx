@@ -3,7 +3,6 @@ import { useEffect, useRef, type JSX } from "react";
 import novaLogo from "../assets/nova-logo-transparent.png";
 import {
   AudioBarsIcon,
-  CheckIcon,
   DownArrowIcon,
   EyeIcon,
   FileIcon,
@@ -17,6 +16,7 @@ import {
 import { NOVA_MODELS, type NovaModelId } from "../design/models";
 import { NOVA_MODES } from "../design/modes";
 import type { AudioSession } from "./audio-session";
+import { PillMenu } from "./pill-menu";
 
 interface PillBarProps {
   readonly focusMode: boolean;
@@ -246,50 +246,34 @@ export function PillBar(props: PillBarProps): JSX.Element {
       </div>
 
       {props.modelMenuOpen && (
-        <div className="mode-menu nd">
-          {NOVA_MODELS.map((model) => (
-            <button
-              type="button"
-              key={model.id}
-              className="mode-menu__item"
-              onClick={() => {
-                props.onPickModel(model.id);
-              }}
-            >
-              <span className="mode-menu__name">{model.name}</span>
-              {model.id === props.activeModel && <CheckIcon />}
-            </button>
-          ))}
-        </div>
+        <PillMenu
+          items={NOVA_MODELS}
+          activeId={props.activeModel}
+          onPick={props.onPickModel}
+        />
       )}
 
       {props.modeMenuOpen && (
-        <div className="mode-menu nd">
-          {NOVA_MODES.map((mode) => (
-            <button
-              type="button"
-              key={mode.id}
-              className="mode-menu__item"
-              onClick={() => {
-                props.onPickMode(mode.id);
-              }}
-            >
-              <span className="mode-menu__name">{mode.name}</span>
-              {mode.id === props.activeMode && <CheckIcon />}
-            </button>
-          ))}
-          <div className="mode-menu__divider" />
-          <button
-            type="button"
-            className="mode-menu__item"
-            onClick={() => {
-              window.novaBridge.openSettings();
-            }}
-          >
-            <SquaresIcon size={16} />
-            <span>Manage</span>
-          </button>
-        </div>
+        <PillMenu
+          items={NOVA_MODES}
+          activeId={props.activeMode}
+          onPick={props.onPickMode}
+          footer={
+            <>
+              <div className="mode-menu__divider" />
+              <button
+                type="button"
+                className="mode-menu__item"
+                onClick={() => {
+                  window.novaBridge.openSettings();
+                }}
+              >
+                <SquaresIcon size={16} />
+                <span>Manage</span>
+              </button>
+            </>
+          }
+        />
       )}
     </>
   );

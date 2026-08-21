@@ -301,7 +301,14 @@ export function PillApp(): JSX.Element {
   return (
     <div
       ref={stageRef}
-      className={modeMenu ? "pill-stage pill-stage--menu-open" : "pill-stage"}
+      className={
+        // ANY open dropdown needs the stage to grow — the window is sized to
+        // this element, so a menu outside the min-height renders past the
+        // window's bottom edge and gets cut (the 2026-08-20 model-menu bug).
+        modeMenu || modelMenu
+          ? "pill-stage pill-stage--menu-open"
+          : "pill-stage"
+      }
     >
       <div className="pill-shell">
         {view === "pill" && (

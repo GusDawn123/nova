@@ -105,7 +105,12 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
     maybeCreateLiveConductorFactory(app);
 
     expect(factorySpy.calls).toHaveLength(1);
-    expect(factorySpy.calls[0]?.[1]).toEqual({ temperature: 0.3 });
+    expect(factorySpy.calls[0]?.[1]).toEqual({
+      temperature: 0.3,
+      // The live Google lane rides gemini-3.7-flash (2026-08-20 picker);
+      // still NO maxOutputTokens — the no-cap pin this test exists for.
+      modelOverrides: { google: "gemini-3.7-flash" },
+    });
   });
 
   it("fires ONE metered prompt-cache pre-warm per session build", () => {
