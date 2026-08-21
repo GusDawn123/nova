@@ -631,6 +631,26 @@ body {
   white-space: pre;
 }
 
+/* Speakable fences WRAP (Gustavo, 2026-08-20): the composer tags speech
+   ```text and today's Brain A still emits bare fences, and both must read
+   like the reference screenshots' highlighted paragraph — wrapped text, never
+   a sideways scroll the user pans mid-call. The language class lands on
+   <code> only (never <pre>), and a bare fence gets NO class at all, so
+   `language-text` + `code:not([class])` are exactly the two speakable shapes.
+   Scoped under `.md pre` so `:not([class])` can never catch inline `.md code`
+   chips; real language fences (```python → code.language-python) keep the
+   scrolling behavior above. */
+.md pre:has(> code.language-text),
+.md pre:has(> code:not([class])) {
+  overflow-x: visible;
+}
+
+.md pre code.language-text,
+.md pre code:not([class]) {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
 /* Inline syntax: a small darker chip, mono. */
 .md code {
   background: rgba(6, 9, 14, 0.55);

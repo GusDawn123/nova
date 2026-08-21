@@ -106,6 +106,21 @@ export interface LlmDebugEntry {
   suggestion_id: string;
   trigger_text: string;
   answer_text: string;
+  /**
+   * The answer BEFORE the deterministic voice pass (2026-08-20 prompt-stack
+   * redesign): raw-vs-shipped diffs in the ledger are the observation channel
+   * that feeds the next prompt/idiom iteration. Same text as `answer_text`
+   * whenever enforcement changed nothing.
+   */
+  raw_answer_text: string;
+  /** Whether `enforceSpoken` rewrote anything — the quick diff-row filter. */
+  enforcement_changed: boolean;
+  /**
+   * Every AI tell DETECTED in the raw answer (band ids from
+   * `modules/prompt/enforce.ts`, e.g. `em-dash`, `banned-word:delve`) —
+   * including word-class tells that are logged but never rewritten.
+   */
+  violations: string[];
   /** Mirrors the wire: `done`, `discard:<reason>`, or `done_after_error`. */
   outcome: string;
   duration_ms: number;
