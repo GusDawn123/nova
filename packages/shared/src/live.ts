@@ -68,7 +68,7 @@ export type LiveMode = z.infer<typeof liveModeSchema>;
  * grok until its key lands) degrades to the next provider instead of failing.
  *
  *   gpt     gpt-5.4-mini via OpenAI (today's default)
- *   gemini  gemini-3.7-flash via Google (the reference product's live voice)
+ *   gemini  gemini-3.5-flash via Google (the reference product's live voice)
  *   grok    grok-4.1-fast via xAI (top human-preference benchmarks, 2026)
  */
 export const liveModelSchema = z.enum(["gpt", "gemini", "grok"]);

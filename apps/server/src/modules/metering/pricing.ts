@@ -43,6 +43,10 @@ export const priceBookSchema = z
       // $1.50/$7.50). grok-4.1-fast is xAI's PUBLISHED rate, NOT yet verified
       // on our own key (none on this machine) — VERIFY the day the key lands.
       "gemini-3.7-flash": { inputPer1MUsd: 0.75, outputPer1MUsd: 3.75 },
+      // The live Gemini lane since 2026-08-21 (3.7's thinking latency + 503s
+      // measured it out). Rate cross-checked against multiple 2026 pricing
+      // pages at swap time.
+      "gemini-3.5-flash": { inputPer1MUsd: 1.5, outputPer1MUsd: 9.0 },
       "grok-4.1-fast": { inputPer1MUsd: 0.2, outputPer1MUsd: 0.5 },
       "llama-3.1-8b-instant": { inputPer1MUsd: 0.05, outputPer1MUsd: 0.08 },
       // Kept priced though Anthropic is disabled (adr-0007 §1).

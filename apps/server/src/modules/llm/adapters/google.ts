@@ -107,15 +107,16 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
           ...(opts.temperature !== undefined
             ? { temperature: opts.temperature }
             : {}),
-          // Thinking LOW (Gustavo, 2026-08-17: decently smart, reasoning low).
-          // 3.7-flash defaults to MEDIUM and bills thinking tokens as OUTPUT,
-          // so leaving the knob off silently costs money and first-token
-          // latency. Lite-lineage models REJECT thinkingConfig (probed
-          // 2026-07-23: 400 INVALID_ARGUMENT — that lineage is non-thinking by
-          // default), so the knob is skipped for them.
-          ...(model.includes("lite")
-            ? {}
-            : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+          // The thinking knob is sent ONLY to the 3.7 lineage: 3.7-flash
+          // defaults to MEDIUM and bills thinking tokens as OUTPUT, so LOW is
+          // pinned there (probed 2026-08-17). Lite-lineage models REJECT
+          // thinkingConfig (probed 2026-07-23: 400). gemini-3.5-flash accepts
+          // it (probed 2026-08-21) but runs KNOB-FREE on purpose — Natively
+          // parity: the reference live voice ships at the API's default
+          // behavior, and that is the configuration its register was tuned in.
+          ...(model.startsWith("gemini-3.7")
+            ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
+            : {}),
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,

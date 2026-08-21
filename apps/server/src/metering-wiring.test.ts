@@ -107,9 +107,10 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
     expect(factorySpy.calls).toHaveLength(1);
     expect(factorySpy.calls[0]?.[1]).toEqual({
       temperature: 0.3,
-      // The live Google lane rides gemini-3.7-flash (2026-08-20 picker);
+      // The live Google lane rides gemini-3.5-flash (2026-08-21 — the
+      // reference's actual live voice; 3.7's thinking latency measured out);
       // still NO maxOutputTokens — the no-cap pin this test exists for.
-      modelOverrides: { google: "gemini-3.7-flash" },
+      modelOverrides: { google: "gemini-3.5-flash" },
     });
   });
 

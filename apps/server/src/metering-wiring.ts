@@ -205,10 +205,12 @@ export function maybeCreateLiveConductorFactory(
   // that posture is unchanged.
   const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
     temperature: 0.3,
-    // The live Gemini lane is the bake-off prospect gemini-3.7-flash (the
-    // reference product's live voice), not the lite fallback default — LIVE
+    // The live Gemini lane is gemini-3.5-flash — the reference product's
+    // ACTUAL live voice (non-thinking, fast first token). 3.7-flash was tried
+    // first and measured out 2026-08-21: it thinks 5-7s per answer and its
+    // endpoint threw mid-stream 503s that truncated two live answers. LIVE
     // construction only; every other consumer keeps the adapter defaults.
-    modelOverrides: { google: "gemini-3.7-flash" },
+    modelOverrides: { google: "gemini-3.5-flash" },
   });
   if (providers.length === 0) return undefined;
 

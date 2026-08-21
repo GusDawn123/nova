@@ -97,6 +97,11 @@ describe("adapters/google — translation", () => {
       await expect(drain("gemini-3.7-flash")).rejects.toThrow();
       // The SDK enum serializes as "LOW" on the wire.
       expect(bodies[1]).toContain('"thinkingLevel":"LOW"');
+
+      // gemini-3.5-flash (the live lane since 2026-08-21) runs KNOB-FREE on
+      // purpose — Natively parity, the register's tuned configuration.
+      await expect(drain("gemini-3.5-flash")).rejects.toThrow();
+      expect(bodies[2]).not.toContain("thinkingLevel");
     } finally {
       globalThis.fetch = realFetch;
     }
