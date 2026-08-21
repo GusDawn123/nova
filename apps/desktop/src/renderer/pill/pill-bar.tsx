@@ -14,8 +14,8 @@ import {
   ScreenIcon,
   SquaresIcon,
 } from "../design/icons";
-import { NOVA_MODES } from "../design/modes";
 import { NOVA_MODELS, type NovaModelId } from "../design/models";
+import { NOVA_MODES } from "../design/modes";
 import type { AudioSession } from "./audio-session";
 
 interface PillBarProps {
