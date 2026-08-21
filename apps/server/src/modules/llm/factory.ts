@@ -45,10 +45,16 @@ export interface LlmProviderOptions {
   temperature?: number;
   /**
    * Per-provider model overrides (2026-08-20 model picker): the live wiring
-   * runs Google on gemini-3.7-flash (the bake-off prospect) while every other
-   * construction keeps each adapter's own default. Absent entries = defaults.
+   * runs Google on its bake-off model while every other construction keeps
+   * each adapter's own default. Absent entries = defaults.
    */
   modelOverrides?: Partial<Record<ProviderId, string>>;
+  /**
+   * Nucleus sampling for the GOOGLE adapter only — where the reference
+   * product applies it (their gemini live voice runs topP 0.85; no evidence
+   * they set it anywhere else, so nowhere else gets it). 2026-08-21.
+   */
+  googleTopP?: number;
 }
 
 /**
@@ -96,6 +102,9 @@ export function createProvidersFromEnv(
         apiKey: env.GOOGLE_API_KEY,
         ...shared,
         ...modelFor("google"),
+        ...(options.googleTopP !== undefined
+          ? { topP: options.googleTopP }
+          : {}),
       }),
     );
   }

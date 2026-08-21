@@ -211,6 +211,11 @@ export function maybeCreateLiveConductorFactory(
     // endpoint threw mid-stream 503s that truncated two live answers. LIVE
     // construction only; every other consumer keeps the adapter defaults.
     modelOverrides: { google: "gemini-3.5-flash" },
+    // topP 0.85 — the reference's exact gemini live-voice setting (their full
+    // recipe: temp 0.25–0.4, topP 0.85, cap at model max, no thinking knob;
+    // we sit at temp 0.3, omit the cap — omitted = model max — and send no
+    // knob, so this was the one missing parameter). 2026-08-21.
+    googleTopP: 0.85,
   });
   if (providers.length === 0) return undefined;
 

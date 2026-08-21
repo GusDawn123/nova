@@ -107,6 +107,33 @@ describe("adapters/google — translation", () => {
     }
   });
 
+  it("sends the configured topP on the wire (the reference's 0.85)", async () => {
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      bodies.push(typeof init?.body === "string" ? init.body : "");
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const provider = createGoogleProvider({
+        apiKey: "test-key",
+        topP: 0.85,
+      });
+      const drain = async (): Promise<void> => {
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      expect(bodies[0]).toContain('"topP":0.85');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
   it("sends the configured temperature on the wire — and omits it by default", async () => {
     // The live wiring passes 0.3 (Natively reference: 0.25–0.4 on answer
     // paths); everything else must keep the vendor's own default, so the
@@ -135,6 +162,8 @@ describe("adapters/google — translation", () => {
 
       await expect(drain()).rejects.toThrow();
       expect(bodies[1]).not.toContain("temperature");
+      // topP rides the wire only when configured (the live lane's 0.85).
+      expect(bodies[1]).not.toContain("topP");
     } finally {
       globalThis.fetch = realFetch;
     }

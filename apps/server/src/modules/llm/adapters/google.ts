@@ -51,6 +51,12 @@ export interface GoogleProviderOptions {
    * 2026-08-19: gemini-3.5-flash-lite accepts it.
    */
   temperature?: number;
+  /**
+   * Nucleus sampling. OMITTED by default; the live wiring passes 0.85 — the
+   * reference product's exact gemini live-voice setting (2026-08-21, copying
+   * their per-model params verbatim per Gustavo).
+   */
+  topP?: number;
 }
 
 /** Gemini's request shape: a `systemInstruction` string + role-tagged contents. */
@@ -107,6 +113,7 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
           ...(opts.temperature !== undefined
             ? { temperature: opts.temperature }
             : {}),
+          ...(opts.topP !== undefined ? { topP: opts.topP } : {}),
           // The thinking knob is sent ONLY to the 3.7 lineage: 3.7-flash
           // defaults to MEDIUM and bills thinking tokens as OUTPUT, so LOW is
           // pinned there (probed 2026-08-17). Lite-lineage models REJECT
