@@ -38,6 +38,12 @@ export const priceBookSchema = z
       // the price they were written with; only NEW calls need current rates.
       "gpt-5.4-mini": { inputPer1MUsd: 0.75, outputPer1MUsd: 4.5 },
       "gemini-3.5-flash-lite": { inputPer1MUsd: 0.3, outputPer1MUsd: 2.5 },
+      // 2026-08-20 model-picker additions (bake-off lanes). gemini-3.7-flash
+      // is the 2026-08-17 verified intro rate (REVISIT 2027-01-01: standard
+      // $1.50/$7.50). grok-4.1-fast is xAI's PUBLISHED rate, NOT yet verified
+      // on our own key (none on this machine) — VERIFY the day the key lands.
+      "gemini-3.7-flash": { inputPer1MUsd: 0.75, outputPer1MUsd: 3.75 },
+      "grok-4.1-fast": { inputPer1MUsd: 0.2, outputPer1MUsd: 0.5 },
       "llama-3.1-8b-instant": { inputPer1MUsd: 0.05, outputPer1MUsd: 0.08 },
       // Kept priced though Anthropic is disabled (adr-0007 §1).
       "claude-haiku-4-5": { inputPer1MUsd: 1.0, outputPer1MUsd: 5.0 },

@@ -28,6 +28,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   GOOGLE_API_KEY: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1).optional(),
+  // xAI (Grok) — the 2026-08-20 model-picker lane. Same optional posture:
+  // absent key means the xai provider is never built and a picked "grok"
+  // session serves from its fallback cascade instead.
+  XAI_API_KEY: z.string().min(1).optional(),
   // STT vendor keys (Phase 3.5). OPTIONAL: the server boots without them — the
   // STT engine simply has no vendors and a live session surfaces a typed error
   // instead of transcribing. ASSEMBLYAI_API_KEY selects the primary vendor,

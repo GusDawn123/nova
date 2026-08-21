@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 
 import {
   LIVE_PROTOCOL_VERSION,
@@ -14,7 +14,7 @@ const SESSION_ID = "22222222-2222-4222-8222-222222222222";
 const SUGGESTION_ID = "33333333-3333-4333-8333-333333333333";
 
 /**
- * Representative accept + reject per event family (not exhaustive — the shape is
+ * Representative accept + reject per event family (not exhaustive â€” the shape is
  * the contract, the union machinery is zod's). Every event carries `v: 1`.
  */
 describe("clientLiveEventSchema", () => {
@@ -51,7 +51,7 @@ describe("clientLiveEventSchema", () => {
     }
   });
 
-  it("treats an OMITTED mode as absent — an old client still starts", () => {
+  it("treats an OMITTED mode as absent â€” an old client still starts", () => {
     // The field is additive on `v: 1`: a client built before the mode picker
     // sends no `mode`, and the server reads that as "general" on its side.
     const result = parseClientEvent({
@@ -66,7 +66,7 @@ describe("clientLiveEventSchema", () => {
   });
 
   it("rejects an unknown mode at the boundary (no silent fallback)", () => {
-    // A bad mode must FAIL the parse — the server then answers `invalid_event`
+    // A bad mode must FAIL the parse â€” the server then answers `invalid_event`
     // rather than quietly serving general and hiding a client bug.
     expect(
       parseClientEvent({
@@ -99,7 +99,7 @@ describe("clientLiveEventSchema", () => {
     }
   });
 
-  it("treats an OMITTED channels as absent — an old mono client still starts", () => {
+  it("treats an OMITTED channels as absent â€” an old mono client still starts", () => {
     const result = parseClientEvent({
       v: 1,
       type: "session.start",
@@ -110,7 +110,7 @@ describe("clientLiveEventSchema", () => {
     expect(result.data.channels).toBeUndefined();
   });
 
-  it("rejects channels outside {1, 2} — numbers and strings alike", () => {
+  it("rejects channels outside {1, 2} â€” numbers and strings alike", () => {
     for (const channels of [0, 3, -1, 1.5, "2", "stereo"]) {
       const result = parseClientEvent({
         v: 1,
@@ -184,12 +184,12 @@ describe("clientLiveEventSchema", () => {
     ).toBe(false);
   });
 
-  it("accepts suggest.now — the empty-handed Answer press (2026-08-17)", () => {
+  it("accepts suggest.now â€” the empty-handed Answer press (2026-08-17)", () => {
     expect(parseClientEvent({ v: 1, type: "suggest.now" }).success).toBe(true);
   });
 
   it("rejects suggest.now carrying a payload it does not define", () => {
-    // Not `.strict()` — zod objects strip unknown keys — but text must not
+    // Not `.strict()` â€” zod objects strip unknown keys â€” but text must not
     // sneak through as data: the parsed event carries only v + type.
     const result = parseClientEvent({
       v: 1,
@@ -292,5 +292,28 @@ describe("serverLiveEventSchema", () => {
       message: "x",
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe("live_model on session.start (the 2026-08-20 model picker)", () => {
+  const base = {
+    v: 1,
+    type: "session.start",
+    meeting_id: "11111111-1111-4111-8111-111111111111",
+  };
+
+  it("accepts each picker model and stays additive when omitted", () => {
+    for (const model of ["gpt", "gemini", "grok"]) {
+      expect(parseClientEvent({ ...base, live_model: model }).success).toBe(
+        true,
+      );
+    }
+    expect(parseClientEvent(base).success).toBe(true);
+  });
+
+  it("rejects an unknown model (closed set - a client bug must surface)", () => {
+    expect(parseClientEvent({ ...base, live_model: "claude" }).success).toBe(
+      false,
+    );
   });
 });

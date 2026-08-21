@@ -109,3 +109,60 @@ describe("modules/live [live-mode] session.start carries the picked mode", () =>
     ]);
   });
 });
+
+describe("modules/live [live-model] session.start carries the picked model", () => {
+  const startWithModel = (model?: string): string =>
+    JSON.stringify({
+      v: 1,
+      type: "session.start",
+      meeting_id: MEETING_ID,
+      ...(model !== undefined ? { live_model: model } : {}),
+    });
+
+  function modelRecordingFactory(): {
+    factory: NonNullable<LiveSessionDeps["createConductor"]>;
+    models: string[];
+  } {
+    const models: string[] = [];
+    const factory: NonNullable<LiveSessionDeps["createConductor"]> = (args) => {
+      models.push(args.liveModel);
+      return {
+        onPartial: () => undefined,
+        onFinal: () => undefined,
+        onDirectQuestion: () => undefined,
+        answerNow: () => undefined,
+        dispose: () => undefined,
+      };
+    };
+    return { factory, models };
+  }
+
+  it("[live-model] hands the picked model to the conductor factory", () => {
+    const { factory, models } = modelRecordingFactory();
+    const { session } = makeSession({ createConductor: factory });
+
+    session.handleTextMessage(startWithModel("grok"));
+
+    expect(models).toEqual(["grok"]);
+  });
+
+  it("[live-model] an OMITTED model means gpt (an old client still works)", () => {
+    const { factory, models } = modelRecordingFactory();
+    const { session } = makeSession({ createConductor: factory });
+
+    session.handleTextMessage(startWithModel());
+
+    expect(models).toEqual(["gpt"]);
+  });
+
+  it("[live-model] an UNKNOWN model is refused at the boundary, not defaulted", () => {
+    const { factory, models } = modelRecordingFactory();
+    const { session, sent } = makeSession({ createConductor: factory });
+
+    session.handleTextMessage(startWithModel("claude"));
+
+    expect(sent.map((e) => e.type)).toEqual(["error"]);
+    expect(sent[0]).toMatchObject({ type: "error", code: "invalid_event" });
+    expect(models).toEqual([]);
+  });
+});

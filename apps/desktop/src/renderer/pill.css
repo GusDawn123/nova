@@ -223,6 +223,37 @@ body {
   color: #fff;
 }
 
+/* The live-model picker chip (2026-08-20): the icon-btn family in text form —
+   the current model's name IS the icon, so the pick is readable at a glance. */
+.model-btn {
+  flex: none;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition:
+    background 0.12s,
+    color 0.15s;
+}
+
+.model-btn:hover {
+  background: rgba(238, 240, 255, 0.15);
+}
+
+.model-btn--on {
+  color: #fff;
+  background: rgba(238, 240, 255, 0.15);
+}
+
 .pill__divider {
   width: 1px;
   height: 16px;

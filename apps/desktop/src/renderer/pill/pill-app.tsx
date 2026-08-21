@@ -1,5 +1,10 @@
 import { useEffect, useRef, useState, type JSX } from "react";
 
+import {
+  isNovaModelId,
+  MODEL_STORAGE_KEY,
+  type NovaModelId,
+} from "../design/models";
 import { useScreenPrivacy } from "../hooks/use-screen-privacy";
 import {
   AnsweringPanel,
@@ -27,6 +32,12 @@ export function PillApp(): JSX.Element {
   const [usesScreen, setUsesScreen] = useState(true);
   const [modeMenu, setModeMenu] = useState(false);
   const [activeMode, setActiveMode] = useState("general");
+  const [modelMenu, setModelMenu] = useState(false);
+  // The model pick survives restarts — it's a taste, not a session fact.
+  const [activeModel, setActiveModel] = useState<NovaModelId>(() => {
+    const saved = window.localStorage.getItem(MODEL_STORAGE_KEY);
+    return isNovaModelId(saved) ? saved : "gpt";
+  });
   const [audio, setAudio] = useState<AudioSession>(AUDIO_OFF);
   const [ask, setAsk] = useState<AskContext | null>(null);
   const [thread, setThread] = useState<readonly ThreadTurn[]>([]);
@@ -269,7 +280,10 @@ export function PillApp(): JSX.Element {
     setAudio({ on: true, paused: false, seconds: 0 });
     void (async (): Promise<void> => {
       try {
-        const result = await window.novaBridge.startLiveSession(activeMode);
+        const result = await window.novaBridge.startLiveSession(
+          activeMode,
+          activeModel,
+        );
         if (!result.ok) {
           // The typed reason lands in the transcript panel via the status push;
           // here the controls just refuse to pretend a session is running.
@@ -312,11 +326,23 @@ export function PillApp(): JSX.Element {
             modeMenuOpen={modeMenu}
             onToggleModeMenu={() => {
               setModeMenu((current) => !current);
+              setModelMenu(false);
             }}
             activeMode={activeMode}
             onPickMode={(id) => {
               setActiveMode(id);
               setModeMenu(false);
+            }}
+            modelMenuOpen={modelMenu}
+            onToggleModelMenu={() => {
+              setModelMenu((current) => !current);
+              setModeMenu(false);
+            }}
+            activeModel={activeModel}
+            onPickModel={(id) => {
+              setActiveModel(id);
+              window.localStorage.setItem(MODEL_STORAGE_KEY, id);
+              setModelMenu(false);
             }}
             audio={audio}
             onStartAudio={startAudio}

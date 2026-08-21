@@ -1,11 +1,11 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+﻿import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthService } from "../auth/service";
 import type { AuthState } from "../auth/state";
 
 /**
  * These handlers are wiring, so the tests are about the wiring's failure modes
- * rather than about auth or HTTP — both of which are already covered where the
+ * rather than about auth or HTTP â€” both of which are already covered where the
  * decisions actually live.
  *
  * The case that matters most: an `ipcMain.handle` callback that THROWS turns
@@ -125,7 +125,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     ...overrides,
   };
 
-  // A real-enough privacy stub: set() latches, get() reads back — the handler
+  // A real-enough privacy stub: set() latches, get() reads back â€” the handler
   // tests care that the wiring calls it and echoes what it returned.
   let privacyEnabled = false;
   const privacySet = vi.fn((enabled: boolean) => {
@@ -175,7 +175,7 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
     dispose,
     emit: (state) => {
       // Cast because one test pushes a state the contract forbids, which is
-      // the only way to reach the broadcast guard — the typed interface makes
+      // the only way to reach the broadcast guard â€” the typed interface makes
       // that value unconstructable by design.
       listener?.(state as AuthState);
     },
@@ -343,7 +343,7 @@ describe("the undetectability toggle", () => {
     expect(privacySet).toHaveBeenCalledTimes(1);
     expect(privacySet).toHaveBeenCalledWith(true);
     expect(result).toEqual({ enabled: true });
-    // Both windows hear it — the pill's eye and the settings toggle must never
+    // Both windows hear it â€” the pill's eye and the settings toggle must never
     // disagree about whether the user is visible in a share.
     expect(sentToWindows).toEqual([
       { channel: IpcChannel.privacyStateChanged, payload: { enabled: true } },
@@ -433,7 +433,7 @@ describe("teardown", () => {
     // `registerIpcHandlers` throw on a duplicate handler, which is exactly what
     // a window reopening on macOS would do.
     expect(registered).toHaveLength(10);
-    // Copied before sorting — `toSorted` is ES2023 and the lib target is ES2022.
+    // Copied before sorting â€” `toSorted` is ES2023 and the lib target is ES2022.
     expect([...removedChannels].sort()).toEqual([...registered].sort());
     expect(handlers.size).toBe(0);
     // The one-way listeners go with them.
@@ -466,7 +466,7 @@ describe("the live session channels", () => {
 
     const result = await invoke(IpcChannel.liveStart, { mode: "technical" });
 
-    expect(liveStart).toHaveBeenCalledWith("technical");
+    expect(liveStart).toHaveBeenCalledWith("technical", "gpt");
     expect(result).toEqual({ ok: true });
   });
 
@@ -568,7 +568,7 @@ describe("the live session channels", () => {
       text: 7,
     } as unknown as LiveSessionEvent);
     // Dropped, not substituted: a mis-shaped line must never put invented
-    // words on the user's screen — nothing new reached any window.
+    // words on the user's screen â€” nothing new reached any window.
     expect(sentToWindows).toHaveLength(1);
   });
 });

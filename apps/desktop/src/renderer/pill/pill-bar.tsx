@@ -15,6 +15,7 @@ import {
   SquaresIcon,
 } from "../design/icons";
 import { NOVA_MODES } from "../design/modes";
+import { NOVA_MODELS, type NovaModelId } from "../design/models";
 import type { AudioSession } from "./audio-session";
 
 interface PillBarProps {
@@ -36,6 +37,11 @@ interface PillBarProps {
   readonly onToggleModeMenu: () => void;
   readonly activeMode: string;
   readonly onPickMode: (id: string) => void;
+  /** The live-model picker (2026-08-20): which model answers this session. */
+  readonly modelMenuOpen: boolean;
+  readonly onToggleModelMenu: () => void;
+  readonly activeModel: NovaModelId;
+  readonly onPickModel: (id: NovaModelId) => void;
   readonly audio: AudioSession;
   readonly onStartAudio: () => void;
   readonly onTogglePause: () => void;
@@ -53,6 +59,8 @@ interface PillBarProps {
 export function PillBar(props: PillBarProps): JSX.Element {
   const activeName =
     NOVA_MODES.find((mode) => mode.id === props.activeMode)?.name ?? "General";
+  const activeModelName =
+    NOVA_MODELS.find((model) => model.id === props.activeModel)?.name ?? "GPT";
   const askLabel = props.audio.on
     ? "Ask anything about the meeting"
     : props.usesScreen
@@ -149,6 +157,25 @@ export function PillBar(props: PillBarProps): JSX.Element {
               </button>
             </span>
 
+            <span className="tipwrap">
+              <span
+                className={props.modelMenuOpen ? "tip tip--suppressed" : "tip"}
+              >
+                {activeModelName}
+              </span>
+              <button
+                type="button"
+                className={
+                  props.modelMenuOpen
+                    ? "model-btn model-btn--on nd"
+                    : "model-btn nd"
+                }
+                onClick={props.onToggleModelMenu}
+              >
+                {activeModelName}
+              </button>
+            </span>
+
             <span className="pill__divider" />
 
             <span className="tipwrap">
@@ -217,6 +244,24 @@ export function PillBar(props: PillBarProps): JSX.Element {
           )}
         </div>
       </div>
+
+      {props.modelMenuOpen && (
+        <div className="mode-menu nd">
+          {NOVA_MODELS.map((model) => (
+            <button
+              type="button"
+              key={model.id}
+              className="mode-menu__item"
+              onClick={() => {
+                props.onPickModel(model.id);
+              }}
+            >
+              <span className="mode-menu__name">{model.name}</span>
+              {model.id === props.activeModel && <CheckIcon />}
+            </button>
+          ))}
+        </div>
+      )}
 
       {props.modeMenuOpen && (
         <div className="mode-menu nd">

@@ -1,8 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import { LIVE_PROTOCOL_VERSION, type ServerLiveEvent } from "@nova/shared";
+import {
+  LIVE_PROTOCOL_VERSION,
+  type LiveModel,
+  type ServerLiveEvent,
+} from "@nova/shared";
 
-import { type LlmRouter, type Meter } from "../llm/index.js";
+import { type LlmRouter, type Meter, type ProviderId } from "../llm/index.js";
 import {
   assembleMeeting,
   enforceChunk,
@@ -69,6 +73,12 @@ export interface ConductorFactoryArgs {
    * like the copilot being vague rather than like a wiring bug.
    */
   readonly mode: PromptMode;
+  /**
+   * The live model this call picked (2026-08-20 picker). REQUIRED for the same
+   * compile-time reason as `mode`; the WIRING maps it to a provider cascade —
+   * the conductor itself only ever sees a providerOrder.
+   */
+  readonly liveModel: LiveModel;
 }
 
 /**
@@ -121,6 +131,12 @@ export interface LiveConductorDeps {
    * byte-identical legacy behavior (the migration's kill-switch law).
    */
   composePrompt?: (context: ComposeSayContext) => AssembledPrompt;
+  /**
+   * Per-session provider cascade (2026-08-20 model picker): the picked model's
+   * provider first, the rest as fallback. Absent → the router's configured
+   * live order, exactly as before the picker existed.
+   */
+  providerOrder?: readonly ProviderId[];
   /** Injected clock (fake-timer tests); defaults to Date.now. */
   now?: () => number;
   /** Suggestion-id factory; overridable for deterministic tests. */
@@ -398,6 +414,9 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
             { role: "user", content: dynamicSuffix },
           ],
           latencyTier: "live",
+          ...(deps.providerOrder !== undefined
+            ? { providerOrder: [...deps.providerOrder] }
+            : {}),
         },
         {
           signal: gen.controller.signal,

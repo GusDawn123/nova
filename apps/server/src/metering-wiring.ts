@@ -1,6 +1,5 @@
 import type { FastifyInstance } from "fastify";
 
-
 import { createPlanReader, createPlanWriter } from "./db/plans.js";
 import { createRoleReader } from "./db/roles.js";
 import {
@@ -159,8 +158,26 @@ function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
   if (env.OPENAI_API_KEY) out.OPENAI_API_KEY = env.OPENAI_API_KEY;
   if (env.GOOGLE_API_KEY) out.GOOGLE_API_KEY = env.GOOGLE_API_KEY;
   if (env.GROQ_API_KEY) out.GROQ_API_KEY = env.GROQ_API_KEY;
+  if (env.XAI_API_KEY) out.XAI_API_KEY = env.XAI_API_KEY;
   return out;
 }
+
+/**
+ * The 2026-08-20 model picker's cascades: the picked model's provider FIRST,
+ * the other picker providers as fallback (a keyless or dying head degrades to
+ * the next instead of failing the ask). Groq-the-llama-vendor is deliberately
+ * NOT in these lineups (Gustavo: "do not set up groq") and anthropic stays
+ * disabled — the router silently skips providers that were never constructed,
+ * so these orders are safe whatever subset of keys exists.
+ */
+const LIVE_MODEL_ORDERS: Record<
+  "gpt" | "gemini" | "grok",
+  readonly ("openai" | "google" | "xai")[]
+> = {
+  gpt: ["openai", "google", "xai"],
+  gemini: ["google", "openai", "xai"],
+  grok: ["xai", "openai", "google"],
+};
 
 /**
  * Build the live copilot conductor factory (Phase 7) — the LLM-suggestion path
@@ -188,6 +205,10 @@ export function maybeCreateLiveConductorFactory(
   // that posture is unchanged.
   const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
     temperature: 0.3,
+    // The live Gemini lane is the bake-off prospect gemini-3.7-flash (the
+    // reference product's live voice), not the lite fallback default — LIVE
+    // construction only; every other consumer keeps the adapter defaults.
+    modelOverrides: { google: "gemini-3.7-flash" },
   });
   if (providers.length === 0) return undefined;
 
@@ -209,10 +230,14 @@ export function maybeCreateLiveConductorFactory(
   // debug-transcript.ts for the RULES §6 exception rationale).
   const debug = createLlmDebugLedger(process.env, app.log);
 
-  return ({ send, userId, meetingId, mode }) => {
+  return ({ send, userId, meetingId, mode, liveModel }) => {
     // The composer flag, read fresh per session build (no module cache — the
     // kill-switch must take effect on the next session, not the next deploy).
     const composerOn = isPromptComposerEnabled();
+    // The picked model's cascade rides every call of this session — the
+    // conductor's asks AND the pre-warm, so the provider that will actually
+    // serve is the one whose cache gets written.
+    const providerOrder = LIVE_MODEL_ORDERS[liveModel];
     // Prompt-cache pre-warm (Natively reference §4/§6): one tiny metered
     // request per session start writes the ACTIVE stablePrefix into the
     // vendor's prefix cache BEFORE the first real ask — otherwise the first
@@ -229,6 +254,7 @@ export function maybeCreateLiveConductorFactory(
       ...(composerOn
         ? { stablePrefix: buildSystemPrompt({ mode: "sales", action: "say" }) }
         : {}),
+      providerOrder,
     });
     return createLiveConductor({
       send,
@@ -253,6 +279,7 @@ export function maybeCreateLiveConductorFactory(
       // prompt-selection site). Absent flag → the dep is absent → the legacy
       // two-brain path runs byte-identical: the migration's kill-switch.
       ...(composerOn ? { composePrompt: composeSay } : {}),
+      providerOrder,
     });
   };
 }

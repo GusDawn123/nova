@@ -1,4 +1,4 @@
-import { type LlmRouter, type Meter } from "../llm/index.js";
+import { type LlmRouter, type Meter, type ProviderId } from "../llm/index.js";
 import { assembleMeeting } from "../prompt/index.js";
 
 import type { LiveLogger } from "./ports.js";
@@ -45,6 +45,12 @@ export interface PrewarmDeps {
    * real ask would run cold. Defaults to the legacy Brain A prefix.
    */
   stablePrefix?: string;
+  /**
+   * The session's provider cascade (2026-08-20 model picker): the warm must
+   * ride the SAME order real asks will, so the provider that actually serves
+   * is the one whose cache gets written. Absent → the router's live order.
+   */
+  providerOrder?: readonly ProviderId[];
   /** Overridable for tests. */
   timeoutMs?: number;
 }
@@ -73,6 +79,9 @@ export async function prewarmPromptCache(deps: PrewarmDeps): Promise<void> {
           { role: "user", content: PREWARM_USER_MESSAGE },
         ],
         latencyTier: "live",
+        ...(deps.providerOrder !== undefined
+          ? { providerOrder: [...deps.providerOrder] }
+          : {}),
       },
       {
         signal: controller.signal,

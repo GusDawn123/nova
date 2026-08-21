@@ -14,6 +14,9 @@ export const providerIdSchema = z.enum([
   "openai",
   "google",
   "groq",
+  // xAI (Grok) — added 2026-08-20 for the humanized-speech bake-off; rides
+  // the OpenAI-compatible engine like groq does.
+  "xai",
 ]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 

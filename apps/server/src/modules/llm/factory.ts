@@ -2,7 +2,8 @@ import { createAnthropicProvider } from "./adapters/anthropic.js";
 import { createGoogleProvider } from "./adapters/google.js";
 import { createGroqProvider } from "./adapters/groq.js";
 import { createOpenAiProvider } from "./adapters/openai.js";
-import type { LlmProvider } from "./ports.js";
+import { createXaiProvider } from "./adapters/xai.js";
+import type { LlmProvider, ProviderId } from "./ports.js";
 
 /**
  * The env-driven provider factory — the wiring seam a later task hangs the HTTP
@@ -21,6 +22,7 @@ export interface LlmProviderEnv {
   OPENAI_API_KEY?: string;
   GOOGLE_API_KEY?: string;
   GROQ_API_KEY?: string;
+  XAI_API_KEY?: string;
 }
 
 /** Per-call-site knobs applied to every provider the factory builds. */
@@ -41,6 +43,12 @@ export interface LlmProviderOptions {
    * deliberate tier keeps each vendor's own default.
    */
   temperature?: number;
+  /**
+   * Per-provider model overrides (2026-08-20 model picker): the live wiring
+   * runs Google on gemini-3.7-flash (the bake-off prospect) while every other
+   * construction keeps each adapter's own default. Absent entries = defaults.
+   */
+  modelOverrides?: Partial<Record<ProviderId, string>>;
 }
 
 /**
@@ -59,24 +67,55 @@ export function createProvidersFromEnv(
       ? { temperature: options.temperature }
       : {}),
   };
+  const modelFor = (id: ProviderId): { model?: string } => {
+    const model = options.modelOverrides?.[id];
+    return model !== undefined ? { model } : {};
+  };
   const providers: LlmProvider[] = [];
   if (env.ANTHROPIC_API_KEY) {
     providers.push(
-      createAnthropicProvider({ apiKey: env.ANTHROPIC_API_KEY, ...shared }),
+      createAnthropicProvider({
+        apiKey: env.ANTHROPIC_API_KEY,
+        ...shared,
+        ...modelFor("anthropic"),
+      }),
     );
   }
   if (env.OPENAI_API_KEY) {
     providers.push(
-      createOpenAiProvider({ apiKey: env.OPENAI_API_KEY, ...shared }),
+      createOpenAiProvider({
+        apiKey: env.OPENAI_API_KEY,
+        ...shared,
+        ...modelFor("openai"),
+      }),
     );
   }
   if (env.GOOGLE_API_KEY) {
     providers.push(
-      createGoogleProvider({ apiKey: env.GOOGLE_API_KEY, ...shared }),
+      createGoogleProvider({
+        apiKey: env.GOOGLE_API_KEY,
+        ...shared,
+        ...modelFor("google"),
+      }),
     );
   }
   if (env.GROQ_API_KEY) {
-    providers.push(createGroqProvider({ apiKey: env.GROQ_API_KEY, ...shared }));
+    providers.push(
+      createGroqProvider({
+        apiKey: env.GROQ_API_KEY,
+        ...shared,
+        ...modelFor("groq"),
+      }),
+    );
+  }
+  if (env.XAI_API_KEY) {
+    providers.push(
+      createXaiProvider({
+        apiKey: env.XAI_API_KEY,
+        ...shared,
+        ...modelFor("xai"),
+      }),
+    );
   }
   return providers;
 }

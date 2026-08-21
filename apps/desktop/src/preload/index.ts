@@ -64,7 +64,10 @@ export interface NovaBridge {
    * `onLiveEvent`. `mode` is a plain string here so the UI's menu ids pass
    * through; main validates it against the shared protocol's mode vocabulary.
    */
-  readonly startLiveSession: (mode: string) => Promise<LiveActionResult>;
+  readonly startLiveSession: (
+    mode: string,
+    model?: string,
+  ) => Promise<LiveActionResult>;
   readonly stopLiveSession: () => Promise<LiveActionResult>;
   readonly setLiveSessionPaused: (paused: boolean) => void;
   /**
@@ -208,9 +211,12 @@ const novaBridge: NovaBridge = {
     };
   },
 
-  startLiveSession: async (mode) => {
+  startLiveSession: async (mode, model) => {
     const parsed = liveActionResultSchema.safeParse(
-      await invoke(IpcChannel.liveStart, { mode }),
+      await invoke(IpcChannel.liveStart, {
+        mode,
+        ...(model !== undefined ? { model } : {}),
+      }),
     );
     return parsed.success
       ? parsed.data

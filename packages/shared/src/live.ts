@@ -60,6 +60,21 @@ export const liveModeSchema = z.enum([
 export type LiveMode = z.infer<typeof liveModeSchema>;
 
 /**
+ * WHICH live model answers this call — picked on the pill's model button
+ * (Gustavo, 2026-08-20: the humanized-speech bake-off) and locked for the
+ * session. The vocabulary is the PICKER's, not the vendor's: each id maps
+ * server-side to a provider cascade whose HEAD is the picked model and whose
+ * tail is the other providers, so a picked model that is down (or keyless —
+ * grok until its key lands) degrades to the next provider instead of failing.
+ *
+ *   gpt     gpt-5.4-mini via OpenAI (today's default)
+ *   gemini  gemini-3.7-flash via Google (the reference product's live voice)
+ *   grok    grok-4.1-fast via xAI (top human-preference benchmarks, 2026)
+ */
+export const liveModelSchema = z.enum(["gpt", "gemini", "grok"]);
+export type LiveModel = z.infer<typeof liveModelSchema>;
+
+/**
  * Open a live session. `meeting_id` ties the socket to an existing meeting row.
  * `echo` is a TEST-ONLY diagnostic: when set, the server (only outside
  * production) echoes each binary audio frame's byte length back as an
@@ -78,6 +93,12 @@ export const sessionStartSchema = z.object({
   meeting_id: z.string().uuid(),
   echo: z.boolean().optional(),
   mode: liveModeSchema.optional(),
+  /**
+   * The picked live model (additive, no `v` bump — exactly the `mode`
+   * contract): omitted means `gpt`, an unknown value fails the parse and is
+   * answered with the existing `invalid_event` error.
+   */
+  live_model: liveModelSchema.optional(),
   /**
    * How many PCM channels the binary audio frames carry (additive, desktop
    * pivot chunk 3 — no `v` bump). Omitted = 1, the phone's mono mic feed.

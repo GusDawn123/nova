@@ -54,6 +54,7 @@ export {
   createGoogleProvider,
   type GoogleProviderOptions,
 } from "./adapters/google.js";
+export { createXaiProvider, type XaiProviderOptions } from "./adapters/xai.js";
 
 export { createProvidersFromEnv, type LlmProviderEnv } from "./factory.js";
 
