@@ -36,6 +36,19 @@ export {
   type TurnEvidence,
 } from "./composer.js";
 
+// The deterministic voice floor (2026-08-20): the conductor runs every spoken
+// answer through this after the model — the prompt asks, this guarantees.
+export {
+  enforceSpoken,
+  enforceChunk,
+  validateSayFormat,
+  repairToSayBlock,
+  speakableStats,
+  type EnforceSpokenResult,
+  type SayFormatCheck,
+  type SpeakableStats,
+} from "./enforce.js";
+
 export {
   assembleMeeting,
   assembleSolver,

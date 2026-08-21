@@ -53,6 +53,8 @@ const LLM_KEYS = [
 ] as const;
 /** Every env var `isUsageEventsConfigured` reads, so a test can unset the DB. */
 const DB_KEYS = ["SUPABASE_DB_URL", "DATABASE_URL"] as const;
+/** The composer flag — cleared per test so the legacy path is the baseline. */
+const FLAG_KEYS = ["PROMPT_COMPOSER_ENABLED"] as const;
 
 let app: FastifyInstance;
 let saved: Record<string, string | undefined>;
@@ -60,7 +62,7 @@ let saved: Record<string, string | undefined>;
 beforeEach(() => {
   app = Fastify({ logger: false });
   saved = {};
-  for (const key of [...LLM_KEYS, ...DB_KEYS]) {
+  for (const key of [...LLM_KEYS, ...DB_KEYS, ...FLAG_KEYS]) {
     saved[key] = process.env[key];
     // Reflect.deleteProperty, not `delete env[key]`: the dynamic-key form is a
     // lint error, and assigning undefined would store the STRING "undefined".
@@ -131,8 +133,39 @@ describe("[metering-wiring] the live copilot factory fails closed", () => {
       userId: "user-1",
       meetingId: "meeting-1",
     });
-    const deps = prewarmSpy.calls[0] as { router?: unknown; meter?: unknown };
+    const deps = prewarmSpy.calls[0] as {
+      router?: unknown;
+      meter?: unknown;
+      stablePrefix?: string;
+    };
     expect(deps.router).toBeDefined();
     expect(deps.meter).toBeDefined();
+    // Flag unset → the legacy prefix (prewarm's own default): no override rides.
+    expect(deps.stablePrefix).toBeUndefined();
+  });
+
+  it("with PROMPT_COMPOSER_ENABLED the pre-warm heats the COMPOSED prefix", () => {
+    // The kill-switch law's other half: flag on → the session's real asks send
+    // the composed prefix, so the warm must target that exact byte sequence.
+    prewarmSpy.calls.length = 0;
+    process.env.OPENAI_API_KEY = "sk-test-not-a-real-key";
+    process.env.SUPABASE_DB_URL =
+      "postgresql://nova:nova@127.0.0.1:54322/postgres";
+    process.env.PROMPT_COMPOSER_ENABLED = "true";
+
+    const factory = maybeCreateLiveConductorFactory(app);
+    const conductor = factory?.({
+      send: () => undefined,
+      userId: "user-1",
+      meetingId: "meeting-1",
+      mode: "general",
+    });
+    conductor?.dispose();
+
+    expect(prewarmSpy.calls).toHaveLength(1);
+    const deps = prewarmSpy.calls[0] as { stablePrefix?: string };
+    expect(deps.stablePrefix).toBeDefined();
+    expect(deps.stablePrefix).toContain('<active_mode name="sales">');
+    expect(deps.stablePrefix).toContain("<final_check>");
   });
 });

@@ -6,6 +6,8 @@ import { liveLlmConfig } from "../llm/index.js";
 import { makeMockProvider } from "../llm/testing/mock-provider.js";
 import { DONE, makeRouter, tok } from "../llm/testing/router-harness.js";
 
+import { composeSay } from "../prompt/index.js";
+
 import { conductorConfigSchema } from "./conductor-config.js";
 import { createLiveConductor } from "./conductor.js";
 
@@ -92,6 +94,40 @@ describe("modules/live [latency] tested contract", () => {
     expect(p50).toBeLessThan(2000);
     expect(p95).toBeLessThan(4000);
     expect(p50).toBeLessThan(1500); // the tighter design bar too
+  });
+
+  it("[latency] composed+enforced path holds the same first-token bars", async () => {
+    // The 2026-08-20 layers must be latency-free where it counts: the REAL
+    // composeSay builds the prompt and the voice floor runs at done — neither
+    // sits between the question moment and the first token, and this proves it
+    // with the same samples and bars as the legacy path above.
+    const latencies: number[] = [];
+    for (const ttft of NONSPEC_TTFT) {
+      events = [];
+      const conductor = createLiveConductor({
+        send: capture(),
+        router: routerWith(ttft),
+        config: conductorConfigSchema.parse({ speculationEnabled: false }),
+        autoSuggest: true,
+        composePrompt: (ctx) => composeSay(ctx),
+      });
+      const t0 = Date.now();
+      conductor.onFinal("What is your pricing model exactly?", "them");
+      await vi.advanceTimersByTimeAsync(ttft + 500);
+      const latency = firstDeltaTime(t0);
+      expect(latency).not.toBeNull();
+      if (latency !== null) latencies.push(latency);
+      conductor.dispose();
+    }
+
+    const p50 = percentile(latencies, 50);
+    const p95 = percentile(latencies, 95);
+    console.log(
+      `[latency] composed+enforced question→first-token: p50=${String(p50)}ms p95=${String(p95)}ms (n=${String(latencies.length)}) bars p50<2000 p95<4000 (design p50<1500)`,
+    );
+    expect(p50).toBeLessThan(2000);
+    expect(p95).toBeLessThan(4000);
+    expect(p50).toBeLessThan(1500);
   });
 
   it("[latency] speculation hit → visible: p50<500ms", async () => {

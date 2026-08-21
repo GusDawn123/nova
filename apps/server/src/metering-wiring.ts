@@ -1,5 +1,7 @@
 import type { FastifyInstance } from "fastify";
 
+import { isPromptComposerEnabled } from "./env.js";
+
 import { createPlanReader, createPlanWriter } from "./db/plans.js";
 import { createRoleReader } from "./db/roles.js";
 import {
@@ -12,6 +14,7 @@ import {
 } from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
 import { prewarmPromptCache } from "./modules/live/prewarm.js";
+import { buildSystemPrompt, composeSay } from "./modules/prompt/index.js";
 
 import { createLlmDebugLedger } from "./debug-transcript.js";
 import {
@@ -207,10 +210,15 @@ export function maybeCreateLiveConductorFactory(
   const debug = createLlmDebugLedger(process.env, app.log);
 
   return ({ send, userId, meetingId, mode }) => {
+    // The composer flag, read fresh per session build (no module cache — the
+    // kill-switch must take effect on the next session, not the next deploy).
+    const composerOn = isPromptComposerEnabled();
     // Prompt-cache pre-warm (Natively reference §4/§6): one tiny metered
-    // request per session start writes Brain A's stablePrefix into the
+    // request per session start writes the ACTIVE stablePrefix into the
     // vendor's prefix cache BEFORE the first real ask — otherwise the first
-    // question pays the cold TTFT the cache exists to remove. Fire-and-forget
+    // question pays the cold TTFT the cache exists to remove. Under the
+    // composer, that prefix is the composed sales+say prompt; warming the
+    // legacy prefix instead would heat the wrong cache entry. Fire-and-forget
     // off the start path; it rides the same router and meter as real asks.
     void prewarmPromptCache({
       router,
@@ -218,6 +226,9 @@ export function maybeCreateLiveConductorFactory(
       logger: app.log,
       userId,
       meetingId,
+      ...(composerOn
+        ? { stablePrefix: buildSystemPrompt({ mode: "sales", action: "say" }) }
+        : {}),
     });
     return createLiveConductor({
       send,
@@ -238,6 +249,10 @@ export function maybeCreateLiveConductorFactory(
       // the trigger-gate machinery stays intact behind this flag.
       autoSuggest: false,
       ...(debug !== undefined ? { debug } : {}),
+      // The 2026-08-20 composer path (`composed ?? legacy` at the conductor's
+      // prompt-selection site). Absent flag → the dep is absent → the legacy
+      // two-brain path runs byte-identical: the migration's kill-switch.
+      ...(composerOn ? { composePrompt: composeSay } : {}),
     });
   };
 }

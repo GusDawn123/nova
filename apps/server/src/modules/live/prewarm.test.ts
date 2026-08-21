@@ -103,4 +103,18 @@ describe("live/prewarm", () => {
     expect(error).toHaveBeenCalledTimes(1);
     expect(error.mock.calls[0]?.[1]).toBe("live.prewarm_failed");
   });
+
+  it("warms the OVERRIDE prefix when one is passed (the composer era)", async () => {
+    // When PROMPT_COMPOSER_ENABLED is on, real asks send the composed prefix -
+    // warming the legacy one would write the wrong cache entry, so the wiring
+    // hands the active prefix in and the warm must use it byte-for-byte.
+    const { router, calls } = makeRouter([{ type: "token", text: "ok" }, DONE]);
+
+    await prewarmPromptCache({ router, stablePrefix: "COMPOSED PREFIX" });
+
+    expect(calls[0]?.req.messages[0]).toEqual({
+      role: "system",
+      content: "COMPOSED PREFIX",
+    });
+  });
 });

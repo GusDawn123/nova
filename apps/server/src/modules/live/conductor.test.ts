@@ -411,3 +411,79 @@ describe("conductor [debug-ledger] — the dev-only answer ledger seam", () => {
     });
   });
 });
+
+describe("conductor [composer+voice-floor] — the 2026-08-20 prompt-stack seams", () => {
+  it("uses composePrompt when wired: currentTurn is the trigger, history rides and caps at 3", async () => {
+    const calls: unknown[] = [];
+    const c = makeConductor({
+      autoSuggest: false,
+      router: router({ firstTokenDelayMs: 10, interTokenDelayMs: 5 }),
+      composePrompt: (ctx) => {
+        calls.push(ctx);
+        return { stablePrefix: "COMPOSED", dynamicSuffix: "TURN" };
+      },
+    });
+
+    for (const q of ["q one?", "q two?", "q three?", "q four?", "q five?"]) {
+      c.onDirectQuestion(q);
+      await vi.advanceTimersByTimeAsync(500);
+    }
+
+    expect(calls).toHaveLength(5);
+    expect(calls[0]).toMatchObject({ currentTurn: "q one?" });
+    // First call has no history; the fifth carries exactly the last 3 answers.
+    expect(
+      (calls[0] as { previousAnswers?: string[] }).previousAnswers,
+    ).toBeUndefined();
+    const fifth = calls[4] as { previousAnswers?: string[] };
+    expect(fifth.previousAnswers).toHaveLength(3);
+  });
+
+  it("repairs a fence-less answer into a Say block ONLY under the composer", async () => {
+    const c = makeConductor({
+      autoSuggest: false,
+      router: router({ firstTokenDelayMs: 10, interTokenDelayMs: 5 }),
+      composePrompt: () => ({ stablePrefix: "P", dynamicSuffix: "S" }),
+    });
+    c.onDirectQuestion("what is the price?");
+    await vi.advanceTimersByTimeAsync(500);
+    const done = events.find((e) => e.type === "suggestion.done");
+    expect(done && "text" in done ? done.text : "").toBe(
+      "Say:\n```text\nAnswer here\n```",
+    );
+  });
+
+  it("legacy path (no composePrompt) ships the enforced text without repair", async () => {
+    const c = makeConductor({ autoSuggest: false });
+    c.onDirectQuestion("what is the price?");
+    await vi.advanceTimersByTimeAsync(500);
+    const done = events.find((e) => e.type === "suggestion.done");
+    expect(done && "text" in done ? done.text : "").toBe("Answer here");
+  });
+
+  it("the voice floor rewrites tells before shipping and ledgers raw vs shipped", async () => {
+    const entries: unknown[] = [];
+    const c = makeConductor({
+      autoSuggest: false,
+      router: router({
+        firstTokenDelayMs: 10,
+        interTokenDelayMs: 5,
+        tokens: ["Totally fair ", "— we handle overflow;", " nights too."],
+      }),
+      debug: (entry) => entries.push(entry),
+    });
+    c.onDirectQuestion("do you handle overflow?");
+    await vi.advanceTimersByTimeAsync(500);
+
+    const done = events.find((e) => e.type === "suggestion.done");
+    const shipped = done && "text" in done ? done.text : "";
+    expect(shipped).not.toMatch(/[—;]/);
+    expect(entries[0]).toMatchObject({
+      enforcement_changed: true,
+      raw_answer_text: "Totally fair — we handle overflow; nights too.",
+    });
+    const violations = (entries[0] as { violations: string[] }).violations;
+    expect(violations).toContain("em-dash");
+    expect(violations).toContain("semicolon");
+  });
+});

@@ -38,6 +38,13 @@ export interface PrewarmDeps {
   /** Attribution for the log line only (the meter already carries identity). */
   userId?: string;
   meetingId?: string;
+  /**
+   * The prefix real asks will actually send (2026-08-20 composer era): when
+   * the composer flag is on, the wiring passes the composed prefix here —
+   * warming the legacy prefix would write the WRONG cache entry and the first
+   * real ask would run cold. Defaults to the legacy Brain A prefix.
+   */
+  stablePrefix?: string;
   /** Overridable for tests. */
   timeoutMs?: number;
 }
@@ -49,8 +56,10 @@ export interface PrewarmDeps {
  */
 export async function prewarmPromptCache(deps: PrewarmDeps): Promise<void> {
   // The prefix must be BYTE-IDENTICAL to what real asks send — the cache keys
-  // on the prefix, and Brain A's stablePrefix is the same for every call.
-  const { stablePrefix } = assembleMeeting({ transcript: [] });
+  // on the prefix. The wiring passes the composed prefix when the composer is
+  // active; the legacy Brain A prefix is the default.
+  const stablePrefix =
+    deps.stablePrefix ?? assembleMeeting({ transcript: [] }).stablePrefix;
   const controller = new AbortController();
   const timeout = setTimeout(() => {
     controller.abort();
