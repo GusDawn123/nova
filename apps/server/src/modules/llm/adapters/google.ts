@@ -114,16 +114,23 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
             ? { temperature: opts.temperature }
             : {}),
           ...(opts.topP !== undefined ? { topP: opts.topP } : {}),
-          // The thinking knob is sent ONLY to the 3.7 lineage: 3.7-flash
-          // defaults to MEDIUM and bills thinking tokens as OUTPUT, so LOW is
-          // pinned there (probed 2026-08-17). Lite-lineage models REJECT
-          // thinkingConfig (probed 2026-07-23: 400). gemini-3.5-flash accepts
-          // it (probed 2026-08-21) but runs KNOB-FREE on purpose — Natively
-          // parity: the reference live voice ships at the API's default
-          // behavior, and that is the configuration its register was tuned in.
-          ...(model.startsWith("gemini-3.7")
-            ? { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }
-            : {}),
+          // THINKING LEVEL, measured 2026-08-22 against the real composed
+          // prompt (streaming TTFT, three rounds each):
+          //   no knob (= the model's own default)  9,217ms
+          //   MEDIUM (3.5-flash's documented default) 5,167ms
+          //   LOW      48s / 95s / 503 UNAVAILABLE  <- pathological, never use
+          //   MINIMAL  918ms / 1,060ms / 883ms      <- the live lane
+          // 3.5-flash ships thinking ON at medium (Google's 3.5 release note),
+          // which is what made the gemini pick feel slow and out of sync, and
+          // its LOW tier is currently both glacial and 503-prone. So the 3.5
+          // lineage pins MINIMAL. The 3.7 lineage keeps LOW (probed fine
+          // 2026-08-17); lite-lineage models REJECT thinkingConfig outright
+          // (probed 2026-07-23: 400), so they still get no knob at all.
+          ...(model.includes("lite")
+            ? {}
+            : model.startsWith("gemini-3.5")
+              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
+              : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,

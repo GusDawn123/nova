@@ -98,10 +98,10 @@ describe("adapters/google — translation", () => {
       // The SDK enum serializes as "LOW" on the wire.
       expect(bodies[1]).toContain('"thinkingLevel":"LOW"');
 
-      // gemini-3.5-flash (the live lane since 2026-08-21) runs KNOB-FREE on
-      // purpose — Natively parity, the register's tuned configuration.
+      // gemini-3.5-flash (the live lane) pins MINIMAL: measured 2026-08-22,
+      // its own default thinks for ~9s and its LOW tier stalls for a minute.
       await expect(drain("gemini-3.5-flash")).rejects.toThrow();
-      expect(bodies[2]).not.toContain("thinkingLevel");
+      expect(bodies[2]).toContain('"thinkingLevel":"MINIMAL"');
     } finally {
       globalThis.fetch = realFetch;
     }
