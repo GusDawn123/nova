@@ -22,6 +22,7 @@ const ENTRY: LlmDebugEntry = {
   raw_answer_text: "The price is $40 a seat — billed monthly.",
   enforcement_changed: true,
   violations: ["em-dash"],
+  tell_score: 1,
   outcome: "done",
   duration_ms: 850,
   input_tokens: 5000,

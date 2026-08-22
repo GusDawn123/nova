@@ -121,6 +121,12 @@ export interface LlmDebugEntry {
    * including word-class tells that are logged but never rewritten.
    */
   violations: string[];
+  /**
+   * How many DISTINCT tell bands the raw answer tripped (2026-08-21). One
+   * number per answer: the trend line across prompt versions, and the
+   * head-to-head metric for one model against another on the same ask.
+   */
+  tell_score: number;
   /** Mirrors the wire: `done`, `discard:<reason>`, or `done_after_error`. */
   outcome: string;
   duration_ms: number;

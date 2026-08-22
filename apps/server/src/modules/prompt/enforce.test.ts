@@ -390,3 +390,93 @@ describe("modules/prompt [enforce] performance", () => {
     expect(avg).toBeLessThan(5);
   });
 });
+
+describe("modules/prompt [enforce] humanizer v2 (2026-08-21)", () => {
+  const say = (body: string): string => "Say:\n```text\n" + body + "\n```";
+  const spoken = (out: string): string =>
+    out.split("```text\n")[1]?.split("\n```")[0] ?? "";
+
+  it("swaps the safe fillers and keeps the sentence grammatical", () => {
+    const r = enforceSpoken(
+      say(
+        "In order to move fast we skipped it. Due to the fact that budget was tight, we waited. At this point in time it works. The team has the ability to run it.",
+      ),
+    );
+    const body = spoken(r.text);
+    expect(body).toContain("To move fast");
+    expect(body).toContain("Because budget was tight");
+    expect(body).toContain("Now it works");
+    expect(body).toContain("The team can run it");
+    expect(r.violations).toContain("filler:in order to");
+  });
+
+  it("straightens curly quotes and apostrophes", () => {
+    const r = enforceSpoken(say("He said “we’re in” and meant it."));
+    expect(spoken(r.text)).toBe('He said "we\'re in" and meant it.');
+    expect(r.violations).toContain("curly-quotes");
+  });
+
+  it("DETECTS the new bands without rewriting their words", () => {
+    const cases: [string, string][] = [
+      ["Our platform boasts a seamless rollout.", "ad-speak"],
+      ["It serves as your first responder.", "serves-as"],
+      ["It's not just a tool, it's a system.", "not-just-x"],
+      ["We handle calls, texts, and email.", "forced-three"],
+      ["It could potentially help.", "qualifier-stack"],
+      ["The real question is whether you grow.", "fake-depth"],
+      ["Let's dive into the numbers.", "staged-opener"],
+      ["The future looks bright for you.", "generic-ending"],
+      ["Speed is the currency of trust.", "formulaic-saying"],
+      ["That was a pivotal moment for us.", "inflation"],
+      ["This is a crucial part of the rollout.", "banned-word:crucial"],
+    ];
+    for (const [body, band] of cases) {
+      const r = enforceSpoken(say(body));
+      expect(r.violations, `${band} for: ${body}`).toContain(band);
+      // Word-class and shape tells are logged, never rewritten.
+      expect(spoken(r.text)).toBe(body);
+    }
+  });
+
+  it("flags a wall of same-length sentences, not a single long answer", () => {
+    const even = enforceSpoken(
+      say(
+        "We answer every inbound call within two rings of it arriving. Your team keeps the conversations that actually need a person. The system handles the repetitive questions that come in daily. Nothing slips through when the front desk gets busy.",
+      ),
+    );
+    expect(even.violations).toContain("uniform-rhythm");
+
+    const varied = enforceSpoken(
+      say(
+        "Totally fair. We answer every inbound call within two rings, so nothing slips when the desk gets busy. Your team keeps the real conversations. That's the whole trade.",
+      ),
+    );
+    expect(varied.violations).not.toContain("uniform-rhythm");
+  });
+
+  it("tellScore counts distinct bands, and stays 0 on clean speech", () => {
+    const clean = enforceSpoken(
+      say(
+        "Totally fair. If after-hours volume is low, I wouldn't anchor there either. The stronger case is daytime overflow.",
+      ),
+    );
+    expect(clean.tellScore).toBe(0);
+    expect(clean.violations).toEqual([]);
+
+    const messy = enforceSpoken(
+      say("Our platform boasts a seamless fit — it could potentially help."),
+    );
+    expect(messy.tellScore).toBe(messy.violations.length);
+    expect(messy.tellScore).toBeGreaterThanOrEqual(3);
+  });
+
+  it("stays idempotent with every new rule on", () => {
+    const input = say(
+      "In order to be clear — the team has the ability to ship; due to the fact that it’s ready.",
+    );
+    const once = enforceSpoken(input).text;
+    const twice = enforceSpoken(once);
+    expect(twice.text).toBe(once);
+    expect(twice.changed).toBe(false);
+  });
+});

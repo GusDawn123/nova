@@ -35,24 +35,25 @@ const hash = (text: string): string =>
 
 type ComboKey = `${ComposerMode}/${ComposerAction}` | "sales/say+script";
 
-/** Pinned 2026-08-20 — the ratified composer content's first composition. */
+/** Re-pinned 2026-08-21: the humanizer-v2 anti-tells, the sales mode's
+ * carve-outs, and the two closing FINAL CHECK questions. */
 const PINNED: Record<ComboKey, string> = {
   "sales/say":
-    "9b12f757c3c4136520bb7b44a8aeb173abd7514c624194f984d49d3a1c1fd382",
+    "bd4b7e452fff5aaaafbab63d7fa1412643344dd268a7045c8610bf50e6d4b45b",
   "sales/solve":
-    "7b68b63ad980a7bc270630e07e426edf50b37a017b757fa6c130e5e6dd60b063",
+    "86c70649ceed12e75e50b066fa1bc6b7987b1155915903ac795cad1b9d444cbb",
   "sales/assist":
-    "e08ff22974a3318cde6716c849afdd75dcf8567dc0c12630a0924da88d649ad0",
+    "1b6e06862cb0313acd64287011dd8d56fb5799002426e9f26814a4db5a0898e7",
   "solver/say":
-    "1847722d62494d5dce2b5bcc0a2b3dba0c987022d7546c399a6302ff4b728405",
+    "0285a1174d698cc1131c37cfd0ae586a69f615a3804a207a77d40e4bad466ec2",
   "solver/solve":
-    "c510702d0dbe9b386ae0e3cc462df5da3919f1e818685c79297d6b4524903a13",
+    "2e9ce006c978f2750677e02882ba36f524f119efdd4cebee347659334790cf15",
   "solver/assist":
-    "42a6912cfc6704cc7c2aefd08c7d734a265137e5368234a9119f437bdc2c34c8",
+    "ad1dcbaab322ebb97e8dbe3d6c0ece064c0edc8dc434265ddaa8d769e3af6cd3",
   // The userScript-present variant: the script joins the SYSTEM prompt
   // (block 7), before the final check.
   "sales/say+script":
-    "f27a37a9b9e030b7dea0d673e72b7474c74869206b187f596cc751a92aaebcd1",
+    "4d97f0e73c039694fb85e2f9e0f49160a0ff569cfacbe9f747cef9768550cc1c",
 };
 
 describe("modules/prompt [prompt-snapshot] composer compositions are byte-pinned", () => {

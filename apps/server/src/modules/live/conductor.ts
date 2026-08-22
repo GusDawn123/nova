@@ -375,6 +375,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       outcome: string,
       shipped: string,
       violations: string[],
+      tellScore: number,
     ): void => {
       deps.debug?.({
         at: new Date().toISOString(),
@@ -386,6 +387,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
         raw_answer_text: full,
         enforcement_changed: shipped !== full,
         violations,
+        tell_score: tellScore,
         outcome,
         duration_ms: now() - startedAt,
         input_tokens: usage?.inputTokens ?? null,
@@ -397,13 +399,21 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
     // deterministic enforcer before it ships; under the composer's format
     // contract, a fence-less answer is additionally repaired into a Say block
     // (legacy prompts predate that contract, so repair is composer-gated).
-    const shipAnswer = (): { shipped: string; violations: string[] } => {
+    const shipAnswer = (): {
+      shipped: string;
+      violations: string[];
+      tellScore: number;
+    } => {
       const enforced = enforceSpoken(full);
       const shipped =
         deps.composePrompt !== undefined
           ? repairToSayBlock(enforced.text)
           : enforced.text;
-      return { shipped, violations: enforced.violations };
+      return {
+        shipped,
+        violations: enforced.violations,
+        tellScore: enforced.tellScore,
+      };
     };
 
     try {
@@ -454,7 +464,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
       if (!isCurrent(gen)) return;
       flush();
       {
-        const { shipped, violations } = shipAnswer();
+        const { shipped, violations, tellScore } = shipAnswer();
         send({
           v: LIVE_PROTOCOL_VERSION,
           type: "suggestion.done",
@@ -462,7 +472,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           text: shipped,
         });
         recordAnswer(shipped);
-        emitDebug("done", shipped, violations);
+        emitDebug("done", shipped, violations, tellScore);
       }
       active = null;
     } catch (err: unknown) {
@@ -476,13 +486,13 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           suggestion_id: gen.id,
           reason: "no_response",
         });
-        emitDebug("discard:no_response", "", []);
+        emitDebug("discard:no_response", "", [], 0);
         // A failed speculation has nothing to reconcile against later.
         if (speculation?.id === gen.id) speculation = null;
       } else {
         // Committed then died → keep what streamed (adr-0004 §2: no zombie, no mix).
         flush();
-        const { shipped, violations } = shipAnswer();
+        const { shipped, violations, tellScore } = shipAnswer();
         send({
           v: LIVE_PROTOCOL_VERSION,
           type: "suggestion.done",
@@ -490,7 +500,7 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           text: shipped,
         });
         recordAnswer(shipped);
-        emitDebug("done_after_error", shipped, violations);
+        emitDebug("done_after_error", shipped, violations, tellScore);
       }
       active = null;
       logger?.error(

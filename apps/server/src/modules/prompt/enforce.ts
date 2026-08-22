@@ -28,6 +28,14 @@ export interface EnforceSpokenResult {
   readonly text: string;
   readonly changed: boolean;
   readonly violations: string[];
+  /**
+   * How many DISTINCT tell bands the raw answer tripped (Gustavo-ratified
+   * 2026-08-21). Blader's law: clusters are the signal, a single ordinary
+   * word is not, so the score counts BANDS, never occurrences. It is the
+   * trend line across prompt versions and the head-to-head number for one
+   * model against another on the same ask.
+   */
+  readonly tellScore: number;
 }
 
 /** Say-format shape check (label present, block count, label discipline). */
@@ -164,6 +172,74 @@ const TRAILING_FILLER =
   /(^|[.!?]\s+|\n[ \t]*)(?:i hope this helps|hope that answers|let me know if you|feel free to|does that make sense|is there anything else|i['’]?d be happy to|i would be happy to|if you want,? i can|want me to)[^.!?\n]*[.!?]?[ \t]*$/i;
 
 /**
+ * Filler phrases with an exact plain-speech equivalent (blader §23). SAFE to
+ * rewrite: each is a grammatical drop-in that cannot change a claim, so these
+ * are the only word-level swaps this pass performs beyond the idiom table.
+ */
+const FILLER_SWAPS: readonly (readonly [
+  key: string,
+  find: RegExp,
+  say: string,
+])[] = [
+  ["in order to", /\bin order to\b/gi, "to"],
+  ["due to the fact that", /\bdue to the fact that\b/gi, "because"],
+  ["at this point in time", /\bat this point in time\b/gi, "now"],
+];
+
+/**
+ * "has/have/had the ability to" -> "can/could": the verb has to agree, so it
+ * is its own rule rather than a row in the flat table above.
+ */
+const ABILITY = /\b(ha[sv]e?|had) the ability to\b/gi;
+
+/** Curly quotes and apostrophes to straight (blader §19). Cosmetic, safe. */
+const CURLY_DOUBLE = /[“”]/g;
+const CURLY_SINGLE = /[‘’]/g;
+
+/**
+ * Detect-only bands (2026-08-21, from blader's catalog). Rewriting any of
+ * these would change meaning or voice, so they are LOGGED and the PROMPT is
+ * what gets fixed when the ledger shows a model leaking them.
+ */
+const DETECT_ONLY: readonly (readonly [key: string, find: RegExp])[] = [
+  [
+    "ad-speak",
+    /\b(boasts?|vibrant|seamless|groundbreaking|renowned|breathtaking|stunning|nestled|robust|unlocks?)\b/i,
+  ],
+  [
+    "inflation",
+    /\b(a testament to|stands as|a pivotal moment|evolving landscape|indelible mark)\b/i,
+  ],
+  [
+    "serves-as",
+    /\b(serves as|stands as|represents|constitutes|functions as)\b/i,
+  ],
+  [
+    "not-just-x",
+    /\b(not just (?:a|an|about)|not only\b[^.!?]*\bbut also|not merely)\b/i,
+  ],
+  ["forced-three", /\w[\w '-]*,\s+\w[\w '-]*,\s+and\s+\w[\w '-]*[.!?]/i],
+  [
+    "qualifier-stack",
+    /\b(could potentially|might arguably|possibly be argued|it's also possible)\b/i,
+  ],
+  [
+    "staged-opener",
+    /(^|[.!?]\s+)(let's (?:dive|explore|break)|here's (?:what you need|the thing)|honestly\?|real talk|look,)/i,
+  ],
+  [
+    "fake-depth",
+    /\b(the real question is|at its core|what really matters|the deeper issue|the heart of the matter)\b/i,
+  ],
+  [
+    "generic-ending",
+    /\b(the future looks bright|exciting times|a step in the right direction)\b/i,
+  ],
+  ["formulaic-saying", /\bis the (?:language|currency|architecture) of\b/i],
+  ["curly-quotes", /[“”‘’]/],
+];
+
+/**
  * Word-class tells: LOGGED as `banned-word:<key>`, never rewritten — a word
  * swap changes meaning, and the raw-vs-shipped ledger is the improvement loop.
  * "leverage" is flagged only in verb positions (inflected forms, or followed
@@ -185,6 +261,18 @@ const BANNED_WORDS: readonly (readonly [key: string, find: RegExp])[] = [
   ["certainly!", /\bcertainly!/i],
   ["in today's fast-paced world", /\bin today['’]?s fast-paced world\b/i],
   ["in the realm of", /\bin the realm of\b/i],
+  // blader §7 additions (2026-08-21).
+  ["testament", /\btestament\b/i],
+  ["pivotal", /\bpivotal\b/i],
+  ["landscape", /\blandscape\b/i],
+  ["interplay", /\binterplay\b/i],
+  ["garner", /\bgarner(?:s|ed|ing)?\b/i],
+  ["foster", /\bfoster(?:s|ed|ing)?\b/i],
+  ["underscore", /\bunderscor(?:e|es|ed|ing)\b/i],
+  ["enhance", /\benhanc(?:e|es|ed|ing)\b/i],
+  ["align with", /\balign(?:s|ed|ing)? with\b/i],
+  ["crucial", /\bcrucial\b/i],
+  ["showcase", /\bshowcas(?:e|es|ed|ing)\b/i],
 ];
 
 // --- Detection (raw speakable segments; protected spans already vaulted) ----
@@ -200,6 +288,14 @@ function detectTells(text: string, violations: Set<string>): void {
     if (text.search(find) !== -1) violations.add(`idiom:${key}`);
   }
   if (TRAILING_FILLER.test(text)) violations.add("filler-ending");
+  for (const [key, find] of FILLER_SWAPS) {
+    if (text.search(find) !== -1) violations.add(`filler:${key}`);
+  }
+  if (ABILITY.test(text)) violations.add("filler:has the ability to");
+  for (const [key, find] of DETECT_ONLY) {
+    if (find.test(text)) violations.add(key);
+  }
+  if (isUniformRhythm(text)) violations.add("uniform-rhythm");
   for (const [key, find] of BANNED_WORDS) {
     if (find.test(text)) violations.add(`banned-word:${key}`);
   }
@@ -287,6 +383,43 @@ function tidy(text: string): string {
 }
 
 /**
+ * Rhythm tell (blader "human details to keep": real writing alternates short
+ * and long; AI trends to an even mid-length cadence). Flagged only with
+ * enough sentences to judge, and only when NONE is short: a single long
+ * answer is not a tell, a wall of same-size sentences is.
+ */
+function isUniformRhythm(text: string): boolean {
+  const lengths = text
+    .split(/[.!?]+/)
+    .map((s) => s.trim().split(/\s+/).filter(Boolean).length)
+    .filter((n) => n > 0);
+  if (lengths.length < 4) return false;
+  return lengths.every((n) => n >= 9);
+}
+
+/** The safe word-level swaps: grammatical drop-ins, never a claim change. */
+function applyFillerSwaps(text: string): string {
+  let t = text;
+  for (const [, find, say] of FILLER_SWAPS) {
+    t = t.replace(find, (m) =>
+      /^\p{Lu}/u.test(m) ? say.charAt(0).toUpperCase() + say.slice(1) : say,
+    );
+  }
+  t = t.replace(ABILITY, (_m, verb: string) => {
+    const word = verb.toLowerCase() === "had" ? "could" : "can";
+    return /^\p{Lu}/u.test(verb)
+      ? word.charAt(0).toUpperCase() + word.slice(1)
+      : word;
+  });
+  return t;
+}
+
+/** Straight quotes: a chatbot artifact, never the speaker's choice. */
+function normalizeQuotes(text: string): string {
+  return text.replace(CURLY_DOUBLE, '"').replace(CURLY_SINGLE, "'");
+}
+
+/**
  * One speech segment through the whole pipeline: vault protected inline spans,
  * detect tells on the RAW text, rewrite the mechanical ones, restore. Order
  * matters — coaching before narration (the label hides the narration behind
@@ -314,6 +447,8 @@ function enforceSpeechSegment(raw: string, violations: Set<string>): string {
   text = applyDashRules(text);
   text = applySemicolonRules(text);
   text = applyIdioms(text);
+  text = applyFillerSwaps(text);
+  text = normalizeQuotes(text);
   text = stripTrailingFiller(text);
   text = tidy(text);
 
@@ -355,6 +490,7 @@ export function enforceSpoken(text: string): EnforceSpokenResult {
     text: result,
     changed: result !== text,
     violations: [...violations],
+    tellScore: violations.size,
   };
 }
 
