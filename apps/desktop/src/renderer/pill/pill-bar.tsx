@@ -20,6 +20,9 @@ import { PillMenu } from "./pill-menu";
 
 interface PillBarProps {
   readonly focusMode: boolean;
+  /** The bar's status line (session end reason, refused ask); click dismisses. */
+  readonly notice: string | null;
+  readonly onDismissNotice: () => void;
   readonly onFocusAsk: () => void;
   readonly onBlurAsk: () => void;
   /**
@@ -102,6 +105,17 @@ export function PillBar(props: PillBarProps): JSX.Element {
             <ReturnIcon />
           </button>
         </div>
+
+        {props.notice !== null && (
+          <button
+            type="button"
+            className="pill__notice nd"
+            title="Dismiss"
+            onClick={props.onDismissNotice}
+          >
+            {props.notice}
+          </button>
+        )}
 
         <div className="pill__bar">
           <button

@@ -17,6 +17,8 @@ interface TranscriptPanelProps {
   readonly live: LiveSessionView;
   readonly onTogglePause: () => void;
   readonly onStopAudio: () => void;
+  /** Tab (and the chip) hand the keyboard to the pill's ask field. */
+  readonly onFocusAsk: () => void;
   readonly onBack: () => void;
 }
 
@@ -162,6 +164,22 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
   const initialKeys = useRef<ReadonlySet<string> | null>(null);
   initialKeys.current ??= new Set(props.live.rows.map((row) => row.key));
 
+  // The chip up top promises Tab; the promise held only on the bar until the
+  // 2026-08-31 live review caught it lying here.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Tab") {
+        return;
+      }
+      event.preventDefault();
+      props.onFocusAsk();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [props.onFocusAsk]);
+
   return (
     <div className="panel">
       <div className="panel__head">
@@ -173,7 +191,12 @@ export function TranscriptPanel(props: TranscriptPanelProps): JSX.Element {
         >
           <BackIcon />
         </button>
-        <span className="pill__tab-hint">
+        <span
+          className="pill__tab-hint nd"
+          onClick={props.onFocusAsk}
+          role="button"
+          tabIndex={-1}
+        >
           <span className="pill__tab-chip">Tab</span>
           <span className="pill__tab-label">to focus</span>
         </span>

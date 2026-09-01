@@ -83,6 +83,25 @@ body {
   cursor: text;
 }
 
+/* The bar's status line — a session's end reason, a refused ask. Click = gone. */
+.pill__notice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-top: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-ink-fill);
+  color: var(--nova-ink-soft);
+  font: 400 11px var(--mono);
+  letter-spacing: 0.04em;
+  padding: 7px 16px;
+  cursor: pointer;
+}
+
+.pill__notice:hover {
+  color: var(--nova-ink);
+}
+
 .pill__tab-chip {
   font: 700 11.5px var(--mono);
   letter-spacing: 0.08em;
