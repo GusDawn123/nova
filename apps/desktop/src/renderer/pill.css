@@ -873,9 +873,11 @@ body {
 
 /* ---- the history panel ---- */
 
+/* Solid, unlike the pill's glass: this is a reading surface, not an overlay
+   (Gustavo, 2026-08-31). */
 .history {
   overflow: hidden;
-  background: var(--nova-canvas-glass);
+  background: var(--nova-canvas);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
@@ -930,6 +932,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 13px;
+  /* Cap comes from the panel (screen-derived); past it the list scrolls
+     inside itself instead of growing the window down the monitor. */
+  overflow-y: auto;
 }
 
 .history__label {

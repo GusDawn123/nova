@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { cobaltPalette, paperPalette } from "./tokens";
 import { themeVariables } from "./theme";
+import { cobaltPalette, paperPalette } from "./tokens";
 
 describe("themeVariables", () => {
   it("derives the glass surface from the palette's own canvas", () => {
