@@ -28,6 +28,10 @@ const envSchema = z.object({
   OPENAI_API_KEY: z.string().min(1).optional(),
   GOOGLE_API_KEY: z.string().min(1).optional(),
   GROQ_API_KEY: z.string().min(1).optional(),
+  // xAI (Grok) — the 2026-08-20 model-picker lane. Same optional posture:
+  // absent key means the xai provider is never built and a picked "grok"
+  // session serves from its fallback cascade instead.
+  XAI_API_KEY: z.string().min(1).optional(),
   // STT vendor keys (Phase 3.5). OPTIONAL: the server boots without them — the
   // STT engine simply has no vendors and a live session surfaces a typed error
   // instead of transcribing. ASSEMBLYAI_API_KEY selects the primary vendor,
@@ -63,6 +67,20 @@ const envSchema = z.object({
   // `Authorization: Bearer <this value>` (constant-time compared). Secret — never
   // logged, never in the repo, configured in the RevenueCat dashboard.
   REVENUECAT_WEBHOOK_TOKEN: z.string().min(1).optional(),
+  // Prompt composer switch (2026-08-20 prompt-stack redesign). OFF by default:
+  // the conductor keeps the legacy assembleMeeting path (byte-identical
+  // fallback) unless this is the string "true" — the migration rule is
+  // `composeSay(...) ?? legacy` behind this flag, and unsetting it is the
+  // kill-switch that restores the old prompts exactly.
+  PROMPT_COMPOSER_ENABLED: z.string().optional(),
+  // Dev-only live-answer ledger opt-in (2026-08-19). HARD-OFF by default —
+  // this sink writes conversation content (a deliberate RULES §6 exception),
+  // so it exists only behind this explicit flag and must never be enabled in
+  // production. `1`/`true` → `.dev/llm-transcript.jsonl`; any other non-empty
+  // value is the path itself. Consumed via `debug-transcript.ts` (its own
+  // boundary); declared here so the env contract documents every variable the
+  // server reads — it predates this line and was the one undocumented flag.
+  LLM_DEBUG_TRANSCRIPT: z.string().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -76,6 +94,17 @@ export function isNotesWorkerEnabled(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
   return env.NOTES_WORKER_ENABLED === "true";
+}
+
+/**
+ * Is the prompt composer explicitly enabled? Same posture and shape as the
+ * notes-worker gate: read at the wiring seam, only the literal string "true"
+ * opts in, so a keyless/CI/test boot always rides the legacy prompt path.
+ */
+export function isPromptComposerEnabled(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.PROMPT_COMPOSER_ENABLED === "true";
 }
 
 /**

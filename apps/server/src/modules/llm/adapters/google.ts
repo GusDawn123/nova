@@ -22,16 +22,18 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
 /** The current model — see docs before changing (do not guess IDs).
  * Lineage: gemini-2.0-flash (retired mid-2026) → gemini-2.5-flash →
  * gemini-3.5-flash-lite (2026-07-23 refresh) → gemini-3.7-flash (2026-08-17,
- * Gustavo's pick: the lite tier ignored Brain A's register rules; 3.7-flash is
- * the newest flash, released 2026-08-13, $0.75/$3.75 per 1M intro pricing
- * verified against the model list on our key + current pricing docs — the
- * price book moves in lockstep, adr-0004 addendum).
+ * Gustavo's pick: the lite tier ignored Brain A's register rules; $0.75/$3.75
+ * per 1M intro pricing) → REVERTED to gemini-3.5-flash-lite (2026-08-19,
+ * Gustavo: keep the old models; id re-probed LIVE on our key the same day and
+ * answering — $0.30/$2.50 per 1M, the price book moves in lockstep, adr-0004
+ * addendum).
  *
- * THINKING: 3.7-flash defaults to MEDIUM and bills thinking tokens as output,
- * so the stream call pins `thinkingLevel: "low"` (Gustavo: decently smart,
- * reasoning low). Lite-lineage models REJECT thinkingConfig outright (probed
- * 2026-07-23: 400), so the knob is skipped when a lite model is configured. */
-const DEFAULT_MODEL = "gemini-3.7-flash";
+ * THINKING: the knob below is model-conditional and stays that way — the lite
+ * default is non-thinking (lite-lineage models REJECT thinkingConfig outright;
+ * probed 2026-07-23: 400), so the knob is skipped for it, while an explicit
+ * non-lite override (e.g. 3.7-flash, which defaults to MEDIUM and bills
+ * thinking tokens as output) still gets `thinkingLevel: "low"` pinned. */
+const DEFAULT_MODEL = "gemini-3.5-flash-lite";
 
 export interface GoogleProviderOptions {
   apiKey: string;
@@ -42,6 +44,19 @@ export interface GoogleProviderOptions {
    * code answers); the model's own vendor limit is the only bound.
    */
   maxOutputTokens?: number;
+  /**
+   * Sampling temperature. OMITTED by default (the vendor's own default); the
+   * live wiring passes a low value (Natively reference, 2026-08-18 doc: their
+   * answer paths run 0.25–0.4 — "lower = faster, more focused"). Probed
+   * 2026-08-19: gemini-3.5-flash-lite accepts it.
+   */
+  temperature?: number;
+  /**
+   * Nucleus sampling. OMITTED by default; the live wiring passes 0.85 — the
+   * reference product's exact gemini live-voice setting (2026-08-21, copying
+   * their per-model params verbatim per Gustavo).
+   */
+  topP?: number;
 }
 
 /** Gemini's request shape: a `systemInstruction` string + role-tagged contents. */
@@ -91,18 +106,31 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
       const { systemInstruction, contents } = toGoogleContents(req.messages);
       let inputTokens: number | undefined;
       let outputTokens: number | undefined;
+      let cachedInputTokens: number | undefined;
       try {
         const config: GenerateContentConfig = {
           ...(maxTokens !== undefined ? { maxOutputTokens: maxTokens } : {}),
-          // Thinking LOW (Gustavo, 2026-08-17: decently smart, reasoning low).
-          // 3.7-flash defaults to MEDIUM and bills thinking tokens as OUTPUT,
-          // so leaving the knob off silently costs money and first-token
-          // latency. Lite-lineage models REJECT thinkingConfig (probed
-          // 2026-07-23: 400 INVALID_ARGUMENT — that lineage is non-thinking by
-          // default), so the knob is skipped for them.
+          ...(opts.temperature !== undefined
+            ? { temperature: opts.temperature }
+            : {}),
+          ...(opts.topP !== undefined ? { topP: opts.topP } : {}),
+          // THINKING LEVEL, measured 2026-08-22 against the real composed
+          // prompt (streaming TTFT, three rounds each):
+          //   no knob (= the model's own default)  9,217ms
+          //   MEDIUM (3.5-flash's documented default) 5,167ms
+          //   LOW      48s / 95s / 503 UNAVAILABLE  <- pathological, never use
+          //   MINIMAL  918ms / 1,060ms / 883ms      <- the live lane
+          // 3.5-flash ships thinking ON at medium (Google's 3.5 release note),
+          // which is what made the gemini pick feel slow and out of sync, and
+          // its LOW tier is currently both glacial and 503-prone. So the 3.5
+          // lineage pins MINIMAL. The 3.7 lineage keeps LOW (probed fine
+          // 2026-08-17); lite-lineage models REJECT thinkingConfig outright
+          // (probed 2026-07-23: 400), so they still get no knob at all.
           ...(model.includes("lite")
             ? {}
-            : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
+            : model.startsWith("gemini-3.5")
+              ? { thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL } }
+              : { thinkingConfig: { thinkingLevel: ThinkingLevel.LOW } }),
           // Client-side abort: unwinds the stream promptly (billing may still
           // apply per the SDK, but our contract is prompt unwind, not un-billing).
           abortSignal: signal,
@@ -126,9 +154,14 @@ export function createGoogleProvider(opts: GoogleProviderOptions): LlmProvider {
           if (usage) {
             inputTokens = usage.promptTokenCount;
             outputTokens = usage.candidatesTokenCount;
+            // Prefix-cache telemetry (Natively reference §4/§6): implicit-cache
+            // hits surface here; a silent miss bills the full input rate.
+            cachedInputTokens = usage.cachedContentTokenCount;
           }
         }
-        yield doneEvent(parseVendorUsage({ inputTokens, outputTokens }));
+        yield doneEvent(
+          parseVendorUsage({ inputTokens, outputTokens, cachedInputTokens }),
+        );
       } catch (error) {
         throw toLlmError(error, signal);
       }

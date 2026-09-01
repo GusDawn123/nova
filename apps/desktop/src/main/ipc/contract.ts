@@ -1,5 +1,9 @@
 import { z } from "zod";
-import { liveModeSchema, meResponseSchema } from "@nova/shared";
+import {
+  liveModeSchema,
+  liveModelSchema,
+  meResponseSchema,
+} from "@nova/shared";
 
 import { apiErrorKindSchema } from "../api/errors";
 import { authActionResultSchema } from "../auth/errors";
@@ -96,12 +100,14 @@ export const pillClickThroughMessageSchema = z
   .strict();
 
 /**
- * renderer → main: start a live session in the picked copilot mode. The mode
- * vocabulary is the shared protocol's own (`liveModeSchema`) — the desktop
- * cannot invent a mode the server would refuse.
+ * renderer → main: start a live session in the picked copilot mode AND the
+ * picked live model (2026-08-20 pill picker). Both vocabularies are the shared
+ * protocol's own (`liveModeSchema` / `liveModelSchema`) — the desktop cannot
+ * invent a value the server would refuse. `model` optional = gpt, mirroring
+ * the wire's own `live_model` contract.
  */
 export const liveStartMessageSchema = z
-  .object({ mode: liveModeSchema })
+  .object({ mode: liveModeSchema, model: liveModelSchema.optional() })
   .strict();
 
 /** main → renderer: the answer to `liveStart` / `liveStop`. */

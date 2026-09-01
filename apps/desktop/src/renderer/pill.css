@@ -1,13 +1,20 @@
-﻿/*
- * The pill window's stylesheet. Every value is transcribed from the ratified
+/*
+ * The pill window's stylesheet. Layout values are transcribed from the ratified
  * mockups (docs/superpowers/mockups/2026-08-14-app-design/project/
- * "Nova Settings.dc.html", the interactive pill) â€” treat that file as the
- * source of truth before "improving" anything here.
+ * "Nova Settings.dc.html", the interactive pill) — treat that file as the source
+ * of truth for GEOMETRY before "improving" anything here.
+ *
+ * Paint is the duotone spine (design/theme.ts): solid canvas, ink at the spec's
+ * opacity bands, hairline borders, no blur and no glass. The glass era's literal
+ * rgba() greys died with the 2026-08 retro-terminal reskin; a literal colour in
+ * this file is a spec violation (2026-08-02 design spec §11).
  */
 
 :root {
-  --sg: "Space Grotesk", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* The old voice names, kept as aliases so every `font:` shorthand below reads
+     unchanged; the faces they resolve to are the Nova trio from design/theme.ts. */
+  --sg: var(--nova-font-body);
+  --mono: var(--nova-font-mono);
 }
 
 * {
@@ -16,6 +23,8 @@
 
 body {
   margin: 0;
+  /* Transparent WINDOW, never a transparent surface: this is what lets the
+     pill's silhouette float without a black rectangle behind it. */
   background: transparent;
   font-family: var(--sg);
   overflow: hidden;
@@ -24,12 +33,11 @@ body {
 
 /*
  * The stage is the window: 40px side gutters and a deep bottom gutter so the
- * pill's drop shadow (and the tooltips above it) render inside the transparent
- * window instead of clipping at its edge. 100vw, not a fixed width â€” the MAIN
- * process decides how long the pill is (a fraction of the screen,
- * windows/pill-window.ts) and the shell stretches to fill; the side padding
- * here must equal SHADOW_GUTTERS there. Row thickness, fonts and icons are
- * untouched by that stretch.
+ * tooltips above the pill render inside the transparent window instead of
+ * clipping at its edge. 100vw, not a fixed width — the MAIN process decides how
+ * long the pill is (a fraction of the screen, windows/pill-window.ts) and the
+ * shell stretches to fill; the side padding here must equal SHADOW_GUTTERS
+ * there. Row thickness, fonts and icons are untouched by that stretch.
  */
 .pill-stage {
   width: 100vw;
@@ -46,13 +54,11 @@ body {
 
 /* ---- the pill itself ---- */
 
+/* A solid terminal panel: canvas surface, hairline edge, square corners. */
 .pill {
-  border-radius: 14px;
   overflow: hidden;
-  background: rgba(14, 20, 30, 0.74);
-  backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 20px 50px rgba(10, 14, 30, 0.22);
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
 
@@ -66,7 +72,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--nova-ink-fill);
 }
 
 .pill__tab-hint {
@@ -78,16 +84,16 @@ body {
 }
 
 .pill__tab-chip {
-  font: 500 11.5px var(--sg);
-  color: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
+  font: 700 11.5px var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--nova-ink-soft);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 3px 10px;
 }
 
 .pill__tab-label {
   font: 400 14px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .pill__input {
@@ -96,34 +102,41 @@ body {
   border: none;
   outline: none;
   font: 400 15.5px var(--sg);
-  color: #fff;
+  color: var(--nova-ink);
 }
 
 .pill__input::placeholder {
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .corner-box {
   flex: none;
   width: 30px;
   height: 30px;
-  border-radius: 8px;
-  background: rgba(238, 240, 255, 0.13);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
 }
 
-/* The Answer button (Ctrl+↵): same chip, now pressable. */
+/* The Answer button (Ctrl+↵): same chip, now pressable — so it takes the cut. */
 .corner-box--click {
   border: none;
   padding: 0;
   cursor: pointer;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
 }
 
 .corner-box--click:hover:not(:disabled) {
-  background: rgba(238, 240, 255, 0.22);
+  background: var(--nova-ink-hairline);
 }
 
 .corner-box--click:disabled {
@@ -137,7 +150,7 @@ body {
   display: flex;
   align-items: center;
   padding: 7px 16px;
-  border-top: 1px solid rgba(238, 240, 255, 0.09);
+  border-top: 1px solid var(--nova-ink-hairline);
 }
 
 .pill__logo {
@@ -146,7 +159,7 @@ body {
   height: 22px;
   border-radius: 50%;
   overflow: hidden;
-  background: #fff;
+  background: var(--nova-ink);
   opacity: 0.9;
   cursor: pointer;
   border: none;
@@ -165,7 +178,7 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--nova-ink-soft);
 }
 
 .tipwrap {
@@ -173,16 +186,17 @@ body {
   display: flex;
 }
 
+/* Tooltips are ink-filled cards: the mirror surface, words in canvas. */
 .tip {
   position: absolute;
   bottom: calc(100% + 9px);
   left: 50%;
   transform: translateX(-50%);
-  background: #000;
-  color: #fff;
-  border-radius: 10px;
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
   padding: 8px 14px;
-  font: 500 14px var(--sg);
+  font: 700 12px var(--mono);
+  letter-spacing: 0.04em;
   white-space: nowrap;
   z-index: 6;
   pointer-events: none;
@@ -201,7 +215,6 @@ body {
   flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -209,24 +222,70 @@ body {
   background: transparent;
   border: none;
   padding: 0;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
   transition:
     background 0.12s,
     color 0.15s;
 }
 
 .icon-btn:hover {
-  background: rgba(238, 240, 255, 0.15);
+  background: var(--nova-ink-fill);
 }
 
 .icon-btn--on {
-  color: #fff;
+  color: var(--nova-ink);
+}
+
+/* The live-model picker chip (2026-08-20): the icon-btn family in text form —
+   the current model's name IS the icon, so the pick is readable at a glance. */
+.model-btn {
+  flex: none;
+  height: 36px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  color: var(--nova-ink-faint);
+  font: 700 11px/1 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+  transition:
+    background 0.12s,
+    color 0.15s;
+}
+
+.model-btn:hover {
+  background: var(--nova-ink-fill);
+}
+
+.model-btn--on {
+  color: var(--nova-ink);
+  background: var(--nova-ink-fill);
 }
 
 .pill__divider {
   width: 1px;
   height: 16px;
-  background: rgba(238, 240, 255, 0.16);
+  background: var(--nova-ink-hairline);
   margin: 0 8px;
 }
 
@@ -242,12 +301,11 @@ body {
   flex: none;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #fff;
+  color: var(--nova-ink);
   background: transparent;
   border: none;
   padding: 0;
@@ -258,7 +316,7 @@ body {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--nova-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -270,14 +328,13 @@ body {
 .pill__stop-square {
   width: 11px;
   height: 11px;
-  border-radius: 3px;
-  background: #0a0a14;
+  background: var(--nova-on-ink);
 }
 
 .pill__time {
   flex: none;
-  font: 500 13px var(--mono);
-  color: rgba(255, 255, 255, 0.85);
+  font: 700 13px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 .pill__history-link {
@@ -292,18 +349,17 @@ body {
 
 .pill__history-label {
   font: 500 12px var(--sg);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .chip-24 {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
-  background: rgba(238, 240, 255, 0.13);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
 }
 
 .pill__transcript-link {
@@ -311,7 +367,7 @@ body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
   font: 500 12px var(--sg);
   background: transparent;
   border: none;
@@ -328,10 +384,8 @@ body {
   left: min(51%, calc(100% - 270px));
   top: calc(100% + 6px);
   width: 270px;
-  background: #141417;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 8px 0;
   z-index: 7;
 }
@@ -344,14 +398,14 @@ body {
   padding: 11px 20px;
   cursor: pointer;
   font: 400 16px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
   background: transparent;
   border: none;
   text-align: left;
 }
 
 .mode-menu__item:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--nova-ink-fill);
 }
 
 .mode-menu__name {
@@ -360,7 +414,7 @@ body {
 
 .mode-menu__divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nova-ink-hairline);
   margin: 8px 0;
 }
 
@@ -401,11 +455,10 @@ body {
   width: 8px;
 }
 .answer__body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
+  background: var(--nova-ink-hairline);
 }
 .answer__body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: var(--nova-ink-faint);
 }
 .answer__body::-webkit-scrollbar-track {
   background: transparent;
@@ -433,18 +486,17 @@ body {
 
 .answer__turn:not(.answer__turn--current) {
   padding-bottom: 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--nova-ink-fill);
 }
 
-/* The user's question, right-aligned — mockup values verbatim. */
+/* The user's question, right-aligned — geometry verbatim from the mockup. */
 .answer__bubble {
   align-self: flex-end;
   max-width: 70%;
   font: 400 14.5px/1.4 var(--sg);
-  color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.12);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
+  color: var(--nova-ink);
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 9px 14px;
 }
 
@@ -455,8 +507,10 @@ body {
 }
 
 .answer__caption {
-  font: 400 12px var(--sg);
-  color: rgba(255, 255, 255, 0.45);
+  font: 700 10px var(--mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--nova-ink-faint);
 }
 
 /* ---- rendered answer markdown ----
@@ -465,13 +519,13 @@ body {
    the same hypothesis→record language the transcript rows speak. */
 .md {
   font: 400 15px/1.6 var(--sg);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--nova-ink);
   text-wrap: pretty;
   transition: color 320ms ease;
 }
 
 .md--streaming {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--nova-ink-soft);
 }
 
 /* The streaming caret rides the LAST rendered element as CSS, never as a
@@ -498,8 +552,8 @@ body {
   }
 }
 
-/* KaTeX inside the translucent panel: inherit the answer's ink; display math
-   scrolls sideways instead of widening the pill. */
+/* KaTeX inside the panel: inherit the answer's ink; display math scrolls
+   sideways instead of widening the pill. */
 .md .katex {
   color: inherit;
   font-size: 1.05em;
@@ -520,8 +574,8 @@ body {
   margin-bottom: 0;
 }
 
-/* Code fences: the darker translucent square (Gustavo, 2026-08-17), wrapped
-   so the copy control can float over the block's corner. */
+/* Code fences: an ink-fill terminal square (Gustavo, 2026-08-17), wrapped so
+   the copy control can float over the block's corner. */
 .md .codebox {
   position: relative;
   margin: 0 0 10px;
@@ -534,9 +588,8 @@ body {
 .md pre {
   margin: 0;
   padding: 12px 14px;
-  background: rgba(6, 9, 14, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   overflow-x: auto;
 }
 
@@ -550,10 +603,9 @@ body {
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.55);
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--nova-ink-faint);
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   cursor: pointer;
   opacity: 0.45;
   transition:
@@ -567,56 +619,59 @@ body {
 }
 
 .codebox__copy:hover {
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--nova-ink);
 }
 
-/* Syntax colors (rehype-highlight), tuned to the translucent dark glass —
-   muted pastels, no theme import so no background fights the fence. */
+/* Syntax "colors" (rehype-highlight) in duotone: weight, slant and the ink
+   bands carry the grammar — a pastel here would be a third colour (spec §11). */
 .md pre .hljs-comment,
 .md pre .hljs-quote {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--nova-ink-faint);
   font-style: italic;
 }
 .md pre .hljs-keyword,
 .md pre .hljs-selector-tag,
 .md pre .hljs-built_in,
 .md pre .hljs-meta {
-  color: #b9a3f5;
+  color: var(--nova-ink);
+  font-weight: 700;
 }
 .md pre .hljs-string,
 .md pre .hljs-addition,
 .md pre .hljs-regexp {
-  color: #9ed08d;
+  color: var(--nova-ink-soft);
 }
 .md pre .hljs-number,
 .md pre .hljs-literal,
 .md pre .hljs-symbol {
-  color: #e5b26c;
+  color: var(--nova-ink-soft);
+  font-weight: 700;
 }
 .md pre .hljs-title,
 .md pre .hljs-title.function_,
 .md pre .hljs-section {
-  color: #85b8f5;
+  color: var(--nova-ink);
+  font-weight: 700;
 }
 .md pre .hljs-attr,
 .md pre .hljs-attribute,
 .md pre .hljs-variable,
 .md pre .hljs-template-variable,
 .md pre .hljs-deletion {
-  color: #e59a9f;
+  color: var(--nova-ink-soft);
 }
 .md pre .hljs-type,
 .md pre .hljs-title.class_,
 .md pre .hljs-name {
-  color: #e4c286;
+  color: var(--nova-ink);
+  font-weight: 700;
 }
 
 .md pre::-webkit-scrollbar {
   height: 8px;
 }
 .md pre::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
+  background: var(--nova-ink-hairline);
 }
 .md pre::-webkit-scrollbar-track {
   background: transparent;
@@ -627,18 +682,50 @@ body {
   border: none;
   padding: 0;
   font: 400 13px/1.5 var(--mono);
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--nova-ink);
   white-space: pre;
 }
 
-/* Inline syntax: a small darker chip, mono. */
+/* Speakable fences WRAP (Gustavo, 2026-08-20): the composer tags speech
+   ```text and today's Brain A still emits bare fences, and both must read
+   like the reference screenshots' highlighted paragraph — wrapped text, never
+   a sideways scroll the user pans mid-call. The language class lands on
+   <code> only (never <pre>), and a bare fence gets NO class at all, so
+   `language-text` + `code:not([class])` are exactly the two speakable shapes.
+   Scoped under `.md pre` so `:not([class])` can never catch inline `.md code`
+   chips; real language fences (```python → code.language-python) keep the
+   scrolling behavior above. */
+.md pre:has(> code.language-text),
+.md pre:has(> code:not([class])) {
+  background: none;
+  border: none;
+  padding: 4px 0;
+  overflow-x: visible;
+}
+
+/* The speakable text is a HIGHLIGHT, not a box (Gustavo, 2026-08-20 v2 — the
+   reference look): the code renders INLINE so its background paints per
+   wrapped line — each line wears its own mark with a visible gap — and
+   box-decoration-break keeps the padding on every line of the wrap. */
+.md pre code.language-text,
+.md pre code:not([class]) {
+  display: inline;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  background: var(--nova-ink-fill);
+  padding: 3px 7px;
+  line-height: 2.1;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Inline syntax: a small ink-fill chip, mono. */
 .md code {
-  background: rgba(6, 9, 14, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 5px;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-fill);
   padding: 1px 6px;
-  font: 500 13px var(--mono);
-  color: rgba(255, 255, 255, 0.9);
+  font: 700 13px var(--mono);
+  color: var(--nova-ink);
 }
 
 .md ul,
@@ -656,35 +743,36 @@ body {
 .md h3,
 .md h4 {
   margin: 0 0 8px;
-  font: 600 15.5px/1.4 var(--sg);
-  color: #fff;
+  font: 700 15.5px/1.4 var(--sg);
+  color: var(--nova-ink);
 }
 
 .md strong {
-  font-weight: 600;
-  color: #fff;
+  font-weight: 700;
+  color: var(--nova-ink);
 }
 
 .md blockquote {
   margin: 0 0 10px;
   padding: 2px 0 2px 12px;
-  border-left: 2px solid rgba(255, 255, 255, 0.25);
-  color: rgba(255, 255, 255, 0.75);
+  border-left: 2px solid var(--nova-ink-hairline);
+  color: var(--nova-ink-soft);
 }
 
 .md a {
-  color: #9db8ff;
+  color: var(--nova-ink);
+  text-decoration: underline;
 }
 
 .md hr {
   border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid var(--nova-ink-hairline);
   margin: 12px 0;
 }
 
 .answer__hint {
   font: 400 14px var(--sg);
-  color: #fff;
+  color: var(--nova-ink);
   opacity: 0.55;
   font-style: italic;
 }
@@ -702,32 +790,32 @@ body {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: none;
+  border: 1px solid var(--nova-ink-hairline);
   padding: 0;
   cursor: pointer;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
 }
 
 .answer__scroll:hover {
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--nova-ink-hairline);
 }
 
 .answer__foot {
   display: flex;
   align-items: center;
   padding: 11px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--nova-ink-hairline);
 }
 
 .answer__foot-cluster {
   display: flex;
   align-items: center;
   gap: 22px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--nova-ink-soft);
 }
 
 .answer__newchat {
@@ -740,19 +828,18 @@ body {
   padding: 0;
   cursor: pointer;
   font: 400 14px var(--sg);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .answer__key {
   width: 30px;
   height: 30px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 500 13px var(--sg);
-  color: rgba(255, 255, 255, 0.85);
+  font: 700 12px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -767,12 +854,9 @@ body {
 /* ---- the history panel ---- */
 
 .history {
-  border-radius: 16px;
   overflow: hidden;
-  background: rgba(10, 12, 16, 0.93);
-  backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 24px 60px rgba(10, 14, 30, 0.35);
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
 
@@ -781,36 +865,43 @@ body {
   align-items: center;
   gap: 14px;
   padding: 13px 16px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom: 1px solid var(--nova-ink-hairline);
 }
 
 .history__back {
   flex: none;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background: rgba(238, 240, 255, 0.12);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   border: none;
   padding: 0;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
 }
 
 .history__back:hover {
-  background: rgba(238, 240, 255, 0.2);
+  background: var(--nova-ink-hairline);
 }
 
 .history__ask {
   flex: 1;
   font: 400 17px var(--sg);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--nova-ink-faint);
 }
 
 .history__search {
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--nova-ink-faint);
   display: flex;
 }
 
@@ -825,9 +916,9 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  font: 600 12px var(--sg);
+  font: 700 12px var(--mono);
   letter-spacing: 0.18em;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--nova-ink-faint);
 }
 
 .history__label--dated {
@@ -838,53 +929,51 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  border-radius: 12px;
   padding: 12px 14px;
   cursor: pointer;
 }
 
 .history__row:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--nova-ink-fill);
 }
 
 .history__row--filled {
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--nova-ink-fill);
 }
 
 .history__row--filled:hover {
-  background: rgba(255, 255, 255, 0.11);
+  background: var(--nova-ink-hairline);
 }
 
 .history__row-icon {
   flex: none;
   width: 38px;
   height: 38px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .history__row-title {
   flex: 1;
   font: 500 16px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
   text-align: left;
 }
 
 .history__duration {
-  background: rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 4px 12px;
-  font: 500 13.5px var(--sg);
-  color: rgba(255, 255, 255, 0.85);
+  font: 700 12px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 .history__time {
-  font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.6);
+  font: 400 15px var(--mono);
+  color: var(--nova-ink-faint);
 }
 
 .history__spacer {
@@ -896,7 +985,7 @@ body {
   align-items: center;
   gap: 14px;
   padding: 12px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.09);
+  border-top: 1px solid var(--nova-ink-hairline);
 }
 
 .history__foot-spacer {
@@ -908,24 +997,23 @@ body {
   align-items: center;
   gap: 9px;
   font: 500 15px var(--sg);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
 }
 
 .chip-28 {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  background: rgba(238, 240, 255, 0.13);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
 }
 
 .history__foot-divider {
   width: 1px;
   height: 18px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--nova-ink-hairline);
 }
 
 .history__new-chat {
@@ -933,31 +1021,27 @@ body {
   align-items: center;
   gap: 9px;
   font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--nova-ink-soft);
 }
 
 .key-chip {
   min-width: 26px;
   height: 26px;
   padding: 0 7px;
-  border-radius: 7px;
-  background: rgba(238, 240, 255, 0.13);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 500 12.5px var(--sg);
-  color: rgba(255, 255, 255, 0.85);
+  font: 700 11.5px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 /* ---- the transcript panel ---- */
 
 .panel {
-  border-radius: 16px;
   overflow: hidden;
-  background: rgba(14, 20, 30, 0.62);
-  backdrop-filter: blur(26px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 22px 55px rgba(10, 14, 30, 0.25);
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
 
@@ -966,29 +1050,36 @@ body {
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--nova-ink-fill);
 }
 
 .panel__btn {
   flex: none;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
   border: none;
   padding: 0;
 }
 
 .panel__btn--click {
   cursor: pointer;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
 }
 
 .panel__btn--click:hover {
-  background: rgba(255, 255, 255, 0.24);
+  background: var(--nova-ink-hairline);
 }
 
 .panel__spring {
@@ -1018,11 +1109,10 @@ body {
   width: 8px;
 }
 .transcript__body::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 4px;
+  background: var(--nova-ink-hairline);
 }
 .transcript__body::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.32);
+  background: var(--nova-ink-faint);
 }
 .transcript__body::-webkit-scrollbar-track {
   background: transparent;
@@ -1064,25 +1154,24 @@ body {
   left: 50%;
   bottom: 14px;
   transform: translateX(-50%);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  background: rgba(20, 28, 42, 0.88);
-  color: rgba(255, 255, 255, 0.9);
-  font: 500 12.5px var(--sg);
+  border: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-canvas);
+  color: var(--nova-ink);
+  font: 700 12px var(--mono);
   padding: 7px 14px;
-  border-radius: 999px;
   cursor: pointer;
   animation: transcript-row-in 200ms ease-out;
 }
 
 .transcript__latest:hover {
-  background: rgba(40, 52, 72, 0.95);
+  background: var(--nova-ink-fill);
 }
 
 .transcript__ts {
   flex: none;
   width: 96px;
-  font: 400 13px var(--sg);
-  color: rgba(255, 255, 255, 0.45);
+  font: 400 13px var(--mono);
+  color: var(--nova-ink-faint);
 }
 
 .transcript__turn {
@@ -1092,24 +1181,24 @@ body {
 }
 
 .transcript__who {
-  font: 600 9.5px var(--sg);
+  font: 700 9.5px var(--mono);
   letter-spacing: 0.18em;
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--nova-ink-faint);
 }
 
 /* The color transition is the partial→final commit: the row keeps its DOM
-   identity (stable keys in use-live-session), so the grey hypothesis eases
-   into the white record in place instead of remounting. */
+   identity (stable keys in use-live-session), so the faint hypothesis eases
+   into the full-ink record in place instead of remounting. */
 .transcript__text {
   font: 400 16px/1.35 var(--sg);
-  color: rgba(255, 255, 255, 0.92);
+  color: var(--nova-ink);
   transition: color 320ms ease;
 }
 /* A partial is a hypothesis still forming; a hint is not a transcript at all.
-   Dimmed via a solid-enough color, not opacity: the translucent pill can sit
-   over a white desktop, where 0.55 opacity fell below WCAG AA (4.5:1). */
+   Dimmed via the soft ink band, not opacity — the band's 75% stays above the
+   spec's ≥65% contrast floor on a solid canvas. */
 .transcript__text--partial {
-  color: rgba(255, 255, 255, 0.78);
+  color: var(--nova-ink-soft);
 }
 
 .transcript__text--hint {
@@ -1121,7 +1210,7 @@ body {
   display: flex;
   align-items: center;
   padding: 11px 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--nova-ink-hairline);
 }
 
 .transcript__logo {
@@ -1130,9 +1219,9 @@ body {
   height: 24px;
   border-radius: 50%;
   overflow: hidden;
-  background: #fff;
+  background: var(--nova-ink);
   cursor: pointer;
-  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 0 1.5px var(--nova-ink-hairline);
   border: none;
   padding: 0;
 }
@@ -1149,14 +1238,14 @@ body {
   display: flex;
   align-items: center;
   gap: 14px;
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--nova-ink-soft);
 }
 
 .transcript__chat-link {
   display: flex;
   align-items: center;
   gap: 9px;
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
   cursor: pointer;
   font: 500 14px var(--sg);
   background: transparent;

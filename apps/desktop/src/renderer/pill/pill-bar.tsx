@@ -3,7 +3,6 @@ import { useEffect, useRef, type JSX } from "react";
 import novaLogo from "../assets/nova-logo-transparent.png";
 import {
   AudioBarsIcon,
-  CheckIcon,
   DownArrowIcon,
   EyeIcon,
   FileIcon,
@@ -14,8 +13,10 @@ import {
   ScreenIcon,
   SquaresIcon,
 } from "../design/icons";
+import { NOVA_MODELS, type NovaModelId } from "../design/models";
 import { NOVA_MODES } from "../design/modes";
 import type { AudioSession } from "./audio-session";
+import { PillMenu } from "./pill-menu";
 
 interface PillBarProps {
   readonly focusMode: boolean;
@@ -36,6 +37,11 @@ interface PillBarProps {
   readonly onToggleModeMenu: () => void;
   readonly activeMode: string;
   readonly onPickMode: (id: string) => void;
+  /** The live-model picker (2026-08-20): which model answers this session. */
+  readonly modelMenuOpen: boolean;
+  readonly onToggleModelMenu: () => void;
+  readonly activeModel: NovaModelId;
+  readonly onPickModel: (id: NovaModelId) => void;
   readonly audio: AudioSession;
   readonly onStartAudio: () => void;
   readonly onTogglePause: () => void;
@@ -53,6 +59,8 @@ interface PillBarProps {
 export function PillBar(props: PillBarProps): JSX.Element {
   const activeName =
     NOVA_MODES.find((mode) => mode.id === props.activeMode)?.name ?? "General";
+  const activeModelName =
+    NOVA_MODELS.find((model) => model.id === props.activeModel)?.name ?? "GPT";
   const askLabel = props.audio.on
     ? "Ask anything about the meeting"
     : props.usesScreen
@@ -149,6 +157,25 @@ export function PillBar(props: PillBarProps): JSX.Element {
               </button>
             </span>
 
+            <span className="tipwrap">
+              <span
+                className={props.modelMenuOpen ? "tip tip--suppressed" : "tip"}
+              >
+                {activeModelName}
+              </span>
+              <button
+                type="button"
+                className={
+                  props.modelMenuOpen
+                    ? "model-btn model-btn--on nd"
+                    : "model-btn nd"
+                }
+                onClick={props.onToggleModelMenu}
+              >
+                {activeModelName}
+              </button>
+            </span>
+
             <span className="pill__divider" />
 
             <span className="tipwrap">
@@ -218,33 +245,35 @@ export function PillBar(props: PillBarProps): JSX.Element {
         </div>
       </div>
 
+      {props.modelMenuOpen && (
+        <PillMenu
+          items={NOVA_MODELS}
+          activeId={props.activeModel}
+          onPick={props.onPickModel}
+        />
+      )}
+
       {props.modeMenuOpen && (
-        <div className="mode-menu nd">
-          {NOVA_MODES.map((mode) => (
-            <button
-              type="button"
-              key={mode.id}
-              className="mode-menu__item"
-              onClick={() => {
-                props.onPickMode(mode.id);
-              }}
-            >
-              <span className="mode-menu__name">{mode.name}</span>
-              {mode.id === props.activeMode && <CheckIcon />}
-            </button>
-          ))}
-          <div className="mode-menu__divider" />
-          <button
-            type="button"
-            className="mode-menu__item"
-            onClick={() => {
-              window.novaBridge.openSettings();
-            }}
-          >
-            <SquaresIcon size={16} />
-            <span>Manage</span>
-          </button>
-        </div>
+        <PillMenu
+          items={NOVA_MODES}
+          activeId={props.activeMode}
+          onPick={props.onPickMode}
+          footer={
+            <>
+              <div className="mode-menu__divider" />
+              <button
+                type="button"
+                className="mode-menu__item"
+                onClick={() => {
+                  window.novaBridge.openSettings();
+                }}
+              >
+                <SquaresIcon size={16} />
+                <span>Manage</span>
+              </button>
+            </>
+          }
+        />
       )}
     </>
   );

@@ -6,11 +6,15 @@ import {
   isUsageEventsConfigured,
   usageEventsDbFromEnv,
 } from "./db/usage-events.js";
+import { createLlmDebugLedger } from "./debug-transcript.js";
+import { isPromptComposerEnabled } from "./env.js";
 import {
   createLiveConductor,
   type LiveConductorFactory,
 } from "./modules/live/conductor.js";
 import type { LiveMetering } from "./modules/live/ports.js";
+import { prewarmPromptCache } from "./modules/live/prewarm.js";
+
 import {
   createLlmRouter,
   createProvidersFromEnv,
@@ -26,6 +30,7 @@ import {
   type MeteringService,
   type QuotaChecker,
 } from "./modules/metering/index.js";
+import { buildSystemPrompt, composeSay } from "./modules/prompt/index.js";
 import { createRagFromEnv, type VoyageUsageLog } from "./modules/rag/index.js";
 
 /**
@@ -153,14 +158,32 @@ function liveLlmProviderEnv(env: NodeJS.ProcessEnv): LlmProviderEnv {
   if (env.OPENAI_API_KEY) out.OPENAI_API_KEY = env.OPENAI_API_KEY;
   if (env.GOOGLE_API_KEY) out.GOOGLE_API_KEY = env.GOOGLE_API_KEY;
   if (env.GROQ_API_KEY) out.GROQ_API_KEY = env.GROQ_API_KEY;
+  if (env.XAI_API_KEY) out.XAI_API_KEY = env.XAI_API_KEY;
   return out;
 }
 
 /**
+ * The 2026-08-20 model picker's cascades: the picked model's provider FIRST,
+ * the other picker providers as fallback (a keyless or dying head degrades to
+ * the next instead of failing the ask). Groq-the-llama-vendor is deliberately
+ * NOT in these lineups (Gustavo: "do not set up groq") and anthropic stays
+ * disabled — the router silently skips providers that were never constructed,
+ * so these orders are safe whatever subset of keys exists.
+ */
+const LIVE_MODEL_ORDERS: Record<
+  "gpt" | "gemini" | "grok",
+  readonly ("openai" | "google" | "xai")[]
+> = {
+  gpt: ["openai", "google", "xai"],
+  gemini: ["google", "openai", "xai"],
+  grok: ["xai", "openai", "google"],
+};
+
+/**
  * Build the live copilot conductor factory (Phase 7) — the LLM-suggestion path
  * of the live session, wired THROUGH the metering seam (adr-0007: no unmetered
- * vendor call). Constructs ONE live-tuned failover router (cheapest-first
- * cascade, tight TTFT/stall budgets) shared across sessions, the per-user RAG
+ * vendor call). Constructs ONE live-tuned failover router (the `liveOrder`
+ * cascade, live TTFT/stall budgets) shared across sessions, the per-user RAG
  * service for grounding (its Voyage usage lands on the ledger via the same sink
  * as the notes/indexer paths), and threads `metering.meterFor(userId, meetingId)`
  * into every suggestion call so each streamed token is attributed.
@@ -176,7 +199,24 @@ export function maybeCreateLiveConductorFactory(
   // the models' own vendor limits. Spend is still governed end-to-end — the
   // quota checker, the meter, and the daily kill-switch, all per token
   // actually generated.
-  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env));
+  // Temperature 0.3 on every live provider (Natively reference, 2026-08-18
+  // doc §6: their answer paths run 0.25–0.4 — "lower = faster, more focused";
+  // both live models probed accepting it 2026-08-19). Still NO output cap —
+  // that posture is unchanged.
+  const providers = createProvidersFromEnv(liveLlmProviderEnv(process.env), {
+    temperature: 0.3,
+    // The live Gemini lane is gemini-3.5-flash — the reference product's
+    // ACTUAL live voice (non-thinking, fast first token). 3.7-flash was tried
+    // first and measured out 2026-08-21: it thinks 5-7s per answer and its
+    // endpoint threw mid-stream 503s that truncated two live answers. LIVE
+    // construction only; every other consumer keeps the adapter defaults.
+    modelOverrides: { google: "gemini-3.5-flash" },
+    // topP 0.85 — the reference's exact gemini live-voice setting (their full
+    // recipe: temp 0.25–0.4, topP 0.85, cap at model max, no thinking knob;
+    // we sit at temp 0.3, omit the cap — omitted = model max — and send no
+    // knob, so this was the one missing parameter). 2026-08-21.
+    googleTopP: 0.85,
+  });
   if (providers.length === 0) return undefined;
 
   // FAIL CLOSED.
@@ -193,9 +233,37 @@ export function maybeCreateLiveConductorFactory(
     logger: app.log,
     logUsage: voyageMeteringSink(metering, app),
   });
+  // Dev-only answer ledger (env-gated, hard-off by default — see
+  // debug-transcript.ts for the RULES §6 exception rationale).
+  const debug = createLlmDebugLedger(process.env, app.log);
 
-  return ({ send, userId, meetingId, mode }) =>
-    createLiveConductor({
+  return ({ send, userId, meetingId, mode, liveModel }) => {
+    // The composer flag, read fresh per session build (no module cache — the
+    // kill-switch must take effect on the next session, not the next deploy).
+    const composerOn = isPromptComposerEnabled();
+    // The picked model's cascade rides every call of this session — the
+    // conductor's asks AND the pre-warm, so the provider that will actually
+    // serve is the one whose cache gets written.
+    const providerOrder = LIVE_MODEL_ORDERS[liveModel];
+    // Prompt-cache pre-warm (Natively reference §4/§6): one tiny metered
+    // request per session start writes the ACTIVE stablePrefix into the
+    // vendor's prefix cache BEFORE the first real ask — otherwise the first
+    // question pays the cold TTFT the cache exists to remove. Under the
+    // composer, that prefix is the composed sales+say prompt; warming the
+    // legacy prefix instead would heat the wrong cache entry. Fire-and-forget
+    // off the start path; it rides the same router and meter as real asks.
+    void prewarmPromptCache({
+      router,
+      meter: metering.meterFor(userId, meetingId),
+      logger: app.log,
+      userId,
+      meetingId,
+      ...(composerOn
+        ? { stablePrefix: buildSystemPrompt({ mode: "sales", action: "say" }) }
+        : {}),
+      providerOrder,
+    });
+    return createLiveConductor({
       send,
       router,
       rag,
@@ -213,7 +281,14 @@ export function maybeCreateLiveConductorFactory(
       // Suggestions fire only from a user ask (typed question / Answer key);
       // the trigger-gate machinery stays intact behind this flag.
       autoSuggest: false,
+      ...(debug !== undefined ? { debug } : {}),
+      // The 2026-08-20 composer path (`composed ?? legacy` at the conductor's
+      // prompt-selection site). Absent flag → the dep is absent → the legacy
+      // two-brain path runs byte-identical: the migration's kill-switch.
+      ...(composerOn ? { composePrompt: composeSay } : {}),
+      providerOrder,
     });
+  };
 }
 
 /**

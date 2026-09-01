@@ -5,11 +5,12 @@ import { makeMockProvider } from "./testing/mock-provider.js";
 import { DONE, drain, makeRouter, REQ, tok } from "./testing/router-harness.js";
 
 /**
- * [tier] The `latencyTier` extension (adr-0004 §4): a `"live"` request routes the
- * cheapest-first `liveOrder` cascade; a deliberate/absent request keeps the
- * quality-first `defaultOrder`; an explicit `providerOrder` still wins over the
- * tier. Reasoning-off is an ADAPTER concern (flash `thinkingBudget:0`), so there
- * is nothing tier-specific to assert here beyond order selection.
+ * [tier] The `latencyTier` extension (adr-0004 §4): a `"live"` request routes
+ * the `liveOrder` cascade (openai-first since the 2026-08-19 revert — the
+ * owner's pick); a deliberate/absent request keeps the quality-first
+ * `defaultOrder`; an explicit `providerOrder` still wins over the tier.
+ * Reasoning-off is an ADAPTER concern, so there is nothing tier-specific to
+ * assert here beyond order selection.
  */
 describe("router [tier] — latency-tier order selection", () => {
   beforeEach(() => {
@@ -19,7 +20,7 @@ describe("router [tier] — latency-tier order selection", () => {
     vi.useRealTimers();
   });
 
-  it('[tier] latencyTier "live" uses liveOrder (cheapest-first), not defaultOrder', async () => {
+  it('[tier] latencyTier "live" uses liveOrder, not defaultOrder', async () => {
     const google = makeMockProvider("google", { events: [tok("G"), DONE] });
     const anthropic = makeMockProvider("anthropic", {
       events: [tok("A"), DONE],
@@ -69,12 +70,14 @@ describe("router [tier] — latency-tier order selection", () => {
     expect(google.calls).toHaveLength(0);
   });
 
-  it("[tier] liveLlmConfig has a tight TTFT and the cheapest-first default liveOrder", () => {
+  it("[tier] liveLlmConfig keeps the 5s TTFT window and the openai-first default liveOrder", () => {
     const config = liveLlmConfig();
     expect(config.ttftTimeoutMs).toBe(5000);
     // Post-M2: long commented-code answers gap >8s mid-stream legitimately, so
     // the live stall window matches the schema default (only TTFT stays tight).
     expect(config.stallTimeoutMs).toBe(20000);
-    expect(config.liveOrder[0]).toBe("google");
+    // Owner's pick (Gustavo, 2026-08-19): GPT is the default live model and
+    // Gemini the fallback — no longer strictly cheapest-first.
+    expect(config.liveOrder).toEqual(["openai", "google", "groq", "anthropic"]);
   });
 });

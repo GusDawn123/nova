@@ -14,6 +14,9 @@ export const providerIdSchema = z.enum([
   "openai",
   "google",
   "groq",
+  // xAI (Grok) — added 2026-08-20 for the humanized-speech bake-off; rides
+  // the OpenAI-compatible engine like groq does.
+  "xai",
 ]);
 export type ProviderId = z.infer<typeof providerIdSchema>;
 
@@ -34,8 +37,8 @@ export const chatRequestSchema = z.object({
   model: z.string().min(1).optional(),
   providerOrder: z.array(providerIdSchema).min(1).optional(),
   /**
-   * Latency tier (adr-0004 §4). `"live"` selects the router's cheapest-first
-   * `liveOrder` cascade (the live copilot) unless `providerOrder` overrides it;
+   * Latency tier (adr-0004 §4). `"live"` selects the router's `liveOrder`
+   * cascade (the live copilot) unless `providerOrder` overrides it;
    * anything else (or absent) uses the quality-first `defaultOrder` (notes /
    * follow-up). Order selection only — budgets are the router config's job.
    */
@@ -56,6 +59,13 @@ export const llmStreamEventSchema = z.discriminatedUnion("type", [
       .object({
         inputTokens: z.number().int().nonnegative().optional(),
         outputTokens: z.number().int().nonnegative().optional(),
+        /**
+         * Input tokens the vendor served from its prompt cache (Natively
+         * reference §4/§6: a silent cache miss looks identical from outside
+         * but bills the full input rate — the count must surface so a log
+         * line can catch it). Telemetry only; the meter ignores it.
+         */
+        cachedInputTokens: z.number().int().nonnegative().optional(),
       })
       .nullable(),
   }),

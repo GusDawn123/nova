@@ -4,13 +4,20 @@ import { doneEvent, parseVendorUsage } from "./usage.js";
 
 describe("adapters/usage", () => {
   it("keeps valid nonnegative-integer counts", () => {
-    expect(parseVendorUsage({ inputTokens: 5, outputTokens: 7 })).toEqual({
+    expect(
+      parseVendorUsage({
+        inputTokens: 5,
+        outputTokens: 7,
+        cachedInputTokens: 4,
+      }),
+    ).toEqual({
       inputTokens: 5,
       outputTokens: 7,
+      cachedInputTokens: 4,
     });
   });
 
-  it("drops a malformed count independently of the other", () => {
+  it("drops a malformed count independently of the others", () => {
     expect(parseVendorUsage({ inputTokens: -1, outputTokens: 3 })).toEqual({
       outputTokens: 3,
     });
@@ -19,6 +26,10 @@ describe("adapters/usage", () => {
     });
     expect(parseVendorUsage({ inputTokens: "9", outputTokens: null })).toEqual(
       {},
+    );
+    // The cache count is hostile vendor output like the rest.
+    expect(parseVendorUsage({ inputTokens: 4, cachedInputTokens: -2 })).toEqual(
+      { inputTokens: 4 },
     );
   });
 

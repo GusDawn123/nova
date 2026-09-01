@@ -32,6 +32,7 @@ export const DONE: LlmStreamEvent = { type: "done", usage: null };
 export function doneWith(usage: {
   inputTokens?: number;
   outputTokens?: number;
+  cachedInputTokens?: number;
 }): LlmStreamEvent {
   return { type: "done", usage };
 }

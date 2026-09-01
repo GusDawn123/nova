@@ -41,11 +41,11 @@ export async function openSettingsWindow(
     resizable: false,
     show: false,
     title: "Nova Settings",
-    backgroundColor: "#0c0c0e",
+    backgroundColor: "#0002DA",
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#0c0c0e",
-      symbolColor: "#ececef",
+      color: "#0002DA",
+      symbolColor: "#FFFFFF",
       height: SETTINGS_TITLE_BAR_HEIGHT,
     },
     webPreferences: {

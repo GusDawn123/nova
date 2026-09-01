@@ -32,38 +32,41 @@ export const llmConfigSchema = z.object({
     .min(1)
     .default(["anthropic", "openai", "google", "groq"]),
   /**
-   * The LIVE (latency-first) cascade order (adr-0004 §5): cheapest/fastest first
-   * — Gemini Flash (thinking off) → Groq Llama → OpenAI mini → Anthropic. Chosen
-   * automatically for a request whose `latencyTier` is `"live"` and which does
-   * not override `providerOrder`. Model policy is config, not code: swaps never
-   * touch the router.
+   * The LIVE cascade order (adr-0004 §5), chosen automatically for a request
+   * whose `latencyTier` is `"live"` and which does not override
+   * `providerOrder`. Since 2026-08-19 this is the OWNER'S PICK, no longer
+   * strictly cheapest-first: GPT is the default live model and Gemini the
+   * fallback (Gustavo, 2026-08-19), then Groq Llama, then Anthropic. Model
+   * policy is config, not code: swaps never touch the router.
    */
   liveOrder: z
     .array(providerIdSchema)
     .min(1)
-    .default(["google", "groq", "openai", "anthropic"]),
+    .default(["openai", "google", "groq", "anthropic"]),
 });
 
 export type LlmConfig = z.infer<typeof llmConfigSchema>;
 
 /**
- * A latency-first router config (adr-0004 §4): the LIVE tier's tight TTFT/stall
- * budgets, over the cheapest-first `liveOrder`. The live copilot conductor builds
- * its router from this so a slow first provider is abandoned fast enough to keep
- * the question-moment → first-token gate (p50 < 2s). Reasoning/thinking is OFF at
- * the ADAPTER layer for every live-cascade model (flash `thinkingBudget: 0`,
- * mini/8b have none), so there is no per-call reasoning toggle to thread here.
+ * A latency-first router config (adr-0004 §4): the LIVE tier's TTFT/stall
+ * budgets, over `liveOrder` (openai-first since 2026-08-19 — the owner's pick).
+ * The live copilot conductor builds its router from this so a slow first
+ * provider is abandoned fast enough to keep the question-moment → first-token
+ * gate (p50 < 2s). Reasoning/thinking is OFF at the ADAPTER layer for every
+ * live-cascade model (the OpenAI mini pins effort "none", the lite Gemini omits
+ * thinkingConfig, 8b has none), so there is no per-call reasoning toggle here.
  */
 export function liveLlmConfig(
   overrides: Partial<z.input<typeof llmConfigSchema>> = {},
 ): LlmConfig {
   return llmConfigSchema.parse({
     // Per-provider first-token window. 1500ms served the non-thinking lite
-    // era; the 2026-08-17 model refresh (gemini-3.7-flash / gpt-5.6-terra at
-    // LOW effort) thinks 2-6s before the first token, and 1500ms aborted a
-    // HEALTHY primary on every ask (live repro: all providers "aborted").
-    // 5s tolerates low-effort thinking; a truly dead vendor still fails over
-    // well inside the conductor's 12s overall deadline.
+    // era, but during the 2026-08-17 thinking-model refresh it aborted a
+    // HEALTHY primary on every ask (live repro: all providers "aborted"). The
+    // 2026-08-19 revert put non-thinking models back, yet 5s is KEPT
+    // DELIBERATELY: it only slows the failure path, never a healthy answer,
+    // and a truly dead vendor still fails over well inside the conductor's
+    // 12s overall deadline.
     ttftTimeoutMs: 5000,
     // The stall window matches the schema default: since M2 (Brain A + no
     // output caps), live answers include long commented code, and vendors

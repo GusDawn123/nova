@@ -2,6 +2,7 @@ import {
   LIVE_PROTOCOL_VERSION,
   serverLiveEventSchema,
   type LiveMode,
+  type LiveModel,
 } from "@nova/shared";
 
 import type { LiveActionResult, LiveSessionEvent } from "../ipc/contract";
@@ -52,7 +53,8 @@ export interface LiveSessionDeps {
 }
 
 export interface LiveSessionService {
-  start(mode: LiveMode): Promise<LiveActionResult>;
+  /** `model` optional = gpt — the wire's own `live_model` contract. */
+  start(mode: LiveMode, model?: LiveModel): Promise<LiveActionResult>;
   stop(): void;
   setPaused(paused: boolean): void;
   /**
@@ -119,7 +121,10 @@ export function createLiveSessionService(
     deps.emit(event);
   }
 
-  async function start(mode: LiveMode): Promise<LiveActionResult> {
+  async function start(
+    mode: LiveMode,
+    model: LiveModel = "gpt",
+  ): Promise<LiveActionResult> {
     if (active !== null) {
       return { ok: false, message: "A live session is already running." };
     }
@@ -191,6 +196,7 @@ export function createLiveSessionService(
           type: "session.start",
           meeting_id: meeting.meetingId,
           mode,
+          live_model: model,
           channels: 2,
         }),
       );

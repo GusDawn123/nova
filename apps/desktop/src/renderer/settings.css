@@ -1,12 +1,14 @@
 /*
- * The settings window's shell and shared vocabulary. Values transcribed from
+ * The settings window's shell and shared vocabulary. Geometry transcribed from
  * the ratified mockups ("Nova Settings.dc.html" + "NovaSettingsTabs.dc.html");
- * tab-specific styles live in settings/panes.css.
+ * tab-specific styles live in settings/panes.css. Paint is the duotone spine
+ * (design/theme.ts) — solid canvas, ink bands, hairlines, no greys and no
+ * third colour (2026-08-02 design spec §11).
  */
 
 :root {
-  --sg: "Space Grotesk", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sg: var(--nova-font-body);
+  --mono: var(--nova-font-mono);
 }
 
 * {
@@ -15,19 +17,19 @@
 
 body {
   margin: 0;
-  background: #0c0c0e;
+  background: var(--nova-canvas);
   font-family: var(--sg);
   overflow: hidden;
   user-select: none;
 }
 
 a {
-  color: #3aa2e0;
-  text-decoration: none;
+  color: var(--nova-ink);
+  text-decoration: underline;
 }
 
 a:hover {
-  color: #6cc0ef;
+  color: var(--nova-ink-soft);
 }
 
 ::-webkit-scrollbar {
@@ -35,9 +37,8 @@ a:hover {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.14);
-  border-radius: 999px;
-  border: 3px solid #0c0c0e;
+  background: var(--nova-ink-hairline);
+  border: 3px solid var(--nova-canvas);
 }
 
 ::-webkit-scrollbar-track {
@@ -65,8 +66,9 @@ a:hover {
 }
 
 .settings__title {
-  font: 600 15.5px var(--sg);
-  color: #ececef;
+  font: 700 14px var(--nova-font-display);
+  letter-spacing: 0.08em;
+  color: var(--nova-ink);
 }
 
 /*
@@ -94,24 +96,31 @@ a:hover {
   align-items: center;
   gap: 7px;
   padding: 12px 17px;
-  border-radius: 13px;
   cursor: pointer;
   font: 500 13.5px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
   background: transparent;
   border: none;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
 }
 
 .settings__tab--active {
   font-weight: 600;
-  color: #fff;
-  background: #26262b;
+  color: var(--nova-ink);
+  background: var(--nova-ink-fill);
 }
 
 .settings__pane {
   flex: 1;
   min-height: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--nova-ink-hairline);
   overflow-y: auto;
   padding: 34px 64px 40px;
 }
@@ -138,13 +147,14 @@ a:hover {
 }
 
 .section-title {
-  font: 600 19px var(--sg);
-  color: #fff;
+  font: 700 17px var(--nova-font-display);
+  letter-spacing: 0.04em;
+  color: var(--nova-ink);
 }
 
 .section-sub {
   font: 400 13.5px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-soft);
 }
 
 .srow {
@@ -158,12 +168,11 @@ a:hover {
   flex: none;
   width: 54px;
   height: 54px;
-  border-radius: 12px;
-  background: #1b1b1f;
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--nova-ink-soft);
 }
 
 .srow__text {
@@ -175,12 +184,12 @@ a:hover {
 
 .srow__title {
   font: 600 16px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .srow__desc {
   font: 400 13.5px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-soft);
 }
 
 .btn-outline {
@@ -188,42 +197,49 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 10px;
+  border: 1px solid var(--nova-ink-hairline);
   padding: 11px 20px;
   font: 500 14.5px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
   cursor: pointer;
   background: transparent;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
 }
 
 .btn-outline:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--nova-ink-fill);
 }
 
 .select {
   flex: none;
-  background: #131316;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 10px;
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 11px 14px;
   font: 500 14.5px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
   cursor: pointer;
 }
 
 .select option {
-  background: #131316;
-  color: #f0f0f2;
+  background: var(--nova-canvas);
+  color: var(--nova-ink);
 }
 
-/* The 46×27 toggle, from the mockup's mkT helper. */
+/* The 46×27 toggle, from the mockup's mkT helper. Duotone: the on-state is
+   full ink, the off-state a hairline shell — state reads by contrast alone. */
 .toggle {
   flex: none;
   width: 46px;
   height: 27px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.22);
+  background: var(--nova-ink-hairline);
   position: relative;
   cursor: pointer;
   transition: background 0.18s;
@@ -232,7 +248,7 @@ a:hover {
 }
 
 .toggle--on {
-  background: #2d9fdb;
+  background: var(--nova-ink);
 }
 
 .toggle__knob {
@@ -242,53 +258,51 @@ a:hover {
   width: 21px;
   height: 21px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--nova-canvas);
   transition: left 0.18s;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .toggle--on .toggle__knob {
   left: 22px;
 }
 
-/* The dark card frame (profile, security). */
+/* The card frame (profile, security): ink-fill panel on the canvas. */
 .card {
-  background: #131316;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 34px 42px;
 }
 
 .card__title {
-  font: 600 24px var(--sg);
-  color: #fff;
+  font: 700 20px var(--nova-font-display);
+  letter-spacing: 0.04em;
+  color: var(--nova-ink);
   padding-bottom: 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--nova-ink-hairline);
 }
 
 .card__label {
   font: 500 15px var(--sg);
-  color: rgba(255, 255, 255, 0.85);
+  color: var(--nova-ink-soft);
   margin: 24px 0 14px;
 }
 
 .card__divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--nova-ink-hairline);
   margin: 24px 0;
 }
 
 .chip-dim {
-  background: #242428;
-  border-radius: 8px;
+  background: var(--nova-ink-fill);
   padding: 3px 10px;
-  font: 500 12.5px var(--sg);
-  color: rgba(255, 255, 255, 0.7);
+  font: 700 11.5px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 .dots {
   margin-left: auto;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--nova-ink-faint);
   cursor: pointer;
   font: 600 16px var(--sg);
   letter-spacing: 2px;

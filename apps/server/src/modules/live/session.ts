@@ -6,6 +6,7 @@ import {
   type ClientLiveEvent,
   type LiveErrorCode,
   type LiveMode,
+  type LiveModel,
   type ServerLiveEvent,
   type TranscriptInputOrigin,
 } from "@nova/shared";
@@ -239,6 +240,8 @@ export class LiveSession {
           event.echo ?? false,
           event.mode ?? "general",
           event.channels ?? 1,
+          // Absent = gpt (the old-client case), exactly the `mode` contract.
+          event.live_model ?? "gpt",
         );
         return;
       case "session.end":
@@ -339,6 +342,7 @@ export class LiveSession {
     echo: boolean,
     mode: LiveMode,
     channels: 1 | 2,
+    liveModel: LiveModel,
   ): Promise<void> {
     if (this.started) {
       // One live session per socket; a second start is a client protocol bug.
@@ -520,6 +524,9 @@ export class LiveSession {
         // The picked mode travels as an ARGUMENT and is never stored anywhere
         // process-wide: one build per session is the only thing that knows it.
         mode,
+        // Same law for the picked model (2026-08-20 picker): per-session by
+        // construction, mapped to a provider cascade in the wiring.
+        liveModel,
       });
       this.conductor = conductor;
       this.registerConsumer(conductor);

@@ -20,7 +20,7 @@ mic (16kHz PCM, 40–80ms frames)
                         │    similarity-reconcile on final, adopt-or-discard)
                         │  deadline ladder (active abort via the llm router)
                         └─► modules/llm (latencyTier: "live" → reasoning OFF,
-                              serial cascade cheapest/fastest first)
+                              serial cascade, openai first — owner's pick 2026-08-19)
                                   └─► suggestion.start/delta/done/discard ──► WS ──► phone
 ```
 
@@ -91,9 +91,10 @@ mic (16kHz PCM, 40–80ms frames)
 
 ### modules/llm (built Phase 2; extended later)
 - Add `latencyTier: "live" | "deliberate"`. Live tier: reasoning/thinking OFF
-  (single biggest TTFT lever), serial cascade cheapest/fastest-first, per-model
-  config (see adr-0004). Deliberate tier (notes pipeline): quality-first order,
-  reasoning allowed.
+  (single biggest TTFT lever), serial cascade — openai-first since the
+  2026-08-19 model revert (owner's pick: GPT default, Gemini fallback; no
+  longer strictly cheapest-first), per-model config (see adr-0004). Deliberate
+  tier (notes pipeline): quality-first order, reasoning allowed.
 
 ## Wire protocol (packages/shared, Phase 3 starts it)
 Zod discriminated union, versioned:

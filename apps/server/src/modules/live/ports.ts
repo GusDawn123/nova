@@ -94,6 +94,50 @@ export interface LiveLogger {
 }
 
 /**
+ * One live generation as it ended, for the dev-only answer ledger. TYPES ONLY
+ * here — the module stays free of filesystem imports (the [no-disk] audit
+ * covers this whole layer); the fs-writing implementation lives in the app
+ * wiring (`src/debug-transcript.ts`), behind its env opt-in.
+ */
+export interface LlmDebugEntry {
+  at: string;
+  user_id: string | null;
+  meeting_id: string | null;
+  suggestion_id: string;
+  trigger_text: string;
+  answer_text: string;
+  /**
+   * The answer BEFORE the deterministic voice pass (2026-08-20 prompt-stack
+   * redesign): raw-vs-shipped diffs in the ledger are the observation channel
+   * that feeds the next prompt/idiom iteration. Same text as `answer_text`
+   * whenever enforcement changed nothing.
+   */
+  raw_answer_text: string;
+  /** Whether `enforceSpoken` rewrote anything — the quick diff-row filter. */
+  enforcement_changed: boolean;
+  /**
+   * Every AI tell DETECTED in the raw answer (band ids from
+   * `modules/prompt/enforce.ts`, e.g. `em-dash`, `banned-word:delve`) —
+   * including word-class tells that are logged but never rewritten.
+   */
+  violations: string[];
+  /**
+   * How many DISTINCT tell bands the raw answer tripped (2026-08-21). One
+   * number per answer: the trend line across prompt versions, and the
+   * head-to-head metric for one model against another on the same ask.
+   */
+  tell_score: number;
+  /** Mirrors the wire: `done`, `discard:<reason>`, or `done_after_error`. */
+  outcome: string;
+  duration_ms: number;
+  input_tokens: number | null;
+  cached_input_tokens: number | null;
+}
+
+/** The sink the conductor calls once per terminal wire event, when wired. */
+export type LlmDebugSink = (entry: LlmDebugEntry) => void;
+
+/**
  * Anything that watches the call's transcript stream (Phase 8, §8). The session
  * fans every transcript event out to a LIST of these instead of hardcoding
  * `this.conductor?.on*` per consumer: Phase 7's copilot conductor is consumer #1,

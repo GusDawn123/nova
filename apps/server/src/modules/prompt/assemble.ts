@@ -77,12 +77,17 @@ export function windowTranscript(
   return kept.reverse();
 }
 
-/** Keep leading snippets whose cumulative tokens fit `budget` (ranked best-first). */
-export function trimSnippets(
-  snippets: PromptRagSnippet[],
+/**
+ * Keep leading snippets whose cumulative tokens fit `budget` (ranked
+ * best-first). Generic over the snippet shape (2026-08-20) so the composer's
+ * kind-tagged evidence entries survive the trim with their `kind` intact —
+ * the budget math and behavior are unchanged.
+ */
+export function trimSnippets<T extends PromptRagSnippet>(
+  snippets: T[],
   budget: number,
-): PromptRagSnippet[] {
-  const kept: PromptRagSnippet[] = [];
+): T[] {
+  const kept: T[] = [];
   let acc = 0;
   for (const snippet of snippets) {
     const cost = approxTokens(`${snippet.header}\n${snippet.content}`);

@@ -1,9 +1,15 @@
 import { join } from "node:path";
 
-import { BrowserWindow, screen } from "electron";
+import { BrowserWindow, globalShortcut, screen } from "electron";
 
 import type { ScreenPrivacyService } from "../privacy/screen-privacy";
 import { hardenNavigation, loadRendererPage } from "./navigation";
+import {
+  moveWindowBy,
+  resizeWindowTo,
+  type MoveDirection,
+  type PillSize,
+} from "./pill-move";
 
 /**
  * How long the pill is: a fraction of the screen's width, per Gustavo's
@@ -25,6 +31,13 @@ const INITIAL_HEIGHT = 160;
 const TOP_MARGIN = 12;
 
 let pillWindow: BrowserWindow | null = null;
+/**
+ * The pill's canonical size in DIPs — the ONE source of truth for how big the
+ * window is. Every size write re-asserts it; no size is ever read back from
+ * the OS (on scaled displays readback is lossy and a read-modify-write grows
+ * the window a pixel per round trip — the 2026-08-19 growth bug).
+ */
+let pillSize: PillSize | null = null;
 
 /**
  * The pill — Nova's face. Frameless, transparent, always on top, and attached
@@ -73,9 +86,19 @@ export async function createPillWindow(
   window.on("ready-to-show", () => {
     window.show();
   });
+  // Move-the-pill hotkeys (Ctrl+Arrows — Gustavo's 2026-08-19 pick, matching
+  // the reference app's muscle memory). Global by necessity: the pill is an
+  // overlay that is almost never the focused window. Scoped to visibility so
+  // the theft of Ctrl+Left/Right (word-jump in every text field) lasts only
+  // while the pill is actually on screen — hidden or closed, typing gets its
+  // keys back. ONLY the pill moves; the settings window never registers these.
+  window.on("show", registerMoveShortcuts);
+  window.on("hide", unregisterMoveShortcuts);
   window.on("closed", () => {
     pillWindow = null;
+    pillSize = null;
     stopIgnoreHeartbeat();
+    unregisterMoveShortcuts();
   });
   // EVERY page load starts clickable — a reloading renderer must never
   // inherit an ignore state it no longer knows about (dev reloads mid-hover;
@@ -88,6 +111,7 @@ export async function createPillWindow(
   // Assigned before the page loads so a second call during the load returns
   // this window instead of building another one.
   pillWindow = window;
+  pillSize = { width: windowWidth, height: INITIAL_HEIGHT };
   try {
     await loadRendererPage(window, "pill.html");
   } catch (error) {
@@ -109,6 +133,59 @@ export function closePillWindow(): void {
   }
 }
 
+/** Accelerator → direction for the pill-mover (all four register together). */
+const MOVE_ACCELERATORS: Record<string, MoveDirection> = {
+  "CommandOrControl+Up": "up",
+  "CommandOrControl+Down": "down",
+  "CommandOrControl+Left": "left",
+  "CommandOrControl+Right": "right",
+};
+
+/**
+ * Nudge the pill one step, clamped into the work area of whichever display
+ * the nudged rectangle lands on — free to cross onto a second monitor, never
+ * able to strand off-screen.
+ */
+function movePill(direction: MoveDirection): void {
+  if (
+    pillWindow === null ||
+    pillWindow.isDestroyed() ||
+    !pillWindow.isVisible()
+  ) {
+    return;
+  }
+  if (pillSize === null) {
+    return;
+  }
+  const size = pillSize;
+  // TEMP DEBUG (2026-08-19 growth bug): remove once the mover is proven.
+  console.log(
+    `[pill-move] dir=${direction} canonical=${JSON.stringify(size)} before=${JSON.stringify(pillWindow.getBounds())}`,
+  );
+  moveWindowBy(
+    pillWindow,
+    size,
+    direction,
+    (rect) => screen.getDisplayMatching(rect).workArea,
+  );
+  // TEMP DEBUG (2026-08-19 growth bug): remove once the mover is proven.
+  console.log(`[pill-move] after=${JSON.stringify(pillWindow.getBounds())}`);
+}
+
+function registerMoveShortcuts(): void {
+  for (const [accelerator, direction] of Object.entries(MOVE_ACCELERATORS)) {
+    globalShortcut.register(accelerator, () => {
+      movePill(direction);
+    });
+  }
+}
+
+function unregisterMoveShortcuts(): void {
+  for (const accelerator of Object.keys(MOVE_ACCELERATORS)) {
+    globalShortcut.unregister(accelerator);
+  }
+}
+
 /**
  * Size the window to the pill's content. The pill grows downward (history,
  * transcript, the mode menu), so width and position stay put and only the
@@ -118,9 +195,17 @@ export function resizePillWindow(height: number): void {
   if (pillWindow === null || pillWindow.isDestroyed()) {
     return;
   }
-  // Frameless window: bounds and content size are the same rectangle, and
-  // getBounds() has the honest non-optional type.
-  pillWindow.setContentSize(pillWindow.getBounds().width, height);
+  if (pillSize === null) {
+    return;
+  }
+  // Width comes from the CANONICAL size, never from getBounds() readback —
+  // sourcing it from readback gained a pixel per call on scaled displays
+  // (the 2026-08-19 growth bug; see pill-move.ts).
+  pillSize = resizeWindowTo(pillWindow, pillSize, height);
+  // TEMP DEBUG (2026-08-19 growth bug): remove once the mover is proven.
+  console.log(
+    `[pill-resize] canonical=${JSON.stringify(pillSize)} readback=${JSON.stringify(pillWindow.getBounds())}`,
+  );
 }
 
 /**

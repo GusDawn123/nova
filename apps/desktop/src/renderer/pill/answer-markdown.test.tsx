@@ -127,4 +127,57 @@ describe("AnswerMarkdown", () => {
     expect(container.querySelector(".md code")?.textContent).toBe("useRef");
     expect(container.textContent).not.toContain("**");
   });
+
+  // The speakable-wrap contract (2026-08-20): pill.css makes ```text and bare
+  // fences wrap like a highlighted paragraph via `.md pre code.language-text`
+  // and `.md pre code:not([class])`. jsdom cannot compute `:has()` styles, so
+  // these pin the DOM classes those selectors key on — if either shape
+  // changes, the wrap rules silently stop applying and this suite says so.
+  it("tags a ```text fence as code.language-text — the wrap selector's hook", () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={
+          "```text\nI led the migration, and it cut deploy time in half.\n```"
+        }
+        streaming={false}
+      />,
+    );
+    const code = container.querySelector(".md pre code");
+    expect(code?.classList.contains("language-text")).toBe(true);
+    // rehype-highlight knows `text` (plaintext alias) and stamps `hljs` too —
+    // the selector must keep matching alongside it.
+    expect(code?.classList.contains("hljs")).toBe(true);
+  });
+
+  it("leaves a bare fence's code CLASSLESS — the other wrap selector", () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={"```\nSpeakable line with no tag.\n```"}
+        streaming={false}
+      />,
+    );
+    const code = container.querySelector(".md pre code");
+    expect(code).not.toBeNull();
+    // rehype-highlight early-returns without a language- class; react-markdown
+    // adds none for a bare fence. No class attribute at all.
+    expect(code?.hasAttribute("class")).toBe(false);
+  });
+
+  it("keeps the language class on real code fences, so they stay scrollable", () => {
+    const { container } = render(
+      <AnswerMarkdown
+        text={"```python\ndef solve():\n    return 42\n```"}
+        streaming={false}
+      />,
+    );
+    const code = container.querySelector(".md pre code");
+    expect(code?.classList.contains("language-python")).toBe(true);
+    // Inline chips live OUTSIDE `.md pre` — the classless-wrap selector is
+    // scoped under `pre` exactly so it can never catch them.
+    const { container: inline } = render(
+      <AnswerMarkdown text={"Use the `useRef` hook."} streaming={false} />,
+    );
+    const chip = inline.querySelector(".md code");
+    expect(chip?.closest("pre")).toBeNull();
+  });
 });

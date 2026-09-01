@@ -85,7 +85,7 @@ export function createLlmRouter(deps: LlmRouterDeps): LlmRouter {
     }
 
     // Order precedence: an explicit per-request `providerOrder` wins; else the
-    // latency tier selects the cascade (live → cheapest-first `liveOrder`,
+    // latency tier selects the cascade (live → the `liveOrder` cascade,
     // deliberate/absent → quality-first `defaultOrder`). Filtered to the
     // providers actually supplied; names not supplied are silently skipped.
     const tierOrder =

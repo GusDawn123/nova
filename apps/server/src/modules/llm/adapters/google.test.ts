@@ -66,10 +66,12 @@ describe("adapters/google — translation", () => {
     }
   });
 
-  it("pins thinking LOW on the wire — and skips the knob for lite models", async () => {
-    // 3.7-flash defaults to MEDIUM thinking and bills thinking tokens as
-    // output; the adapter must pin low (Gustavo, 2026-08-17). Lite-lineage
-    // models 400 on any thinkingConfig, so the knob must vanish for them.
+  it("skips the thinking knob for the lite default — and pins LOW for non-lite", async () => {
+    // The default is lite again (2026-08-19 revert) and lite-lineage models
+    // 400 on any thinkingConfig, so the knob must be ABSENT by default. An
+    // explicit non-lite override (e.g. 3.7-flash, which defaults to MEDIUM and
+    // bills thinking tokens as output) must still get thinkingLevel LOW
+    // pinned (Gustavo, 2026-08-17).
     const bodies: string[] = [];
     const realFetch = globalThis.fetch;
     globalThis.fetch = (_url, init) => {
@@ -90,11 +92,78 @@ describe("adapters/google — translation", () => {
         }
       };
       await expect(drain()).rejects.toThrow();
-      // The SDK enum serializes as "LOW" on the wire.
-      expect(bodies[0]).toContain('"thinkingLevel":"LOW"');
+      expect(bodies[0]).not.toContain("thinkingLevel");
 
-      await expect(drain("gemini-3.5-flash-lite")).rejects.toThrow();
-      expect(bodies[1]).not.toContain("thinkingLevel");
+      await expect(drain("gemini-3.7-flash")).rejects.toThrow();
+      // The SDK enum serializes as "LOW" on the wire.
+      expect(bodies[1]).toContain('"thinkingLevel":"LOW"');
+
+      // gemini-3.5-flash (the live lane) pins MINIMAL: measured 2026-08-22,
+      // its own default thinks for ~9s and its LOW tier stalls for a minute.
+      await expect(drain("gemini-3.5-flash")).rejects.toThrow();
+      expect(bodies[2]).toContain('"thinkingLevel":"MINIMAL"');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("sends the configured topP on the wire (the reference's 0.85)", async () => {
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      bodies.push(typeof init?.body === "string" ? init.body : "");
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const provider = createGoogleProvider({
+        apiKey: "test-key",
+        topP: 0.85,
+      });
+      const drain = async (): Promise<void> => {
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain()).rejects.toThrow();
+      expect(bodies[0]).toContain('"topP":0.85');
+    } finally {
+      globalThis.fetch = realFetch;
+    }
+  });
+
+  it("sends the configured temperature on the wire — and omits it by default", async () => {
+    // The live wiring passes 0.3 (Natively reference: 0.25–0.4 on answer
+    // paths); everything else must keep the vendor's own default, so the
+    // param must not exist on the wire unless configured.
+    const bodies: string[] = [];
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (_url, init) => {
+      bodies.push(typeof init?.body === "string" ? init.body : "");
+      return Promise.resolve(new Response("", { status: 500 }));
+    };
+    try {
+      const drain = async (temperature?: number): Promise<void> => {
+        const provider = createGoogleProvider({
+          apiKey: "test-key",
+          ...(temperature !== undefined ? { temperature } : {}),
+        });
+        for await (const event of provider.stream(
+          { messages: [{ role: "user", content: "hi" }] },
+          new AbortController().signal,
+        )) {
+          void event;
+        }
+      };
+      await expect(drain(0.3)).rejects.toThrow();
+      expect(bodies[0]).toContain('"temperature":0.3');
+
+      await expect(drain()).rejects.toThrow();
+      expect(bodies[1]).not.toContain("temperature");
+      // topP rides the wire only when configured (the live lane's 0.85).
+      expect(bodies[1]).not.toContain("topP");
     } finally {
       globalThis.fetch = realFetch;
     }

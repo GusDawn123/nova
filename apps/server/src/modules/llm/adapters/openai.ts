@@ -11,14 +11,18 @@ import { createOpenAiCompatibleProvider } from "./openai-compatible.js";
  * Lineage: gpt-4o-mini (2024, Phase 2 default) → gpt-5.4-mini (2026-07-23
  * refresh) → gpt-5.6-terra (2026-08-17, Gustavo's pick: "decently smart,
  * reasoning low" — Terra is the balanced GPT-5.6 tier, ~GPT-5.5 quality at
- * $2/$12 per 1M, GA 2026-07-09; id verified against the model list on our
- * key — the price book must move in lockstep, adr-0004 addendum). */
-const DEFAULT_MODEL = "gpt-5.6-terra";
+ * $2/$12 per 1M, GA 2026-07-09) → REVERTED to gpt-5.4-mini (2026-08-19,
+ * Gustavo: keep the old models; id re-probed LIVE on our key the same day and
+ * answering — $0.75/$4.50 per 1M, the price book must move in lockstep,
+ * adr-0004 addendum). */
+const DEFAULT_MODEL = "gpt-5.4-mini";
 
 export interface OpenAiProviderOptions {
   apiKey: string;
   model?: string;
   maxOutputTokens?: number;
+  /** Sampling temperature; omitted = vendor default (see openai-compatible). */
+  temperature?: number;
 }
 
 export function createOpenAiProvider(opts: OpenAiProviderOptions): LlmProvider {
@@ -26,13 +30,18 @@ export function createOpenAiProvider(opts: OpenAiProviderOptions): LlmProvider {
     id: "openai",
     apiKey: opts.apiKey,
     model: opts.model ?? DEFAULT_MODEL,
-    // Reasoning LOW (Gustavo, 2026-08-17: decently smart, reasoning low) —
-    // enough to plan an answer, cheap enough for the live loop. The gpt-5.x
-    // effort ladder is 'none'|'low'|'medium'|'high'(|'xhigh'); 'minimal' was
-    // probed REJECTED (400) on this family 2026-07-23.
-    reasoningEffort: "low",
+    // Reasoning OFF via "none" — the 2026-07-23 setting, restored with the
+    // 2026-08-19 model revert (adr-0004 §4: reasoning off at the adapter layer
+    // is the single biggest TTFT lever). PROBED 2026-07-23: gpt-5.4-mini
+    // accepts 'none'|'low'|'medium'|'high'|'xhigh' and REJECTS 'minimal' with
+    // a 400; "none" verified to yield reasoning_tokens: 0. Re-probed
+    // 2026-08-19: still accepted.
+    reasoningEffort: "none",
     ...(opts.maxOutputTokens !== undefined
       ? { maxOutputTokens: opts.maxOutputTokens }
+      : {}),
+    ...(opts.temperature !== undefined
+      ? { temperature: opts.temperature }
       : {}),
   });
 }

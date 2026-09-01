@@ -246,7 +246,7 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
   ipcMain.handle(IpcChannel.liveStart, async (_event, payload: unknown) => {
     const parsed = liveStartMessageSchema.safeParse(payload);
     const result: LiveActionResult = parsed.success
-      ? await live.start(parsed.data.mode)
+      ? await live.start(parsed.data.mode, parsed.data.model ?? "gpt")
       : { ok: false, message: "That is not a mode this build knows." };
     return outbound(
       IpcChannel.liveStart,

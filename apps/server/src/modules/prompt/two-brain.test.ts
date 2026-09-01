@@ -17,7 +17,7 @@ import {
  */
 
 /** A phrase each brain's authored text contains and the other's does not. */
-const BRAIN_A_SENTINEL = "live-meeting co-pilot";
+const BRAIN_A_SENTINEL = "live sales copilot";
 const BRAIN_B_SENTINEL =
   "analyze and solve problems asked by the user or shown on the screen";
 

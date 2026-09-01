@@ -1,17 +1,26 @@
 import { randomUUID } from "node:crypto";
 
-import { LIVE_PROTOCOL_VERSION, type ServerLiveEvent } from "@nova/shared";
+import {
+  LIVE_PROTOCOL_VERSION,
+  type LiveModel,
+  type ServerLiveEvent,
+} from "@nova/shared";
 
-import { type LlmRouter, type Meter } from "../llm/index.js";
+import { type LlmRouter, type Meter, type ProviderId } from "../llm/index.js";
 import {
   assembleMeeting,
+  enforceChunk,
+  enforceSpoken,
+  repairToSayBlock,
+  type AssembledPrompt,
+  type ComposeSayContext,
   type PromptMode,
   type PromptTranscriptTurn,
 } from "../prompt/index.js";
 import type { RagService } from "../rag/index.js";
 
 import { conductorConfig, type ConductorConfig } from "./conductor-config.js";
-import type { LiveLogger } from "./ports.js";
+import type { LiveLogger, LlmDebugSink } from "./ports.js";
 import { isConfidentPartial, reconcile } from "./speculation.js";
 import { evaluateTrigger, type TriggerDecision } from "./trigger.js";
 
@@ -64,6 +73,12 @@ export interface ConductorFactoryArgs {
    * like the copilot being vague rather than like a wiring bug.
    */
   readonly mode: PromptMode;
+  /**
+   * The live model this call picked (2026-08-20 picker). REQUIRED for the same
+   * compile-time reason as `mode`; the WIRING maps it to a provider cascade —
+   * the conductor itself only ever sees a providerOrder.
+   */
+  readonly liveModel: LiveModel;
 }
 
 /**
@@ -80,7 +95,7 @@ export type LiveConductorFactory = (
 export interface LiveConductorDeps {
   /** Emit a typed event down the socket (the session's own `send`). */
   send: (event: ServerLiveEvent) => void;
-  /** A LIVE-tuned llm router (cheapest-first cascade, tight budgets). */
+  /** A LIVE-tuned llm router (the `liveOrder` cascade, live budgets). */
   router: LlmRouter;
   /** Per-user RAG memory for grounding. Omitted → suggestions are ungrounded. */
   rag?: RagService;
@@ -102,6 +117,26 @@ export interface LiveConductorDeps {
   mode?: PromptMode;
   logger?: LiveLogger;
   config?: ConductorConfig;
+  /**
+   * Dev-only answer ledger (debug-transcript.ts). When wired, every generation
+   * that reaches a terminal wire event also lands one JSONL entry — trigger,
+   * full answer, outcome, timing. Absent in production (the env-gated seam).
+   */
+  debug?: LlmDebugSink;
+  /**
+   * The 2026-08-20 composer seam. When wired (PROMPT_COMPOSER_ENABLED — the
+   * wiring reads the flag, this module never touches env), every generation
+   * builds its prompt through the canonical composer instead of the legacy
+   * two-brain path, and the Say-format repair guarantee applies. Absent →
+   * byte-identical legacy behavior (the migration's kill-switch law).
+   */
+  composePrompt?: (context: ComposeSayContext) => AssembledPrompt;
+  /**
+   * Per-session provider cascade (2026-08-20 model picker): the picked model's
+   * provider first, the rest as fallback. Absent → the router's configured
+   * live order, exactly as before the picker existed.
+   */
+  providerOrder?: readonly ProviderId[];
   /** Injected clock (fake-timer tests); defaults to Date.now. */
   now?: () => number;
   /** Suggestion-id factory; overridable for deterministic tests. */
@@ -148,6 +183,27 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
    */
   let speculation: { id: string; triggerText: string } | null = null;
   let disposed = false;
+  /**
+   * Cache telemetry latch (Natively reference §4/§6): the FIRST completed
+   * generation logs how much of the prompt the vendor served from cache — a
+   * silent miss looks identical from outside (same answer, same latency shape)
+   * but bills the full input rate, and the first ask is where the pre-warm's
+   * payoff (or its absence) shows. One line per session, not per ask.
+   */
+  let cacheLogged = false;
+  /**
+   * Nova's own shipped answers this call, newest last (cap 3). Ridden into the
+   * composer's previous-responses envelope block so "never the same opener
+   * twice" is a rule the model can actually obey — without seeing its prior
+   * answers, rotation was unobeyable (the 2026-08-19 field find).
+   */
+  const answerHistory: string[] = [];
+  const ANSWER_HISTORY_MAX = 3;
+
+  function recordAnswer(shipped: string): void {
+    answerHistory.push(shipped);
+    if (answerHistory.length > ANSWER_HISTORY_MAX) answerHistory.shift();
+  }
 
   function send(event: ServerLiveEvent): void {
     deps.send(event);
@@ -254,18 +310,41 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
   }
 
   async function generate(gen: ActiveGeneration): Promise<void> {
+    const startedAt = now();
+    let usage: {
+      inputTokens?: number | undefined;
+      outputTokens?: number | undefined;
+      cachedInputTokens?: number | undefined;
+    } | null = null;
     const snippets = await groundingSnippets(gen.triggerText);
     if (!isCurrent(gen)) return;
 
-    // Brain A for every meeting request (M2). RAG grounding rides facts-grade
-    // (`userMemory`); the user's own context is script-grade (`userScript`).
-    const { stablePrefix, dynamicSuffix } = assembleMeeting({
-      transcript,
-      ...(snippets.length > 0 ? { userMemory: snippets } : {}),
-      ...(deps.userContext !== undefined
-        ? { userScript: deps.userContext }
-        : {}),
-    });
+    // The composer when wired (PROMPT_COMPOSER_ENABLED), the legacy two-brain
+    // path otherwise — the migration's `composed ?? legacy` law, decided per
+    // generation so the kill-switch needs no restart semantics beyond a new
+    // session. The composer additionally sees the trigger as `currentTurn`
+    // and the shipped-answer history (opener rotation needs it).
+    const { stablePrefix, dynamicSuffix }: AssembledPrompt =
+      deps.composePrompt?.({
+        transcript,
+        ...(snippets.length > 0 ? { userMemory: snippets } : {}),
+        ...(deps.userContext !== undefined
+          ? { userScript: deps.userContext }
+          : {}),
+        ...(answerHistory.length > 0
+          ? { previousAnswers: [...answerHistory] }
+          : {}),
+        currentTurn: gen.triggerText,
+      }) ??
+      // Brain A for every meeting request (M2). RAG grounding rides facts-grade
+      // (`userMemory`); the user's own context is script-grade (`userScript`).
+      assembleMeeting({
+        transcript,
+        ...(snippets.length > 0 ? { userMemory: snippets } : {}),
+        ...(deps.userContext !== undefined
+          ? { userScript: deps.userContext }
+          : {}),
+      });
 
     // Deadline ladder: abort if the router yields no first token in time.
     const deadline = setTimeout(() => {
@@ -281,10 +360,60 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
         v: LIVE_PROTOCOL_VERSION,
         type: "suggestion.delta",
         suggestion_id: gen.id,
-        text: batch,
+        // Streaming-safe tell cleanup (dashes only): the pane never shows an
+        // em dash even mid-stream; the done-pass below stays authoritative.
+        text: enforceChunk(batch),
       });
       batch = "";
       lastFlush = now();
+    };
+
+    // One ledger line per terminal wire event (dev-only seam; no-op unwired).
+    // `full` is the RAW model text; `shipped` is what the voice floor let
+    // through — the raw-vs-shipped pair is the prompt-improvement channel.
+    const emitDebug = (
+      outcome: string,
+      shipped: string,
+      violations: string[],
+      tellScore: number,
+    ): void => {
+      deps.debug?.({
+        at: new Date().toISOString(),
+        user_id: deps.userId ?? null,
+        meeting_id: deps.meetingId ?? null,
+        suggestion_id: gen.id,
+        trigger_text: gen.triggerText,
+        answer_text: shipped,
+        raw_answer_text: full,
+        enforcement_changed: shipped !== full,
+        violations,
+        tell_score: tellScore,
+        outcome,
+        duration_ms: now() - startedAt,
+        input_tokens: usage?.inputTokens ?? null,
+        cached_input_tokens: usage?.cachedInputTokens ?? null,
+      });
+    };
+
+    // The voice floor (2026-08-20): every finished answer passes through the
+    // deterministic enforcer before it ships; under the composer's format
+    // contract, a fence-less answer is additionally repaired into a Say block
+    // (legacy prompts predate that contract, so repair is composer-gated).
+    const shipAnswer = (): {
+      shipped: string;
+      violations: string[];
+      tellScore: number;
+    } => {
+      const enforced = enforceSpoken(full);
+      const shipped =
+        deps.composePrompt !== undefined
+          ? repairToSayBlock(enforced.text)
+          : enforced.text;
+      return {
+        shipped,
+        violations: enforced.violations,
+        tellScore: enforced.tellScore,
+      };
     };
 
     try {
@@ -295,6 +424,9 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
             { role: "user", content: dynamicSuffix },
           ],
           latencyTier: "live",
+          ...(deps.providerOrder !== undefined
+            ? { providerOrder: [...deps.providerOrder] }
+            : {}),
         },
         {
           signal: gen.controller.signal,
@@ -312,16 +444,36 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           batch += event.text;
           if (now() - lastFlush >= config.coalesceMs) flush();
         }
+        if (event.type === "done") {
+          usage = event.usage;
+          if (!cacheLogged) {
+            cacheLogged = true;
+            logger?.info?.(
+              {
+                user_id: deps.userId ?? null,
+                meeting_id: deps.meetingId ?? null,
+                input_tokens: event.usage?.inputTokens ?? null,
+                cached_input_tokens: event.usage?.cachedInputTokens ?? null,
+              },
+              "live.llm_cache",
+            );
+          }
+        }
       }
       clearTimeout(deadline);
       if (!isCurrent(gen)) return;
       flush();
-      send({
-        v: LIVE_PROTOCOL_VERSION,
-        type: "suggestion.done",
-        suggestion_id: gen.id,
-        text: full,
-      });
+      {
+        const { shipped, violations, tellScore } = shipAnswer();
+        send({
+          v: LIVE_PROTOCOL_VERSION,
+          type: "suggestion.done",
+          suggestion_id: gen.id,
+          text: shipped,
+        });
+        recordAnswer(shipped);
+        emitDebug("done", shipped, violations, tellScore);
+      }
       active = null;
     } catch (err: unknown) {
       clearTimeout(deadline);
@@ -334,17 +486,21 @@ export function createLiveConductor(deps: LiveConductorDeps): LiveConductor {
           suggestion_id: gen.id,
           reason: "no_response",
         });
+        emitDebug("discard:no_response", "", [], 0);
         // A failed speculation has nothing to reconcile against later.
         if (speculation?.id === gen.id) speculation = null;
       } else {
         // Committed then died → keep what streamed (adr-0004 §2: no zombie, no mix).
         flush();
+        const { shipped, violations, tellScore } = shipAnswer();
         send({
           v: LIVE_PROTOCOL_VERSION,
           type: "suggestion.done",
           suggestion_id: gen.id,
-          text: full,
+          text: shipped,
         });
+        recordAnswer(shipped);
+        emitDebug("done_after_error", shipped, violations, tellScore);
       }
       active = null;
       logger?.error(

@@ -12,6 +12,43 @@
 
 export { assemble } from "./assemble.js";
 
+// The 2026-08-20 composer — Nova's ONE canonical prompt layer (mode × action
+// block stack + the escaped turn envelope). Wired behind
+// PROMPT_COMPOSER_ENABLED with the two-brain path as byte-identical fallback.
+export {
+  buildSystemPrompt,
+  buildTurnContent,
+  composeSay,
+  composerModeSchema,
+  composerActionSchema,
+  composeSayContextSchema,
+  turnContentSchema,
+  turnEvidenceSchema,
+  escapeXml,
+  DEFAULT_TURN_TASK,
+  NO_ACTION_SENTINEL,
+  USER_SCRIPT_MAX_CHARS,
+  type BuildSystemPromptInput,
+  type ComposerMode,
+  type ComposerAction,
+  type ComposeSayContext,
+  type TurnContentInput,
+  type TurnEvidence,
+} from "./composer.js";
+
+// The deterministic voice floor (2026-08-20): the conductor runs every spoken
+// answer through this after the model — the prompt asks, this guarantees.
+export {
+  enforceSpoken,
+  enforceChunk,
+  validateSayFormat,
+  repairToSayBlock,
+  speakableStats,
+  type EnforceSpokenResult,
+  type SayFormatCheck,
+  type SpeakableStats,
+} from "./enforce.js";
+
 export {
   assembleMeeting,
   assembleSolver,

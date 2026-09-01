@@ -9,19 +9,22 @@ import type { LlmStreamEvent } from "../ports.js";
  */
 const tokenCountSchema = z.number().int().nonnegative();
 
-/** Parsed token usage, both fields independently optional. */
+/** Parsed token usage, all fields independently optional. */
 export interface ParsedUsage {
   inputTokens?: number;
   outputTokens?: number;
+  /** Input tokens the vendor served from its prompt cache (telemetry). */
+  cachedInputTokens?: number;
 }
 
 /**
- * zod-parse raw input/output token counts. Each field is validated on its own
- * so a single malformed count doesn't discard the other.
+ * zod-parse raw token counts. Each field is validated on its own so a single
+ * malformed count doesn't discard the others.
  */
 export function parseVendorUsage(raw: {
   inputTokens?: unknown;
   outputTokens?: unknown;
+  cachedInputTokens?: unknown;
 }): ParsedUsage {
   const parsed: ParsedUsage = {};
   const input = tokenCountSchema.safeParse(raw.inputTokens);
@@ -31,6 +34,10 @@ export function parseVendorUsage(raw: {
   const output = tokenCountSchema.safeParse(raw.outputTokens);
   if (output.success) {
     parsed.outputTokens = output.data;
+  }
+  const cached = tokenCountSchema.safeParse(raw.cachedInputTokens);
+  if (cached.success) {
+    parsed.cachedInputTokens = cached.data;
   }
   return parsed;
 }
@@ -42,6 +49,8 @@ export function parseVendorUsage(raw: {
  */
 export function doneEvent(usage: ParsedUsage): LlmStreamEvent {
   const hasCounts =
-    usage.inputTokens !== undefined || usage.outputTokens !== undefined;
+    usage.inputTokens !== undefined ||
+    usage.outputTokens !== undefined ||
+    usage.cachedInputTokens !== undefined;
   return { type: "done", usage: hasCounts ? usage : null };
 }

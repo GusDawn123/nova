@@ -1,14 +1,15 @@
 /*
  * The login window's stylesheet, in the settings window's vocabulary
  * (settings.css) — same palette, same fonts, same title strip — so the front
- * door and the settings read as one app. The login VISUALS are a stand-in
- * until sign-in gets its own design pass; the class names are kept from the
- * original sign-in surface so the form components did not have to change.
+ * door and the settings read as one app. Paint is the duotone spine
+ * (design/theme.ts): solid canvas, ink bands, hairlines, no greys. The class
+ * names are kept from the original sign-in surface so the form components did
+ * not have to change.
  */
 
 :root {
-  --sg: "Space Grotesk", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
+  --sg: var(--nova-font-body);
+  --mono: var(--nova-font-mono);
 }
 
 * {
@@ -17,16 +18,16 @@
 
 body {
   margin: 0;
-  background: #0c0c0e;
-  color: #f0f0f2;
+  background: var(--nova-canvas);
+  color: var(--nova-ink);
   font-family: var(--sg);
   overflow: hidden;
   user-select: none;
 }
 
 ::selection {
-  background: rgba(255, 255, 255, 0.85);
-  color: #0c0c0e;
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
 }
 
 #root {
@@ -48,8 +49,9 @@ body {
 }
 
 .login__title {
-  font: 600 15.5px var(--sg);
-  color: #ececef;
+  font: 700 14px var(--nova-font-display);
+  letter-spacing: 0.08em;
+  color: var(--nova-ink);
 }
 
 .screen {
@@ -61,13 +63,12 @@ body {
   padding: 32px;
 }
 
-/* The dark card frame, from settings.css. */
+/* The card frame: an ink-fill terminal panel on the canvas. */
 .card {
   width: 100%;
   max-width: 440px;
-  background: #131316;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   padding: 34px 42px;
 }
 
@@ -77,22 +78,23 @@ body {
 
 .wordmark {
   margin: 0;
-  font: 600 24px var(--sg);
-  color: #fff;
+  font: 900 24px var(--nova-font-display);
+  letter-spacing: 0.06em;
+  color: var(--nova-ink);
 }
 
 .eyebrow {
   display: block;
-  font: 500 11.5px var(--mono);
+  font: 700 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .lede {
   margin: 8px 0 24px;
   font: 400 13.5px/1.5 var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-soft);
 }
 
 /* ---------------------------------------------------------------- form ---- */
@@ -105,33 +107,32 @@ body {
 .field__label {
   display: block;
   margin-bottom: 8px;
-  font: 500 11.5px var(--mono);
+  font: 700 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .field__input {
   width: 100%;
-  border: 1px solid rgba(255, 255, 255, 0.28);
-  border-radius: 10px;
+  border: 1px solid var(--nova-ink-hairline);
   padding: 11px 14px;
   background: transparent;
-  color: #f0f0f2;
+  color: var(--nova-ink);
   font: 400 14.5px var(--sg);
 }
 
 .field__input::placeholder {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--nova-ink-faint);
 }
 
 .field__input:focus-visible {
   outline: none;
-  border-color: rgba(255, 255, 255, 0.85);
+  border-color: var(--nova-ink);
 }
 
 .field__input:disabled {
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--nova-ink-faint);
 }
 
 .actions {
@@ -142,40 +143,47 @@ body {
 
 /* ------------------------------------------------------------- controls ---- */
 
-/* Primary: filled white, like the mockup's stop button. Quiet: the settings
-   .btn-outline. */
+/* Primary: the ink-filled key, chamfered — actionable things take the cut
+   (design spec §3). Quiet: hairline outline, same silhouette. */
 .key {
   flex: 1;
-  border: 1px solid #fff;
-  border-radius: 10px;
+  border: 1px solid var(--nova-ink);
   padding: 11px 20px;
-  background: #fff;
-  color: #0c0c0e;
-  font: 600 14.5px var(--sg);
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+  font: 700 14.5px var(--sg);
   cursor: pointer;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
 }
 
 .key:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.4);
+  box-shadow: inset 0 0 0 2px var(--nova-ink-faint);
 }
 
 .key--quiet {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.28);
-  color: #f0f0f2;
+  border-color: var(--nova-ink-hairline);
+  color: var(--nova-ink);
   font-weight: 500;
 }
 
 .key--quiet:hover:enabled {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--nova-ink-fill);
 }
 
 .key:disabled {
   cursor: default;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--nova-ink-fill);
   border-color: transparent;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--nova-ink-faint);
 }
 
 /* ----------------------------------------------------------- messaging ---- */
@@ -184,15 +192,14 @@ body {
 .notice {
   margin-top: 18px;
   padding: 14px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  background: #0c0c0e;
+  border: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-canvas);
 }
 
 .notice__body {
   margin: 6px 0 0;
   font: 400 13.5px/1.5 var(--sg);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--nova-ink-soft);
 }
 
 .status-line {
@@ -200,25 +207,25 @@ body {
   align-items: center;
   gap: 8px;
   margin-top: 24px;
-  font: 500 11.5px var(--mono);
+  font: 700 11.5px var(--mono);
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .status-line__dot {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--nova-ink);
 }
 
 .status-line__dot--hollow {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 1px solid var(--nova-ink-hairline);
 }
 
 code {
   font: 400 12.5px var(--mono);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }

@@ -10,12 +10,12 @@ export const conductorConfigSchema = z.object({
   /**
    * Hard deadline from generation start to the FIRST suggestion token. If the
    * router yields nothing by here, the attempt is actively aborted (the deadline
-   * ladder). Re-sized 2026-08-17 for the thinking-model era (Gustavo's pick:
-   * gemini-3.7-flash / gpt-5.6-terra at LOW effort — they legitimately think
-   * 2-6s before the first token; the old 4s gate assumed a non-thinking lite
-   * model and aborted BOTH cascade rungs, killing the whole answer). Sized to
-   * cover the router's per-provider TTFT window twice (primary + one
-   * failover) plus slack.
+   * ladder). Re-sized 2026-08-17 after the old 4s gate aborted BOTH cascade
+   * rungs on the then-current thinking models (killing the whole answer). The
+   * 2026-08-19 model revert put non-thinking models back, but the generous
+   * window is KEPT DELIBERATELY — it only slows the failure path, never a
+   * healthy answer. Sized to cover the router's per-provider TTFT window twice
+   * (primary + one failover) plus slack.
    */
   firstTokenDeadlineMs: z.number().int().positive().default(12000),
   /**
