@@ -11,15 +11,22 @@ import {
   authResultMessageSchema,
   authStateMessageSchema,
   credentialsSchema,
+  followUpAskMessageSchema,
+  followUpResultMessageSchema,
   liveActionResultSchema,
   liveAskMessageSchema,
   livePausedMessageSchema,
   liveSessionEventSchema,
   liveStartMessageSchema,
+  meetingIdMessageSchema,
+  meetingNotesResultMessageSchema,
+  meetingsListResultMessageSchema,
+  meetingTranscriptResultMessageSchema,
   meResultMessageSchema,
   pillClickThroughMessageSchema,
   pillResizeMessageSchema,
   privacyStateMessageSchema,
+  regenerateResultMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
   INVALID_CREDENTIALS_PAYLOAD_MESSAGE,
   type AuthStateMessage,
@@ -78,6 +85,22 @@ const OFF_CONTRACT_ME_RESULT: MeResultMessage = {
   kind: "schema",
   message: INVALID_BRIDGE_RESPONSE_MESSAGE,
 };
+
+/**
+ * Every api answer shares the failure half of its shape, so one off-contract
+ * fallback and one garbled-ask answer serve the whole meetings surface.
+ */
+const OFF_CONTRACT_API_RESULT = {
+  ok: false,
+  kind: "schema",
+  message: INVALID_BRIDGE_RESPONSE_MESSAGE,
+} as const;
+
+const INVALID_MEETING_ASK = {
+  ok: false,
+  kind: "schema",
+  message: "That is not a meeting this build knows how to ask about.",
+} as const;
 
 const OFF_CONTRACT_LIVE_RESULT: LiveActionResult = {
   ok: false,
@@ -213,6 +236,79 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     ),
   );
 
+  ipcMain.handle(IpcChannel.apiMeetingsList, async () =>
+    outbound(
+      IpcChannel.apiMeetingsList,
+      meetingsListResultMessageSchema,
+      await api.listMeetings(),
+      OFF_CONTRACT_API_RESULT,
+    ),
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiMeetingNotes,
+    async (_event, payload: unknown) => {
+      const parsed = meetingIdMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.meetingNotes(parsed.data.meetingId)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiMeetingNotes,
+        meetingNotesResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiMeetingTranscript,
+    async (_event, payload: unknown) => {
+      const parsed = meetingIdMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.meetingTranscript(parsed.data.meetingId)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiMeetingTranscript,
+        meetingTranscriptResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiNotesRegenerate,
+    async (_event, payload: unknown) => {
+      const parsed = meetingIdMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.regenerateNotes(parsed.data.meetingId)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiNotesRegenerate,
+        regenerateResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiFollowUpDraft,
+    async (_event, payload: unknown) => {
+      const parsed = followUpAskMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.followUpDraft(parsed.data.meetingId, parsed.data.tone)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiFollowUpDraft,
+        followUpResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
   ipcMain.handle(IpcChannel.privacyGetState, () =>
     outbound(
       IpcChannel.privacyGetState,
@@ -345,6 +441,11 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
       IpcChannel.authSignUp,
       IpcChannel.authSignOut,
       IpcChannel.apiGetMe,
+      IpcChannel.apiMeetingsList,
+      IpcChannel.apiMeetingNotes,
+      IpcChannel.apiMeetingTranscript,
+      IpcChannel.apiNotesRegenerate,
+      IpcChannel.apiFollowUpDraft,
       IpcChannel.privacyGetState,
       IpcChannel.privacySetState,
       IpcChannel.liveStart,

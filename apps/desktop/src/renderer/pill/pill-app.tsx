@@ -13,11 +13,12 @@ import {
 } from "./answering-panel";
 import { AUDIO_OFF, type AudioSession } from "./audio-session";
 import { HistoryPanel } from "./history-panel";
+import { NotesView } from "./notes-view";
 import { formatSeconds, PillBar } from "./pill-bar";
 import { TranscriptPanel } from "./transcript-panel";
 import { useLiveSession } from "./use-live-session";
 
-type PillView = "pill" | "history" | "transcript" | "answering";
+type PillView = "pill" | "history" | "notes" | "transcript" | "answering";
 
 /**
  * The pill window's whole surface and its local state machine, mirroring the
@@ -41,6 +42,11 @@ export function PillApp(): JSX.Element {
   const [audio, setAudio] = useState<AudioSession>(AUDIO_OFF);
   const [ask, setAsk] = useState<AskContext | null>(null);
   const [thread, setThread] = useState<readonly ThreadTurn[]>([]);
+  // Which meeting the notes view is unfolded on; null whenever it is closed.
+  const [openMeeting, setOpenMeeting] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
   const { enabled: undetectable, request } = useScreenPrivacy();
   const live = useLiveSession();
   const stageRef = useRef<HTMLDivElement>(null);
@@ -394,6 +400,20 @@ export function PillApp(): JSX.Element {
           <HistoryPanel
             onBack={() => {
               setView("pill");
+            }}
+            onOpenMeeting={(meetingId, title) => {
+              setOpenMeeting({ id: meetingId, title });
+              setView("notes");
+            }}
+          />
+        )}
+        {view === "notes" && openMeeting !== null && (
+          <NotesView
+            meetingId={openMeeting.id}
+            title={openMeeting.title}
+            onBack={() => {
+              setOpenMeeting(null);
+              setView("history");
             }}
           />
         )}

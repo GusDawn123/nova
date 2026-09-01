@@ -6,15 +6,25 @@ import { IpcChannel, type IpcChannelName } from "../main/ipc/channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
+  followUpResultMessageSchema,
   liveActionResultSchema,
   liveSessionEventSchema,
+  meetingNotesResultMessageSchema,
+  meetingsListResultMessageSchema,
+  meetingTranscriptResultMessageSchema,
   meResultMessageSchema,
   privacyStateMessageSchema,
+  regenerateResultMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
+  type FollowUpResultMessage,
   type LiveActionResult,
   type LiveSessionEvent,
+  type MeetingNotesResultMessage,
+  type MeetingsListResultMessage,
+  type MeetingTranscriptResultMessage,
   type MeResultMessage,
   type PrivacyStateMessage,
+  type RegenerateResultMessage,
 } from "../main/ipc/contract";
 
 /**
@@ -48,6 +58,25 @@ export interface NovaBridge {
     listener: (state: AuthState) => void,
   ) => () => void;
   readonly getMe: () => Promise<MeResultMessage>;
+  /**
+   * The meetings/notes read surface — every member is one authed server call
+   * made by main, answered in the same ApiResult vocabulary as `getMe`. The
+   * renderer never sees a token or a URL; it names a meeting and gets a result.
+   */
+  readonly listMeetings: () => Promise<MeetingsListResultMessage>;
+  readonly meetingNotes: (
+    meetingId: string,
+  ) => Promise<MeetingNotesResultMessage>;
+  readonly meetingTranscript: (
+    meetingId: string,
+  ) => Promise<MeetingTranscriptResultMessage>;
+  readonly regenerateNotes: (
+    meetingId: string,
+  ) => Promise<RegenerateResultMessage>;
+  readonly followUpDraft: (
+    meetingId: string,
+    tone: string,
+  ) => Promise<FollowUpResultMessage>;
   /**
    * Undetectability. The renderer only ever ASKS — the flag itself is a
    * main-process act on the windows (docs/DESIGN/desktop-screen-privacy-notes.md),
@@ -176,6 +205,51 @@ const novaBridge: NovaBridge = {
   getMe: async () => {
     const parsed = meResultMessageSchema.safeParse(
       await invoke(IpcChannel.apiGetMe),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  listMeetings: async () => {
+    const parsed = meetingsListResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiMeetingsList),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  meetingNotes: async (meetingId) => {
+    const parsed = meetingNotesResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiMeetingNotes, { meetingId }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  meetingTranscript: async (meetingId) => {
+    const parsed = meetingTranscriptResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiMeetingTranscript, { meetingId }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  regenerateNotes: async (meetingId) => {
+    const parsed = regenerateResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiNotesRegenerate, { meetingId }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  followUpDraft: async (meetingId, tone) => {
+    const parsed = followUpResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiFollowUpDraft, { meetingId, tone }),
     );
     return parsed.success
       ? parsed.data
