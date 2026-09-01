@@ -78,6 +78,13 @@ describe("toListItem", () => {
     expect(item.action_item_count).toBe(2);
   });
 
+  it("the notes' title outranks the row's placeholder title", () => {
+    const item = toListItem(
+      row({ title: "Desktop call", notes: FINAL_NOTES }),
+    );
+    expect(item.title).toBe("Northwind discovery");
+  });
+
   it("yields nulls and a zero count when there are no notes at all", () => {
     const item = toListItem(row());
 

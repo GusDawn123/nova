@@ -23,7 +23,9 @@ export function toListItem(row: MeetingListRow): MeetingListItem {
   const notes = row.notes;
   return {
     id: row.id,
-    title: row.title,
+    // The notes' own title outranks the placeholder the row was created with —
+    // a finished call reads by what it was about, not by when it started.
+    title: notes?.title ?? row.title,
     started_at: row.startedAt,
     ended_at: row.endedAt,
     notes_status: row.notesStatus,
