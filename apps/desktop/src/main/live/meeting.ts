@@ -39,9 +39,13 @@ export async function createMeetingRow(
           // Ask PostgREST to hand back the inserted row — its id IS the result.
           Prefer: "return=representation",
         },
+        // A plain title — the notes pipeline renames the meeting after the
+        // call. `started_at` is stamped here because history's day groups and
+        // durations derive from it; a null start reads as UNDATED forever.
         body: JSON.stringify({
           user_id: deps.userId,
-          title: `Desktop call — ${new Date().toLocaleString()}`,
+          title: "Desktop call",
+          started_at: new Date().toISOString(),
         }),
       },
     );
