@@ -1,13 +1,15 @@
 /*
- * Tab-specific styles for the settings window, transcribed from the ratified
- * mockup. The shared shell/row/toggle vocabulary lives in ../settings.css.
+ * Tab-specific styles for the settings window, geometry transcribed from the
+ * ratified mockup. The shared shell/row/toggle vocabulary lives in
+ * ../settings.css. Paint is the duotone spine — the glass era's accent blues,
+ * greens and reds are gone: state reads through the ink bands, and risk is
+ * said in words, never in a colour (2026-08-02 design spec §11).
  */
 
 /* ---- General: meetings card and footer ---- */
 
 .meetings-card {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border: 1px solid var(--nova-ink-hairline);
   overflow: hidden;
 }
 
@@ -28,12 +30,11 @@
   flex: none;
   width: 46px;
   height: 46px;
-  border-radius: 11px;
-  background: #1b1b1f;
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--nova-ink-soft);
 }
 
 .meetings-card__text {
@@ -45,22 +46,21 @@
 
 .meetings-card__count {
   font: 600 15px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .meetings-card__meter {
   height: 6px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--nova-ink-fill);
 }
 
 .meetings-card__note {
   font: 400 13px var(--sg);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--nova-ink-faint);
 }
 
 .meetings-card__upgrade {
-  background: #1a1a1e;
+  background: var(--nova-ink-fill);
   padding: 16px 22px;
   display: flex;
   align-items: center;
@@ -72,25 +72,25 @@
 }
 
 .meetings-card__upgrade:hover {
-  background: #202026;
+  background: var(--nova-ink-hairline);
 }
 
 .pro-chip {
   flex: none;
-  border: 1.5px solid #2d9fdb;
-  color: #63b8e8;
-  border-radius: 999px;
+  border: 1.5px solid var(--nova-ink);
+  color: var(--nova-ink);
   padding: 5px 15px;
-  font: 600 14px var(--sg);
+  font: 700 13px var(--mono);
+  letter-spacing: 0.08em;
 }
 
 .meetings-card__upgrade-title {
   font: 600 15.5px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .meetings-card__upgrade-arrow {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--nova-ink-soft);
   display: flex;
 }
 
@@ -100,13 +100,13 @@
   gap: 26px;
   margin-top: 26px;
   padding-top: 20px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid var(--nova-ink-hairline);
 }
 
 .general__footer-label {
   flex: 1;
   font: 400 14.5px var(--sg);
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--nova-ink-faint);
 }
 
 .general__footer-action {
@@ -114,7 +114,7 @@
   align-items: center;
   gap: 8px;
   font: 500 14.5px var(--sg);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
   cursor: pointer;
   background: transparent;
   border: none;
@@ -122,7 +122,7 @@
 }
 
 .general__footer-action:hover {
-  color: #fff;
+  color: var(--nova-ink);
 }
 
 /* ---- Modes ---- */
@@ -136,8 +136,8 @@
 .modes__sidebar {
   flex: none;
   width: 340px;
-  background: #121215;
-  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--nova-ink-fill);
+  border-right: 1px solid var(--nova-ink-hairline);
   padding: 18px 16px;
   overflow-y: auto;
   display: flex;
@@ -150,7 +150,6 @@
   align-items: center;
   gap: 14px;
   padding: 13px 14px;
-  border-radius: 12px;
   cursor: pointer;
   background: transparent;
   border: none;
@@ -158,46 +157,46 @@
 }
 
 .modes__item:hover {
-  background: #1b1b1f;
+  background: var(--nova-ink-fill);
 }
 
 .modes__item--selected {
-  background: #1e1e23;
+  background: var(--nova-ink-fill);
+  box-shadow: inset 2px 0 0 var(--nova-ink);
 }
 
 .modes__item--new {
-  background: #12222e;
-  border: 1px solid rgba(45, 159, 219, 0.3);
+  background: transparent;
+  border: 1px solid var(--nova-ink-hairline);
 }
 
 .modes__item--new:hover {
-  background: #12222e;
+  background: var(--nova-ink-fill);
 }
 
 .modes__item-icon {
   flex: none;
   width: 40px;
   height: 40px;
-  border-radius: 10px;
-  background: #232328;
+  background: var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .modes__item--new .modes__item-icon {
-  background: #1c3b50;
-  color: #4db2e8;
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
 }
 
 .modes__item-name {
   font: 600 16px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
 }
 
 .modes__item--new .modes__item-name {
-  color: #4db2e8;
+  color: var(--nova-ink);
 }
 
 .modes__group {
@@ -208,14 +207,16 @@
 }
 
 .modes__group-label {
-  font: 400 13px var(--sg);
-  color: rgba(255, 255, 255, 0.45);
+  font: 700 11px var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--nova-ink-faint);
 }
 
 .modes__group-line {
   flex: 1;
   height: 1px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--nova-ink-hairline);
 }
 
 .modes__detail {
@@ -225,47 +226,55 @@
 }
 
 .modes__detail-title {
-  font: 600 40px var(--sg);
-  color: #fff;
+  font: 700 34px var(--nova-font-display);
+  letter-spacing: 0.03em;
+  color: var(--nova-ink);
   margin: 0 0 22px;
 }
 
 .modes__detail-desc {
   font: 400 19px/1.55 var(--sg);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--nova-ink-soft);
   max-width: 760px;
   text-wrap: pretty;
 }
 
 .modes__footer {
   flex: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--nova-ink-hairline);
   padding: 14px 24px;
   display: flex;
   justify-content: flex-end;
 }
 
 .modes__set-active {
-  font: 600 15px var(--sg);
-  color: #fff;
-  background: #2d9fdb;
-  border: 1px solid transparent;
-  border-radius: 999px;
+  font: 700 15px var(--sg);
+  color: var(--nova-on-ink);
+  background: var(--nova-ink);
+  border: 1px solid var(--nova-ink);
   padding: 11px 26px;
   cursor: pointer;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
 }
 
 .modes__set-active--active {
-  color: #7cc9f0;
-  background: rgba(45, 159, 219, 0.18);
-  border-color: rgba(45, 159, 219, 0.4);
+  color: var(--nova-ink);
+  background: var(--nova-ink-fill);
+  border-color: var(--nova-ink-hairline);
 }
 
 /* ---- Keybinds ---- */
 
 .keys__group {
   font: 600 17px var(--sg);
-  color: #f0f0f2;
+  color: var(--nova-ink);
   margin: 26px 0 4px;
 }
 
@@ -278,24 +287,23 @@
   align-items: center;
   gap: 16px;
   padding: 13px 10px;
-  border-radius: 12px;
   cursor: pointer;
 }
 
 .keys__row:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--nova-ink-fill);
 }
 
 .keys__row-icon {
   flex: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--nova-ink-faint);
   display: flex;
 }
 
 .keys__row-label {
   flex: 1;
   font: 400 15.5px var(--sg);
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--nova-ink);
 }
 
 .keys__chips {
@@ -306,13 +314,13 @@
 .keys__chip {
   min-width: 32px;
   height: 32px;
-  border-radius: 8px;
-  background: #242428;
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 500 14px var(--sg);
-  color: rgba(255, 255, 255, 0.9);
+  font: 700 13px var(--mono);
+  color: var(--nova-ink);
   padding: 0 9px;
 }
 
@@ -329,18 +337,18 @@
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: #1f5e50;
+  background: var(--nova-ink);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 22px var(--sg);
-  color: #fff;
+  font: 700 22px var(--nova-font-display);
+  color: var(--nova-on-ink);
 }
 
 .profile__name {
   flex: 1;
   font: 500 17px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .profile__row {
@@ -351,17 +359,17 @@
 
 .profile__value {
   font: 400 15.5px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .profile__provider {
   font: 500 15.5px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .profile__meta {
   font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .profile__add {
@@ -393,9 +401,8 @@
   flex: none;
   width: 44px;
   height: 30px;
-  border-radius: 5px;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: var(--nova-canvas);
+  border: 1px solid var(--nova-ink-hairline);
   margin-top: 2px;
 }
 
@@ -414,17 +421,20 @@
 
 .device__name {
   font: 600 16px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .device__meta {
   font: 400 14px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
+/* Danger is the WORD "Delete", not a red — underlined so it still reads as
+   the row's one destructive act. */
 .security__delete {
   font: 500 15.5px var(--sg);
-  color: #e0564d;
+  color: var(--nova-ink-soft);
+  text-decoration: underline;
   cursor: pointer;
   background: transparent;
   border: none;
@@ -432,7 +442,7 @@
 }
 
 .security__delete:hover {
-  color: #f07a72;
+  color: var(--nova-ink);
 }
 
 /* ---- Billing ---- */
@@ -444,8 +454,7 @@
 }
 
 .billing__period-box {
-  background: #1a1a1e;
-  border-radius: 999px;
+  background: var(--nova-ink-fill);
   padding: 4px;
   display: flex;
   gap: 2px;
@@ -456,26 +465,24 @@
   align-items: center;
   gap: 9px;
   padding: 8px 18px;
-  border-radius: 999px;
   cursor: pointer;
   font: 500 15px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
   background: transparent;
   border: none;
 }
 
 .billing__period-chip--on {
   font-weight: 600;
-  color: #fff;
-  background: #2e2e35;
+  color: var(--nova-on-ink);
+  background: var(--nova-ink);
 }
 
 .billing__save-badge {
-  background: #cfe0fb;
-  color: #2b62d9;
-  border-radius: 999px;
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
   padding: 3px 11px;
-  font: 600 13px var(--sg);
+  font: 700 12px var(--mono);
 }
 
 .billing__cards {
@@ -484,21 +491,16 @@
   justify-content: center;
 }
 
+/* Plan cards: terminal panels — ink-fill surface, hairline edge. The gradient
+   era is over; Pro stands out by its filled CTA and its POPULAR chip. */
 .plan {
   flex: 1;
   max-width: 470px;
-  border-radius: 20px;
   padding: 28px 30px;
   display: flex;
   flex-direction: column;
-}
-
-.plan--pro {
-  background: linear-gradient(165deg, #9db9f2 0%, #5c7fe6 100%);
-}
-
-.plan--undetect {
-  background: linear-gradient(165deg, #7a7890 0%, #585669 100%);
+  background: var(--nova-ink-fill);
+  border: 1px solid var(--nova-ink-hairline);
 }
 
 .plan__name-row {
@@ -508,16 +510,18 @@
 }
 
 .plan__name {
-  font: 500 17px var(--sg);
-  color: rgba(255, 255, 255, 0.92);
+  font: 700 15px var(--mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nova-ink);
 }
 
 .plan__popular {
-  background: rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
+  background: var(--nova-ink);
   padding: 4px 13px;
-  font: 500 13.5px var(--sg);
-  color: #fff;
+  font: 700 12px var(--mono);
+  letter-spacing: 0.06em;
+  color: var(--nova-on-ink);
 }
 
 .plan__price-row {
@@ -529,28 +533,24 @@
 
 .plan__strike {
   font: 500 22px var(--sg);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--nova-ink-faint);
   text-decoration: line-through;
 }
 
 .plan__price {
-  font: 700 44px var(--sg);
-  color: #fff;
+  font: 900 44px var(--nova-font-display);
+  color: var(--nova-ink);
 }
 
 .plan__cadence {
   font: 400 17px var(--sg);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .plan__divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--nova-ink-hairline);
   margin-bottom: 18px;
-}
-
-.plan--undetect .plan__divider {
-  background: rgba(255, 255, 255, 0.3);
 }
 
 .plan__features {
@@ -565,7 +565,7 @@
   align-items: center;
   gap: 13px;
   font: 400 15.5px var(--sg);
-  color: #fff;
+  color: var(--nova-ink);
 }
 
 .plan__badge {
@@ -573,12 +573,12 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
+  border: 1px solid var(--nova-ink-hairline);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 13px var(--sg);
-  color: #fff;
+  font: 700 12px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 .plan__hero-feature {
@@ -592,12 +592,12 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #3f8fdc;
+  background: var(--nova-ink);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 13px var(--sg);
-  color: #fff;
+  font: 700 12px var(--mono);
+  color: var(--nova-on-ink);
 }
 
 .plan__hero-text {
@@ -608,22 +608,23 @@
 
 .plan__hero-title {
   font: 600 16px var(--sg);
-  color: #fff;
+  color: var(--nova-ink);
 }
 
 .plan__hero-desc {
   font: 400 14.5px/1.4 var(--sg);
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--nova-ink-soft);
 }
 
+/* The art slot keeps its diagonal weave, now drawn in ink bands. */
 .plan__art {
   height: 140px;
-  border-radius: 12px;
   background: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.1) 0 10px,
-    rgba(255, 255, 255, 0.04) 10px 20px
+    var(--nova-ink-fill) 0 10px,
+    transparent 10px 20px
   );
+  border: 1px solid var(--nova-ink-fill);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -631,60 +632,67 @@
 }
 
 .plan__art-label {
-  font: 500 11px var(--mono);
-  color: rgba(255, 255, 255, 0.65);
+  font: 700 11px var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--nova-ink-soft);
 }
 
 .plan__cta {
   margin-top: auto;
-  border-radius: 14px;
   padding: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   cursor: pointer;
-  font: 600 18px var(--sg);
+  font: 700 18px var(--sg);
   border: none;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
 }
 
 .plan--pro .plan__cta {
-  background: #fff;
-  color: #1d2b56;
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
 }
 
 .plan--pro .plan__cta:hover {
-  background: #f0f4ff;
+  background: var(--nova-ink-soft);
 }
 
 .plan--pro .plan__cta-badge {
-  background: #d9e4fb;
-  color: #3763d6;
-  border-radius: 999px;
+  background: var(--nova-ink-fill);
+  color: var(--nova-on-ink);
   padding: 3px 12px;
-  font: 600 13px var(--sg);
+  font: 700 12px var(--mono);
 }
 
 .plan--undetect .plan__cta {
-  background: linear-gradient(90deg, #6b93f2, #4d74e4);
-  color: #fff;
+  background: transparent;
+  border: 1px solid var(--nova-ink);
+  color: var(--nova-ink);
 }
 
 .plan--undetect .plan__cta:hover {
-  filter: brightness(1.08);
+  background: var(--nova-ink-fill);
 }
 
 .plan--undetect .plan__cta-badge {
-  background: rgba(255, 255, 255, 0.22);
-  color: #fff;
-  border-radius: 999px;
+  background: var(--nova-ink-fill);
+  color: var(--nova-ink);
   padding: 3px 12px;
-  font: 600 13px var(--sg);
+  font: 700 12px var(--mono);
 }
 
 .billing__divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--nova-ink-hairline);
   margin: 32px 0 26px;
 }
 
@@ -702,12 +710,12 @@
 
 .billing__free-label {
   font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--nova-ink-faint);
 }
 
 .billing__free-price {
-  font: 600 34px var(--sg);
-  color: #fff;
+  font: 900 34px var(--nova-font-display);
+  color: var(--nova-ink);
 }
 
 .billing__free-grid {
@@ -722,7 +730,7 @@
   align-items: center;
   gap: 13px;
   font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--nova-ink-soft);
 }
 
 .billing__free-badge {
@@ -730,19 +738,18 @@
   width: 26px;
   height: 26px;
   border-radius: 50%;
-  background: #242428;
+  border: 1px solid var(--nova-ink-hairline);
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 12px var(--sg);
-  color: rgba(255, 255, 255, 0.7);
+  font: 700 12px var(--mono);
+  color: var(--nova-ink-soft);
 }
 
 /* ---- About ---- */
 
 .about__release {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border: 1px solid var(--nova-ink-hairline);
   padding: 22px 24px;
   display: flex;
   gap: 18px;
@@ -763,17 +770,17 @@
 
 .about__release-title {
   font: 600 17px var(--sg);
-  color: #f2f2f4;
+  color: var(--nova-ink);
 }
 
 .about__release-date {
-  font: 400 14px var(--sg);
-  color: rgba(255, 255, 255, 0.5);
+  font: 400 14px var(--mono);
+  color: var(--nova-ink-faint);
 }
 
 .about__release-summary {
   font: 400 14.5px/1.5 var(--sg);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--nova-ink-soft);
 }
 
 .about__release-list {
@@ -786,10 +793,10 @@
 
 .about__release-item {
   font: 400 14.5px/1.5 var(--sg);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--nova-ink-soft);
 }
 
 .about__version {
-  font: 400 15px var(--sg);
-  color: rgba(255, 255, 255, 0.6);
+  font: 400 15px var(--mono);
+  color: var(--nova-ink-faint);
 }

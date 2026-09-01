@@ -1,0 +1,70 @@
+/**
+ * The design kit's own paint — everything here draws with theme variables from
+ * `design/theme.ts` and spec numbers only; a literal colour in this file is a
+ * duotone violation (spec §11). Shapes come from the kit components; this file
+ * gives them their ink.
+ */
+
+/* ------------------------------------------------------------------ chamfer */
+
+/* Outer layer IS the stroke: hairline ink, clipped to the cut silhouette. */
+.nova-chamfer {
+  position: relative;
+  background: var(--nova-ink-hairline);
+  padding: 1px;
+}
+
+/* Inner layer is the surface; inset 1px so the outer reads as an outline. */
+.nova-chamfer__fill {
+  background: var(--nova-canvas);
+  width: 100%;
+  height: 100%;
+}
+
+/* Filled (ink) variant — the submit-key look: ink surface, canvas text. */
+.nova-chamfer--filled > .nova-chamfer__fill {
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+}
+
+/* ---------------------------------------------------------------- scanlines */
+
+/* Spec §7: 1px line every 4px at ~5% ink. One gradient, zero DOM per line. */
+.nova-scanlines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--nova-ink) 0,
+    var(--nova-ink) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+  opacity: 0.05;
+}
+
+/* -------------------------------------------------------------- block caret */
+
+/* The machine's write-head: a mono-width block that blinks in steps, and
+   holds steady for readers who asked motion to stop. */
+.nova-caret {
+  display: inline-block;
+  width: 0.6em;
+  height: 1em;
+  background: var(--nova-ink);
+  vertical-align: text-bottom;
+  animation: nova-caret-blink 1.1s steps(1) infinite;
+}
+
+@keyframes nova-caret-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nova-caret {
+    animation: none;
+  }
+}

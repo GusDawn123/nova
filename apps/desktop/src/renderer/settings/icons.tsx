@@ -147,7 +147,7 @@ export function MeetingAlertIcon({ size = 22 }: IconProps): JSX.Element {
     <Svg size={size}>
       <rect x="2.6" y="4.2" width="12" height="12.8" rx="2" />
       <path d="M2.6 8.4h12M6.2 2.4v3M11 2.4v3" />
-      <circle cx="14.6" cy="13.4" r="3.4" fill="#1b1b1f" />
+      <circle cx="14.6" cy="13.4" r="3.4" fill="var(--nova-canvas)" />
       <path d="M14.6 11.9v1.5l1.1.9" />
     </Svg>
   );
