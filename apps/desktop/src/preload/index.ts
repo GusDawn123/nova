@@ -6,6 +6,9 @@ import { IpcChannel, type IpcChannelName } from "../main/ipc/channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
+  contextDocCreateResultMessageSchema,
+  contextDocDeleteResultMessageSchema,
+  contextDocsListResultMessageSchema,
   followUpResultMessageSchema,
   liveActionResultSchema,
   liveSessionEventSchema,
@@ -16,6 +19,9 @@ import {
   privacyStateMessageSchema,
   regenerateResultMessageSchema,
   INVALID_BRIDGE_RESPONSE_MESSAGE,
+  type ContextDocCreateResultMessage,
+  type ContextDocDeleteResultMessage,
+  type ContextDocsListResultMessage,
   type FollowUpResultMessage,
   type LiveActionResult,
   type LiveSessionEvent,
@@ -77,6 +83,15 @@ export interface NovaBridge {
     meetingId: string,
     tone: string,
   ) => Promise<FollowUpResultMessage>;
+  /** The knowledge base: the user's uploaded reference documents. */
+  readonly listContextDocs: () => Promise<ContextDocsListResultMessage>;
+  readonly createContextDoc: (
+    title: string,
+    content: string,
+  ) => Promise<ContextDocCreateResultMessage>;
+  readonly deleteContextDoc: (
+    docId: string,
+  ) => Promise<ContextDocDeleteResultMessage>;
   /**
    * Undetectability. The renderer only ever ASKS — the flag itself is a
    * main-process act on the windows (docs/DESIGN/desktop-screen-privacy-notes.md),
@@ -250,6 +265,33 @@ const novaBridge: NovaBridge = {
   followUpDraft: async (meetingId, tone) => {
     const parsed = followUpResultMessageSchema.safeParse(
       await invoke(IpcChannel.apiFollowUpDraft, { meetingId, tone }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  listContextDocs: async () => {
+    const parsed = contextDocsListResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiContextDocsList),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  createContextDoc: async (title, content) => {
+    const parsed = contextDocCreateResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiContextDocCreate, { title, content }),
+    );
+    return parsed.success
+      ? parsed.data
+      : { ok: false, kind: "schema", message: INVALID_BRIDGE_RESPONSE_MESSAGE };
+  },
+
+  deleteContextDoc: async (docId) => {
+    const parsed = contextDocDeleteResultMessageSchema.safeParse(
+      await invoke(IpcChannel.apiContextDocDelete, { docId }),
     );
     return parsed.success
       ? parsed.data

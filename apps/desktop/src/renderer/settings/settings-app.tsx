@@ -5,7 +5,7 @@ import {
   SETTINGS_CONTENT_DESIGN_HEIGHT,
   SETTINGS_DESIGN_WIDTH,
 } from "../../main/windows/settings-layout";
-import { CalendarIcon } from "../design/icons";
+import { CalendarIcon, DocIcon } from "../design/icons";
 import {
   TabAboutIcon,
   TabBillingIcon,
@@ -21,6 +21,7 @@ import { BillingTab } from "./tabs/billing";
 import { CalendarTab } from "./tabs/calendar";
 import { GeneralTab } from "./tabs/general";
 import { KeybindsTab } from "./tabs/keybinds";
+import { KnowledgeTab } from "./tabs/knowledge";
 import { ModesTab } from "./tabs/modes";
 import { NotificationsTab } from "./tabs/notifications";
 import { ProfileTab } from "./tabs/profile";
@@ -32,6 +33,7 @@ type TabId =
   | "notifications"
   | "modes"
   | "keybinds"
+  | "knowledge"
   | "profile"
   | "security"
   | "billing"
@@ -47,6 +49,7 @@ const TABS: readonly { id: TabId; name: string; icon: ReactNode }[] = [
   },
   { id: "modes", name: "Modes", icon: <TabModesIcon /> },
   { id: "keybinds", name: "Keybinds", icon: <TabKeybindsIcon /> },
+  { id: "knowledge", name: "Knowledge", icon: <DocIcon size={20} /> },
   { id: "profile", name: "Profile", icon: <TabProfileIcon /> },
   { id: "security", name: "Security", icon: <TabSecurityIcon /> },
   { id: "billing", name: "Billing", icon: <TabBillingIcon /> },
@@ -59,6 +62,7 @@ const PANES: Record<TabId, () => JSX.Element> = {
   notifications: NotificationsTab,
   modes: ModesTab,
   keybinds: KeybindsTab,
+  knowledge: KnowledgeTab,
   profile: ProfileTab,
   security: SecurityTab,
   billing: BillingTab,

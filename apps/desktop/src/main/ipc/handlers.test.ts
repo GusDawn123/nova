@@ -162,6 +162,19 @@ function register(overrides: Partial<AuthService> = {}): Stubs {
         kind: "server",
         message: "not under test",
       }),
+      listContextDocs: vi
+        .fn()
+        .mockResolvedValue({ ok: true, data: { docs: [] } }),
+      createContextDoc: vi.fn().mockResolvedValue({
+        ok: false,
+        kind: "server",
+        message: "not under test",
+      }),
+      deleteContextDoc: vi.fn().mockResolvedValue({
+        ok: false,
+        kind: "server",
+        message: "not under test",
+      }),
       followUpDraft: vi.fn().mockResolvedValue({
         ok: false,
         kind: "server",
@@ -457,7 +470,7 @@ describe("teardown", () => {
     // Ten request/response channels. Leaving one behind would make a second
     // `registerIpcHandlers` throw on a duplicate handler, which is exactly what
     // a window reopening on macOS would do.
-    expect(registered).toHaveLength(15);
+    expect(registered).toHaveLength(18);
     // Copied before sorting â€” `toSorted` is ES2023 and the lib target is ES2022.
     expect([...removedChannels].sort()).toEqual([...registered].sort());
     expect(handlers.size).toBe(0);

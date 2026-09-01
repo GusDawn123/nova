@@ -1,11 +1,18 @@
 import { z } from "zod";
 import {
+  contextDocsListResponseSchema,
+  createContextDocResponseSchema,
+  deleteContextDocResponseSchema,
   followUpDraftSchema,
   meetingListResponseSchema,
   meetingTranscriptResponseSchema,
   meResponseSchema,
   notesReadResponseSchema,
   regenerateResponseSchema,
+  type ContextDocsListResponse,
+  type CreateContextDocRequest,
+  type CreateContextDocResponse,
+  type DeleteContextDocResponse,
   type FollowUpDraft,
   type FollowUpTone,
   type MeetingListResponse,
@@ -71,6 +78,11 @@ export interface ApiClient {
     meetingId: string,
     tone: FollowUpTone,
   ): Promise<ApiResult<FollowUpDraft>>;
+  listContextDocs(): Promise<ApiResult<ContextDocsListResponse>>;
+  createContextDoc(
+    doc: CreateContextDocRequest,
+  ): Promise<ApiResult<CreateContextDocResponse>>;
+  deleteContextDoc(docId: string): Promise<ApiResult<DeleteContextDocResponse>>;
 }
 
 /** The mobile app settled on the same budget for its list fetches. */
@@ -93,7 +105,7 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
   const baseUrl = deps.baseUrl.replace(/\/+$/, "");
 
   interface RequestOptions {
-    method?: "POST";
+    method?: "POST" | "DELETE";
     body?: unknown;
     /**
      * Route-specific words for statuses the generic table would flatten into
@@ -264,6 +276,22 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
             503: "Follow-up drafting is not available right now.",
           },
         },
+      ),
+    listContextDocs: () =>
+      request("/context-docs", contextDocsListResponseSchema),
+    createContextDoc: (doc) =>
+      request("/context-docs", createContextDocResponseSchema, {
+        method: "POST",
+        body: doc,
+        statusMessages: {
+          409: "You have reached the knowledge base's document limit.",
+        },
+      }),
+    deleteContextDoc: (docId) =>
+      request(
+        `/context-docs/${encodeURIComponent(docId)}`,
+        deleteContextDocResponseSchema,
+        { method: "DELETE" },
       ),
   };
 }

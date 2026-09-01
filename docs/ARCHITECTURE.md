@@ -405,6 +405,18 @@ hero — design spec `DESIGN/notes-pipeline.md`, decisions `DECISIONS/adr-0006-n
   `POST /meetings/:id/follow-up` (200 persisted draft | 409 `notes_not_ready` | 503
   `provider_unavailable` on transport failure — synchronous, one small call). Wire schemas in
   `packages/shared/src/notes.ts` (versioned `meetingNotesSchema`, follow-up + response shapes).
+- **Knowledge base REST** (`modules/context-docs/routes.ts`, `db/context-docs.ts`) — the
+  user's reference documents, uploaded so RAG grounding can draw on their material. Authed
+  surface (all `requireAuth`, user-scoped, uniform 404): `GET /context-docs`,
+  `POST /context-docs` (200; 409 `doc_limit` at 50 docs; content ≤200k chars), and
+  `DELETE /context-docs/:id`. Rows are the source of truth and always save; indexing is
+  best-effort THROUGH `RagService.ingest` (the `context_doc` arm the union always had) and a
+  failure downgrades the answer to `indexed: false` plus a sentence — never a silent
+  half-success. Delete retires the chunks first (ingest with empty content — the store's
+  idempotent replace), then soft-deletes the row. `context_docs.indexed_at` (migration
+  20260831093000) is the searchability stamp; every embed rides the metered Voyage sink, so
+  the no-unmetered-path rule holds. Wire schemas in `packages/shared/src/context-docs.ts`;
+  the desktop's Settings → Knowledge tab is the surface.
 - **Stale-call reaper** (`db/stale-call-reaper.ts`) — stamps `ended_at` on crashed-mid-call
   orphans (~6h, config), feeding BOTH the RAG indexer and the notes queue — closes the Phase 4
   crash-orphan opener.

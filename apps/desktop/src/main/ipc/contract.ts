@@ -1,5 +1,9 @@
 import { z } from "zod";
 import {
+  contextDocsListResponseSchema,
+  createContextDocRequestSchema,
+  createContextDocResponseSchema,
+  deleteContextDocResponseSchema,
   followUpDraftSchema,
   followUpToneSchema,
   liveModeSchema,
@@ -126,6 +130,40 @@ export type RegenerateResultMessage = z.infer<
 
 export const followUpResultMessageSchema = apiResultMessage(followUpDraftSchema);
 export type FollowUpResultMessage = z.infer<typeof followUpResultMessageSchema>;
+
+/** renderer → main: a knowledge-base upload — the shared request shape, reused. */
+export const contextDocCreateMessageSchema = createContextDocRequestSchema;
+export type ContextDocCreateMessage = z.infer<
+  typeof contextDocCreateMessageSchema
+>;
+
+/** renderer → main: which knowledge-base doc a delete is about. */
+export const contextDocIdMessageSchema = z
+  .object({ docId: z.string().uuid() })
+  .strict();
+export type ContextDocIdMessage = z.infer<typeof contextDocIdMessageSchema>;
+
+/** main → renderer: the knowledge-base answers. */
+export const contextDocsListResultMessageSchema = apiResultMessage(
+  contextDocsListResponseSchema,
+);
+export type ContextDocsListResultMessage = z.infer<
+  typeof contextDocsListResultMessageSchema
+>;
+
+export const contextDocCreateResultMessageSchema = apiResultMessage(
+  createContextDocResponseSchema,
+);
+export type ContextDocCreateResultMessage = z.infer<
+  typeof contextDocCreateResultMessageSchema
+>;
+
+export const contextDocDeleteResultMessageSchema = apiResultMessage(
+  deleteContextDocResponseSchema,
+);
+export type ContextDocDeleteResultMessage = z.infer<
+  typeof contextDocDeleteResultMessageSchema
+>;
 
 /**
  * Both directions of the undetectability toggle. One boolean, strict both

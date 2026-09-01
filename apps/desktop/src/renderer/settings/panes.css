@@ -800,3 +800,128 @@
   font: 400 15px var(--mono);
   color: var(--nova-ink-faint);
 }
+
+
+/* ---- Knowledge (the user's reference documents) ---- */
+
+.kb__composer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-ink-fill);
+  padding: 18px 20px;
+  margin-top: 10px;
+}
+
+.kb__title {
+  border: 1px solid var(--nova-ink-hairline);
+  background: transparent;
+  color: var(--nova-ink);
+  font: 400 14.5px var(--sg);
+  padding: 10px 12px;
+}
+
+.kb__title::placeholder,
+.kb__content::placeholder {
+  color: var(--nova-ink-faint);
+}
+
+.kb__content {
+  border: 1px solid var(--nova-ink-hairline);
+  background: transparent;
+  color: var(--nova-ink);
+  font: 400 13.5px/1.5 var(--mono);
+  padding: 10px 12px;
+  min-height: 120px;
+  resize: vertical;
+}
+
+.kb__composer-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.kb__upload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--nova-ink);
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+  font: 700 14px var(--sg);
+  padding: 11px 20px;
+  cursor: pointer;
+  clip-path: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+}
+
+.kb__upload:disabled {
+  background: var(--nova-ink-fill);
+  border-color: transparent;
+  color: var(--nova-ink-faint);
+  cursor: default;
+}
+
+.kb__note {
+  margin: 8px 0 0;
+  font: 400 13.5px/1.5 var(--sg);
+  color: var(--nova-ink-soft);
+}
+
+.kb__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 13px 4px;
+  border-bottom: 1px solid var(--nova-ink-fill);
+}
+
+.kb__row-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kb__row-title {
+  font: 600 15.5px var(--sg);
+  color: var(--nova-ink);
+}
+
+.kb__row-meta {
+  font: 700 10.5px var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--nova-ink-faint);
+}
+
+/* Danger is the word, not a colour (spec section 11). */
+.kb__delete {
+  font: 500 14.5px var(--sg);
+  color: var(--nova-ink-soft);
+  text-decoration: underline;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.kb__delete:hover {
+  color: var(--nova-ink);
+}
+
+/* The real input stays reachable by assistive tech; only its box is removed. */
+.visually-hidden-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
