@@ -54,10 +54,11 @@ body {
 
 /* ---- the pill itself ---- */
 
-/* A solid terminal panel: canvas surface, hairline edge, square corners. */
+/* A translucent terminal panel — the meeting shows through the glass.
+   Menus and floats stay solid canvas: content scrolls under THEM. */
 .pill {
   overflow: hidden;
-  background: var(--nova-canvas);
+  background: var(--nova-canvas-glass);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
@@ -874,7 +875,7 @@ body {
 
 .history {
   overflow: hidden;
-  background: var(--nova-canvas);
+  background: var(--nova-canvas-glass);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
@@ -944,12 +945,21 @@ body {
   margin-top: 8px;
 }
 
+/* Rows are <button>s — without this reset the user-agent's grey buttonface
+   paints under the ink and every row reads as a disabled slab. */
 .history__row {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 12px 14px;
   cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+}
+
+.history__row:hover {
+  background: var(--nova-ink-fill);
 }
 
 .history__row:hover {
@@ -1059,7 +1069,7 @@ body {
 
 .panel {
   overflow: hidden;
-  background: var(--nova-canvas);
+  background: var(--nova-canvas-glass);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }

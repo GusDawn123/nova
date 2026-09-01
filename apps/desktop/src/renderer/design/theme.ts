@@ -1,6 +1,6 @@
 import {
-  cobaltPalette,
   FontSize,
+  paperPalette,
   Radius,
   Size,
   Space,
@@ -36,10 +36,26 @@ function px(value: number): string {
   return `${String(value)}px`;
 }
 
+/**
+ * `#RRGGBB` at an opacity. Derived HERE, not in tokens — tokens.ts is shared
+ * verbatim with mobile, and glass is this window's own idea (an Electron
+ * transparent-window overlay showing the meeting through itself).
+ */
+function rgba(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${String(r)},${String(g)},${String(b)},${String(alpha)})`;
+}
+
+/** The pill's translucency — high enough that ink stays past the contrast floor. */
+const GLASS_ALPHA = 0.86;
+
 /** Every token this UI paints with, as CSS custom properties. */
 export function themeVariables(palette: Palette): Record<string, string> {
   return {
     "--nova-canvas": palette.canvas,
+    "--nova-canvas-glass": rgba(palette.canvas, GLASS_ALPHA),
     "--nova-ink": palette.ink,
     "--nova-ink-soft": palette.inkSoft,
     "--nova-ink-faint": palette.inkFaint,
@@ -78,13 +94,13 @@ export function themeVariables(palette: Palette): Record<string, string> {
 }
 
 /**
- * Paint a palette onto the document. Cobalt by default — the mirror (`paper`) is
- * chosen in Account on mobile, and this app has no Account yet, so there is
- * nothing here that could ask for it.
+ * Paint a palette onto the document. Paper by default — Gustavo's 2026-08-31
+ * call: the desktop wears the white-with-blue mirror, cobalt stays one
+ * argument away.
  */
 export function applyTheme(
   root: HTMLElement,
-  palette: Palette = cobaltPalette,
+  palette: Palette = paperPalette,
 ): void {
   for (const [name, value] of Object.entries(themeVariables(palette))) {
     root.style.setProperty(name, value);
