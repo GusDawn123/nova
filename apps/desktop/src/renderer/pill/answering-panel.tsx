@@ -52,6 +52,8 @@ interface AnsweringPanelProps {
   readonly onOpenModes: () => void;
   readonly onOpenTranscript: () => void;
   readonly onNewChat: () => void;
+  /** Tab (and the chip) hand the keyboard to the pill's ask field. */
+  readonly onFocusAsk: () => void;
   readonly onBack: () => void;
 }
 
@@ -174,6 +176,22 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
     };
   }, []);
 
+  // The chip promises Tab. That outranks in-panel Tab cycling (the 2026-08-22
+  // worry): every control here is mouse-reachable, the ask field is not.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== "Tab") {
+        return;
+      }
+      event.preventDefault();
+      props.onFocusAsk();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [props.onFocusAsk]);
+
   return (
     <div className="panel">
       <div className="panel__head">
@@ -185,7 +203,12 @@ export function AnsweringPanel(props: AnsweringPanelProps): JSX.Element {
         >
           <BackIcon />
         </button>
-        <span className="pill__tab-hint">
+        <span
+          className="pill__tab-hint nd"
+          onClick={props.onFocusAsk}
+          role="button"
+          tabIndex={-1}
+        >
           <span className="pill__tab-chip">Tab</span>
           <span className="pill__tab-label">to focus</span>
         </span>

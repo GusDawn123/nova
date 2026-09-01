@@ -54,10 +54,11 @@ body {
 
 /* ---- the pill itself ---- */
 
-/* A solid terminal panel: canvas surface, hairline edge, square corners. */
+/* A translucent terminal panel — the meeting shows through the glass.
+   Menus and floats stay solid canvas: content scrolls under THEM. */
 .pill {
   overflow: hidden;
-  background: var(--nova-canvas);
+  background: var(--nova-canvas-glass);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }
@@ -81,6 +82,25 @@ body {
   align-items: center;
   gap: 8px;
   cursor: text;
+}
+
+/* The bar's status line — a session's end reason, a refused ask. Click = gone. */
+.pill__notice {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  border-top: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-ink-fill);
+  color: var(--nova-ink-soft);
+  font: 400 11px var(--mono);
+  letter-spacing: 0.04em;
+  padding: 7px 16px;
+  cursor: pointer;
+}
+
+.pill__notice:hover {
+  color: var(--nova-ink);
 }
 
 .pill__tab-chip {
@@ -853,6 +873,8 @@ body {
 
 /* ---- the history panel ---- */
 
+/* Solid, unlike the pill's glass: this is a reading surface, not an overlay
+   (Gustavo, 2026-08-31). */
 .history {
   overflow: hidden;
   background: var(--nova-canvas);
@@ -910,6 +932,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 13px;
+  /* Cap comes from the panel (screen-derived); past it the list scrolls
+     inside itself instead of growing the window down the monitor. */
+  overflow-y: auto;
 }
 
 .history__label {
@@ -925,12 +950,21 @@ body {
   margin-top: 8px;
 }
 
+/* Rows are <button>s — without this reset the user-agent's grey buttonface
+   paints under the ink and every row reads as a disabled slab. */
 .history__row {
   display: flex;
   align-items: center;
   gap: 14px;
   padding: 12px 14px;
   cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+}
+
+.history__row:hover {
+  background: var(--nova-ink-fill);
 }
 
 .history__row:hover {
@@ -1040,7 +1074,7 @@ body {
 
 .panel {
   overflow: hidden;
-  background: var(--nova-canvas);
+  background: var(--nova-canvas-glass);
   border: 1px solid var(--nova-ink-hairline);
   -webkit-app-region: drag;
 }

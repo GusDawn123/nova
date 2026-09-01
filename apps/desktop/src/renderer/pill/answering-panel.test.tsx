@@ -66,6 +66,7 @@ function renderPanel(overrides?: {
   error?: string | null;
   thread?: readonly ThreadTurn[];
   onNewChat?: () => void;
+  onFocusAsk?: () => void;
   onBack?: () => void;
 }) {
   return render(
@@ -84,6 +85,7 @@ function renderPanel(overrides?: {
       onOpenModes={() => undefined}
       onOpenTranscript={() => undefined}
       onNewChat={overrides?.onNewChat ?? (() => undefined)}
+      onFocusAsk={overrides?.onFocusAsk ?? (() => undefined)}
       onBack={overrides?.onBack ?? (() => undefined)}
     />,
   );
@@ -147,6 +149,14 @@ describe("AnsweringPanel", () => {
     });
     expect(screen.getByText("…")).toBeTruthy();
     expect(container.querySelector(".answer__caption")).toBeNull();
+  });
+
+  it("Tab and the chip both hand focus to the ask field", () => {
+    const onFocusAsk = vi.fn();
+    renderPanel({ onFocusAsk });
+    fireEvent.keyDown(window, { key: "Tab" });
+    fireEvent.click(screen.getByText("to focus"));
+    expect(onFocusAsk).toHaveBeenCalledTimes(2);
   });
 
   it("shows the thinking hint before the stream starts, then flips on done", () => {

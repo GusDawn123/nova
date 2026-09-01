@@ -39,11 +39,11 @@ export async function openLoginWindow(
     resizable: false,
     show: false,
     title: "Nova",
-    backgroundColor: "#0002DA",
+    backgroundColor: "#FFFFFF",
     titleBarStyle: "hidden",
     titleBarOverlay: {
-      color: "#0002DA",
-      symbolColor: "#FFFFFF",
+      color: "#FFFFFF",
+      symbolColor: "#0002DA",
       height: SETTINGS_TITLE_BAR_HEIGHT,
     },
     webPreferences: {

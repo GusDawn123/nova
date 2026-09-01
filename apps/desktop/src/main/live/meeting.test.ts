@@ -36,7 +36,11 @@ describe("createMeetingRow", () => {
     if (typeof init?.body !== "string")
       throw new Error("expected a string body");
     const body: unknown = JSON.parse(init.body);
-    expect(body).toMatchObject({ user_id: "user-1" });
+    expect(body).toMatchObject({ user_id: "user-1", title: "Desktop call" });
+    // The row is born started: history groups and durations hang off this.
+    const started = (body as { started_at?: string }).started_at;
+    expect(typeof started).toBe("string");
+    expect(Number.isNaN(Date.parse(started ?? ""))).toBe(false);
   });
 
   it("fails typed on a non-OK response", async () => {

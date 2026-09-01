@@ -13,6 +13,7 @@ import {
 } from "./answering-panel";
 import { AUDIO_OFF, type AudioSession } from "./audio-session";
 import { HistoryPanel } from "./history-panel";
+import { ASK_NEEDS_SESSION, sessionEndNotice } from "./live-notice";
 import { NotesView } from "./notes-view";
 import { formatSeconds, PillBar } from "./pill-bar";
 import { TranscriptPanel } from "./transcript-panel";
@@ -40,6 +41,9 @@ export function PillApp(): JSX.Element {
     return isNovaModelId(saved) ? saved : "gpt";
   });
   const [audio, setAudio] = useState<AudioSession>(AUDIO_OFF);
+  // The bar's status line: why the session stopped, why an ask was refused.
+  const [notice, setNotice] = useState<string | null>(null);
+  const userStopped = useRef(false);
   const [ask, setAsk] = useState<AskContext | null>(null);
   const [thread, setThread] = useState<readonly ThreadTurn[]>([]);
   // Which meeting the notes view is unfolded on; null whenever it is closed.
@@ -63,6 +67,10 @@ export function PillApp(): JSX.Element {
   useEffect(() => {
     if (live.state === "error" || live.state === "ended") {
       setAudio(AUDIO_OFF);
+      // Dying on the bar without a word looked like the pill "turning itself
+      // off" (live repro 2026-08-31) — the reason must reach the resting face,
+      // not just the transcript panel nobody had open.
+      setNotice(sessionEndNotice(live.state, live.message, userStopped.current));
     }
     // A fresh call is a fresh chat: nothing from the previous call may leak
     // into it (Gustavo, 2026-08-17) — same boundary the transcript keeps.
@@ -70,7 +78,7 @@ export function PillApp(): JSX.Element {
       setThread([]);
       setAsk(null);
     }
-  }, [live.state]);
+  }, [live.state, live.message]);
 
   // Tab summons the ask field, exactly like the mockup — while this window has
   // OS focus. A global hotkey that works with the meeting app frontmost is
@@ -165,7 +173,10 @@ export function PillApp(): JSX.Element {
   // pill into the answering panel while the stream arrives.
   const askNova = (text: string | null): void => {
     if (live.state !== "live") {
-      return; // asks only mean something mid-call (pre-call asks are M5)
+      // Asks only mean something mid-call (pre-call asks are M5) — but the
+      // refusal must be words on the bar, never a swallowed Enter.
+      setNotice(ASK_NEEDS_SESSION);
+      return;
     }
     const lastTs = live.rows.at(-1)?.tsMs;
     // The finished Q/A joins the thread before the pane is cleared for the
@@ -253,8 +264,7 @@ export function PillApp(): JSX.Element {
   }, [view, live.state, live.rows]);
 
   // Escape leaves the answering panel for the pill with the ask field open.
-  // NOT Tab: the panel has focusable controls (Back, footer, New Chat), and
-  // stealing Tab would make every one of them unreachable by keyboard.
+  // (Tab does the same from inside the panel — its own chip promises it.)
   useEffect(() => {
     if (view !== "answering") {
       return;
@@ -278,11 +288,14 @@ export function PillApp(): JSX.Element {
     setAudio((current) => ({ ...current, paused }));
   };
   const stopAudio = (): void => {
+    userStopped.current = true;
     void window.novaBridge.stopLiveSession();
     setAudio(AUDIO_OFF);
     setView("pill");
   };
   const startAudio = (): void => {
+    userStopped.current = false;
+    setNotice(null);
     setAudio({ on: true, paused: false, seconds: 0 });
     void (async (): Promise<void> => {
       try {
@@ -320,6 +333,10 @@ export function PillApp(): JSX.Element {
         {view === "pill" && (
           <PillBar
             focusMode={focusMode}
+            notice={notice}
+            onDismissNotice={() => {
+              setNotice(null);
+            }}
             onFocusAsk={() => {
               setFocusMode(true);
             }}
@@ -391,6 +408,10 @@ export function PillApp(): JSX.Element {
               setView("transcript");
             }}
             onNewChat={newChat}
+            onFocusAsk={() => {
+              setView("pill");
+              setFocusMode(true);
+            }}
             onBack={() => {
               setView("pill");
             }}
@@ -423,6 +444,10 @@ export function PillApp(): JSX.Element {
             live={live}
             onTogglePause={togglePause}
             onStopAudio={stopAudio}
+            onFocusAsk={() => {
+              setView("pill");
+              setFocusMode(true);
+            }}
             onBack={() => {
               setView("pill");
             }}

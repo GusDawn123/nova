@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import { useState, type JSX } from "react";
 
 import novaLogo from "../assets/nova-logo-transparent.png";
 import {
@@ -25,11 +25,17 @@ interface HistoryPanelProps {
  * words on the same rows the data would occupy; the calendar row and the
  * footer chrome keep their mockup role until their features land.
  */
+/** The list's growth cap — half the screen, same as the transcript panel. */
+function historyMaxHeight(): number {
+  return Math.max(320, Math.round(window.screen.height / 2));
+}
+
 export function HistoryPanel({
   onBack,
   onOpenMeeting,
 }: HistoryPanelProps): JSX.Element {
   const { state, reload } = useMeetings();
+  const [maxHeight] = useState(historyMaxHeight);
 
   return (
     <div className="history">
@@ -48,7 +54,7 @@ export function HistoryPanel({
         </span>
       </div>
 
-      <div className="history__body">
+      <div className="history__body" style={{ maxHeight }}>
         <span className="history__label">
           UPCOMING
           <button
