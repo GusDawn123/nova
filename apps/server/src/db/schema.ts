@@ -20,6 +20,23 @@ export const smokeRowSchema = z.object({
 export type SmokeRow = z.infer<typeof smokeRowSchema>;
 
 /**
+ * Runtime shape of a `context_docs` row — the knowledge base's source of truth.
+ * `indexed_at` is the searchability stamp (NULL = chunks not written yet);
+ * `deleted_at` is the soft-delete column (RULES §3).
+ */
+export const contextDocRowSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  title: z.string(),
+  content: z.string(),
+  created_at: z.string(),
+  indexed_at: z.string().nullable(),
+  deleted_at: z.string().nullable(),
+});
+
+export type ContextDocDbRow = z.infer<typeof contextDocRowSchema>;
+
+/**
  * Runtime shape of a `deletion_requests` row, validated on every read. `processed_at`
  * is the pending-vs-done lifecycle marker (NULL = pending) — not a soft-delete column.
  */
@@ -210,6 +227,20 @@ export interface Database {
           created_at?: string;
           deleted_at?: string | null;
         };
+        Relationships: [];
+      };
+      context_docs: {
+        Row: ContextDocDbRow;
+        Insert: {
+          user_id: string;
+          title: string;
+          content: string;
+          id?: string;
+          created_at?: string;
+          indexed_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Update: Partial<ContextDocDbRow>;
         Relationships: [];
       };
       deletion_requests: {

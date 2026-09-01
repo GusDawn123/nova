@@ -16,6 +16,7 @@ import {
 
 import { queueAccountDeletion } from "./db/account.js";
 import { isSupabaseConfigured, SupabaseConfigError } from "./db/client.js";
+import { createContextDocsStore } from "./db/context-docs.js";
 import { isJobStoreConfigured, notesJobStoreFromEnv } from "./db/jobs.js";
 import { createMeetingsReader } from "./db/meetings.js";
 import { createNoteItemStateStore } from "./db/note-item-state.js";
@@ -40,6 +41,7 @@ import {
   maybeRegisterRevenueCatRoutes,
   voyageMeteringSink,
 } from "./metering-wiring.js";
+import { createContextDocsRoutes } from "./modules/context-docs/routes.js";
 import { liveRoutes } from "./modules/live/routes.js";
 import {
   AllProvidersFailedError,
@@ -167,6 +169,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   // Meetings read surface (list + transcript). Gated on the DB ALONE — unlike the
   // notes routes these call no provider, so they mount on a keyless boot too.
   maybeRegisterMeetingsRoutes(app);
+
+  // Knowledge base (context docs list/upload/delete). Rows gate on Supabase alone;
+  // the RAG half rides only when an embedder is configured — an upload on a
+  // keyless boot still saves and honestly answers "not searchable yet".
+  maybeRegisterContextDocsRoutes(app, metering);
 
   // RevenueCat webhook (adr-0007 §7): server-to-server plan sync, registered
   // ONLY when REVENUECAT_WEBHOOK_TOKEN (+ the DB) is configured.
@@ -416,6 +423,39 @@ function maybeStartNotesWorker(
  * {@link maybeRegisterNotesRoutes} they mount on a fully keyless boot. A DB-less
  * boot still omits them rather than mounting routes that would 500 on first use.
  */
+/**
+ * Knowledge-base surface. Rows need only the supabase-js seam; making a doc
+ * SEARCHABLE additionally needs the embedder + the ledger (the same trio the
+ * indexer requires — every Voyage call is metered through the same sink, so
+ * the static audit's no-unmetered-path rule holds here too). Without them the
+ * routes still mount and uploads save unindexed, saying so in words.
+ */
+function maybeRegisterContextDocsRoutes(
+  app: FastifyInstance,
+  metering: MeteringService | undefined,
+): void {
+  if (!isSupabaseConfigured(process.env)) return;
+
+  const env = process.env;
+  const ragConfigured =
+    Boolean(env.VOYAGE_API_KEY) && Boolean(env.SUPABASE_DB_URL);
+  const rag =
+    ragConfigured && metering !== undefined
+      ? createRagFromEnv(env, {
+          logger: app.log,
+          logUsage: voyageMeteringSink(metering, app),
+        })
+      : null;
+
+  void app.register(
+    createContextDocsRoutes({
+      store: createContextDocsStore(),
+      rag,
+      logger: app.log,
+    }),
+  );
+}
+
 function maybeRegisterMeetingsRoutes(app: FastifyInstance): void {
   if (!isSupabaseConfigured(process.env)) return;
 

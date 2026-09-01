@@ -43,6 +43,21 @@ export {
   type MeetingTranscriptTurn,
 } from "./meetings.js";
 export {
+  contextDocItemSchema,
+  contextDocsListResponseSchema,
+  createContextDocRequestSchema,
+  createContextDocResponseSchema,
+  deleteContextDocResponseSchema,
+  CONTEXT_DOC_MAX_CHARS,
+  CONTEXT_DOC_MAX_COUNT,
+  CONTEXT_DOC_TITLE_MAX,
+  type ContextDocItem,
+  type ContextDocsListResponse,
+  type CreateContextDocRequest,
+  type CreateContextDocResponse,
+  type DeleteContextDocResponse,
+} from "./context-docs.js";
+export {
   meResponseSchema,
   roleSchema,
   type MeResponse,

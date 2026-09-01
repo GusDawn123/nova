@@ -10,6 +10,11 @@ import { IpcChannel } from "./channels";
 import {
   authResultMessageSchema,
   authStateMessageSchema,
+  contextDocCreateMessageSchema,
+  contextDocCreateResultMessageSchema,
+  contextDocDeleteResultMessageSchema,
+  contextDocIdMessageSchema,
+  contextDocsListResultMessageSchema,
   credentialsSchema,
   followUpAskMessageSchema,
   followUpResultMessageSchema,
@@ -309,6 +314,47 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
     },
   );
 
+  ipcMain.handle(IpcChannel.apiContextDocsList, async () =>
+    outbound(
+      IpcChannel.apiContextDocsList,
+      contextDocsListResultMessageSchema,
+      await api.listContextDocs(),
+      OFF_CONTRACT_API_RESULT,
+    ),
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiContextDocCreate,
+    async (_event, payload: unknown) => {
+      const parsed = contextDocCreateMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.createContextDoc(parsed.data)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiContextDocCreate,
+        contextDocCreateResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
+  ipcMain.handle(
+    IpcChannel.apiContextDocDelete,
+    async (_event, payload: unknown) => {
+      const parsed = contextDocIdMessageSchema.safeParse(payload);
+      const result = parsed.success
+        ? await api.deleteContextDoc(parsed.data.docId)
+        : INVALID_MEETING_ASK;
+      return outbound(
+        IpcChannel.apiContextDocDelete,
+        contextDocDeleteResultMessageSchema,
+        result,
+        OFF_CONTRACT_API_RESULT,
+      );
+    },
+  );
+
   ipcMain.handle(IpcChannel.privacyGetState, () =>
     outbound(
       IpcChannel.privacyGetState,
@@ -446,6 +492,9 @@ export function registerIpcHandlers(deps: IpcDeps): () => void {
       IpcChannel.apiMeetingTranscript,
       IpcChannel.apiNotesRegenerate,
       IpcChannel.apiFollowUpDraft,
+      IpcChannel.apiContextDocsList,
+      IpcChannel.apiContextDocCreate,
+      IpcChannel.apiContextDocDelete,
       IpcChannel.privacyGetState,
       IpcChannel.privacySetState,
       IpcChannel.liveStart,

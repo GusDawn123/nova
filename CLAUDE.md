@@ -4,6 +4,18 @@ Guidance for AI coding agents working in this repo.
 
 ## What this is
 
+**Desktop status (2026-08-31): the duotone reskin + notes + knowledge base landed on
+`dev-desktop-duotone` → `dev-desktop-notes` → `dev-desktop-knowledge` (stacked off
+`dev-nova-prompt-stack`).** The desktop windows now paint entirely from the shared duotone
+tokens (Orbitron/Inter/Space Mono bundled, chamfer cuts on actionables, no glass, geometry
+byte-identical — the reskin touched paint only). The pill's history panel is REAL
+(`GET /meetings` through five new IPC channels) and opens a notes view (notes / lazy
+transcript / tone-picked follow-up, polling while the server folds). Settings gained a
+Knowledge tab over the new `context-docs` REST surface — uploads always save, indexing is
+best-effort through `RagService.ingest`'s existing `context_doc` arm with `indexed_at` as
+the stamp (migration 20260831093000), and every embed is metered.
+
+
 **Nova** — a mobile AI call copilot. Phone mic (speakerphone/acoustic capture) →
 streaming STT with diarization → live text suggestions + post-call structured notes,
 grounded in per-user RAG memory. Company-held API keys; users pay subscription.
