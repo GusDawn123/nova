@@ -18,6 +18,7 @@ import {
  */
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
+const MEETING_ID = "22222222-2222-4222-8222-222222222222";
 const BASE_URL = "http://127.0.0.1:3000";
 
 function jsonFetch(status: number, body: unknown): typeof globalThis.fetch {
@@ -225,5 +226,61 @@ describe("getMe", () => {
     const serialized = JSON.stringify(logged);
     expect(serialized).not.toContain("not-a-uuid");
     expect(serialized).not.toContain("leak@nova.test");
+  });
+});
+
+describe("the meetings surface", () => {
+  it("lists meetings from GET /meetings", async () => {
+    const calls: string[] = [];
+    const result = await client({
+      fetch: (input) => {
+        calls.push(urlOf(input));
+        return jsonFetch(200, { meetings: [], month_count: 0 })(input);
+      },
+    }).listMeetings();
+
+    expect(result).toEqual({ ok: true, data: { meetings: [], month_count: 0 } });
+    expect(calls).toEqual([`${BASE_URL}/meetings`]);
+  });
+
+  it("regenerate POSTs, and a 409 answers in the route's own words", async () => {
+    const seen: { url: string; method: string | undefined }[] = [];
+    const result = await client({
+      fetch: (input, init) => {
+        seen.push({ url: urlOf(input), method: init?.method });
+        return jsonFetch(409, { error: "already_running" })(input, init);
+      },
+    }).regenerateNotes(MEETING_ID);
+
+    expect(seen).toEqual([
+      {
+        url: `${BASE_URL}/meetings/${MEETING_ID}/notes/regenerate`,
+        method: "POST",
+      },
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toContain("already being regenerated");
+    }
+  });
+
+  it("follow-up POSTs the tone and parses the draft", async () => {
+    const bodies: unknown[] = [];
+    const result = await client({
+      fetch: (input, init) => {
+        bodies.push(init?.body);
+        return jsonFetch(200, {
+          tone: "warm",
+          subject: "Great talking today",
+          body: "Hi — thanks for the call.",
+        })(input, init);
+      },
+    }).followUpDraft(MEETING_ID, "warm");
+
+    expect(bodies).toEqual([JSON.stringify({ tone: "warm" })]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.subject).toBe("Great talking today");
+    }
   });
 });

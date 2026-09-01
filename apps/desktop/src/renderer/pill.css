@@ -1252,3 +1252,204 @@ body {
   border: none;
   padding: 0;
 }
+
+/* ---- the notes view (a meeting unfolded: notes / transcript / follow-up) ---- */
+
+/* The refresh control inside the UPCOMING label — a bare glyph, pressable. */
+.history__refresh {
+  display: flex;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: var(--nova-ink-faint);
+  cursor: pointer;
+}
+
+.history__refresh:hover {
+  color: var(--nova-ink);
+}
+
+.history__group {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+.notesv__title {
+  flex: 1;
+  font: 700 14px var(--nova-font-display);
+  letter-spacing: 0.05em;
+  color: var(--nova-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notesv__tabs {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+
+.notesv__tab {
+  border: 1px solid var(--nova-ink-hairline);
+  background: transparent;
+  color: var(--nova-ink-faint);
+  font: 700 11px var(--mono);
+  letter-spacing: 0.1em;
+  padding: 6px 12px;
+  cursor: pointer;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+}
+
+.notesv__tab--on {
+  background: var(--nova-ink);
+  border-color: var(--nova-ink);
+  color: var(--nova-on-ink);
+}
+
+.notesv__body {
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 160px;
+  max-height: 460px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.notesv__body::-webkit-scrollbar {
+  width: 8px;
+}
+.notesv__body::-webkit-scrollbar-thumb {
+  background: var(--nova-ink-hairline);
+}
+.notesv__body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.notesv__state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 700 12px var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--nova-ink-faint);
+}
+
+.notesv__words {
+  margin: 0;
+  font: 400 14.5px/1.5 var(--sg);
+  color: var(--nova-ink-soft);
+}
+
+.notesv__tldr {
+  margin: 0;
+  font: 600 15.5px/1.5 var(--sg);
+  color: var(--nova-ink);
+}
+
+.notesv__section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notesv__label {
+  font: 700 10.5px var(--mono);
+  letter-spacing: 0.18em;
+  color: var(--nova-ink-faint);
+}
+
+.notesv__list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.notesv__item {
+  font: 400 14.5px/1.5 var(--sg);
+  color: var(--nova-ink);
+}
+
+.notesv__quote {
+  display: block;
+  padding-left: 10px;
+  border-left: 2px solid var(--nova-ink-hairline);
+  color: var(--nova-ink-soft);
+  font-style: italic;
+}
+
+.notesv__key {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: flex-start;
+  border: 1px solid var(--nova-ink);
+  background: var(--nova-ink);
+  color: var(--nova-on-ink);
+  font: 700 12.5px var(--sg);
+  padding: 8px 16px;
+  cursor: pointer;
+  clip-path: polygon(
+    8px 0,
+    100% 0,
+    100% calc(100% - 8px),
+    calc(100% - 8px) 100%,
+    0 100%,
+    0 8px
+  );
+}
+
+.notesv__key:disabled {
+  background: var(--nova-ink-fill);
+  border-color: transparent;
+  color: var(--nova-ink-faint);
+  cursor: default;
+}
+
+.notesv__foot-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.notesv__tones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.notesv__draft {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid var(--nova-ink-hairline);
+  background: var(--nova-ink-fill);
+  padding: 14px 16px;
+}
+
+.notesv__subject {
+  margin: 0;
+  font: 600 15px var(--sg);
+  color: var(--nova-ink);
+}
+
+.notesv__draft-body {
+  margin: 0;
+  font: 400 14.5px/1.55 var(--sg);
+  color: var(--nova-ink);
+  white-space: pre-wrap;
+}

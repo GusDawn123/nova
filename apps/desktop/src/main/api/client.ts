@@ -1,5 +1,19 @@
 import { z } from "zod";
-import { meResponseSchema, type MeResponse } from "@nova/shared";
+import {
+  followUpDraftSchema,
+  meetingListResponseSchema,
+  meetingTranscriptResponseSchema,
+  meResponseSchema,
+  notesReadResponseSchema,
+  regenerateResponseSchema,
+  type FollowUpDraft,
+  type FollowUpTone,
+  type MeetingListResponse,
+  type MeetingTranscriptResponse,
+  type MeResponse,
+  type NotesReadResponse,
+  type RegenerateResponse,
+} from "@nova/shared";
 
 import type { ApiResult } from "./errors";
 
@@ -47,6 +61,16 @@ export interface ApiClientDeps {
 
 export interface ApiClient {
   getMe(): Promise<ApiResult<MeResponse>>;
+  listMeetings(): Promise<ApiResult<MeetingListResponse>>;
+  meetingNotes(meetingId: string): Promise<ApiResult<NotesReadResponse>>;
+  meetingTranscript(
+    meetingId: string,
+  ): Promise<ApiResult<MeetingTranscriptResponse>>;
+  regenerateNotes(meetingId: string): Promise<ApiResult<RegenerateResponse>>;
+  followUpDraft(
+    meetingId: string,
+    tone: FollowUpTone,
+  ): Promise<ApiResult<FollowUpDraft>>;
 }
 
 /** The mobile app settled on the same budget for its list fetches. */
@@ -68,9 +92,23 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
     });
   const baseUrl = deps.baseUrl.replace(/\/+$/, "");
 
+  interface RequestOptions {
+    method?: "POST";
+    body?: unknown;
+    /**
+     * Route-specific words for statuses the generic table would flatten into
+     * "unexpected status" — a 409 on regenerate means "already running", and
+     * that sentence belongs to the route that knows it.
+     */
+    statusMessages?: Readonly<Record<number, string>>;
+  }
+
   async function request<T>(
     endpoint: string,
-    schema: z.ZodType<T>,
+    // The third parameter stays `unknown`: a response schema may carry
+    // `.default()` fields, whose INPUT type is looser than what they infer to.
+    schema: z.ZodType<T, z.ZodTypeDef, unknown>,
+    options: RequestOptions = {},
   ): Promise<ApiResult<T>> {
     // Inside its own guard: `getAccessToken` reaches into supabase-js, which
     // refreshes an expired token over the network and rejects when that fails.
@@ -112,11 +150,24 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
 
     try {
       const response = await deps.fetch(`${baseUrl}${endpoint}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        method: options.method ?? "GET",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          ...(options.body === undefined
+            ? {}
+            : { "Content-Type": "application/json" }),
+        },
+        ...(options.body === undefined
+          ? {}
+          : { body: JSON.stringify(options.body) }),
         signal: controller.signal,
       });
 
       if (!response.ok) {
+        const routeMessage = options.statusMessages?.[response.status];
+        if (routeMessage !== undefined) {
+          return { ok: false, kind: "server", message: routeMessage };
+        }
         return httpFailure(response.status);
       }
 
@@ -178,6 +229,42 @@ export function createApiClient(deps: ApiClientDeps): ApiClient {
 
   return {
     getMe: () => request("/me", meResponseSchema),
+    listMeetings: () => request("/meetings", meetingListResponseSchema),
+    meetingNotes: (meetingId) =>
+      request(
+        `/meetings/${encodeURIComponent(meetingId)}/notes`,
+        notesReadResponseSchema,
+      ),
+    meetingTranscript: (meetingId) =>
+      request(
+        `/meetings/${encodeURIComponent(meetingId)}/transcript`,
+        meetingTranscriptResponseSchema,
+      ),
+    regenerateNotes: (meetingId) =>
+      request(
+        `/meetings/${encodeURIComponent(meetingId)}/notes/regenerate`,
+        regenerateResponseSchema,
+        {
+          method: "POST",
+          statusMessages: {
+            409: "Notes are already being regenerated for this meeting.",
+            503: "Notes generation is not available right now.",
+          },
+        },
+      ),
+    followUpDraft: (meetingId, tone) =>
+      request(
+        `/meetings/${encodeURIComponent(meetingId)}/follow-up`,
+        followUpDraftSchema,
+        {
+          method: "POST",
+          body: { tone },
+          statusMessages: {
+            409: "Notes are not ready yet — the follow-up needs them first.",
+            503: "Follow-up drafting is not available right now.",
+          },
+        },
+      ),
   };
 }
 

@@ -10,24 +10,27 @@ import {
   ReturnIcon,
   SearchIcon,
 } from "../design/icons";
+import { useMeetings } from "../hooks/use-meetings";
+import { groupByDay, meetingDuration, meetingTime } from "./meeting-format";
 
 interface HistoryPanelProps {
   readonly onBack: () => void;
+  /** Open one meeting's notes. The panel only names the id; the app routes. */
+  readonly onOpenMeeting: (meetingId: string, title: string) => void;
 }
 
-/** A past or upcoming session row. Placeholder data until history is wired. */
-const SESSIONS = [
-  { title: "Weekend Crew Scheduling Call", duration: "4h 8m", time: "3:00 PM" },
-  { title: "Untitled session", duration: "1m", time: "10:30 AM" },
-  { title: "Untitled session", duration: "1m", time: "10:30 AM" },
-];
-
 /**
- * The pill unfolded into its history view — upcoming meetings and past
- * sessions, verbatim from the mockup. Every row is a dead end for now; the
- * back button and the footer chrome are the live parts.
+ * The pill unfolded into its history view — the real meetings list, in the
+ * mockup's exact geometry. Loading, failure and emptiness are all said in
+ * words on the same rows the data would occupy; the calendar row and the
+ * footer chrome keep their mockup role until their features land.
  */
-export function HistoryPanel({ onBack }: HistoryPanelProps): JSX.Element {
+export function HistoryPanel({
+  onBack,
+  onOpenMeeting,
+}: HistoryPanelProps): JSX.Element {
+  const { state, reload } = useMeetings();
+
   return (
     <div className="history">
       <div className="history__head">
@@ -48,7 +51,14 @@ export function HistoryPanel({ onBack }: HistoryPanelProps): JSX.Element {
       <div className="history__body">
         <span className="history__label">
           UPCOMING
-          <RefreshIcon />
+          <button
+            type="button"
+            className="history__refresh nd"
+            title="Refresh sessions"
+            onClick={reload}
+          >
+            <RefreshIcon />
+          </button>
         </span>
         <div className="history__row history__row--filled nd" role="button">
           <span className="history__row-icon">
@@ -57,27 +67,76 @@ export function HistoryPanel({ onBack }: HistoryPanelProps): JSX.Element {
           <span className="history__row-title">Connect your calendar</span>
         </div>
 
-        <span className="history__label history__label--dated">
-          FRI, AUG 14, 2026
-        </span>
-        {SESSIONS.map((session, index) => (
-          <div
-            key={`${session.title}-${String(index)}`}
-            className={
-              index === 0
-                ? "history__row history__row--filled nd"
-                : "history__row nd"
-            }
-            role="button"
-          >
-            <span className="history__row-icon">
-              <DocIcon />
+        {state.status === "loading" && (
+          <span className="history__label history__label--dated">LOADING…</span>
+        )}
+
+        {state.status === "error" && (
+          <>
+            <span className="history__label history__label--dated">
+              SESSIONS
             </span>
-            <span className="history__row-title">{session.title}</span>
-            <span className="history__duration">{session.duration}</span>
-            <span className="history__time">{session.time}</span>
-          </div>
-        ))}
+            <div className="history__row nd">
+              <span className="history__row-title">{state.message}</span>
+            </div>
+            <button
+              type="button"
+              className="history__row history__row--filled nd"
+              onClick={reload}
+            >
+              <span className="history__row-icon">
+                <RefreshIcon />
+              </span>
+              <span className="history__row-title">Try again</span>
+            </button>
+          </>
+        )}
+
+        {state.status === "success" && state.meetings.length === 0 && (
+          <>
+            <span className="history__label history__label--dated">
+              SESSIONS
+            </span>
+            <div className="history__row nd">
+              <span className="history__row-title">
+                No sessions yet — your first call's notes will land here.
+              </span>
+            </div>
+          </>
+        )}
+
+        {state.status === "success" &&
+          groupByDay(state.meetings).map((group) => (
+            <div key={group.label} className="history__group">
+              <span className="history__label history__label--dated">
+                {group.label}
+              </span>
+              {group.items.map((meeting) => {
+                const duration = meetingDuration(meeting);
+                return (
+                  <button
+                    key={meeting.id}
+                    type="button"
+                    className="history__row nd"
+                    onClick={() => {
+                      onOpenMeeting(meeting.id, meeting.title);
+                    }}
+                  >
+                    <span className="history__row-icon">
+                      <DocIcon />
+                    </span>
+                    <span className="history__row-title">{meeting.title}</span>
+                    {duration !== null && (
+                      <span className="history__duration">{duration}</span>
+                    )}
+                    <span className="history__time">
+                      {meetingTime(meeting)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         <div className="history__spacer" />
       </div>
 

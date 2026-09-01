@@ -1,8 +1,14 @@
 import { z } from "zod";
 import {
+  followUpDraftSchema,
+  followUpToneSchema,
   liveModeSchema,
   liveModelSchema,
+  meetingListResponseSchema,
+  meetingTranscriptResponseSchema,
   meResponseSchema,
+  notesReadResponseSchema,
+  regenerateResponseSchema,
 } from "@nova/shared";
 
 import { apiErrorKindSchema } from "../api/errors";
@@ -56,16 +62,70 @@ export const authResultMessageSchema = authActionResultSchema;
 export const authStateMessageSchema = authStateSchema;
 export type AuthStateMessage = z.infer<typeof authStateMessageSchema>;
 
+/**
+ * The one shape every api answer crosses the bridge in: the client's
+ * `ApiResult`, composed from the schema that owns the success payload. Written
+ * as a factory so five endpoints cannot drift into five slightly different
+ * failure shapes.
+ */
+function apiResultMessage<T extends z.ZodTypeAny>(dataSchema: T) {
+  return z.discriminatedUnion("ok", [
+    z.object({ ok: z.literal(true), data: dataSchema }),
+    z.object({
+      ok: z.literal(false),
+      kind: apiErrorKindSchema,
+      message: z.string(),
+    }),
+  ]);
+}
+
 /** main → renderer: the answer to `apiGetMe`. */
-export const meResultMessageSchema = z.discriminatedUnion("ok", [
-  z.object({ ok: z.literal(true), data: meResponseSchema }),
-  z.object({
-    ok: z.literal(false),
-    kind: apiErrorKindSchema,
-    message: z.string(),
-  }),
-]);
+export const meResultMessageSchema = apiResultMessage(meResponseSchema);
 export type MeResultMessage = z.infer<typeof meResultMessageSchema>;
+
+/** renderer → main: which meeting a notes/transcript/regenerate ask is about. */
+export const meetingIdMessageSchema = z
+  .object({ meetingId: z.string().uuid() })
+  .strict();
+export type MeetingIdMessage = z.infer<typeof meetingIdMessageSchema>;
+
+/** renderer → main: the follow-up ask — a meeting and the voice to write in. */
+export const followUpAskMessageSchema = z
+  .object({ meetingId: z.string().uuid(), tone: followUpToneSchema })
+  .strict();
+export type FollowUpAskMessage = z.infer<typeof followUpAskMessageSchema>;
+
+/** main → renderer: the answers to the meetings/notes surface. */
+export const meetingsListResultMessageSchema = apiResultMessage(
+  meetingListResponseSchema,
+);
+export type MeetingsListResultMessage = z.infer<
+  typeof meetingsListResultMessageSchema
+>;
+
+export const meetingNotesResultMessageSchema = apiResultMessage(
+  notesReadResponseSchema,
+);
+export type MeetingNotesResultMessage = z.infer<
+  typeof meetingNotesResultMessageSchema
+>;
+
+export const meetingTranscriptResultMessageSchema = apiResultMessage(
+  meetingTranscriptResponseSchema,
+);
+export type MeetingTranscriptResultMessage = z.infer<
+  typeof meetingTranscriptResultMessageSchema
+>;
+
+export const regenerateResultMessageSchema = apiResultMessage(
+  regenerateResponseSchema,
+);
+export type RegenerateResultMessage = z.infer<
+  typeof regenerateResultMessageSchema
+>;
+
+export const followUpResultMessageSchema = apiResultMessage(followUpDraftSchema);
+export type FollowUpResultMessage = z.infer<typeof followUpResultMessageSchema>;
 
 /**
  * Both directions of the undetectability toggle. One boolean, strict both
